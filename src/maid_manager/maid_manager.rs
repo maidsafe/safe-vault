@@ -34,6 +34,20 @@ impl MaidManager {
     MaidManager { db_: database::MaidManagerDatabase::new() }
   }
 
+  // pub fn handle_create_account(&mut self,
+  //                              public_maid: &maidsafe_types::public_maid::PublicMaid,
+  //                              public_anmaid: &maidsafe_types::public_an_maid::PublicAnMaid,
+  //                              space_offered: usize) {
+  //     // let maid_name: Vec<Address> = Vec::with_capacity(64);
+  //     // maid_name.push_all(&public_maid.get_name());
+  //     // assert!(db_.exist(&maid_name));
+
+  //     // let mut d = Decoder::from_bytes(&maid_name[..]);
+  //     // let immutable_data: maidsafe_types::ImmutableData = d.decode().next().unwrap().unwrap();
+  //     // let data_name = self::routing::types::array_as_vector(&immutable_data.get_name().get_id());
+  //     // db_.put_data(
+  // }
+
   pub fn handle_put(&mut self, from : &routing::types::Address, data : &Vec<u8>) ->Result<routing::Action, routing::RoutingError> {
     // TODO the data_type shall be passed down or data needs to be name + content
     //      here assuming data is serialised_data of ImmutableData
@@ -49,5 +63,29 @@ impl MaidManager {
     destinations.push(routing::DhtIdentity { id : immutable_data.get_name().get_id() });
 
     Ok(routing::Action::SendOn(destinations))
+  }
+
+  pub fn handle_churn(&mut self, close_group_difference: &CloseGroupDifference) {
+      let old_accounts = close_group_difference.0.clone();
+      for old_account in &old_accounts {
+          let mut d = Decoder::from_bytes(&old_account[..]);
+          let immutable_data: maidsafe_types::ImmutableData = d.decode().next().unwrap().unwrap();
+          let data_name = self::routing::types::array_as_vector(&immutable_data.get_name().get_id());
+
+          self.db_.delete_data(old_account, data_name.len() as u64);
+      }
+
+      let send_accounts = close_group_difference.1.clone();
+      for send_account in &send_accounts {
+          let mut d = Decoder::from_bytes(&send_account[..]);
+          let immutable_data: maidsafe_types::ImmutableData = d.decode().next().unwrap().unwrap();
+          let data_name = self::routing::types::array_as_vector(&immutable_data.get_name().get_id());
+
+          self.db_.delete_data(send_account, data_name.len() as u64);
+      }
+  }
+
+  pub fn has_account(&mut self, name: &routing::types::Identity) -> bool {
+      self.db_.exist(name)
   }
 }
