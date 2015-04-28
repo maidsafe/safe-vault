@@ -25,6 +25,7 @@ use cbor;
 
 type Identity = NameType; // maid node address
 
+#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug)]
 pub struct MaidManagerAccount {
   data_stored : u64,
   space_available : u64
@@ -39,48 +40,39 @@ impl Clone for MaidManagerAccount {
     }
 }
 
-impl Encodable for MaidManagerAccount {
-    fn encode<E: Encoder>(&self, e: &mut E)->Result<(), E::Error> {
-        cbor::CborTagEncode::new(5483_002, &(
-            self.data_stored,
-            self.space_available)).encode(e)
-    }
-}
-
-impl Decodable for MaidManagerAccount {
-    fn decode<D: Decoder>(d: &mut D)-> Result<MaidManagerAccount, D::Error> {
-        try!(d.read_u64());
-        let (data_stored, space_available) : (u64, u64) = try!(Decodable::decode(d));
-        Ok(MaidManagerAccount {data_stored: data_stored, space_available: space_available })
-    }
-}
-
-
-
 impl MaidManagerAccount {
-  pub fn new() -> MaidManagerAccount {
-    // FIXME : to bypass the AccountCreation process for simple network allownance is granted automatically
-    MaidManagerAccount { data_stored: 0, space_available: 1073741824 }
-  }
-
-  pub fn put_data(&mut self, size : u64) -> bool {
-    if size > self.space_available {
-      return false;
+    pub fn new() -> MaidManagerAccount {
+        // FIXME : to bypass the AccountCreation process for simple network allownance is granted automatically
+        MaidManagerAccount { data_stored: 0, space_available: 1073741824 }
     }
-    self.data_stored += size;
-    self.space_available -= size;
-    true
-  }
 
-  pub fn delete_data(&mut self, size : u64) {
-    if self.data_stored < size {
-      self.space_available += self.data_stored;
-      self.data_stored = 0;
-    } else {
-      self.data_stored -= size;
-      self.space_available += size;
+    pub fn put_data(&mut self, size : u64) -> bool {
+        if size > self.space_available {
+            return false;
+        }
+        self.data_stored += size;
+        self.space_available -= size;
+        true
     }
-  }
+
+    pub fn delete_data(&mut self, size : u64) {
+        if self.data_stored < size {
+            self.space_available += self.data_stored;
+            self.data_stored = 0;
+        } else {
+            self.data_stored -= size;
+            self.space_available += size;
+        }
+    }
+
+    pub fn get_available_space(&self) -> u64 {
+      self.space_available.clone()
+    }
+
+
+    pub fn get_data_stored(&self) -> u64 {
+        self.data_stored.clone()
+    }
 
 }
 
@@ -102,7 +94,7 @@ impl MaidManagerDatabase {
     let entry = self.storage.remove(name.clone());
   	if entry.is_some() {
   	  tmp = entry.unwrap();
-  	} 
+  	}
     let result = tmp.put_data(size);
     self.storage.add(name.clone(), tmp);
     result
@@ -136,8 +128,9 @@ impl MaidManagerDatabase {
 
 #[cfg(test)]
 mod test {
-  use super::*;  
+  use super::*;
   use routing;
+  use cbor;
 
   #[test]
   fn exist() {
@@ -181,6 +174,19 @@ mod test {
     assert_eq!(db.exist(&name), true);
     assert_eq!(db.put_data(&name, 1073741825), false);
     assert_eq!(db.put_data(&name, 1073741824), true);
+  }
+
+  #[test]
+  fn maid_manager_account_serialisation() {
+      let obj_before = MaidManagerAccount::new();
+
+       let mut e = cbor::Encoder::from_memory();
+       e.encode(&[&obj_before]).unwrap();
+
+       let mut d = cbor::Decoder::from_bytes(e.into_bytes());
+       let obj_after: MaidManagerAccount = d.decode().next().unwrap().unwrap();
+
+       assert_eq!(obj_before, obj_after);
   }
 
 }
