@@ -69,7 +69,7 @@ impl DataManagerDatabase {
             if nodes[i] == pmid_node {
               nodes.remove(i);
               break;
-            }
+            }            
         }
     }
 

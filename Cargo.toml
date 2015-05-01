@@ -16,5 +16,7 @@ cbor = "*"
 time = "*"
 sodiumoxide = "0.0.4"
 rand = "*"
-routing = "0.1.31"
-maidsafe_types = "0.1.2"
+[dependencies.routing]
+path="../routing"
+[dependencies.maidsafe_types]
+path="../maidsafe_types"

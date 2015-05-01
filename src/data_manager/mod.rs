@@ -42,7 +42,7 @@ impl DataManager {
 	  if result.len() == 0 {
 	    return Err(routing::RoutingError::NoData);
 	  }
-      
+
 	  let mut dest_pmids : Vec<NameType> = Vec::new();
 	  for pmid in result.iter() {
         dest_pmids.push(pmid.clone());
@@ -50,7 +50,7 @@ impl DataManager {
 	  Ok(routing::Action::SendOn(dest_pmids))
   }
 
-  pub fn handle_put(&mut self, data : &Vec<u8>, nodes_in_table : &mut Vec<NameType>) ->Result<routing::Action, routing::RoutingError> {    
+  pub fn handle_put(&mut self, data : &Vec<u8>, nodes_in_table : &mut Vec<NameType>) ->Result<routing::Action, routing::RoutingError> {
     let mut name : routing::NameType;
     let mut d = Decoder::from_bytes(&data[..]);
     let payload: maidsafe_types::Payload = d.decode().next().unwrap().unwrap();

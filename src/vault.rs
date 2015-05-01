@@ -27,7 +27,8 @@ use maid_manager::MaidManager;
 use pmid_manager::PmidManager;
 use pmid_node::PmidNode;
 use version_handler::VersionHandler;
-use routing::node_interface::RoutingNodeAction;
+use routing::node_interface::{ Interface, RoutingNodeAction };
+
 
 /// Main struct to hold all personas
 pub struct VaultFacade {
@@ -45,7 +46,7 @@ impl Clone for VaultFacade {
     }
 }
 
-impl routing::node_interface::Interface for VaultFacade {
+impl Interface for VaultFacade {
     fn handle_get(&mut self, type_id: u64, name: NameType, our_authority: Authority, from_authority: Authority,
                 from_address: NameType)->Result<Action, RoutingError> {
         match our_authority {
@@ -61,6 +62,11 @@ impl routing::node_interface::Interface for VaultFacade {
             Authority::ManagedNode => { return self.pmid_node.handle_get(name); }
             _ => { return Err(RoutingError::InvalidRequest); }
         }
+    }
+
+    fn handle_get_key(&mut self, type_id: u64, name: NameType, our_authority: Authority, from_authority: Authority,
+                from_address: NameType)->Result<Action, RoutingError> {
+        unimplemented!();
     }
 
     fn handle_put(&mut self, our_authority: Authority, from_authority: Authority,
@@ -88,7 +94,8 @@ impl routing::node_interface::Interface for VaultFacade {
         Err(RoutingError::InvalidRequest)
     }
 
-    fn handle_get_response(&mut self, from_address: NameType, response: Result<Vec<u8>, RoutingError>) -> routing::node_interface::RoutingNodeAction {
+    fn handle_get_response(&mut self, from_address: NameType, response: Result<Vec<u8>,
+         RoutingError>) -> RoutingNodeAction {
         if response.is_ok() {
             self.data_manager.handle_get_response(response.ok().unwrap())
         } else {
@@ -110,7 +117,8 @@ impl routing::node_interface::Interface for VaultFacade {
         let mut pm = self.pmid_manager.retrieve_all_and_reset(&close_group);
         let mut dm = self.data_manager.retrieve_all_and_reset(&mut close_group);
 
-        dm.into_iter().chain(mm.into_iter().chain(pm.into_iter().chain(vh.into_iter()))).collect()
+        //dm.into_iter().chain(mm.into_iter().chain(pm.into_iter().chain(vh.into_iter()))).collect()
+        vec![RoutingNodeAction::None]
     }
 
     fn handle_cache_get(&mut self,
@@ -369,7 +377,7 @@ impl VaultFacade {
     //        for i in 10..30 {
     //            close_group.push(available_nodes[i].clone());
     //        }
-    //        
+    //
     //        let churn_data = vault.handle_churn(close_group);
     //        assert_eq!(churn_data.len(), 1);
     //        assert!(churn_data[0].name() == data.name().clone());
