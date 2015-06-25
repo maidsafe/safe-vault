@@ -23,10 +23,11 @@ use cbor::Decoder;
 use routing::NameType;
 use routing::types::MessageAction;
 use routing::error::{ResponseError, InterfaceError};
-use maidsafe_types;
+use maidsafe_types::data_tags;
 use routing::node_interface::MethodCall;
 use routing::sendable::Sendable;
 pub use self::database::{MaidManagerAccountWrapper, MaidManagerAccount};
+use data_parser::Data;
 
 type Address = NameType;
 
@@ -39,48 +40,53 @@ impl MaidManager {
     MaidManager { db_: database::MaidManagerDatabase::new() }
   }
 
-  pub fn handle_put(&mut self, from : &NameType, data : &Vec<u8>) ->Result<MessageAction, InterfaceError> {
-    let mut d = Decoder::from_bytes(&data[..]);
-    let payload: maidsafe_types::Payload = d.decode().next().unwrap().unwrap();
-    let mut destinations : Vec<NameType> = Vec::new();
-    match payload.get_type_tag() {
-      maidsafe_types::PayloadTypeTag::StructuredData => {
-        let structured_data : maidsafe_types::StructuredData = payload.get_data();
-        if !self.db_.put_data(from, structured_data.value().len() as u64) {
+  pub fn handle_put(&mut self, from : &NameType, serialised_data : &Vec<u8>) ->Result<MessageAction, InterfaceError> {
+      let data : Box<Sendable>;
+      let mut destinations : Vec<NameType> = Vec::new();
+      let mut free_of_charge = false;
+      let mut suppress_error = false;
+      let mut decoder = Decoder::from_bytes(&serialised_data[..]);
+      if let Some(parsed_data) = decoder.decode().next().and_then(|result| result.ok()) {
+          match parsed_data {
+              Data::Immutable(parsed) => data = Box::new(parsed),
+              Data::ImmutableBackup(parsed) => {
+                  data = Box::new(parsed);
+                  suppress_error = true;
+              },
+              Data::ImmutableSacrificial(parsed) => {
+                  data = Box::new(parsed);
+                  suppress_error = true;
+              },
+              Data::Structured(parsed) => data = Box::new(parsed),
+              Data::PublicMaid(parsed) => {
+                  data = Box::new(parsed);
+                  free_of_charge = true;
+              },
+              Data::PublicMpid(parsed) => {
+                  data = Box::new(parsed);
+                  free_of_charge = true;
+              },
+              _ => return Err(From::from(ResponseError::InvalidRequest)),
+          }
+      } else {
           return Err(From::from(ResponseError::InvalidRequest));
-        }
-        destinations.push(NameType::new(structured_data.name().get_id()));
       }
-      maidsafe_types::PayloadTypeTag::ImmutableData => {
-        let immutable_data : maidsafe_types::ImmutableData = payload.get_data();
-        if !self.db_.put_data(from, immutable_data.value().len() as u64) {
-          return Err(From::from(ResponseError::InvalidRequest));
-        }
-        destinations.push(NameType::new(immutable_data.name().get_id()));
+
+      let data_name = data.name();
+      // FIXME: is there a direct way to get to the data length? (this call re-encodes it)
+      let data_length = data.serialised_contents().len() as u64;
+
+      if !self.db_.put_data(from, data_length)
+          && !free_of_charge {
+          if !suppress_error {
+              // FIXME: report clear payment error ?
+              return Err(From::from(ResponseError::InvalidRequest));
+          } else {
+              return Err(InterfaceError::Abort);
+          }
       }
-      // The assumption here is Backup and Sacrificial copies incur storage charge.
-      // However, in case of not enough allownance, no put_failure being sent back, just abort the flow
-      maidsafe_types::PayloadTypeTag::ImmutableDataBackup => {
-        let backup_data : maidsafe_types::ImmutableDataBackup = payload.get_data();
-        if !self.db_.put_data(from, backup_data.value().len() as u64) {
-          return Err(InterfaceError::Abort);
-        }
-        destinations.push(NameType::new(backup_data.name().get_id()));
-      }
-      maidsafe_types::PayloadTypeTag::ImmutableDataSacrificial => {
-        let sacrificial_data : maidsafe_types::ImmutableDataSacrificial = payload.get_data();
-        if !self.db_.put_data(from, sacrificial_data.value().len() as u64) {
-          return Err(InterfaceError::Abort);
-        }
-        destinations.push(NameType::new(sacrificial_data.name().get_id()));
-      }
-      maidsafe_types::PayloadTypeTag::PublicMaid => {
-        // PublicMaid doesn't use any allowance
-        destinations.push(NameType::new(payload.get_data::<maidsafe_types::PublicIdType>().name().get_id()));
-      }
-      _ => return Err(From::from(ResponseError::InvalidRequest))
-    }
-    Ok(MessageAction::SendOn(destinations))
+      destinations.push(data_name);
+      Ok(MessageAction::SendOn(destinations))
   }
 
   pub fn handle_account_transfer(&mut self, payload : maidsafe_types::Payload) {
