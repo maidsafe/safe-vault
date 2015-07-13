@@ -17,8 +17,12 @@ time = "*"
 sodiumoxide = "*"
 lru_time_cache = "0.2.*"
 crust = "0.1.*"
-routing = "0.2.*"
-maidsafe_types = "0.2.*"
+
+[dependencies.routing]
+git = "https://github.com/maqi/routing.git"
+
+[dependencies.maidsafe_types]
+git = "https://github.com/maqi/maidsafe_types.git"
 
 [dev-dependencies]
 rand = "*"
