@@ -15,15 +15,11 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(dead_code)]
-
 use cbor;
 use rustc_serialize::{Decoder, Encodable, Encoder};
 use std::collections;
 
-use routing_types::*;
 use transfer_parser::transfer_tags::MAID_MANAGER_ACCOUNT_TAG;
-use utils::{median, encode, decode};
 
 type Identity = NameType; // maid node address
 
@@ -198,11 +194,8 @@ impl MaidManagerDatabase {
 
 #[cfg(test)]
 mod test {
-    use cbor;
-
     use super::*;
-
-    use routing_types::*;
+    use cbor;
 
     #[test]
     fn exist() {

@@ -15,11 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(dead_code)]
-
 use chunk_store::ChunkStore;
-use routing_types::*;
-use utils::{encode, decode};
 
 pub struct PmidNode {
     chunk_store_ : ChunkStore
@@ -84,8 +80,6 @@ impl PmidNode {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    use routing_types::*;
 
     #[test]
     fn handle_put_get() {

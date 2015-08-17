@@ -15,21 +15,17 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(dead_code)]
-
 mod database;
 
 use std::cmp;
 use cbor;
 use rustc_serialize::Encodable;
 
-use routing_types::*;
 use transfer_parser::transfer_tags::DATA_MANAGER_STATS_TAG;
-use utils::{median, encode, decode};
 
 type Address = NameType;
 
-pub use self::database::DataManagerSendable;
+pub use self::database::Account;
 
 pub static PARALLELISM: usize = 4;
 
@@ -88,7 +84,7 @@ impl Sendable for DataManagerStatsSendable {
         }
         assert!(resource_indexes.len() < (GROUP_SIZE + 1) / 2);
         Some(Box::new(DataManagerStatsSendable::new(NameType([0u8; 64]),
-                                                    median(resource_indexes))))
+                                                    utils::median(resource_indexes))))
     }
 }
 
@@ -152,7 +148,7 @@ impl DataManager {
               vec![MethodCall::Put { destination: pmid_node, content: response, }]
           },
           None => vec![]
-      }      
+      }
   }
 
   pub fn handle_put_response(&mut self, response: ResponseError,
@@ -190,7 +186,7 @@ impl DataManager {
       vec![]
   }
 
-  pub fn handle_account_transfer(&mut self, merged_account: DataManagerSendable) {
+  pub fn handle_account_transfer(&mut self, merged_account: Account) {
       self.db_.handle_account_transfer(&merged_account);
   }
 
@@ -246,9 +242,7 @@ impl DataManager {
 #[cfg(test)]
 mod test {
     use super::{DataManager, DataManagerStatsSendable};
-    use super::database::DataManagerSendable;
-
-    use routing_types::*;
+    use super::database::Account;
 
     #[test]
     fn handle_put_get() {
@@ -292,7 +286,7 @@ mod test {
     fn handle_account_transfer() {
         let mut data_manager = DataManager::new();
         let name = NameType(vector_as_u8_64_array(generate_random_vec_u8(64)));
-        let account_wrapper = DataManagerSendable::new(name.clone(), vec![]);
+        let account_wrapper = Account::new(name.clone(), vec![]);
         data_manager.handle_account_transfer(account_wrapper);
         assert_eq!(data_manager.db_.exist(&name), true);
     }

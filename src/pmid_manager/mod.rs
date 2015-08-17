@@ -15,11 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(dead_code)]
-
 mod database;
-
-use routing_types::*;
 
 pub use self::database::{PmidManagerAccountWrapper, PmidManagerAccount};
 
@@ -68,8 +64,6 @@ impl PmidManager {
 mod test {
   use super::database::{PmidManagerAccount, PmidManagerAccountWrapper};
   use super::PmidManager;
-
-  use routing_types::*;
 
   #[test]
   fn handle_put() {

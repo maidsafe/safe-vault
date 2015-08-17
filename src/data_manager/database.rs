@@ -15,84 +15,36 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(dead_code)]
-
 use cbor;
-use rustc_serialize::Encodable;
-use std::collections::HashMap;
 
-use routing_types::*;
 use transfer_parser::transfer_tags::DATA_MANAGER_ACCOUNT_TAG;
-use utils::{encode, decode};
 
-type Identity = NameType; // name of the chunk
-type PmidNode = NameType;
+type DataName = ::routing::NameType;  // name of the chunk
+type PmidNode = ::routing::NameType;
 
 pub type PmidNodes = Vec<PmidNode>;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
-pub struct DataManagerSendable {
-    name: NameType,
+pub struct Account {
+    name: DataName,
     data_holders: PmidNodes,
-    preserialised_content: Vec<u8>,
-    has_preserialised_content: bool,
 }
 
-impl DataManagerSendable {
-    pub fn new(name: NameType, data_holders: PmidNodes) -> DataManagerSendable {
-        DataManagerSendable {
+impl Account {
+    pub fn new(name: DataName, data_holders: PmidNodes) -> Account {
+        Account {
             name: name,
             data_holders: data_holders,
-            preserialised_content: Vec::new(),
-            has_preserialised_content: false,
         }
     }
 
-    pub fn with_content(name: NameType, preserialised_content: Vec<u8>) -> DataManagerSendable {
-        DataManagerSendable {
-            name: name,
-            data_holders: PmidNodes::new(),
-            preserialised_content: preserialised_content,
-            has_preserialised_content: true,
-        }
-    }
-
-    pub fn get_data_holders(&self) -> PmidNodes {
-        self.data_holders.clone()
-    }
-}
-
-impl Sendable for DataManagerSendable {
-    fn name(&self) -> NameType {
-        self.name.clone()
-    }
-
-    fn type_tag(&self) -> u64 {
-        DATA_MANAGER_ACCOUNT_TAG
-    }
-
-    fn serialised_contents(&self) -> Vec<u8> {
-        if self.has_preserialised_content {
-            self.preserialised_content.clone()
-        } else {
-            match encode(&self) {
-                Ok(result) => result,
-                Err(_) => Vec::new()
-            }
-        }
-    }
-
-    fn refresh(&self)->bool {
-        true
-    }
-
-    fn merge(&self, responses: Vec<Box<Sendable>>) -> Option<Box<Sendable>> {
+    fn merge(responses: Vec<Box<Account>>) -> Option<Box<Account>> {
         if responses.len() == GROUP_SIZE - 1 {
             return None;
         }
         let mut stats = Vec::<(PmidNodes, u64)>::new();
         for it in responses.iter() {
-            let wrapper = match decode::<DataManagerSendable>(&it.serialised_contents()) {
+            let wrapper = match decode::<Account>(&it.serialised_contents()) {
                     Ok(result) => result,
                     Err(_) => { continue }
                 };
@@ -107,46 +59,45 @@ impl Sendable for DataManagerSendable {
         stats.sort_by(|a, b| b.1.cmp(&a.1));
         let (pmids, count) = stats[0].clone();
         if count < (GROUP_SIZE as u64 + 1) / 2 {
-            return Some(Box::new(DataManagerSendable::new(self.name.clone(), pmids)));
+            return Some(Box::new(Account::new(self.name.clone(), pmids)));
         }
         None
     }
-
 }
 
 
 
 pub struct DataManagerDatabase {
-    storage : HashMap<Identity, PmidNodes>,
+    storage : ::std::collections::HashMap<DataName, PmidNodes>,
     pub close_grp_from_churn: Vec<NameType>,
-    pub temp_storage_after_churn: HashMap<NameType, PmidNodes>,
+    pub temp_storage_after_churn: ::std::collections::HashMap<NameType, PmidNodes>,
 }
 
 impl DataManagerDatabase {
     pub fn new () -> DataManagerDatabase {
         DataManagerDatabase {
-            storage: HashMap::with_capacity(10000),
+            storage: ::std::collections::HashMap::with_capacity(10000),
             close_grp_from_churn: Vec::new(),
-            temp_storage_after_churn: HashMap::new(),
+            temp_storage_after_churn: ::std::collections::HashMap::new(),
         }
     }
 
-    pub fn exist(&mut self, name : &Identity) -> bool {
+    pub fn exist(&mut self, name : &DataName) -> bool {
         self.storage.contains_key(name)
     }
 
-    pub fn put_pmid_nodes(&mut self, name : &Identity, pmid_nodes: PmidNodes) {
+    pub fn put_pmid_nodes(&mut self, name : &DataName, pmid_nodes: PmidNodes) {
         self.storage.entry(name.clone()).or_insert(pmid_nodes.clone());
     }
 
-    pub fn add_pmid_node(&mut self, name : &Identity, pmid_node: PmidNode) {
+    pub fn add_pmid_node(&mut self, name : &DataName, pmid_node: PmidNode) {
         let nodes = self.storage.entry(name.clone()).or_insert(vec![pmid_node.clone()]);
         if !nodes.contains(&pmid_node) {
             nodes.push(pmid_node);
         }
     }
 
-    pub fn remove_pmid_node(&mut self, name : &Identity, pmid_node: PmidNode) {
+    pub fn remove_pmid_node(&mut self, name : &DataName, pmid_node: PmidNode) {
         if !self.storage.contains_key(name) {
             return;
         }
@@ -159,15 +110,14 @@ impl DataManagerDatabase {
         }
     }
 
-    pub fn get_pmid_nodes(&mut self, name : &Identity) -> PmidNodes {
+    pub fn get_pmid_nodes(&mut self, name : &DataName) -> PmidNodes {
         match self.storage.get(&name) {
             Some(entry) => entry.clone(),
             None => Vec::<PmidNode>::new()
         }
     }
 
-
-    pub fn handle_account_transfer(&mut self, account_wrapper : &DataManagerSendable) {
+    pub fn handle_account_transfer(&mut self, account_wrapper : &Account) {
         // TODO: Assuming the incoming merged account entry has the priority and shall also be trusted first
         let _ = self.storage.remove(&account_wrapper.name());
         self.storage.insert(account_wrapper.name(), account_wrapper.get_data_holders());
@@ -204,7 +154,7 @@ impl DataManagerDatabase {
                 }}
                 None => continue
             }
-            let data_manager_sendable = DataManagerSendable::new((*key).clone(), (*value).clone());
+            let data_manager_sendable = Account::new((*key).clone(), (*value).clone());
             let mut encoder = cbor::Encoder::from_memory();
             if encoder.encode(&[data_manager_sendable.clone()]).is_ok() {
                 actions.push(MethodCall::Refresh {
@@ -222,7 +172,6 @@ impl DataManagerDatabase {
 #[cfg(test)]
 mod test {
   use super::*;
-  use routing_types::*;
 
   #[test]
   fn exist() {
@@ -330,7 +279,7 @@ mod test {
     db.put_pmid_nodes(&data_name, pmid_nodes.clone());
     assert_eq!(db.get_pmid_nodes(&data_name).len(), pmid_nodes.len());
 
-    db.handle_account_transfer(&DataManagerSendable::new(data_name.clone(), vec![]));
+    db.handle_account_transfer(&Account::new(data_name.clone(), vec![]));
     assert_eq!(db.get_pmid_nodes(&data_name).len(), 0);
   }
 }

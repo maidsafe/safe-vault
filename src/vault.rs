@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![deny(missing_docs)]
-
 use std::convert::From;
 
 use time::Duration;
@@ -25,9 +23,7 @@ use rustc_serialize::{Decodable, Encodable};
 
 use lru_time_cache::LruCache;
 
-use routing_types::*;
-
-use data_manager::{DataManager, DataManagerSendable, DataManagerStatsSendable};
+use data_manager::{DataManager, DataManagerStatsSendable};
 use maid_manager::{MaidManager, MaidManagerAccountWrapper, MaidManagerAccount};
 use pmid_manager::{PmidManager, PmidManagerAccountWrapper, PmidManagerAccount};
 use pmid_node::PmidNode;
@@ -178,7 +174,7 @@ impl Interface for VaultFacade {
     }
 
     // https://maidsafe.atlassian.net/browse/MAID-1111 post_response is not required on vault
-    fn handle_post_response(&mut self, 
+    fn handle_post_response(&mut self,
                             _: Authority, // from_authority
                             _: SourceAddress, // from_address
                             _: ResponseError) -> Vec<MethodCall> { // response
@@ -209,7 +205,7 @@ impl Interface for VaultFacade {
                 self.maid_manager.handle_account_transfer(merged_account);
             },
             DATA_MANAGER_ACCOUNT_TAG => {
-                let merged_account = merge_refreshable(DataManagerSendable::new(from_group, vec![]),
+                let merged_account = merge_refreshable(data_manager::Account::new(from_group, vec![]),
                                                        payloads);
                 self.data_manager.handle_account_transfer(merged_account);
             },
@@ -345,16 +341,15 @@ impl VaultFacade {
 
 #[cfg(test)]
  mod test {
+    use super::*;
     use std::convert::From;
 
     use cbor;
     use sodiumoxide::crypto;
 
-    use super::*;
     use data_manager;
     use transfer_parser::{Transfer, transfer_tags};
     use utils::decode;
-    use routing_types::*;
 
     fn maid_manager_put(vault: &mut VaultFacade, from: SourceAddress,
                         dest: DestinationAddress, im_data: ImmutableData) {
@@ -408,7 +403,7 @@ impl VaultFacade {
         assert_eq!(calls.len(), 1);
         match calls[0] {
             MethodCall::Forward { destination } => {
-                assert_eq!(destination, dest_address);                
+                assert_eq!(destination, dest_address);
             }
             _ => panic!("Unexpected"),
         }
@@ -546,7 +541,7 @@ impl VaultFacade {
         let mut sd_new = StructuredData::new(0, name, value.clone(), vec![keys1.0], 1, vec![keys2.0], vec![]);
         assert_eq!(sd_new.add_signature(&keys1.1).ok(), Some(0));
         sd_manager_post(&mut vault, from.clone(), dest.clone(), sd_new.clone());
-        
+
         sd_manager_get(&mut vault, from.clone(), StructuredData::compute_name(0, &name), sd_new);
     }
 
