@@ -15,14 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(unsafe_code, unused)] // TODO Remove the unused attribute later
-
-pub mod mock_routing_types;
-
 use std::io::{Read, Write};
 use sodiumoxide::crypto;
-
-use self::mock_routing_types::*;
 
 type DataStore = ::std::sync::Arc<::std::sync::Mutex<::std::collections::HashMap<NameType, Vec<u8>>>>;
 
@@ -84,13 +78,13 @@ fn sync_disk_storage(memory_storage: &::std::collections::HashMap<NameType, Vec<
     file.sync_all();
 }
 
-pub struct RoutingVaultMock {
-    sender          : ::std::sync::mpsc::Sender<RoutingMessage>,
-    client_sender   : ::std::sync::mpsc::Sender<Data>,  // for testing only
-    network_delay_ms: u32,  // for testing only
+pub struct MockRouting {
+    sender : ::std::sync::mpsc::Sender<RoutingMessage>,
+    client_sender : ::std::sync::mpsc::Sender<Data>,  // for testing only
+    network_delay_ms : u32,  // for testing only
 }
 
-impl RoutingVaultMock {
+impl MockRouting {
     pub fn new() -> (RoutingVaultMock, ::std::sync::mpsc::Receiver<RoutingMessage>) {
         let (sender, receiver) = ::std::sync::mpsc::channel();
         let (client_sender, _) = ::std::sync::mpsc::channel();
@@ -214,7 +208,7 @@ impl RoutingVaultMock {
                                                                      data));
             } else {
                 let _ = cloned_sender.send(RoutingMessage::ShutDown);
-            };            
+            };
         });
 
         Ok(())

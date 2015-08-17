@@ -15,12 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(dead_code)]
-
 use chunk_store::ChunkStore;
-use routing_types::*;
 use transfer_parser::transfer_tags::SD_MANAGER_ACCOUNT_TAG;
-use utils::{encode, decode};
 
 pub struct StructuredDataManager {
     // TODO: This is assuming ChunkStore has the ability of handling mutable(SDV) data, and put is overwritable
@@ -108,12 +104,9 @@ impl StructuredDataManager {
 
 #[cfg(test)]
 mod test {
-    use sodiumoxide::crypto;
-
     use super::*;
+    use sodiumoxide::crypto;
     use utils::encode;
-
-    use routing_types::*;
 
     #[test]
     fn handle_put_get() {

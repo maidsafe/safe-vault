@@ -15,15 +15,11 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(dead_code)]
-
 use cbor;
 use rustc_serialize::{Decoder, Encodable, Encoder};
 use std::collections;
 
 use transfer_parser::transfer_tags::PMID_MANAGER_ACCOUNT_TAG;
-use routing_types::*;
-use utils::{median, encode, decode};
 
 type Identity = NameType; // pmidnode address
 
@@ -226,11 +222,8 @@ impl PmidManagerDatabase {
 
 #[cfg(test)]
 mod test {
-    use cbor;
-
     use super::{PmidManagerDatabase, PmidManagerAccount, PmidManagerAccountWrapper};
-
-    use routing_types::*;
+    use cbor;
 
     #[test]
     fn exist() {

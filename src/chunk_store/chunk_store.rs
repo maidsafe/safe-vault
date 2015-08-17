@@ -13,18 +13,11 @@
 // KIND, either express or implied.
 //
 // Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.                                                                */
+// relating to use of the SAFE Network Software.
 
-#![allow(dead_code)]
-#![deny(missing_docs)]
-
-extern crate tempdir;
-
-use routing_types::{NameType, vector_as_u8_64_array, NAME_TYPE_LEN};
 use std::fs::{File, read_dir, remove_file};
 use std::ffi::OsStr;
 use std::path::Path;
-use self::tempdir::TempDir;
 use std::io::{Read, Write};
 use std::error::Error;
 use rustc_serialize::hex::{ToHex, FromHex};

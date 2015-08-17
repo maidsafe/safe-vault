@@ -17,7 +17,6 @@
 
 use rustc_serialize::{Decodable, Decoder};
 
-use data_manager::{DataManagerSendable, DataManagerStatsSendable};
 use maid_manager::MaidManagerAccountWrapper;
 use pmid_manager::PmidManagerAccountWrapper;
 
@@ -33,7 +32,7 @@ pub mod transfer_tags {
 
 pub enum Transfer {
     MaidManagerAccount(MaidManagerAccountWrapper),
-    DataManagerAccount(DataManagerSendable),
+    DataManagerAccount(data_manager::Account),
     PmidManagerAccount(PmidManagerAccountWrapper),
     DataManagerStats(DataManagerStatsSendable),
     Unknown(u64),

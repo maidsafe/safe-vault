@@ -18,9 +18,6 @@
 #[cfg(test)]
 mod test {
   use rand::{thread_rng, Rng};
-
-  use routing_types::*;
-
   use chunk_store::ChunkStore;
 
   static ONE_KB: usize = 1024;

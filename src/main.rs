@@ -13,37 +13,34 @@
 // KIND, either express or implied.
 //
 // Please review the Licences for the specific language governing permissions and limitations
-// relating to use of the SAFE Network Software.                                                              */
-
-#![crate_name = "safe_vault"]
-#![crate_type = "bin"]
-#![doc(html_logo_url = "http://maidsafe.net/img/Resources/branding/maidsafe_logo.fab2.png",
-       html_favicon_url = "http://maidsafe.net/img/favicon.ico",
-              html_root_url = "http://dirvine.github.io/dirvine/safe_vault/")]
-#![forbid(bad_style, warnings)]
-#![deny(deprecated, improper_ctypes, missing_docs, non_shorthand_field_patterns,
-        overflowing_literals, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
-        raw_pointer_derive, stable_features, unconditional_recursion, unknown_lints, unsafe_code,
-        unused, unused_allocation, unused_attributes, unused_comparisons, unused_features,
-        unused_parens, while_true)]
-
-#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
-        unused_qualifications)]
+// relating to use of the SAFE Network Software.
 
 //! Safe Vault provides the interface to SAFE routing.
 //! The resulting executable is the Vault node for the SAFE network.
-#![feature(negate_unsigned)]
-#![allow(unused)]
 
+#![doc(html_logo_url = "http://maidsafe.net/img/Resources/branding/maidsafe_logo.fab2.png",
+       html_favicon_url = "http://maidsafe.net/img/favicon.ico",
+       html_root_url = "http://maidsafe.github.io/safe_vault")]
+#![forbid(bad_style, warnings)]
+#![deny(deprecated, drop_with_repr_extern, improper_ctypes, missing_docs,
+        non_shorthand_field_patterns, overflowing_literals, plugin_as_library,
+        private_no_mangle_fns, private_no_mangle_statics, raw_pointer_derive, stable_features,
+        unconditional_recursion, unknown_lints, unsafe_code, unused, unused_allocation,
+        unused_attributes, unused_comparisons, unused_features, unused_parens, while_true)]
+#![warn(trivial_casts, trivial_numeric_casts, unused_extern_crates, unused_import_braces,
+        unused_qualifications, unused_results, variant_size_differences)]
+
+// Non-MaidSafe crates
 extern crate cbor;
 extern crate rand;
 extern crate rustc_serialize;
 extern crate sodiumoxide;
+extern crate tempdir;
 extern crate time;
-extern crate lru_time_cache;
 
-use std::thread;
-use std::thread::spawn;
+// MaidSafe crates
+extern crate lru_time_cache;
+extern crate routing;
 
 mod data_manager;
 mod maid_manager;
@@ -54,31 +51,36 @@ mod pmid_node;
 mod transfer_parser;
 mod vault;
 mod utils;
-mod routing_types;
 mod macros;
 
+#[cfg(not(feature = "use-actual-routing"))]
 mod non_networking_test_framework;
-
-use vault::{VaultFacade, ResponseNotifier};
-use routing_types::{MethodCall, POLL_DURATION_IN_MILLISEC, RoutingMessage};
-use non_networking_test_framework::RoutingVaultMock;
-
-type RoutingVault = ::std::sync::Arc<::std::sync::Mutex<RoutingVaultMock>>;
-fn get_new_routing_vault() -> (RoutingVault, ::std::sync::mpsc::Receiver<RoutingMessage>) {
-    let (routing_mock, receiver) = RoutingVaultMock::new();
-    (::std::sync::Arc::new(::std::sync::Mutex::new(routing_mock)), receiver)
+#[cfg(not(feature = "use-actual-routing"))]
+type Routing = ::std::sync::Arc<::std::sync::Mutex<non_networking_test_framework::MockRouting>>;
+#[cfg(not(feature = "use-actual-routing"))]
+fn get_new_routing() -> (Routing, ::std::sync::mpsc::Receiver<(::routing::event::Event)>) {
+    let (mock_routing, receiver) = non_networking_test_framework::MockRouting::new();
+    (::std::sync::Arc::new(::std::sync::Mutex::new(mock_routing)), receiver)
 }
 
-/// Placeholder doc test
-pub fn always_true() -> bool { true }
+#[cfg(feature = "use-actual-routing")]
+type Routing = ::std::sync::Arc<::std::sync::Mutex<::routing::routing::Routing>>;
+#[cfg(feature = "use-actual-routing")]
+fn get_new_routing(event_sender: ::std::sync::mpsc::Sender<(::routing::event::Event)>) -> Routing {
+    ::std::sync::Arc::new(::std::sync::Mutex::new(::routing::routing::Routing::new(event_sender)))
+}
+
+
+
+use vault::{VaultFacade, ResponseNotifier};
 
 /// The Vault structure to hold the logical interface to provide behavioural logic to routing.
 pub struct Vault {
-    routing            : RoutingVault,
-    vault_facade       : ::std::sync::Arc<::std::sync::Mutex<VaultFacade>>,
-    join_handles       : Vec<::std::thread::JoinHandle<()>>,    
-    response_notifier  : ResponseNotifier,
-    routing_stop_flag  : ::std::sync::Arc<::std::sync::Mutex<bool>>,
+    routing : Routing,
+    vault_facade : ::std::sync::Arc<::std::sync::Mutex<VaultFacade>>,
+    join_handles : Vec<::std::thread::JoinHandle<()>>,
+    response_notifier : ResponseNotifier,
+    routing_stop_flag : ::std::sync::Arc<::std::sync::Mutex<bool>>,
 }
 
 
@@ -103,11 +105,11 @@ impl Vault {
         });
 
         Vault {
-            routing            : routing_vault,
-            vault_facade       : vault_facade,
-            join_handles       : vec![routing_joiner, receiver_joiner],
-            response_notifier  : notifier,
-            routing_stop_flag  : routing_stop_flag,
+            routing : routing_vault,
+            vault_facade : vault_facade,
+            join_handles : vec![routing_joiner, receiver_joiner],
+            response_notifier : notifier,
+            routing_stop_flag : routing_stop_flag,
         }
     }
 
@@ -157,8 +159,6 @@ mod test {
     use std::thread;
     use std::thread::spawn;
     use sodiumoxide::crypto;
-
-    use routing_types::*;
 
     #[test]
     fn lib_test() {
