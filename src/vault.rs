@@ -17,16 +17,16 @@
 
 use routing_types::*;
 
-#[cfg(feature = "use-actual-routing")]
+#[cfg(not(feature = "use-mock-routing"))]
 type Routing = ::routing::routing::Routing;
-#[cfg(feature = "use-actual-routing")]
+#[cfg(not(feature = "use-mock-routing"))]
 fn get_new_routing(event_sender: ::std::sync::mpsc::Sender<(::routing::event::Event)>) -> Routing {
     ::routing::routing::Routing::new(event_sender)
 }
 
-#[cfg(not(feature = "use-actual-routing"))]
+#[cfg(feature = "use-mock-routing")]
 type Routing = ::non_networking_test_framework::MockRouting;
-#[cfg(not(feature = "use-actual-routing"))]
+#[cfg(feature = "use-mock-routing")]
 fn get_new_routing(event_sender: ::std::sync::mpsc::Sender<(::routing::event::Event)>) -> Routing {
     ::non_networking_test_framework::MockRouting::new(event_sender)
 }
@@ -152,8 +152,8 @@ impl Vault {
             ::routing::ExternalResponse::Get(data, _, response_token) => {
                 self.handle_get_response(our_authority, from_authority, data, response_token);
             },
-            ::routing::ExternalResponse::Put(/*response_error*/_, /*response_token*/_) => {
-                unimplemented!();
+            ::routing::ExternalResponse::Put(response_error, response_token) => {
+                self.handle_put_response(our_authority, from_authority, response_error, response_token);
             },
             ::routing::ExternalResponse::Post(/*response_error*/_, /*response_token*/_) => {
                 unimplemented!();
@@ -274,7 +274,7 @@ impl Vault {
                 }
             },
             Authority::NodeManager(dest_address) => self.pmid_manager.handle_put(dest_address, data),
-            Authority::ManagedNode(_) => self.pmid_node.handle_put(data),
+            Authority::ManagedNode(pmid_node) => self.pmid_node.handle_put(pmid_node, data),
             _ => Ok(vec![]),
         };
         if let Ok(actions) = returned_actions {
@@ -335,22 +335,21 @@ impl Vault {
         self.send(our_authority, returned_actions, response_token, None, None);
     }
 
-    // Put response will holding the copy of failed to store data, which will be:
-    //     1, the original immutable data if it failed to squeeze in
-    //     2, the sacrificial copy if it has been removed to empty the space
     // DataManager doesn't need to carry out replication in case of sacrificial copy
     #[allow(dead_code)]
     fn handle_put_response(&mut self,
+                           our_authority: Authority,
                            from_authority: Authority,
                            response: ResponseError,
-                           _: Option<::routing::SignedToken>) -> Vec<MethodCall> {
-        match from_authority {
+                           response_token: Option<::routing::SignedToken>) {
+        let fowarding_calls = match from_authority {
             Authority::ManagedNode(pmid_node) =>
                 self.pmid_manager.handle_put_response(&pmid_node, response),
             Authority::NodeManager(pmid_node) =>
                 self.data_manager.handle_put_response(response, &pmid_node),
             _ => vec![]
-        }
+        };
+        self.send(our_authority, fowarding_calls, response_token, None, None);
     }
 
     // https://maidsafe.atlassian.net/browse/MAID-1111 post_response is not required on vault
@@ -463,8 +462,21 @@ impl Vault {
                 MethodCall::Refresh { type_tag, from_group, payload } => {
                     debug!("refreshing account type {:?} of group {:?} to network", type_tag, from_group);
                     self.routing.refresh_request(type_tag, from_group, payload);
+                },
+                MethodCall::FailedPut { location, data } => {
+                    debug!("as {:?} failed in putting data {:?}, responding to {:?}",
+                           our_authority, data, location);
+                    self.routing.put_response(our_authority.clone(), location,
+                                              ResponseError::FailedRequestForData(data),
+                                              response_token.clone());
+                },
+                MethodCall::ClearSacrificial { location, name, size } => {
+                    debug!("as {:?} sacrifize data {:?} freeing space {:?}, notifying {:?}",
+                           our_authority, name, size, location);
+                    self.routing.put_response(our_authority.clone(), location,
+                                              ResponseError::HadToClearSacrificial(name, size),
+                                              response_token.clone());
                 }
-                _ => {}
             }
         }
     }
@@ -483,7 +495,7 @@ pub type ResponseNotifier =
     use transfer_parser::{Transfer, transfer_tags};
     use routing_types::*;
 
-    #[cfg(not(feature = "use-actual-routing"))]
+    #[cfg(feature = "use-mock-routing")]
     fn mock_env_setup() -> (super::Routing, ::std::sync::mpsc::Receiver<(Data)>) {
         let run_vault = |mut vault: Vault| {
             let _ = ::std::thread::spawn(move || {
@@ -504,7 +516,7 @@ pub type ResponseNotifier =
         (routing, receiver)
     }
 
-    #[cfg(not(feature = "use-actual-routing"))]
+    #[cfg(feature = "use-mock-routing")]
     #[test]
     fn put_get_flow() {
         let (mut routing, receiver) = mock_env_setup();
@@ -528,7 +540,7 @@ pub type ResponseNotifier =
         }
     }
 
-    #[cfg(not(feature = "use-actual-routing"))]
+    #[cfg(feature = "use-mock-routing")]
     #[test]
     fn post_flow() {
         let (mut routing, receiver) = mock_env_setup();
@@ -561,7 +573,7 @@ pub type ResponseNotifier =
         }
     }
 
-    #[cfg(feature = "use-actual-routing")]
+    #[cfg(not(feature = "use-mock-routing"))]
     fn network_env_setup() -> (::routing::routing_client::RoutingClient,
                                ::std::sync::mpsc::Receiver<(Data)>,
                                NameType) {
@@ -627,7 +639,7 @@ pub type ResponseNotifier =
         (client_routing, client_receiver, client_name)
     }
 
-    #[cfg(feature = "use-actual-routing")]
+    #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_put_get_test() {
         let (mut client_routing, client_receiver, client_name) = network_env_setup();
@@ -648,7 +660,7 @@ pub type ResponseNotifier =
         }
     }
 
-    #[cfg(feature = "use-actual-routing")]
+    #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_post_test() {
         let (mut client_routing, client_receiver, client_name) = network_env_setup();
