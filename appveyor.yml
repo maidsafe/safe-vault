@@ -30,4 +30,4 @@ test_script:
           $env:config_flags = "--release"
         }
   - cargo build --verbose %config_flags%
-  - cargo test --verbose
+  - RUST_LOG=info cargo test --verbose
