@@ -2,7 +2,7 @@
 
 [![](https://img.shields.io/badge/Project%20SAFE-Approved-green.svg)](http://maidsafe.net/applications) [![](https://img.shields.io/badge/License-GPL3-green.svg)](https://github.com/maidsafe/safe_vault/blob/master/COPYING)
 
-**Primary Maintainer:**     Qi Ma (qi.ma@maidsafe.net)
+**Primary Maintainer:**     Viv (qi.ma@maidsafe.net)
 
 **Secondary Maintainer:**   Fraser Hutchison (fraser.hutchison@maidsafe.net)
 
