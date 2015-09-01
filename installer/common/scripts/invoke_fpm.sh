@@ -252,7 +252,7 @@ function create_package {
     $AfterInstallCommand \
     $BeforeRemoveCommand \
     "$RootDir/target/release/$VaultName"=$VaultPath \
-    "$RootDir/installer/common/$VaultName.crust.config"=$ConfigFilePath \
+    #"$RootDir/installer/common/$VaultName.crust.config"=$ConfigFilePath \
     $ExtraFilesCommand
 }
 
