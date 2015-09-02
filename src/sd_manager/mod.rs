@@ -99,7 +99,7 @@ impl StructuredDataManager {
                 payload: data
             });
         }
-        self.chunk_store_ = ChunkStore::with_max_disk_usage(1073741824);
+        // self.chunk_store_ = ChunkStore::with_max_disk_usage(1073741824);
         actions
     }
 

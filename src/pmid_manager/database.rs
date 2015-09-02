@@ -220,7 +220,7 @@ impl PmidManagerDatabase {
                 }
             }
         }
-        self.storage.clear();
+        // self.storage.clear();
         actions
     }
 }
