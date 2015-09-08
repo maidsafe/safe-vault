@@ -486,11 +486,11 @@ pub type ResponseNotifier =
 
 #[cfg(test)]
  mod test {
-    use cbor;
-    use sodiumoxide::crypto;
+    // use cbor;
+    // use sodiumoxide::crypto;
 
     use super::*;
-    use transfer_parser::{Transfer, transfer_tags};
+    // use transfer_parser::{Transfer, transfer_tags};
     use routing_types::*;
 
     #[cfg(feature = "use-mock-routing")]
@@ -742,225 +742,225 @@ pub type ResponseNotifier =
         }
     }
 
-    fn maid_manager_put(vault: &mut Vault, client: NameType, im_data: ImmutableData) {
-        let keys = crypto::sign::gen_keypair();
-        let _put_result = vault.handle_put(Authority::ClientManager(client),
-                                           Authority::Client(client, keys.0),
-                                           Data::ImmutableData(im_data.clone()), None);
-    }
+    // fn maid_manager_put(vault: &mut Vault, client: NameType, im_data: ImmutableData) {
+    //     let keys = crypto::sign::gen_keypair();
+    //     let _put_result = vault.handle_put(Authority::ClientManager(client),
+    //                                        Authority::Client(client, keys.0),
+    //                                        Data::ImmutableData(im_data.clone()), None);
+    // }
 
-    fn data_manager_put(vault: &mut Vault, im_data: ImmutableData) {
-        let _put_result = vault.handle_put(Authority::NaeManager(im_data.name()),
-                                           Authority::ClientManager(NameType::new([1u8; 64])),
-                                           Data::ImmutableData(im_data), None);
-    }
+    // fn data_manager_put(vault: &mut Vault, im_data: ImmutableData) {
+    //     let _put_result = vault.handle_put(Authority::NaeManager(im_data.name()),
+    //                                        Authority::ClientManager(NameType::new([1u8; 64])),
+    //                                        Data::ImmutableData(im_data), None);
+    // }
 
-    fn add_nodes_to_table(vault: &mut Vault, nodes: &Vec<NameType>) {
-        for node in nodes {
-            vault.nodes_in_table.push(node.clone());
-        }
-    }
+    // fn add_nodes_to_table(vault: &mut Vault, nodes: &Vec<NameType>) {
+    //     for node in nodes {
+    //         vault.nodes_in_table.push(node.clone());
+    //     }
+    // }
 
-    fn pmid_manager_put(vault: &mut Vault, pmid_node: NameType, im_data: ImmutableData) {
-          let _put_result = vault.handle_put(Authority::NodeManager(pmid_node),
-                                             Authority::NaeManager(im_data.name()),
-                                             Data::ImmutableData(im_data), None);
-    }
+    // fn pmid_manager_put(vault: &mut Vault, pmid_node: NameType, im_data: ImmutableData) {
+    //       let _put_result = vault.handle_put(Authority::NodeManager(pmid_node),
+    //                                          Authority::NaeManager(im_data.name()),
+    //                                          Data::ImmutableData(im_data), None);
+    // }
 
-    fn sd_manager_put(vault: &mut Vault, sdv: StructuredData) {
-        let _put_result = vault.handle_put(Authority::NaeManager(sdv.name()),
-                                           Authority::ManagedNode(NameType::new([7u8; 64])),
-                                           Data::StructuredData(sdv.clone()), None);
-    }
+    // fn sd_manager_put(vault: &mut Vault, sdv: StructuredData) {
+    //     let _put_result = vault.handle_put(Authority::NaeManager(sdv.name()),
+    //                                        Authority::ManagedNode(NameType::new([7u8; 64])),
+    //                                        Data::StructuredData(sdv.clone()), None);
+    // }
 
-    #[test]
-    fn churn_test() {
-        let mut vault = Vault::new();
+    // #[test]
+    // fn churn_test() {
+    //     let mut vault = Vault::new();
 
-        let mut available_nodes = Vec::with_capacity(30);
-        for _ in 0..30 {
-            available_nodes.push(NameType(vector_as_u8_64_array(generate_random_vec_u8(64))));
-        }
+    //     let mut available_nodes = Vec::with_capacity(30);
+    //     for _ in 0..30 {
+    //         available_nodes.push(NameType(vector_as_u8_64_array(generate_random_vec_u8(64))));
+    //     }
 
-        let value = generate_random_vec_u8(1024);
-        let im_data = ImmutableData::new(ImmutableDataType::Normal, value);
+    //     let value = generate_random_vec_u8(1024);
+    //     let im_data = ImmutableData::new(ImmutableDataType::Normal, value);
 
-        let mut small_close_group = Vec::with_capacity(5);
-        for i in 0..5 {
-            small_close_group.push(available_nodes[i].clone());
-        }
+    //     let mut small_close_group = Vec::with_capacity(5);
+    //     for i in 0..5 {
+    //         small_close_group.push(available_nodes[i].clone());
+    //     }
 
-        {// MaidManager - churn handling
-            maid_manager_put(&mut vault, available_nodes[0].clone(), im_data.clone());
-            let churn_data = vault.handle_churn(small_close_group.clone());
-            // DataManagerStatsTransfer will always be included in the return
-            assert!(churn_data.len() == 2);
+    //     {// MaidManager - churn handling
+    //         maid_manager_put(&mut vault, available_nodes[0].clone(), im_data.clone());
+    //         let churn_data = vault.handle_churn(small_close_group.clone());
+    //         // DataManagerStatsTransfer will always be included in the return
+    //         assert!(churn_data.len() == 2);
 
-            // MaidManagerAccount
-            match churn_data[0] {
-                MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
-                    assert_eq!(*type_tag,
-                               ::transfer_parser::transfer_tags::MAID_MANAGER_ACCOUNT_TAG);
-                    assert_eq!(*from_group, available_nodes[0]);
-                    let mut d = cbor::Decoder::from_bytes(&payload[..]);
-                    if let Some(parsed_data) = d.decode().next().and_then(|result| result.ok()) {
-                        match parsed_data {
-                            Transfer::MaidManagerAccount(mm_account_wrapper) => {
-                                assert_eq!(mm_account_wrapper.name(), available_nodes[0]);
-                                assert_eq!(mm_account_wrapper.get_account().get_data_stored(),
-                                           1024);
-                            },
-                            _ => panic!("Unexpected"),
-                        }
-                    }
-                    let mut payloads = vec![];
-                    for _ in 0..(::routing::types::GROUP_SIZE - 1) {
-                        payloads.push(payload.clone());
-                    }
-                    vault.handle_refresh(*type_tag, *from_group, payloads);
-                },
-                _ => panic!("Refresh type expected")
-            };
-            add_nodes_to_table(&mut vault, &Vec::<::routing::NameType>::new());
-            let re_churn_data = vault.handle_churn(small_close_group.clone());
-            assert_eq!(churn_data[0], re_churn_data[0]);
-            assert!(vault.maid_manager.retrieve_all_and_reset().is_empty());
-        }
+    //         // MaidManagerAccount
+    //         match churn_data[0] {
+    //             MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
+    //                 assert_eq!(*type_tag,
+    //                            ::transfer_parser::transfer_tags::MAID_MANAGER_ACCOUNT_TAG);
+    //                 assert_eq!(*from_group, available_nodes[0]);
+    //                 let mut d = cbor::Decoder::from_bytes(&payload[..]);
+    //                 if let Some(parsed_data) = d.decode().next().and_then(|result| result.ok()) {
+    //                     match parsed_data {
+    //                         Transfer::MaidManagerAccount(mm_account_wrapper) => {
+    //                             assert_eq!(mm_account_wrapper.name(), available_nodes[0]);
+    //                             assert_eq!(mm_account_wrapper.get_account().get_data_stored(),
+    //                                        1024);
+    //                         },
+    //                         _ => panic!("Unexpected"),
+    //                     }
+    //                 }
+    //                 let mut payloads = vec![];
+    //                 for _ in 0..(::routing::types::GROUP_SIZE - 1) {
+    //                     payloads.push(payload.clone());
+    //                 }
+    //                 vault.handle_refresh(*type_tag, *from_group, payloads);
+    //             },
+    //             _ => panic!("Refresh type expected")
+    //         };
+    //         add_nodes_to_table(&mut vault, &Vec::<::routing::NameType>::new());
+    //         let re_churn_data = vault.handle_churn(small_close_group.clone());
+    //         assert_eq!(churn_data[0], re_churn_data[0]);
+    //         assert!(vault.maid_manager.retrieve_all_and_reset().is_empty());
+    //     }
 
-        add_nodes_to_table(&mut vault, &available_nodes);
+    //     add_nodes_to_table(&mut vault, &available_nodes);
 
-        {// DataManager - churn handling
-            data_manager_put(&mut vault, im_data.clone());
-            let mut close_group = Vec::with_capacity(20);
-            for i in 10..30 {
-                close_group.push(available_nodes[i].clone());
-            }
-            // DataManagerStatsTransfer will always be included in the return
-            let churn_data = vault.handle_churn(close_group.clone());
-            assert_eq!(churn_data.len(), 2);
+    //     {// DataManager - churn handling
+    //         data_manager_put(&mut vault, im_data.clone());
+    //         let mut close_group = Vec::with_capacity(20);
+    //         for i in 10..30 {
+    //             close_group.push(available_nodes[i].clone());
+    //         }
+    //         // DataManagerStatsTransfer will always be included in the return
+    //         let churn_data = vault.handle_churn(close_group.clone());
+    //         assert_eq!(churn_data.len(), 2);
 
-            match churn_data[0] {
-                MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
-                    assert_eq!(*type_tag, transfer_tags::DATA_MANAGER_ACCOUNT_TAG);
-                    assert_eq!(*from_group, im_data.name());
-                    let mut d = cbor::Decoder::from_bytes(&payload[..]);
-                    if let Some(parsed_data) = d.decode().next().and_then(|result| result.ok()) {
-                        match parsed_data {
-                            Transfer::DataManagerAccount(data_manager_sendable) => {
-                                assert_eq!(data_manager_sendable.name(), im_data.name());
-                            },
-                            _ => panic!("Unexpected"),
-                        }
-                    }
-                    let mut payloads = vec![];
-                    for _ in 0..(::routing::types::GROUP_SIZE - 1) {
-                        payloads.push(payload.clone());
-                    }
-                    vault.handle_refresh(*type_tag, *from_group, payloads);
-                },
-                MethodCall::Get { .. } => (),
-                _ => panic!("Refresh type expected")
-            };
+    //         match churn_data[0] {
+    //             MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
+    //                 assert_eq!(*type_tag, transfer_tags::DATA_MANAGER_ACCOUNT_TAG);
+    //                 assert_eq!(*from_group, im_data.name());
+    //                 let mut d = cbor::Decoder::from_bytes(&payload[..]);
+    //                 if let Some(parsed_data) = d.decode().next().and_then(|result| result.ok()) {
+    //                     match parsed_data {
+    //                         Transfer::DataManagerAccount(data_manager_sendable) => {
+    //                             assert_eq!(data_manager_sendable.name(), im_data.name());
+    //                         },
+    //                         _ => panic!("Unexpected"),
+    //                     }
+    //                 }
+    //                 let mut payloads = vec![];
+    //                 for _ in 0..(::routing::types::GROUP_SIZE - 1) {
+    //                     payloads.push(payload.clone());
+    //                 }
+    //                 vault.handle_refresh(*type_tag, *from_group, payloads);
+    //             },
+    //             MethodCall::Get { .. } => (),
+    //             _ => panic!("Refresh type expected")
+    //         };
 
-            match churn_data[1] {
-                MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
-                    assert_eq!(*type_tag, transfer_tags::DATA_MANAGER_STATS_TAG);
-                    assert_eq!(*from_group, close_group[0]);
-                    let mut d = cbor::Decoder::from_bytes(&payload[..]);
-                    if let Some(parsed_data) = d.decode().next().and_then(|result| result.ok()) {
-                        match parsed_data {
-                            Transfer::DataManagerStats(stats_sendable) => {
-                                assert_eq!(stats_sendable.get_resource_index(), 1);
-                            },
-                            _ => panic!("Unexpected"),
-                        }
-                    }
-                    let mut payloads = vec![];
-                    for _ in 0..(::routing::types::GROUP_SIZE - 1) {
-                        payloads.push(payload.clone());
-                    }
-                    vault.handle_refresh(*type_tag, *from_group, payloads);
-                },
-                MethodCall::Get { .. } => (),
-                _ => panic!("Refresh type expected")
-            };
-            add_nodes_to_table(&mut vault, &available_nodes);
-            let re_churn_data = vault.handle_churn(close_group.clone());
-            assert_eq!(churn_data[0], re_churn_data[0]);
-            assert_eq!(churn_data[1], re_churn_data[1]);
-            // DataManagerStatsTransfer will always be included in the return
-            assert_eq!(vault.data_manager.retrieve_all_and_reset(&mut close_group).len(), 1);
-        }
+    //         match churn_data[1] {
+    //             MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
+    //                 assert_eq!(*type_tag, transfer_tags::DATA_MANAGER_STATS_TAG);
+    //                 assert_eq!(*from_group, close_group[0]);
+    //                 let mut d = cbor::Decoder::from_bytes(&payload[..]);
+    //                 if let Some(parsed_data) = d.decode().next().and_then(|result| result.ok()) {
+    //                     match parsed_data {
+    //                         Transfer::DataManagerStats(stats_sendable) => {
+    //                             assert_eq!(stats_sendable.get_resource_index(), 1);
+    //                         },
+    //                         _ => panic!("Unexpected"),
+    //                     }
+    //                 }
+    //                 let mut payloads = vec![];
+    //                 for _ in 0..(::routing::types::GROUP_SIZE - 1) {
+    //                     payloads.push(payload.clone());
+    //                 }
+    //                 vault.handle_refresh(*type_tag, *from_group, payloads);
+    //             },
+    //             MethodCall::Get { .. } => (),
+    //             _ => panic!("Refresh type expected")
+    //         };
+    //         add_nodes_to_table(&mut vault, &available_nodes);
+    //         let re_churn_data = vault.handle_churn(close_group.clone());
+    //         assert_eq!(churn_data[0], re_churn_data[0]);
+    //         assert_eq!(churn_data[1], re_churn_data[1]);
+    //         // DataManagerStatsTransfer will always be included in the return
+    //         assert_eq!(vault.data_manager.retrieve_all_and_reset(&mut close_group).len(), 1);
+    //     }
 
-        {// PmidManager - churn handling
-            pmid_manager_put(&mut vault, available_nodes[1].clone(), im_data.clone());
-            let churn_data = vault.handle_churn(small_close_group.clone());
-            // DataManagerStatsTransfer will always be included in the return
-            assert_eq!(churn_data.len(), 2);
-            //assert_eq!(churn_data[0].0, from);
+    //     {// PmidManager - churn handling
+    //         pmid_manager_put(&mut vault, available_nodes[1].clone(), im_data.clone());
+    //         let churn_data = vault.handle_churn(small_close_group.clone());
+    //         // DataManagerStatsTransfer will always be included in the return
+    //         assert_eq!(churn_data.len(), 2);
+    //         //assert_eq!(churn_data[0].0, from);
 
-            match churn_data[0] {
-                MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
-                    assert_eq!(*type_tag, transfer_tags::PMID_MANAGER_ACCOUNT_TAG);
-                    assert_eq!(*from_group, available_nodes[1]);
-                    let mut d = cbor::Decoder::from_bytes(&payload[..]);
-                    if let Some(parsed_data) = d.decode().next().and_then(|result| result.ok()) {
-                        match parsed_data {
-                            Transfer::PmidManagerAccount(account_wrapper) => {
-                                assert_eq!(account_wrapper.name(),available_nodes[1]);
-                            },
-                            _ => panic!("Unexpected"),
-                        }
-                    }
-                    let mut payloads = vec![];
-                    for _ in 0..(::routing::types::GROUP_SIZE - 1) {
-                        payloads.push(payload.clone());
-                    }
-                    vault.handle_refresh(*type_tag, *from_group, payloads);
-                },
-                _ => panic!("Refresh type expected")
-            };
-            add_nodes_to_table(&mut vault, &Vec::<::routing::NameType>::new());
-            let re_churn_data = vault.handle_churn(small_close_group.clone());
-            assert_eq!(churn_data[0], re_churn_data[0]);
-            assert!(vault.pmid_manager.retrieve_all_and_reset(&Vec::new()).is_empty());
-        }
+    //         match churn_data[0] {
+    //             MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
+    //                 assert_eq!(*type_tag, transfer_tags::PMID_MANAGER_ACCOUNT_TAG);
+    //                 assert_eq!(*from_group, available_nodes[1]);
+    //                 let mut d = cbor::Decoder::from_bytes(&payload[..]);
+    //                 if let Some(parsed_data) = d.decode().next().and_then(|result| result.ok()) {
+    //                     match parsed_data {
+    //                         Transfer::PmidManagerAccount(account_wrapper) => {
+    //                             assert_eq!(account_wrapper.name(),available_nodes[1]);
+    //                         },
+    //                         _ => panic!("Unexpected"),
+    //                     }
+    //                 }
+    //                 let mut payloads = vec![];
+    //                 for _ in 0..(::routing::types::GROUP_SIZE - 1) {
+    //                     payloads.push(payload.clone());
+    //                 }
+    //                 vault.handle_refresh(*type_tag, *from_group, payloads);
+    //             },
+    //             _ => panic!("Refresh type expected")
+    //         };
+    //         add_nodes_to_table(&mut vault, &Vec::<::routing::NameType>::new());
+    //         let re_churn_data = vault.handle_churn(small_close_group.clone());
+    //         assert_eq!(churn_data[0], re_churn_data[0]);
+    //         assert!(vault.pmid_manager.retrieve_all_and_reset(&Vec::new()).is_empty());
+    //     }
 
-        {// StructuredDataManager - churn handling
-            let name = NameType([3u8; 64]);
-            let value = generate_random_vec_u8(1024);
-            let keys = crypto::sign::gen_keypair();
-            let sdv = StructuredData::new(0, name, 0, value, vec![keys.0], vec![],
-                                          Some(&keys.1)).ok().unwrap();
+    //     {// StructuredDataManager - churn handling
+    //         let name = NameType([3u8; 64]);
+    //         let value = generate_random_vec_u8(1024);
+    //         let keys = crypto::sign::gen_keypair();
+    //         let sdv = StructuredData::new(0, name, 0, value, vec![keys.0], vec![],
+    //                                       Some(&keys.1)).ok().unwrap();
 
-            sd_manager_put(&mut vault, sdv.clone());
-            let churn_data = vault.handle_churn(small_close_group.clone());
-            // DataManagerStatsTransfer will always be included in the return
-            assert_eq!(churn_data.len(), 2);
+    //         sd_manager_put(&mut vault, sdv.clone());
+    //         let churn_data = vault.handle_churn(small_close_group.clone());
+    //         // DataManagerStatsTransfer will always be included in the return
+    //         assert_eq!(churn_data.len(), 2);
 
-            match churn_data[0] {
-                MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
-                    assert_eq!(*type_tag, transfer_tags::SD_MANAGER_ACCOUNT_TAG);
-                    assert_eq!(*from_group, sdv.name());
-                    match ::routing::utils::decode::<StructuredData>(payload) {
-                        Ok(sd) => { assert_eq!(sd, sdv); }
-                        Err(_) => panic!("Unexpected"),
-                    };
-                    let mut payloads = vec![];
-                    for _ in 0..(::routing::types::GROUP_SIZE - 1) {
-                        payloads.push(payload.clone());
-                    }
-                    vault.handle_refresh(*type_tag, *from_group, payloads);
-                },
-                _ => panic!("Refresh type expected")
-            };
-            add_nodes_to_table(&mut vault, &Vec::<::routing::NameType>::new());
-            let re_churn_data = vault.handle_churn(small_close_group.clone());
-            assert_eq!(churn_data[0], re_churn_data[0]);
-            assert!(vault.sd_manager.retrieve_all_and_reset().is_empty());
-        }
+    //         match churn_data[0] {
+    //             MethodCall::Refresh{ref type_tag, ref from_group, ref payload} => {
+    //                 assert_eq!(*type_tag, transfer_tags::SD_MANAGER_ACCOUNT_TAG);
+    //                 assert_eq!(*from_group, sdv.name());
+    //                 match ::routing::utils::decode::<StructuredData>(payload) {
+    //                     Ok(sd) => { assert_eq!(sd, sdv); }
+    //                     Err(_) => panic!("Unexpected"),
+    //                 };
+    //                 let mut payloads = vec![];
+    //                 for _ in 0..(::routing::types::GROUP_SIZE - 1) {
+    //                     payloads.push(payload.clone());
+    //                 }
+    //                 vault.handle_refresh(*type_tag, *from_group, payloads);
+    //             },
+    //             _ => panic!("Refresh type expected")
+    //         };
+    //         add_nodes_to_table(&mut vault, &Vec::<::routing::NameType>::new());
+    //         let re_churn_data = vault.handle_churn(small_close_group.clone());
+    //         assert_eq!(churn_data[0], re_churn_data[0]);
+    //         assert!(vault.sd_manager.retrieve_all_and_reset().is_empty());
+    //     }
 
-    }
+    // }
 
     #[test]
     fn cache_test() {

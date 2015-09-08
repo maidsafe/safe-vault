@@ -198,8 +198,8 @@ impl DataManagerDatabase {
                 });
             }
         }
-        self.storage.clear();
-        debug!("DataManager storage cleaned in churn with actions.len() = {:?}", actions.len());
+        // self.storage.clear();
+        // debug!("DataManager storage cleaned in churn with actions.len() = {:?}", actions.len());
         actions
     }
 }

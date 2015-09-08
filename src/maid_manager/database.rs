@@ -184,7 +184,7 @@ impl MaidManagerDatabase {
                 });
             }
         }
-        self.storage.clear();
+        // self.storage.clear();
         actions
     }
 
