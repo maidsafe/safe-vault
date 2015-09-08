@@ -456,9 +456,9 @@ impl Vault {
                         _ => {},
                     };
                 },
-                MethodCall::Refresh { type_tag, from_group, payload } => {
-                    info!("refreshing account type {:?} of group {:?} to network", type_tag, from_group);
-                    self.routing.refresh_request(type_tag, from_group, payload);
+                MethodCall::Refresh { type_tag, group, payload } => {
+                    info!("refreshing account type {:?} of group {:?} to network", type_tag, group);
+                    self.routing.refresh_request(type_tag, group, payload);
                 },
                 MethodCall::FailedPut { location, data } => {
                     debug!("as {:?} failed in putting data {:?}, responding to {:?}",

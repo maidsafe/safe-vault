@@ -179,7 +179,8 @@ impl MaidManagerDatabase {
             let mut encoder = cbor::Encoder::from_memory();
             if encoder.encode(&[maid_manager_wrapper.clone()]).is_ok() {
                 actions.push(MethodCall::Refresh {
-                    type_tag: MAID_MANAGER_ACCOUNT_TAG, from_group: maid_manager_wrapper.name(),
+                    type_tag: MAID_MANAGER_ACCOUNT_TAG,
+                    group: Authority::ClientManager(maid_manager_wrapper.name()),
                     payload: encoder.as_bytes().to_vec()
                 });
             }

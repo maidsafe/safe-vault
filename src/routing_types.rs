@@ -37,7 +37,7 @@ pub enum MethodCall {
     // /// Request delete
     // Delete { name: NameType, data : Data },
     /// request to refresh
-    Refresh { type_tag: u64, from_group: NameType, payload: Vec<u8> },
+    Refresh { type_tag: u64, group: Authority, payload: Vec<u8> },
     /// reply
     Reply { data: Data },
     /// response error indicating failed in putting data
