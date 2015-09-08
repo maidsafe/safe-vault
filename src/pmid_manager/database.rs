@@ -214,7 +214,8 @@ impl PmidManagerDatabase {
                 let mut encoder = cbor::Encoder::from_memory();
                 if encoder.encode(&[pmid_manager_wrapper.clone()]).is_ok() {
                     actions.push(MethodCall::Refresh {
-                        type_tag: PMID_MANAGER_ACCOUNT_TAG, from_group: pmid_manager_wrapper.name(),
+                        type_tag: PMID_MANAGER_ACCOUNT_TAG,
+                        group: Authority::NodeManager(pmid_manager_wrapper.name()),
                         payload: encoder.as_bytes().to_vec()
                     });
                 }

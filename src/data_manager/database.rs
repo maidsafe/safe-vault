@@ -193,7 +193,7 @@ impl DataManagerDatabase {
                 debug!("DataManager sends out a refresh regarding account {:?}", data_manager_sendable.name());
                 actions.push(MethodCall::Refresh {
                     type_tag: DATA_MANAGER_ACCOUNT_TAG,
-                    from_group: data_manager_sendable.name(),
+                    group: Authority::NaeManager(data_manager_sendable.name()),
                     payload: encoder.as_bytes().to_vec()
                 });
             }
