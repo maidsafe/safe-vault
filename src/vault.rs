@@ -439,6 +439,7 @@ mod test {
             assert_eq!(it, ::routing::data::Data::StructuredData(sd_new));
             break;
         }
+        routing.terminate();
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
