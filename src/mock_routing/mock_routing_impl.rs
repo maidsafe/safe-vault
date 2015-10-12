@@ -135,7 +135,7 @@ impl MockRoutingImpl {
 
     pub fn terminate(&self) {
         use routing::event::Event;
-        self.sender.send(Event::Terminated).unwrap();
+        let _ = self.sender.send(Event::Terminated);
     }
 
     // -----------  the following methods are expected to be API functions   ------------- //
