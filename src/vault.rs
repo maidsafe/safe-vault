@@ -394,6 +394,8 @@ mod test {
             assert_eq!(it, ::routing::data::Data::ImmutableData(im_data));
             break;
         }
+        routing.terminate();
+        ::std::thread::sleep_ms(2000);
     }
 
     #[cfg(feature = "use-mock-routing")]
@@ -440,6 +442,7 @@ mod test {
             break;
         }
         routing.terminate();
+        ::std::thread::sleep_ms(2000);
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
