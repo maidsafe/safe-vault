@@ -352,30 +352,32 @@ mod test {
     use super::*;
 
     #[cfg(feature = "use-mock-routing")]
-    fn mock_env_setup() -> (Routing, ::std::sync::mpsc::Receiver<(::routing::data::Data)>) {
+    fn mock_env_setup() -> (Routing,
+                            ::std::sync::mpsc::Receiver<(::routing::data::Data)>,
+                            ::std::thread::JoinHandle<()>) {
         ::utils::initialise_logger();
         let run_vault = |mut vault: Vault| {
-            let _ = ::std::thread::spawn(move || {
+            ::std::thread::spawn(move || {
                 vault.do_run();
-            });
+            })
         };
         let vault = Vault::new(None, None);
         let mut routing = vault.pmid_node.routing();
         let receiver = routing.get_client_receiver();
-        let _ = run_vault(vault);
+        let join_handle = run_vault(vault);
 
         let mut available_nodes = Vec::with_capacity(30);
         for _ in 0..30 {
             available_nodes.push(::utils::random_name());
         }
         routing.churn_event(available_nodes, ::utils::random_name());
-        (routing, receiver)
+        (routing, receiver, join_handle)
     }
 
     #[cfg(feature = "use-mock-routing")]
     #[test]
     fn put_get_flow() {
-        let (mut routing, receiver) = mock_env_setup();
+        let (mut routing, receiver, join_handle) = mock_env_setup();
 
         let client_name = ::utils::random_name();
         let sign_keys = ::sodiumoxide::crypto::sign::gen_keypair();
@@ -395,13 +397,13 @@ mod test {
             break;
         }
         routing.stop();
-        ::std::thread::sleep_ms(2000);
+        let _ = join_handle.join();
     }
 
     #[cfg(feature = "use-mock-routing")]
     #[test]
     fn post_flow() {
-        let (mut routing, receiver) = mock_env_setup();
+        let (mut routing, receiver, join_handle) = mock_env_setup();
 
         let name = ::utils::random_name();
         let value = ::routing::types::generate_random_vec_u8(1024);
@@ -442,7 +444,7 @@ mod test {
             break;
         }
         routing.stop();
-        ::std::thread::sleep_ms(2000);
+        let _ = join_handle.join();
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
