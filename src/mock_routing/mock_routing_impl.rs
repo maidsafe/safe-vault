@@ -133,7 +133,7 @@ impl MockRoutingImpl {
         self.refresh_requests_given.clone()
     }
 
-    pub fn terminate(&self) {
+    pub fn stop(&self) {
         use routing::event::Event;
         let _ = self.sender.send(Event::Terminated);
     }

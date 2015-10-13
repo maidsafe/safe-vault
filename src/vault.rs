@@ -394,7 +394,7 @@ mod test {
             assert_eq!(it, ::routing::data::Data::ImmutableData(im_data));
             break;
         }
-        routing.terminate();
+        routing.stop();
         ::std::thread::sleep_ms(2000);
     }
 
@@ -441,7 +441,7 @@ mod test {
             assert_eq!(it, ::routing::data::Data::StructuredData(sd_new));
             break;
         }
-        routing.terminate();
+        routing.stop();
         ::std::thread::sleep_ms(2000);
     }
 
