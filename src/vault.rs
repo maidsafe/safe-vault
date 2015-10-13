@@ -651,6 +651,7 @@ mod test {
     #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_test() {
+        remove_files();
         let (mut vault_notifiers, mut client_routing, client_receiver, client_name) =
             network_env_setup();
 
@@ -885,5 +886,65 @@ mod test {
                                  3,
                                  1,
                                  ::time::Duration::minutes(3));
+
+        remove_files();
+    }
+
+    #[cfg(not(feature = "use-mock-routing"))]
+    fn remove_files() {
+        // let _ = current_bin_dir().and_then(|cur_bin_dir| {
+        //     println!("going to remove cur_bin_dir : {:?}", cur_bin_dir);
+        //                                     ::std::fs::remove_dir_all(cur_bin_dir) });
+        let _ = user_app_dir().and_then(|user_app_dir| {
+            println!("going to remove user_app_dir : {:?}", user_app_dir);
+                                            ::std::fs::remove_dir_all(user_app_dir) });
+        let _ = system_cache_dir().and_then(|sys_cache_dir| {
+            println!("going to remove sys_cache_dir : {:?}", sys_cache_dir);
+                                            ::std::fs::remove_dir_all(sys_cache_dir) });
+    }
+
+    // #[cfg(not(feature = "use-mock-routing"))]
+    // fn current_bin_dir() -> Result<::std::path::PathBuf, ::std::io::Error> {
+    //     let mut path = try!(::std::env::current_exe());
+    //     let pop_result = path.pop();
+    //     debug_assert!(pop_result);
+    //     Ok(path)
+    // }
+
+    #[cfg(all(target_os = "windows", not(feature = "use-mock-routing")))]
+    fn user_app_dir() -> Result<::std::path::PathBuf, ::std::io::Error> {
+        Ok(try!(join_exe_file_stem(::std::path::Path::new(&try!(::std::env::var("APPDATA"))))))
+    }
+
+    #[cfg(all(any(target_os="macos", target_os="ios", target_os="linux"), not(feature = "use-mock-routing")))]
+    fn user_app_dir() -> Result<::std::path::PathBuf, ::std::io::Error> {
+        Ok(try!(join_exe_file_stem(&try!(::std::env::home_dir().ok_or(not_found_error()))
+                                  .join(".config"))))
+    }
+
+    #[cfg(all(target_os = "windows", not(feature = "use-mock-routing")))]
+    fn system_cache_dir() -> Result<::std::path::PathBuf, ::std::io::Error> {
+        Ok(try!(join_exe_file_stem(::std::path::Path::new(&try!(::std::env::var("ALLUSERSPROFILE"))))))
+    }
+
+    #[cfg(all(any(target_os="macos", target_os="ios", target_os="linux"), not(feature = "use-mock-routing")))]
+    fn system_cache_dir() -> Result<::std::path::PathBuf, ::std::io::Error> {
+        join_exe_file_stem(::std::path::Path::new("/var/cache"))
+    }
+
+    #[cfg(not(feature = "use-mock-routing"))]
+    fn join_exe_file_stem(path: &::std::path::Path) -> Result<::std::path::PathBuf, ::std::io::Error> {
+        Ok(path.join(try!(exe_file_stem())))
+    }
+
+    #[cfg(not(feature = "use-mock-routing"))]
+    fn exe_file_stem() -> Result<::std::path::PathBuf, ::std::io::Error> {
+        let exe_path = try!(::std::env::current_exe());
+        Ok(::std::path::PathBuf::from(try!(exe_path.file_stem().ok_or(not_found_error()))))
+    }
+
+    #[cfg(not(feature = "use-mock-routing"))]
+    fn not_found_error() -> ::std::io::Error {
+        ::std::io::Error::new(::std::io::ErrorKind::NotFound, "No file name component")
     }
 }
