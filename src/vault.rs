@@ -651,6 +651,10 @@ mod test {
     #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_test() {
+        let mut boostrap_cleaner = ::crust::BootstrapRemover;
+        boostrap_cleaner.remove();
+        let mut config_cleaner = ::crust::ConfigRemover;
+        config_cleaner.remove();
         let (mut vault_notifiers, mut client_routing, client_receiver, client_name) =
             network_env_setup();
 
