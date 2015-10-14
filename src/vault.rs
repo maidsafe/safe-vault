@@ -422,7 +422,10 @@ mod test {
         loop {
             match completion_receiver.try_recv() {
                 Err(_) => {}
-                Ok(_) => break,
+                Ok(_) => {
+                    ::std::thread::sleep_ms(20);
+                    break;
+                }
             }
             ::std::thread::sleep_ms(1);
             if starting_time + time_limit < ::time::SteadyTime::now() {
@@ -479,8 +482,11 @@ mod test {
         let time_limit = ::time::Duration::seconds(10);
         loop {
             match completion_receiver.try_recv() {
-                Err(_) => {}
-                Ok(_) => break,
+                Err(_) => {},
+                Ok(_) => {
+                    ::std::thread::sleep_ms(20);
+                    break;
+                }
             }
             ::std::thread::sleep_ms(1);
             if starting_time + time_limit < ::time::SteadyTime::now() {
