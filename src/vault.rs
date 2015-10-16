@@ -501,7 +501,9 @@ mod test {
             ::routing::routing_client::RoutingClient,
             ::std::sync::mpsc::Receiver<(::routing::data::Data)>,
             ::routing::NameType,
-            ::std::sync::mpsc::Receiver<::routing::event::Event>) {
+            ::std::sync::mpsc::Sender<::routing::event::Event>,
+            ::std::sync::mpsc::Receiver<::routing::event::Event>,
+            ) {
         ::utils::initialise_logger();
 
         let (completion_sender, completion_receiver) = ::std::sync::mpsc::channel();
@@ -521,7 +523,7 @@ mod test {
             vault_notifiers.push(cur_notifier.swap_remove(0));
         }
         let (client_routing, client_receiver, client_name) = create_client();
-        (vault_notifiers, client_routing, client_receiver, client_name, completion_receiver)
+        (vault_notifiers, client_routing, client_receiver, client_name, completion_sender, completion_receiver)
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
@@ -738,7 +740,7 @@ mod test {
         remove_bootstrap_file();
         create_empty_bootstrap_file();
         let (mut vault_notifiers, mut client_routing, client_receiver,
-             client_name, completion_receiver) =
+             client_name, completion_sender, completion_receiver) =
             network_env_setup();
 
         // ======================= Put/Get test =======================
@@ -824,9 +826,12 @@ mod test {
         println!("network_churn_up_immutable_data_test starting new vault");
         let (sender, receiver) = ::std::sync::mpsc::channel();
         let (app_sender, app_receiver) = ::std::sync::mpsc::channel();
-        let _ = ::std::thread::spawn(move || {
-            ::vault::Vault::new(Some(sender), Some(app_receiver)).do_run(None);
-        });
+        let run_vault = |mut vault: Vault, completion_sender: ::std::sync::mpsc::Sender<::routing::event::Event>| {
+            let _ = ::std::thread::spawn(move || {
+                vault.do_run(Some(completion_sender));
+            });
+        };
+        let _ = run_vault(Vault::new(Some(sender), Some(app_receiver)), completion_sender.clone());
         vault_notifiers.push((receiver, app_sender));
         let _ = waiting_for_hits(&vault_notifiers,
                                  20,
@@ -865,9 +870,7 @@ mod test {
         println!("network_churn_up_structured_data_test starting new vault");
         let (sender, receiver) = ::std::sync::mpsc::channel();
         let (app_sender, app_receiver) = ::std::sync::mpsc::channel();
-        let _ = ::std::thread::spawn(move || {
-            ::vault::Vault::new(Some(sender), Some(app_receiver)).do_run(None);
-        });
+        let _ = run_vault(Vault::new(Some(sender), Some(app_receiver)), completion_sender.clone());
         vault_notifiers.push((receiver, app_sender));
         let _ = waiting_for_hits(&vault_notifiers,
                                  21,
