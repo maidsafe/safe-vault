@@ -500,12 +500,14 @@ mod test {
                                     ::std::sync::mpsc::Sender<(u8)>)>,
             ::routing::routing_client::RoutingClient,
             ::std::sync::mpsc::Receiver<(::routing::data::Data)>,
-            ::routing::NameType) {
+            ::routing::NameType,
+            ::std::sync::mpsc::Receiver<::routing::event::Event>) {
         ::utils::initialise_logger();
 
-        let run_vault = |mut vault: Vault| {
+        let (completion_sender, completion_receiver) = ::std::sync::mpsc::channel();
+        let run_vault = |mut vault: Vault, completion_sender: ::std::sync::mpsc::Sender<::routing::event::Event>| {
             let _ = ::std::thread::spawn(move || {
-                vault.do_run(None);
+                vault.do_run(Some(completion_sender));
             });
         };
         let mut vault_notifiers = Vec::new();
@@ -513,13 +515,13 @@ mod test {
             println!("starting node {:?}", i);
             let (vault_sender, vault_receiver) = ::std::sync::mpsc::channel();
             let (app_sender, app_receiver) = ::std::sync::mpsc::channel();
-            let _ = run_vault(Vault::new(Some(vault_sender), Some(app_receiver)));
+            let _ = run_vault(Vault::new(Some(vault_sender), Some(app_receiver)), completion_sender.clone());
             let mut cur_notifier = vec![(vault_receiver, app_sender)];
             let _ = waiting_for_hits(&cur_notifier, 10, i, ::time::Duration::seconds(10 * (i + 1) as i64));
             vault_notifiers.push(cur_notifier.swap_remove(0));
         }
         let (client_routing, client_receiver, client_name) = create_client();
-        (vault_notifiers, client_routing, client_receiver, client_name)
+        (vault_notifiers, client_routing, client_receiver, client_name, completion_receiver)
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
@@ -683,9 +685,38 @@ mod test {
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
+    fn clean_up_vault(vault_notifiers: Vec<(::std::sync::mpsc::Receiver<(::routing::event::Event)>, 
+                                            ::std::sync::mpsc::Sender<(u8)>)>,
+                        mut client_routing: ::routing::routing_client::RoutingClient,
+                        completion_receiver: ::std::sync::mpsc::Receiver<::routing::event::Event>) {
+        client_routing.stop();
+        for notifier in &vault_notifiers {
+            let _ = notifier.1.send(0);
+        }
+        let starting_time = ::time::SteadyTime::now();
+        let time_limit = ::time::Duration::seconds(10);
+        for _ in 0..vault_notifiers.len() {
+            loop {
+                match completion_receiver.try_recv() {
+                    Err(_) => {}
+                    Ok(_) => {
+                        ::std::thread::sleep_ms(20);
+                        break;
+                    }
+                }
+                ::std::thread::sleep_ms(1);
+                if starting_time + time_limit < ::time::SteadyTime::now() {
+                    panic!("vaults did not shut down in expected duration");
+                }
+            }
+        }
+    }
+
+    #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_put_get_test() {
-        let (vault_notifiers, mut client_routing, client_receiver, client_name) =
+        let (vault_notifiers, mut client_routing, client_receiver,
+             client_name, completion_receiver) =
             network_env_setup();
 
         let value = ::routing::types::generate_random_vec_u8(1024);
@@ -705,12 +736,14 @@ mod test {
         waiting_for_client_get(client_receiver,
                                ::routing::data::Data::ImmutableData(im_data),
                                ::time::Duration::minutes(1));
+        clean_up_vault(vault_notifiers, client_routing, completion_receiver);
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_post_test() {
-        let (vault_notifiers, mut client_routing, client_receiver, client_name) =
+        let (vault_notifiers, mut client_routing, client_receiver,
+             client_name, completion_receiver) =
             network_env_setup();
 
         let name = ::utils::random_name();
@@ -754,12 +787,14 @@ mod test {
         waiting_for_client_get(client_receiver,
                                ::routing::data::Data::StructuredData(sd_new),
                                ::time::Duration::minutes(1));
+        clean_up_vault(vault_notifiers, client_routing, completion_receiver);
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_churn_up_immutable_data_test() {
-        let (mut vault_notifiers, mut client_routing, client_receiver, client_name) =
+        let (mut vault_notifiers, mut client_routing, client_receiver,
+             client_name, completion_receiver) =
             network_env_setup();
 
         let value = ::routing::types::generate_random_vec_u8(1024);
@@ -791,12 +826,14 @@ mod test {
         waiting_for_client_get(client_receiver,
                                ::routing::data::Data::ImmutableData(im_data),
                                ::time::Duration::minutes(1));
+        clean_up_vault(vault_notifiers, client_routing, completion_receiver);
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_churn_up_structured_data_test() {
-        let (mut vault_notifiers, mut client_routing, client_receiver, client_name) =
+        let (mut vault_notifiers, mut client_routing, client_receiver,
+             client_name, completion_receiver) =
             network_env_setup();
 
         let name = ::utils::random_name();
@@ -835,12 +872,13 @@ mod test {
         waiting_for_client_get(client_receiver,
                                ::routing::data::Data::StructuredData(sd),
                                ::time::Duration::minutes(1));
+        clean_up_vault(vault_notifiers, client_routing, completion_receiver);
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_churn_down_one_node_immutable_data_test() {
-        let (vault_notifiers, client_routing, _, client_name) =
+        let (vault_notifiers, client_routing, _, client_name, completion_receiver) =
             network_env_setup();
 
         let value = ::routing::types::generate_random_vec_u8(1024);
@@ -882,12 +920,13 @@ mod test {
                                  30,
                                  ::routing::types::GROUP_SIZE / 2 + 1,
                                  ::time::Duration::minutes(3));
+        clean_up_vault(vault_notifiers, new_client_routing, completion_receiver);
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
     #[test]
     fn network_churn_down_two_nodes_immutable_data_test() {
-        let (vault_notifiers, client_routing, _, client_name) =
+        let (vault_notifiers, client_routing, _, client_name, completion_receiver) =
             network_env_setup();
 
         let value = ::routing::types::generate_random_vec_u8(1024);
@@ -936,5 +975,6 @@ mod test {
                                  3,
                                  1,
                                  ::time::Duration::minutes(3));
+        clean_up_vault(vault_notifiers, new_client_routing, completion_receiver);
     }
 }
