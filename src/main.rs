@@ -51,6 +51,7 @@ extern crate time;
 extern crate rand;
 
 // MaidSafe crates
+extern crate crust;
 extern crate lru_time_cache;
 extern crate routing;
 
@@ -59,6 +60,7 @@ mod macros;
 
 mod chunk_store;
 mod data_manager;
+mod error;
 mod maid_manager;
 mod mock_routing;
 mod pmid_manager;
@@ -72,5 +74,6 @@ mod vault;
 /// Runs a SAFE Network vault.
 pub fn main() {
     ::utils::initialise_logger();
+    ::utils::handle_version();
     ::vault::Vault::run();
 }

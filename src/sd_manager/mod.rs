@@ -21,19 +21,18 @@ pub const ACCOUNT_TAG: u64 = ::transfer_tag::TransferTag::StructuredDataManagerA
 
 pub struct StructuredDataManager {
     routing: ::vault::Routing,
-    // TODO: This is assuming ChunkStore has the ability of handling mutable(SDV)
-    // data, and put is overwritable
-    // If such assumption becomes invalid, LruCache or Sqlite based persona specific
-    // database shall be used
+    // ChunkStore has the ability of handling mutable(SDV) data, and put is overwritable
     chunk_store: ::chunk_store::ChunkStore,
 }
 
 impl StructuredDataManager {
     pub fn new(routing: ::vault::Routing) -> StructuredDataManager {
-        // TODO adjustable max_disk_space
         StructuredDataManager {
             routing: routing,
-            chunk_store: ::chunk_store::ChunkStore::new(1073741824),
+            // TODO allow adjustable max_disk_space and return meaningful error rather than panic
+            // if the ChunkStore creation fails.
+            // See https://maidsafe.atlassian.net/browse/MAID-1370
+            chunk_store: ::chunk_store::ChunkStore::new(1073741824).unwrap(),
         }
     }
 
@@ -102,7 +101,8 @@ impl StructuredDataManager {
             return ::utils::HANDLED;
         }
 
-        // TODO: SD using PUT for the first copy, then POST to update and transfer in case of churn
+        // SD using PUT for the first copy so the request can pass through MaidManager,
+        //    then POST to update and transfer in case of churn
         //       so if the data exists, then the put shall be rejected
         //          if the data does not exist, and the request is not from SDM(i.e. a transfer),
         //              then the post shall be rejected
@@ -142,7 +142,8 @@ impl StructuredDataManager {
             }
         };
 
-        // TODO: SD using PUT for the first copy, then POST to update and transfer in case of churn
+        // SD using PUT for the first copy so the request can pass through MaidManager,
+        //    then POST to update and transfer in case of churn
         //       so if the data exists, then the put shall be rejected
         //          if the data does not exist, and the request is not from SDM(i.e. a transfer),
         //              then the post shall be rejected
@@ -193,9 +194,9 @@ impl StructuredDataManager {
             self.routing.refresh_request(ACCOUNT_TAG, Authority(name),
                                          data, churn_node.clone());
         }
-        // FIXME: as pointed out in https://github.com/maidsafe/safe_vault/issues/250
-        //        the uncontrollable order of events (churn/refresh/account_transfer)
-        //        forcing the node have to keep its current records to avoid losing
+        // As pointed out in https://github.com/maidsafe/safe_vault/issues/250
+        // the uncontrollable order of events (churn/refresh/account_transfer)
+        // forcing the node have to keep its current records to avoid losing record
         // self.chunk_store = ::chunk_store::ChunkStore::new(1073741824);
     }
 
@@ -220,7 +221,10 @@ impl StructuredDataManager {
 
     pub fn reset(&mut self, routing: ::vault::Routing) {
         self.routing = routing;
-        self.chunk_store = ::chunk_store::ChunkStore::new(1073741824);
+        match ::chunk_store::ChunkStore::new(1073741824) {
+            Ok(chunk_store) => self.chunk_store = chunk_store,
+            Err(err) => { debug!("Failed to reset sd_manager chunk store {:?}", err); },
+        };
     }
 
     fn handle_account_transfer(&mut self,
