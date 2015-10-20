@@ -395,6 +395,27 @@ mod test {
     }
 
     #[cfg(feature = "use-mock-routing")]
+    fn mock_env_close(routing: Routing,
+                     completion_receiver: ::std::sync::mpsc::Receiver<(::routing::event::Event)>) {
+        routing.stop();
+        let starting_time = ::time::SteadyTime::now();
+        let time_limit = ::time::Duration::seconds(10);
+        loop {
+            match completion_receiver.try_recv() {
+                Err(_) => {}
+                Ok(_) => {
+                    ::std::thread::sleep_ms(20);
+                    break;
+                }
+            }
+            ::std::thread::sleep_ms(1);
+            if starting_time + time_limit < ::time::SteadyTime::now() {
+                panic!("vault did not shut down in expected duration");
+            }
+        }
+    }
+
+    #[cfg(feature = "use-mock-routing")]
     #[test]
     fn put_get_flow() {
         let (mut routing, receiver, completion_receiver) = mock_env_setup();
@@ -416,22 +437,7 @@ mod test {
             assert_eq!(it, ::routing::data::Data::ImmutableData(im_data));
             break;
         }
-        routing.stop();
-        let starting_time = ::time::SteadyTime::now();
-        let time_limit = ::time::Duration::seconds(10);
-        loop {
-            match completion_receiver.try_recv() {
-                Err(_) => {}
-                Ok(_) => {
-                    ::std::thread::sleep_ms(20);
-                    break;
-                }
-            }
-            ::std::thread::sleep_ms(1);
-            if starting_time + time_limit < ::time::SteadyTime::now() {
-                panic!("vault did not shut down in expected duration");
-            }
-        }
+        mock_env_close(routing, completion_receiver);
     }
 
     #[cfg(feature = "use-mock-routing")]
@@ -477,22 +483,7 @@ mod test {
             assert_eq!(it, ::routing::data::Data::StructuredData(sd_new));
             break;
         }
-        routing.stop();
-        let starting_time = ::time::SteadyTime::now();
-        let time_limit = ::time::Duration::seconds(10);
-        loop {
-            match completion_receiver.try_recv() {
-                Err(_) => {},
-                Ok(_) => {
-                    ::std::thread::sleep_ms(20);
-                    break;
-                }
-            }
-            ::std::thread::sleep_ms(1);
-            if starting_time + time_limit < ::time::SteadyTime::now() {
-                panic!("vault did not shut down in expected duration");
-            }
-        }
+        mock_env_close(routing, completion_receiver);
     }
 
     #[cfg(not(feature = "use-mock-routing"))]
