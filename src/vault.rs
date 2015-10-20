@@ -114,12 +114,8 @@ impl Vault {
     #[cfg(test)]
     fn confirm_run_complete(&self, completion_sender: Option<::std::sync::mpsc::Sender<::routing::event::Event>>)
     {
-        match completion_sender {
-            Some(sender) => {
-                let _ = sender.send(::routing::event::Event::Terminated);
-            },
-            None => { },
-        }
+        let _ = completion_sender
+            .and_then(|sender| { Some(sender.send(::routing::event::Event::Terminated)) });
     }
 
     #[cfg(not(test))]
