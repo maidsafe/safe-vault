@@ -133,6 +133,11 @@ impl MockRoutingImpl {
         self.refresh_requests_given.clone()
     }
 
+    pub fn stop(&self) {
+        use routing::event::Event;
+        let _ = self.sender.send(Event::Terminated);
+    }
+
     // -----------  the following methods are expected to be API functions   ------------- //
     pub fn get_request(&mut self,
                        our_authority: ::routing::Authority,
