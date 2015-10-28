@@ -152,7 +152,8 @@ impl ChunkStore {
             Some(safe_vault_pids) => {
                 let own_pid = format!("{}", Self::get_own_pid());
                 ::std::fs::read_dir(::std::env::temp_dir()).ok().and_then(|dir_entries| {
-                    dir_entries.filter(|dir_entry| {
+                    let own_dir: Vec<Result<::std::fs::DirEntry, ::std::io::Error>>
+                            = dir_entries.filter(|dir_entry| {
                         match dir_entry {
                             &Ok(ref entry) => {
                                 let line = entry.file_name().into_string().ok().unwrap_or(String::from(""));
@@ -160,7 +161,9 @@ impl ChunkStore {
                                     (true, false) => {
                                         let v: Vec<&str> = line.split("-").collect();
                                         if v.len() > 1 && !safe_vault_pids.contains(&String::from(v[1])) {
-                                            let _ = evaluate_result!(::std::fs::remove_dir_all(entry.path()));
+                                            // As the dir itself is not atomic, there is chance other vault
+                                            // has cleaned up the directory, no need to panic here
+                                            ignore_result!(::std::fs::remove_dir_all(entry.path()));
                                         }
                                     }
                                     (true, true) => return true,
@@ -170,7 +173,11 @@ impl ChunkStore {
                             &Err(_) => {},
                         }
                         false
-                    }).next()
+                    }).collect();
+                    match own_dir.len() {
+                        0 => None,
+                        _ => Some(true),
+                    }
                 }).is_none()
             }
             None => true,
