@@ -30,9 +30,7 @@ impl ChunkStore {
         let mut path = ::std::env::temp_dir();
         path.push(folder_name);
         if Self::cleanup() {
-            // As the dir itself is not atomic among threads, when executing cargo test in
-            // multi-threads mode, there is chance the tempdir has been created by other
-            ignore_result!(::std::fs::create_dir(&path));
+            let _ = try!(::std::fs::create_dir(&path));
         }
         let tempdir = try!(::tempdir::TempDir::new_in(path, "safe_vault"));
 
@@ -159,13 +157,12 @@ impl ChunkStore {
                         match dir_entry {
                             &Ok(ref entry) => {
                                 let line = entry.file_name().into_string().ok().unwrap_or(String::from(""));
-                                  match (line.contains("safe_vault"), line.contains(&own_pid)) {
+                                match (line.contains("safe_vault"), line.contains(&own_pid)) {
                                     (true, false) => {
                                         let v: Vec<&str> = line.split("-").collect();
                                         if v.len() > 1 && !safe_vault_pids.contains(&String::from(v[1])) {
-                                            // As the dir itself is not atomic among threads,
-                                            // when executing cargo test in multi-threads mode,
-                                            // there is chance the tempdir has been removed
+                                            // As the dir itself is not atomic, there is chance other vault
+                                            // has cleaned up the directory, no need to panic here
                                             ignore_result!(::std::fs::remove_dir_all(entry.path()));
                                         }
                                     }
