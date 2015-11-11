@@ -21,6 +21,7 @@ pub type PmidNodes = Vec<PmidNode>;
 type PmidNode = ::routing::NameType;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
+#[allow(unused_results)] 
 pub struct Account {
     name: DataName,
     data_holders: PmidNodes,

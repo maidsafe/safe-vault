@@ -18,6 +18,7 @@
 type PmidNodeName = ::routing::NameType;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
+#[allow(unused_results)] 
 pub struct Account {
     name: PmidNodeName,
     value: AccountValue,
@@ -48,6 +49,7 @@ impl ::types::Refreshable for Account {
 
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
+#[allow(unused_results)] 
 pub struct AccountValue {
     stored_total_size: u64,
     lost_total_size: u64,
