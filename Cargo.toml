@@ -16,14 +16,14 @@ log = "*"
 env_logger = "*"
 rand = "*"
 rustc-serialize = "*"
-sodiumoxide = "*"
+sodiumoxide = "0.0.8"
 tempdir = "*"
 time = "*"
 
 # ---- MaidSafe ------
-crust = "0.4.*"
+crust = "0.5.*"
 lru_time_cache = "0.2.*"
-routing = "0.4.*"
+routing ={ git="https://github.com/waynenilsen/routing.git", rev="256a7f3"} 
 
 [features]
 use-mock-routing = []

@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 #[derive(Debug)]
+#[allow(unused_results)] 
 pub enum ChunkStoreError {
     // Report Input/Output error.
     Io(::std::io::Error),
