@@ -18,7 +18,6 @@
 type MaidNodeName = ::routing::NameType;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
-#[allow(unused_results)] 
 pub struct Account {
     name: MaidNodeName,
     value: AccountValue,
@@ -49,7 +48,6 @@ impl ::types::Refreshable for Account {
 
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
-#[allow(unused_results)] 
 pub struct AccountValue {
     data_stored: u64,
     space_available: u64,

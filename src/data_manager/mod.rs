@@ -31,7 +31,6 @@ type ChunkNameAndPmidNode = (::routing::NameType, ::routing::NameType);
 const LRU_CACHE_SIZE: usize = 1000;
 
 #[derive(RustcEncodable, RustcDecodable, Clone, PartialEq, Eq, Debug)]
-#[allow(unused_results)] 
 pub struct Stats {
     name: ::routing::NameType,
     resource_index: u64,
