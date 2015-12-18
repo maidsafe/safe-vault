@@ -15,7 +15,10 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-type PmidNodeName = ::routing::NameType;
+use maidsafe_utilities::serialisation::serialise;
+use routing::Authority;
+use xor_name::XorName;
+type PmidNodeName = XorName;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
 pub struct Account {
@@ -25,12 +28,15 @@ pub struct Account {
 
 impl Account {
     fn new(name: PmidNodeName, value: AccountValue) -> Account {
-        Account { name: name, value: value }
+        Account {
+            name: name,
+            value: value,
+        }
     }
 }
 
 impl ::types::Refreshable for Account {
-    fn merge(from_group: ::routing::NameType, responses: Vec<Account>) -> Option<Account> {
+    fn merge(from_group: XorName, responses: Vec<Account>) -> Option<Account> {
         let mut stored_total_size: Vec<u64> = Vec::new();
         let mut lost_total_size: Vec<u64> = Vec::new();
         for response in responses {
@@ -57,7 +63,10 @@ impl Default for AccountValue {
     // FIXME: Account Creation process required https://maidsafe.atlassian.net/browse/MAID-1191
     //   To bypass the the process for a simple network, allowance is granted by default
     fn default() -> AccountValue {
-        AccountValue { stored_total_size: 0, lost_total_size: 0 }
+        AccountValue {
+            stored_total_size: 0,
+            lost_total_size: 0,
+        }
     }
 }
 
@@ -69,9 +78,9 @@ impl AccountValue {
         }
     }
 
-  // Always return true to allow pmid_node carry out removal of Sacrificial copies
-  // Otherwise AccountValue need to remember storage info of Primary, Backup and Sacrificial
-  // copies separately to trigger an early alert
+    // Always return true to allow pmid_node carry out removal of Sacrificial copies
+    // Otherwise AccountValue need to remember storage info of Primary, Backup and Sacrificial
+    // copies separately to trigger an early alert
     fn put_data(&mut self, size: u64) {
         // if (self.stored_total_size + size) > self.offered_space {
         //   return false;
@@ -126,6 +135,7 @@ impl Database {
         entry.put_data(size)
     }
 
+    #[allow(unused)]
     pub fn delete_data(&mut self, name: &PmidNodeName, size: u64) {
         let default: AccountValue = Default::default();
         let entry = self.storage.entry(name.clone()).or_insert(default);
@@ -136,21 +146,23 @@ impl Database {
         let _ = self.storage.remove(&merged_account.name);
         let value = merged_account.value.clone();
         let _ = self.storage.insert(merged_account.name, merged_account.value);
-        info!("PmidManager updated account {:?} to {:?}", merged_account.name, value);
+        info!("PmidManager updated account {:?} to {:?}",
+              merged_account.name,
+              value);
     }
 
-    pub fn handle_churn(&mut self, close_group: &Vec<::routing::NameType>,
-                        routing: &::vault::Routing, churn_node: &::routing::NameType) {
+    pub fn handle_churn(&mut self, close_group: &Vec<XorName>, routing: &::vault::Routing, churn_node: &XorName) {
         for (key, value) in self.storage.iter() {
             if close_group.iter().find(|a| **a == *key).is_some() {
                 let account = Account::new((*key).clone(), (*value).clone());
-                let our_authority = super::Authority(account.name);
-                let mut encoder = ::cbor::Encoder::from_memory();
-                if encoder.encode(&[account]).is_ok() {
-                    debug!("PmidManager sends out a refresh regarding account {:?}",
-                           our_authority.get_location());
-                routing.refresh_request(super::ACCOUNT_TAG, our_authority,
-                                        encoder.as_bytes().to_vec(), churn_node.clone());
+                let our_authority = Authority::NodeManager(account.name);
+                if let Ok(serialised_account) = serialise(&[account]) {
+                    debug!("PmidManager sending refresh for account {:?}",
+                           our_authority.get_name());
+                    let _ = routing.send_refresh_request(super::ACCOUNT_TAG,
+                                                         our_authority.clone(),
+                                                         serialised_account,
+                                                         churn_node.clone());
                 }
             }
         }
@@ -163,18 +175,20 @@ impl Database {
     pub fn do_refresh(&mut self,
                       type_tag: &u64,
                       our_authority: &::routing::Authority,
-                      churn_node: &::routing::NameType,
-                      routing: &::vault::Routing) -> Option<()> {
+                      churn_node: &XorName,
+                      routing: &::vault::Routing)
+                      -> Option<()> {
         if type_tag == &super::ACCOUNT_TAG {
             for (key, value) in self.storage.iter() {
-                if key == our_authority.get_location() {
+                if key == our_authority.get_name() {
                     let account = Account::new((*key).clone(), (*value).clone());
-                    let mut encoder = ::cbor::Encoder::from_memory();
-                    if encoder.encode(&[account]).is_ok() {
-                        debug!("PmidManager on-request sends out a refresh regarding account {:?}",
-                               our_authority.get_location());
-                        routing.refresh_request(super::ACCOUNT_TAG, our_authority.clone(),
-                                                encoder.as_bytes().to_vec(), churn_node.clone());
+                    if let Ok(serialised_account) = serialise(&[account]) {
+                        debug!("PmidManager sending on_refresh for account {:?}",
+                               our_authority.get_name());
+                        let _ = routing.send_refresh_request(super::ACCOUNT_TAG,
+                                                             our_authority.clone(),
+                                                             serialised_account,
+                                                             churn_node.clone());
                     }
                 }
             }
@@ -183,6 +197,7 @@ impl Database {
         ::utils::NOT_HANDLED
     }
 
+    #[allow(unused)]
     pub fn cleanup(&mut self) {
         self.storage.clear();
     }
@@ -191,11 +206,13 @@ impl Database {
 #[cfg(test)]
 mod test {
     use super::*;
+    use ::rand::random;
+    use xor_name::XorName;
 
     #[test]
     fn exist() {
         let mut db = Database::new();
-        let name = ::utils::random_name();
+        let name = random();
         assert!(!db.storage.contains_key(&name));
         db.put_data(&name, 1024);
         assert!(db.storage.contains_key(&name));
@@ -204,7 +221,7 @@ mod test {
     // #[test]
     // fn put_data() {
     //     let mut db = Database::new();
-    //     let name = ::utils::random_name();
+    //     let name = random();
     //     assert_eq!(db.put_data(&name, 0), true);
     //     assert_eq!(db.exist(&name), true);
     //     assert_eq!(db.put_data(&name, 1), true);
@@ -219,12 +236,11 @@ mod test {
     #[test]
     fn handle_account_transfer() {
         let mut db = Database::new();
-        let name = ::utils::random_name();
+        let name = random();
         db.put_data(&name, 1024);
         assert!(db.storage.contains_key(&name));
 
-        let account_value = AccountValue::new(::rand::random::<u64>(),
-                                              ::rand::random::<u64>());
+        let account_value = AccountValue::new(::rand::random::<u64>(), ::rand::random::<u64>());
         let account = Account::new(name.clone(), account_value.clone());
         db.handle_account_transfer(account);
         assert_eq!(db.storage[&name], account_value);
@@ -232,15 +248,14 @@ mod test {
 
     #[test]
     fn pmid_manager_account_serialisation() {
-        let obj_before = Account::new(::routing::NameType([1u8; 64]),
-                                      AccountValue::new(::rand::random::<u64>(),
-                                                        ::rand::random::<u64>()));
+        let obj_before = Account::new(XorName([1u8; 64]),
+                                      AccountValue::new(::rand::random::<u64>(), ::rand::random::<u64>()));
 
         let mut e = ::cbor::Encoder::from_memory();
-        evaluate_result!(e.encode(&[&obj_before]));
+        unwrap_result!(e.encode(&[&obj_before]));
 
         let mut d = ::cbor::Decoder::from_bytes(e.as_bytes());
-        let obj_after: Account = evaluate_result!(evaluate_option!(d.decode().next(), ""));
+        let obj_after: Account = unwrap_result!(unwrap_option!(d.decode().next(), ""));
 
         assert_eq!(obj_before, obj_after);
     }
