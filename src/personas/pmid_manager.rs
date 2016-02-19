@@ -99,7 +99,10 @@ impl PmidManager {
                       pmid_node: XorName)
                       -> Result<(), InternalError> {
         // Put data always being allowed, i.e. no early alert
-        self.accounts.entry(pmid_node.clone()).or_insert(Account::default()).put_data(data.payload_size() as u64);
+        self.accounts
+            .entry(pmid_node.clone())
+            .or_insert(Account::default())
+            .put_data(data.payload_size() as u64);
 
         let src = Authority::NodeManager(pmid_node.clone());
         let dst = Authority::ManagedNode(pmid_node);
@@ -156,29 +159,17 @@ impl PmidManager {
         let _ = self.accounts.insert(name, account);
     }
 
-    pub fn handle_churn(&mut self, routing_node: &RoutingNode, churn_event_id: &MessageId) {
+    pub fn handle_churn(&mut self, routing_node: &RoutingNode) {
         for (pmid_node, account) in self.accounts.iter() {
-            // Only refresh accounts for PmidNodes which are still in our close group
-            let close_group = match routing_node.close_group() {
-                Ok(group) => group,
-                Err(error) => {
-                    error!("Failed to get close group from Routing: {:?}", error);
-                    return;
-                }
-            };
-            if !close_group.iter().any(|&group_member| group_member == *pmid_node) {
+            // Only refresh accounts for PmidNodes to which we are still close
+            if routing_node.close_group(pmid_node.clone()).ok().is_none() {
                 continue;
             }
 
             let src = Authority::NodeManager(pmid_node.clone());
-            let refresh = Refresh {
-                id: churn_event_id.clone(),
-                name: pmid_node.clone(),
-                value: RefreshValue::PmidManager(account.clone()),
-            };
+            let refresh = Refresh::new(pmid_node, RefreshValue::PmidManager(account.clone()));
             if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
-                debug!("PmidManager sending refresh for account {:?}",
-                       src.get_name());
+                debug!("PmidManager sending refresh for account {:?}", src.name());
                 let _ = routing_node.send_refresh_request(src, serialised_refresh);
             }
         }
@@ -247,7 +238,7 @@ impl PmidManager {
 // assert_eq!(put_requests.len(), 1);
 // assert_eq!(put_requests[0].our_authority, our_authority);
 // assert_eq!(put_requests[0].location,
-// Authority::ManagedNode(our_authority.get_name().clone()));
+// Authority::ManagedNode(our_authority.name().clone()));
 // assert_eq!(put_requests[0].data,
 // ::routing::data::Data::ImmutableData(data));
 // }
@@ -267,7 +258,7 @@ impl PmidManager {
 // XorName::new([2u8; 64]),
 // XorName::new([3u8; 64]),
 // XorName::new([4u8; 64]),
-// our_authority.get_name().clone(),
+// our_authority.name().clone(),
 // XorName::new([5u8; 64]),
 // XorName::new([6u8; 64]),
 // XorName::new([7u8; 64]),
@@ -277,8 +268,8 @@ impl PmidManager {
 // let refresh_requests = routing.refresh_requests_given();
 // assert_eq!(refresh_requests.len(), 1);
 // assert_eq!(refresh_requests[0].type_tag, ACCOUNT_TAG);
-// assert_eq!(refresh_requests[0].our_authority.get_name(),
-// our_authority.get_name());
+// assert_eq!(refresh_requests[0].our_authority.name(),
+// our_authority.name());
 //
 // let mut d = ::cbor::Decoder::from_bytes(&refresh_requests[0].content[..]);
 // if let Some(pm_account) = d.decode().next().and_then(|result| result.ok()) {

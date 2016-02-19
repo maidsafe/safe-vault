@@ -15,15 +15,23 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use personas::{immutable_data_manager, maid_manager, pmid_manager};
-use routing::{MessageId, StructuredData};
+use personas::{immutable_data_manager, maid_manager, pmid_manager, mpid_manager};
+use routing::{PlainData, StructuredData};
 use xor_name::XorName;
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable, RustcDecodable)]
 pub struct Refresh {
-    pub id: MessageId,
     pub name: XorName,
     pub value: RefreshValue,
+}
+
+impl Refresh {
+    pub fn new(name: &XorName, value: RefreshValue) -> Refresh {
+        Refresh {
+            name: name.clone(),
+            value: value,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable, RustcDecodable)]
@@ -32,4 +40,6 @@ pub enum RefreshValue {
     ImmutableDataManager(immutable_data_manager::Account),
     StructuredDataManager(StructuredData),
     PmidManager(pmid_manager::Account),
+    // mpid_manager: account, outbox messages, inbox headers
+    MpidManager(mpid_manager::Account, Vec<PlainData>, Vec<PlainData>),
 }

@@ -17,8 +17,8 @@
 
 use ctrlc::CtrlC;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, Data, DataRequest, Event, MessageId, RequestContent, RequestMessage, ResponseContent,
-              ResponseMessage, RoutingMessage};
+use routing::{Authority, Data, DataRequest, Event, RequestContent, RequestMessage,
+              ResponseContent, ResponseMessage, RoutingMessage};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -66,7 +66,9 @@ impl Vault {
         let _ = unwrap_result!(unwrap_result!(Vault::new(None, stop_receiver)).do_run());
     }
 
-    fn new(app_event_sender: Option<Sender<Event>>, stop_receiver: Receiver<()>) -> Result<Vault, InternalError> {
+    fn new(app_event_sender: Option<Sender<Event>>,
+           stop_receiver: Receiver<()>)
+           -> Result<Vault, InternalError> {
         ::sodiumoxide::init();
 
         Ok(Vault {
@@ -120,7 +122,8 @@ impl Vault {
             if let Err(error) = match event {
                 Event::Request(request) => self.on_request(routing_node, request),
                 Event::Response(response) => self.on_response(routing_node, response),
-                Event::Churn{ id, lost_close_node } => self.on_churn(routing_node, id, lost_close_node),
+                Event::NodeAdded(node_added) => self.on_node_added(routing_node, node_added),
+                Event::NodeLost(node_lost) => self.on_node_lost(routing_node, node_lost),
                 Event::Connected => self.on_connected(),
             } {
                 warn!("Failed to handle event: {:?}", error);
@@ -133,7 +136,10 @@ impl Vault {
         Ok(())
     }
 
-    fn on_request(&mut self, routing_node: &RoutingNode, request: RequestMessage) -> Result<(), InternalError> {
+    fn on_request(&mut self,
+                  routing_node: &RoutingNode,
+                  request: RequestMessage)
+                  -> Result<(), InternalError> {
         match (&request.src, &request.dst, &request.content) {
             // ================== Get ==================
             (&Authority::Client{ .. },
@@ -185,11 +191,15 @@ impl Vault {
             }
             (&Authority::NodeManager(_),
              &Authority::ManagedNode(_),
-             &RequestContent::Put(Data::ImmutableData(_), _)) => self.pmid_node.handle_put(&request),
+             &RequestContent::Put(Data::ImmutableData(_), _)) => {
+                self.pmid_node.handle_put(&request)
+            }
             // ================== Post ==================
             (&Authority::Client{ .. },
              &Authority::NaeManager(_),
-             &RequestContent::Post(Data::StructuredData(_), _)) => self.structured_data_manager.handle_post(&request),
+             &RequestContent::Post(Data::StructuredData(_), _)) => {
+                self.structured_data_manager.handle_post(routing_node, &request)
+            }
             (&Authority::Client{ .. },
              &Authority::ClientManager(_),
              &RequestContent::Post(Data::PlainData(_), _)) |
@@ -213,7 +223,10 @@ impl Vault {
         }
     }
 
-    fn on_response(&mut self, routing_node: &RoutingNode, response: ResponseMessage) -> Result<(), InternalError> {
+    fn on_response(&mut self,
+                   routing_node: &RoutingNode,
+                   response: ResponseMessage)
+                   -> Result<(), InternalError> {
         match (&response.src, &response.dst, &response.content) {
             // ================== GetSuccess ==================
             (&Authority::ManagedNode(_),
@@ -254,15 +267,27 @@ impl Vault {
         }
     }
 
-    fn on_churn(&mut self,
-                routing_node: &RoutingNode,
-                churn_event_id: MessageId,
-                lost_close_node: Option<XorName>)
-                -> Result<(), InternalError> {
-        self.maid_manager.handle_churn(routing_node, &churn_event_id);
-        self.immutable_data_manager.handle_churn(routing_node, &churn_event_id, lost_close_node);
-        self.structured_data_manager.handle_churn(routing_node, &churn_event_id);
-        self.pmid_manager.handle_churn(routing_node, &churn_event_id);
+    fn on_node_added(&mut self,
+                     routing_node: &RoutingNode,
+                     node_added: XorName)
+                     -> Result<(), InternalError> {
+        self.maid_manager.handle_churn(routing_node);
+        self.immutable_data_manager.handle_node_added(routing_node, node_added);
+        self.structured_data_manager.handle_churn(routing_node);
+        self.pmid_manager.handle_churn(routing_node);
+        self.mpid_manager.handle_churn(routing_node);
+        Ok(())
+    }
+
+    fn on_node_lost(&mut self,
+                    routing_node: &RoutingNode,
+                    node_lost: XorName)
+                    -> Result<(), InternalError> {
+        self.maid_manager.handle_churn(routing_node);
+        self.immutable_data_manager.handle_node_lost(routing_node, node_lost);
+        self.structured_data_manager.handle_churn(routing_node);
+        self.pmid_manager.handle_churn(routing_node);
+        self.mpid_manager.handle_churn(routing_node);
         Ok(())
     }
 
@@ -284,6 +309,12 @@ impl Vault {
              &Authority::ClientManager(_),
              &RefreshValue::MaidManager(ref account)) => {
                 Ok(self.maid_manager.handle_refresh(refresh.name, account.clone()))
+            }
+            (&Authority::ClientManager(_),
+             &Authority::ClientManager(_),
+             &RefreshValue::MpidManager(ref account, ref stored_messages, ref received_headers)) => {
+                Ok(self.mpid_manager
+                       .handle_refresh(refresh.name, account, stored_messages, received_headers))
             }
             (&Authority::NaeManager(_),
              &Authority::NaeManager(_),
