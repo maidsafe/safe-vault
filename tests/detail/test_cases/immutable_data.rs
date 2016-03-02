@@ -45,6 +45,8 @@ pub fn test(max_get_attempts: u32) {
         ResponseMessage { content: ResponseContent::PutSuccess(..), .. } => {}
         _ => panic!("Received unexpected response"),
     }
+    // an interval allows pmid_node storing data
+    ::std::thread::sleep(::std::time::Duration::from_secs(5));
 
     test_group.start_case("Get");
     let mut data_request = DataRequest::Immutable(data.name(), ImmutableDataType::Normal);
