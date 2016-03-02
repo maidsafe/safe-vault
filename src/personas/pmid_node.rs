@@ -58,6 +58,7 @@ impl PmidNode {
                                                       request.src.clone(),
                                                       immutable_data,
                                                       message_id.clone());
+                return Ok(());
             }
         }
         let error = ClientError::NoSuchData;
