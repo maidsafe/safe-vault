@@ -181,6 +181,7 @@ impl MaidManager {
                              account.put_data(DEFAULT_PAYMENT /* data.payload_size() as u64 */)
                          });
         if let Err(error) = result {
+            trace!("MM sending put failure for immutable_data {:?} with error {:?}", data.name(), error);
             try!(self.reply_with_put_failure(routing_node, request.clone(), message_id, &error));
             return Err(InternalError::Client(error));
         }
@@ -195,6 +196,7 @@ impl MaidManager {
         // Send success response back to client but log client request in case SD Put fails at SDMs
         let src = request.dst.clone();
         let dst = request.src.clone();
+        trace!("MM sending put success for immutable_data {:?}", data.name());
         let _ = routing_node.send_put_success(src, dst, message_hash, message_id);
         Ok(())
     }
