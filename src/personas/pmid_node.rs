@@ -153,22 +153,22 @@ impl PmidNode {
         Ok(())
     }
 
-    pub fn handle_churn(&mut self, routing_node: &RoutingNode) {
+    pub fn handle_churn(&mut self, _routing_node: &RoutingNode) {
         // Only retain chunks for which we're still in the close group
-        let chunk_names = self.chunk_store.names();
-        for chunk_name in chunk_names {
-            match routing_node.close_group(chunk_name) {
-                Ok(None) => {
-                    trace!("No longer a PN for {}", chunk_name);
-                    let _ = self.chunk_store.delete(&chunk_name);
-                }
-                Ok(Some(_)) => (),
-                Err(error) => {
-                    error!("Failed to get close group: {:?} for {}", error, chunk_name);
-                    let _ = self.chunk_store.delete(&chunk_name);
-                }
-            }
-        }
+        // let chunk_names = self.chunk_store.names();
+        // for chunk_name in chunk_names {
+        //     match routing_node.close_group(chunk_name) {
+        //         Ok(None) => {
+        //             trace!("No longer a PN for {}", chunk_name);
+        //             let _ = self.chunk_store.delete(&chunk_name);
+        //         }
+        //         Ok(Some(_)) => (),
+        //         Err(error) => {
+        //             error!("Failed to get close group: {:?} for {}", error, chunk_name);
+        //             let _ = self.chunk_store.delete(&chunk_name);
+        //         }
+        //     }
+        // }
     }
 
     fn notify_managers_of_success(&mut self,

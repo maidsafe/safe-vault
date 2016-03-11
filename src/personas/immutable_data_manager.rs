@@ -431,14 +431,17 @@ impl ImmutableDataManager {
     }
 
     pub fn handle_node_added(&mut self, routing_node: &RoutingNode, node_added: XorName) {
-        self.handle_churn(routing_node, MessageId::from_added_node(node_added));
+        self.handle_churn(routing_node, MessageId::from_added_node(node_added), None);
     }
 
     pub fn handle_node_lost(&mut self, routing_node: &RoutingNode, node_lost: XorName) {
-        self.handle_churn(routing_node, MessageId::from_lost_node(node_lost));
+        self.handle_churn(routing_node, MessageId::from_lost_node(node_lost), Some(node_lost));
     }
 
-    fn handle_churn(&mut self, routing_node: &RoutingNode, message_id: MessageId) {
+    fn handle_churn(&mut self,
+                    routing_node: &RoutingNode,
+                    message_id: MessageId,
+                    node_lost: Option<XorName>) {
         // Only retain accounts for which we're still in the close group
         let accounts = mem::replace(&mut self.accounts, HashMap::new());
         self.accounts = accounts.into_iter()
@@ -446,7 +449,8 @@ impl ImmutableDataManager {
                                     self.handle_churn_for_account(routing_node,
                                                                   &data_name,
                                                                   &message_id,
-                                                                  &mut pmid_nodes)
+                                                                  &mut pmid_nodes,
+                                                                  node_lost)
                                 })
                                 .collect();
     }
@@ -455,7 +459,8 @@ impl ImmutableDataManager {
                                 routing_node: &RoutingNode,
                                 data_name: &XorName,
                                 message_id: &MessageId,
-                                pmid_nodes: &mut HashSet<DataHolder>)
+                                pmid_nodes: &mut HashSet<DataHolder>,
+                                node_lost: Option<XorName>)
                                 -> Option<(XorName, HashSet<DataHolder>)> {
         trace!("Churning for {} - holders before: {:?}",
                data_name,
@@ -473,13 +478,20 @@ impl ImmutableDataManager {
             return None;
         };
 
-        *pmid_nodes = pmid_nodes.iter()
-                                .filter(|pmid_node| close_group.contains(pmid_node.name()))
-                                .cloned()
-                                .collect();
-        trace!("Churning for {} - holders after: {:?}",
-               data_name,
-               pmid_nodes);
+        if let Some(lost_node) = node_lost {
+            *pmid_nodes = pmid_nodes.iter()
+                                    .filter(|pmid_node| lost_node != *pmid_node.name())
+                                    .cloned()
+                                    .collect();
+        }
+
+        // *pmid_nodes = pmid_nodes.iter()
+        //                         .filter(|pmid_node| close_group.contains(pmid_node.name()))
+        //                         .cloned()
+        //                         .collect();
+        // trace!("Churning for {} - holders after: {:?}",
+        //        data_name,
+        //        pmid_nodes);
         if pmid_nodes.is_empty() {
             error!("Chunk lost - No valid nodes left to retrieve chunk");
             return None;
