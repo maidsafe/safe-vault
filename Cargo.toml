@@ -7,11 +7,11 @@ license = "GPL-3.0"
 name = "safe_vault"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_vault"
-version = "0.4.0"
+version = "0.5.0"
 
 [dependencies]
-clippy = {version = "~0.0.51", optional = true}
 chunk_store = "~0.3.0"
+clippy = {version = "~0.0.51", optional = true}
 config_file_handler = "~0.2.0"
 ctrlc = "~1.1.1"
 docopt = "~0.6.78"
