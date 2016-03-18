@@ -48,6 +48,7 @@ extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate sodiumoxide;
+extern crate time;
 extern crate xor_name;
 
 #[cfg(not(feature = "use-mock-routing"))]

@@ -17,9 +17,13 @@
 
 #![cfg_attr(feature="clippy", allow(print_stdout))]
 
+use time::SteadyTime;
+
 pub struct TestGroup {
     name: Option<String>,
     case: Option<String>,
+    test_case_timestamp: SteadyTime,
+    test_group_timestamp: SteadyTime,
 }
 
 impl TestGroup {
@@ -28,23 +32,29 @@ impl TestGroup {
         TestGroup {
             name: Some(name.to_owned()),
             case: None,
+            test_case_timestamp: SteadyTime::now(),
+            test_group_timestamp: SteadyTime::now(),
         }
     }
 
     pub fn start_case(&mut self, case: &str) {
         if let Some(ref case) = self.case {
-            println!("    {} ... ok", case);
+            let duration = SteadyTime::now() - self.test_case_timestamp;
+            println!("    {} ... ok , completed in {:?}", case, duration);
         }
         println!("    {} ...", case);
+        self.test_case_timestamp = SteadyTime::now();
         self.case = Some(case.to_owned());
     }
 
     pub fn release(&mut self) {
         if let Some(ref case) = self.case {
-            println!("    {} ... ok", case);
+            let duration = SteadyTime::now() - self.test_case_timestamp;
+            println!("    {} ... ok , completed in {:?}", case, duration);
         }
         if let Some(ref name) = self.name {
-            println!("{} ... ok\n", name);
+            let duration = SteadyTime::now() - self.test_group_timestamp;
+            println!("{} ... ok , completed in {:?}\n", name, duration);
         }
         self.case = None;
         self.name = None;
@@ -54,7 +64,8 @@ impl TestGroup {
 impl Drop for TestGroup {
     fn drop(&mut self) {
         if let Some(ref case) = self.case {
-            println!("    {} ... FAILED", case);
+            let duration = SteadyTime::now() - self.test_case_timestamp;
+            println!("    {} ... FAILED after {:?}", case, duration);
         }
         if let Some(ref name) = self.name {
             println!("{} ... FAILED\n", name);

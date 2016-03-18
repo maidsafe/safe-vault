@@ -26,9 +26,9 @@ pub fn test(request_count: u32) {
     client.create_account();
     let mut stored_data = Vec::with_capacity(request_count as usize);
     for i in 0..request_count {
-        test_group.start_case(&format!("Put ImmutableData {}", i));
         let data = Data::Immutable(ImmutableData::new(ImmutableDataType::Normal,
                                                       generate_random_vec_u8(1024)));
+        test_group.start_case(&format!("Put ImmutableData {} {}", i, data.name()));
         trace!("Putting ImmutableData {} - {}", i, data.name());
         if let ResponseMessage { content: ResponseContent::PutSuccess(..), .. } =
                unwrap_option!(client.put(data.clone()), "") {} else {
@@ -38,7 +38,7 @@ pub fn test(request_count: u32) {
     }
 
     for (i, data) in stored_data.iter().enumerate() {
-        test_group.start_case(&format!("Get ImmutableData {}", i));
+        test_group.start_case(&format!("Get ImmutableData {} {}", i, data.name()));
         let data_request = DataRequest::Immutable(data.name(), ImmutableDataType::Normal);
         trace!("Getting ImmutableData {} - {}", i, data.name());
         if let ResponseMessage { content: ResponseContent::GetSuccess(response_data, _), .. } =
