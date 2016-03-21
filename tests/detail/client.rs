@@ -138,8 +138,3 @@ impl Debug for Client {
     }
 }
 
-// impl Default for Client {
-//     fn default() -> Client {
-//         Client::create_unregistered_client()
-//     }
-// }

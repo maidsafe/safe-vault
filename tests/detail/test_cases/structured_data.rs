@@ -55,13 +55,15 @@ pub fn test() {
 }
 
 fn put(fixture: &mut Fixture) {
-    fixture.test_group.start_case("Put with no account");
     let testing_data = Data::Structured(fixture.sd.clone());
-    match fixture.client1.put(testing_data.clone()) {
-        Ok(result) => panic!("Received unexpected response {:?}", result),
-        Err(MutationError::NoSuchAccount) => {}
-        Err(err) => panic!("Received unexpected err {:?}", err),
-    }
+    // safe_core::client doesn't provide an API allows connecting to network without creating an
+    // account. The unregistered client can only do get, not put.
+    // fixture.test_group.start_case("Put with no account");
+    // match fixture.client1.put(testing_data.clone()) {
+    //     Ok(result) => panic!("Received unexpected response {:?}", result),
+    //     Err(MutationError::NoSuchAccount) => {}
+    //     Err(err) => panic!("Received unexpected err {:?}", err),
+    // }
 
     fixture.test_group.start_case("Put");
     fixture.client1 = Client::create_account();

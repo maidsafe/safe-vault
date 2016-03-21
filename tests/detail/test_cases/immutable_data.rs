@@ -18,24 +18,26 @@
 use super::*;
 use rand;
 use routing::{Data, DataRequest, ImmutableData, ImmutableDataType};
-use safe_network_common::client_errors::{GetError, MutationError};
+use safe_network_common::client_errors::GetError;
 use xor_name::XorName;
 
 pub fn test() {
     let mut test_group = TestGroup::new("ImmutableData test");
-
-    test_group.start_case("Put with no account");
-    let mut client1 = Client::create_unregistered_client();
     let testing_data = Data::Immutable(ImmutableData::new(ImmutableDataType::Normal,
                                                           generate_random_vec_u8(1024)));
-    match client1.put(testing_data.clone()) {
-        Ok(result) => panic!("Received unexpected response {:?}", result),
-        Err(MutationError::NoSuchAccount) => {}
-        Err(err) => panic!("Received unexpected err {:?}", err),
-    }
+
+    // safe_core::client doesn't provide an API allows connecting to network without creating an
+    // account. The unregistered client can only do get, not put.
+    // test_group.start_case("Put with no account");
+    // let mut client1 = Client::create_unregistered_client();
+    // match client1.put(testing_data.clone()) {
+    //     Ok(result) => panic!("Received unexpected response {:?}", result),
+    //     Err(MutationError::NoSuchAccount) => {}
+    //     Err(err) => panic!("Received unexpected err {:?}", err),
+    // }
 
     test_group.start_case("Put");
-    client1 = Client::create_account();
+    let mut client1 = Client::create_account();
     assert!(client1.put(testing_data.clone()).is_ok());
 
     test_group.start_case("Get");
