@@ -30,8 +30,9 @@ struct Fixture {
 
 pub fn test() {
     let test_group = TestGroup::new("StructuredData test");
-    let client1 = Client::create_unregistered_client();
-    let client2 = Client::create_unregistered_client();
+    // safe_core::client API requires create_account to having keys
+    let client1 = Client::create_account();
+    let client2 = Client::create_account();
     let sd = unwrap_result!(StructuredData::new(1,
                                                 rand::random::<XorName>(),
                                                 0,
@@ -66,7 +67,6 @@ fn put(fixture: &mut Fixture) {
     // }
 
     fixture.test_group.start_case("Put");
-    fixture.client1 = Client::create_account();
     assert!(fixture.client1.put(testing_data).is_ok());
 }
 
