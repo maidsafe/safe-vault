@@ -69,6 +69,7 @@ mod config_handler;
 mod error;
 mod mock_routing;
 mod personas;
+mod tests;
 mod timed_buffer;
 mod types;
 mod utils;
