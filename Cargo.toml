@@ -18,10 +18,7 @@ docopt = "~0.6.78"
 log = "~0.3.5"
 lru_time_cache = "~0.2.7"
 maidsafe_utilities = "~0.4.1"
-
-# routing = "~0.11.1"
-routing = { git = "https://github.com/madadam/routing.git", branch = "export-mock-crust" }
-
+routing = "~0.11.1"
 rustc-serialize = "~0.3.18"
 safe_network_common = "~0.0.1"
 sodiumoxide = "~0.0.9"
@@ -37,7 +34,7 @@ safe_core = { git = "https://github.com/madadam/safe_core.git", branch = "mock-c
 
 [features]
 use-mock-routing = []
-use-mock-crust = ["routing/use-mock-crust"]
+use-mock-crust = ["routing/use-mock-crust", "safe_core/use-mock-crust"]
 
 [[test]]
 harness = false
