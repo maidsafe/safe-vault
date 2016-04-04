@@ -60,7 +60,7 @@ pub struct Vault {
     app_event_sender: Option<Sender<Event>>,
 
     #[cfg(feature = "use-mock-crust")] routing_node: Option<RoutingNode>,
-    #[cfg(feature = "use-mock-crust")] routing_rx: Receiver<Event>,
+    #[cfg(feature = "use-mock-crust")] routing_receiver: Receiver<Event>,
 }
 
 fn init_components() -> Result<(ImmutableDataManager,
@@ -115,8 +115,8 @@ impl Vault {
              pmid_node,
              structured_data_manager) = try!(init_components());
 
-        let (routing_tx, routing_rx) = mpsc::channel();
-        let routing_node = try!(RoutingNode::new(routing_tx));
+        let (routing_sender, routing_receiver) = mpsc::channel();
+        let routing_node = try!(RoutingNode::new(routing_sender));
 
         Ok(Vault {
             immutable_data_manager: immutable_data_manager,
@@ -127,14 +127,14 @@ impl Vault {
             structured_data_manager: structured_data_manager,
             app_event_sender: app_event_sender,
             routing_node: Some(routing_node),
-            routing_rx: routing_rx,
+            routing_receiver: routing_receiver,
         })
     }
 
     #[cfg(not(feature = "use-mock-crust"))]
     pub fn run(&mut self) -> Result<(), InternalError> {
-        let (routing_tx, routing_rx) = mpsc::channel();
-        let routing_node = try!(RoutingNode::new(routing_tx));
+        let (routing_sender, routing_receiver) = mpsc::channel();
+        let routing_node = try!(RoutingNode::new(routing_sender));
         let routing_node0 = Arc::new(Mutex::new(Some(routing_node)));
         let routing_node1 = routing_node0.clone();
 
@@ -143,10 +143,10 @@ impl Vault {
         CtrlC::set_handler(move || {
             // Drop the routing node to close the event channel which terminates
             // the receive loop and thus this whole function.
-            let _ = routing_node0.lock().unwrap().take();
+            let _ = routing_node0.lock().unwrap();
         });
 
-        for event in routing_rx.iter() {
+        for event in routing_receiver.iter() {
             let routing_node = unwrap_result!(routing_node1.lock());
 
             if let Some(routing_node) = routing_node.as_ref() {
@@ -164,7 +164,7 @@ impl Vault {
         let mut routing_node = self.routing_node.take().unwrap();
         let mut result = routing_node.poll();
 
-        if let Ok(event) = self.routing_rx.try_recv() {
+        if let Ok(event) = self.routing_receiver.try_recv() {
             self.process_event(&routing_node, event);
             result = true
         }
