@@ -28,9 +28,7 @@ xor_name = "~0.1.0"
 [dev-dependencies]
 kademlia_routing_table = "~0.4.0"
 rand = "~0.3.14"
-
-# safe_core = "~0.12.1"
-safe_core = { git = "https://github.com/madadam/safe_core.git", branch = "mock-crust" }
+safe_core = "~0.13.0"
 
 [features]
 use-mock-routing = []
