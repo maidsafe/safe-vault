@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use personas::{immutable_data_manager, maid_manager, pmid_manager, mpid_manager};
-use routing::{PlainData, StructuredData};
+use routing::{MessageId, PlainData, StructuredData};
 use xor_name::XorName;
 
 #[derive(Debug, Clone, Eq, PartialEq, RustcEncodable, RustcDecodable)]
@@ -38,7 +38,7 @@ impl Refresh {
 pub enum RefreshValue {
     MaidManagerAccount(maid_manager::Account),
     ImmutableDataManagerAccount(immutable_data_manager::Account),
-    StructuredDataManager(StructuredData),
+    StructuredDataManager(StructuredData, MessageId),
     PmidManagerAccount(pmid_manager::Account),
     // mpid_manager: account, outbox messages, inbox headers
     MpidManagerAccount(mpid_manager::Account, Vec<PlainData>, Vec<PlainData>),

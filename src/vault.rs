@@ -407,7 +407,7 @@ impl Vault {
                      -> Result<(), InternalError> {
         self.maid_manager.handle_churn(routing_node);
         self.immutable_data_manager.handle_node_added(routing_node, node_added);
-        self.structured_data_manager.handle_churn(routing_node);
+        self.structured_data_manager.handle_churn(routing_node, node_added);
         self.pmid_manager.handle_churn(routing_node);
         self.pmid_node.handle_churn(routing_node);
         self.mpid_manager.handle_churn(routing_node);
@@ -421,7 +421,7 @@ impl Vault {
         let _ = self.full_pmid_nodes.remove(&node_lost);
         self.maid_manager.handle_churn(routing_node);
         self.immutable_data_manager.handle_node_lost(routing_node, node_lost);
-        self.structured_data_manager.handle_churn(routing_node);
+        self.structured_data_manager.handle_churn(routing_node, node_lost);
         self.pmid_manager.handle_churn(routing_node);
         self.pmid_node.handle_churn(routing_node);
         self.mpid_manager.handle_churn(routing_node);
@@ -467,7 +467,7 @@ impl Vault {
             }
             (&Authority::NaeManager(_),
              &Authority::NaeManager(_),
-             &RefreshValue::StructuredDataManager(ref structured_data)) => {
+             &RefreshValue::StructuredDataManager(ref structured_data, _)) => {
                 self.structured_data_manager.handle_refresh(structured_data.clone())
             }
             (&Authority::NodeManager(_),
