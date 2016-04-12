@@ -18,6 +18,5 @@ RUN apt-get remove -y build-essential curl file pkg-config sudo && \
 COPY safe_vault.crust.config /root/.cargo/bin/
 ENV PATH ${PATH}:/root/.cargo/bin
 ENV RUST_LOG=warn
-EXPOSE 5483
+EXPOSE 5000 5100
 ENTRYPOINT ["safe_vault"]
-
