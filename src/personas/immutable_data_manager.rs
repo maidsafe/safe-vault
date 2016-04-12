@@ -551,35 +551,33 @@ impl ImmutableDataManager {
 
     pub fn handle_put_success(&mut self,
                               pmid_node: &XorName,
-                              _data_name: &XorName,
+                              data_name: &XorName,
                               message_id: &MessageId)
                               -> Result<(), InternalError> {
-        // TODO: The cache has not been refreshed in but the account has
         let mut replicants_stored = 0;
-
-        let entry = if let Some(entry) = self.ongoing_puts
-                                             .iter()
-                                             .find(|&entry| entry.1 == *message_id) {
-            // TODO: Check that the data_name is correct.
-            if let Some(account) = self.accounts.get_mut(&entry.0.name()) {
-                if !account.pmid_nodes_mut().remove(&DataHolder::Pending(*pmid_node)) {
-                    return Err(InternalError::InvalidResponse);
-                }
-                account.pmid_nodes_mut().insert(DataHolder::Good(*pmid_node));
-                for node in account.pmid_nodes().iter() {
-                    if let DataHolder::Good(_) = *node {
-                        replicants_stored += 1;
-                    }
-                }
-                entry.clone()
-            } else {
+        // TODO: Check that the data_name is correct.
+        if let Some(account) = self.accounts.get_mut(data_name) {
+            if !account.pmid_nodes_mut().remove(&DataHolder::Pending(*pmid_node)) {
                 return Err(InternalError::InvalidResponse);
             }
+            account.pmid_nodes_mut().insert(DataHolder::Good(*pmid_node));
+            for node in account.pmid_nodes().iter() {
+                if let DataHolder::Good(_) = *node {
+                    replicants_stored += 1;
+                }
+            }
         } else {
-            return Err(InternalError::FailedToFindCachedRequest(*message_id));
-        };
-
+            return Err(InternalError::InvalidResponse);
+        }
         if replicants_stored >= REPLICANTS {
+            let entry = if let Some(entry) = self.ongoing_puts
+                                                 .iter()
+                                                 .find(|&entry| entry.0.name() == *data_name &&
+                                                                entry.1 == *message_id) {
+                entry.clone()
+            } else {
+                return Err(InternalError::FailedToFindCachedRequest(*message_id));
+            };
             let _ = self.ongoing_puts.remove(&entry);
         }
 
@@ -865,7 +863,7 @@ impl ImmutableDataManager {
         trace!("vault {:?} Churning chunk {} - holders after: {:?}",
                routing_node.name(), data_name, account);
         if account.pmid_nodes().is_empty() {
-            trace!("Chunk lost - No valid nodes left to retrieve chunk");
+            error!("Chunk lost - No valid nodes left to retrieve chunk");
             return None;
         }
 
@@ -884,12 +882,13 @@ impl ImmutableDataManager {
                !self.handle_churn_for_ongoing_gets(data_name, &close_group) {
                 // Create a new entry and send Get requests to each of the current holders
                 let entry = MetadataForGetRequest::new(message_id, &account);
-                trace!("Created ongoing get entry for {} - {:?}", data_name, entry);
+                trace!("vault {:?} Created ongoing get entry for {} - {:?}",
+                        routing_node.name(), data_name, entry);
                 entry.send_get_requests(routing_node, data_name, *message_id);
                 let _ = self.ongoing_gets.insert(*data_name, entry);
             }
         }
-
+        trace!("vault {:?} refreshing account {:?}", routing_node.name(), account);
         self.send_refresh(routing_node, &data_name, account, &message_id);
         Some((*data_name, account.clone()))
     }
