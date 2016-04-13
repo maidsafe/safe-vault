@@ -528,6 +528,7 @@ impl ImmutableDataManager {
             // TODO: Check that the data_name is correct.
             if let Some(account) = self.accounts.get_mut(&entry.0.name()) {
                 if !account.pmid_nodes_mut().remove(&DataHolder::Pending(*pmid_node)) {
+                    debug!("Failed to remove {} - {:?}", pmid_node, account);
                     return Err(InternalError::InvalidResponse);
                 }
                 account.pmid_nodes_mut().insert(DataHolder::Good(*pmid_node));
@@ -538,6 +539,7 @@ impl ImmutableDataManager {
                 }
                 entry.clone()
             } else {
+                debug!("Don't have account for {}", entry.0.name());
                 return Err(InternalError::InvalidResponse);
             }
         } else {
@@ -562,6 +564,7 @@ impl ImmutableDataManager {
             if let Some(account) = self.accounts.get_mut(&immutable_data.name()) {
                 // Mark the holder as Failed
                 if !account.pmid_nodes_mut().remove(&DataHolder::Pending(*pmid_node)) {
+                    debug!("Failed to remove {} - {:?}", pmid_node, account);
                     return Err(InternalError::InvalidResponse);
                 }
                 account.pmid_nodes_mut().insert(DataHolder::Failed(*pmid_node));
@@ -580,13 +583,14 @@ impl ImmutableDataManager {
                             let _ = routing_node.send_put_request(src, dst, data, *message_id);
                             account.pmid_nodes_mut().insert(DataHolder::Pending(*new_holder));
                         } else {
-                            warn!("Failed to find a new storage node for {}.", data_name);
+                            error!("Failed to find a new storage node for {}.", data_name);
                             return Err(InternalError::UnableToAllocateNewPmidNode);
                         }
                     }
                     None => return Err(InternalError::NotInCloseGroup),
                 }
             } else {
+                debug!("Don't have account for {}", immutable_data.name());
                 return Err(InternalError::InvalidResponse);
             }
         } else {
