@@ -15,6 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use std::cmp::Ordering;
 use std::mem;
 use std::convert::From;
 use std::collections::{HashMap, HashSet};
@@ -72,6 +73,24 @@ impl Account {
             Account::Sacrificial(_) => ImmutableDataType::Sacrificial,
         }
     }
+
+    pub fn sort(&mut self) {
+        match *self {
+            Account::Normal(ref mut nodes) |
+            Account::Backup(ref mut nodes) |
+            Account::Sacrificial(ref mut nodes) => {
+                let mut temp : Vec<DataHolder> = nodes.clone().into_iter().map(|node| node).collect();
+                // let mut temp : Vec<DataHolder> = nodes.iter().collect();
+                temp.sort();
+                nodes.clear();
+                for node in &temp {
+                    nodes.insert(*node);
+                }
+                // nodes = temp.into_iter().map(|node| node).collect();
+                // nodes = temp.iter().collect();
+            }
+        }
+    }
 }
 
 
@@ -96,6 +115,20 @@ impl DataHolder {
             DataHolder::Failed(ref name) |
             DataHolder::Pending(ref name) => name,
         }
+    }
+}
+
+impl Ord for DataHolder {
+    #[inline]
+    fn cmp(&self, other: &DataHolder) -> Ordering {
+        Ord::cmp(self.name(), other.name())
+    }
+}
+
+impl PartialOrd for DataHolder {
+    #[inline]
+    fn partial_cmp(&self, other: &DataHolder) -> Option<Ordering> {
+        PartialOrd::partial_cmp(self.name(), other.name())
     }
 }
 
@@ -476,7 +509,8 @@ impl ImmutableDataManager {
                                                        *message_id);
                 account.pmid_nodes_mut().insert(DataHolder::Failed(*pmid_node));
             }
-            trace!("Account for {} updated to {:?}", data_name, account);
+            trace!("vault {:?} Account for {} updated to {:?}",
+                   routing_node.name(), data_name, account);
         }
 
         if let Some(msg_id) = metadata_message_id {
@@ -518,34 +552,33 @@ impl ImmutableDataManager {
 
     pub fn handle_put_success(&mut self,
                               pmid_node: &XorName,
-                              _data_name: &XorName,
+                              data_name: &XorName,
                               message_id: &MessageId)
                               -> Result<(), InternalError> {
         let mut replicants_stored = 0;
-
-        let entry = if let Some(entry) = self.ongoing_puts
-                                             .iter()
-                                             .find(|&entry| entry.1 == *message_id) {
-            // TODO: Check that the data_name is correct.
-            if let Some(account) = self.accounts.get_mut(&entry.0.name()) {
-                if !account.pmid_nodes_mut().remove(&DataHolder::Pending(*pmid_node)) {
-                    return Err(InternalError::InvalidResponse);
-                }
-                account.pmid_nodes_mut().insert(DataHolder::Good(*pmid_node));
-                for node in account.pmid_nodes().iter() {
-                    if let DataHolder::Good(_) = *node {
-                        replicants_stored += 1;
-                    }
-                }
-                entry.clone()
-            } else {
+        // TODO: Check that the data_name is correct.
+        if let Some(account) = self.accounts.get_mut(data_name) {
+            if !account.pmid_nodes_mut().remove(&DataHolder::Pending(*pmid_node)) {
                 return Err(InternalError::InvalidResponse);
             }
+            account.pmid_nodes_mut().insert(DataHolder::Good(*pmid_node));
+            for node in account.pmid_nodes().iter() {
+                if let DataHolder::Good(_) = *node {
+                    replicants_stored += 1;
+                }
+            }
         } else {
-            return Err(InternalError::FailedToFindCachedRequest(*message_id));
-        };
-
+            return Err(InternalError::InvalidResponse);
+        }
         if replicants_stored >= REPLICANTS {
+            let entry = if let Some(entry) = self.ongoing_puts
+                                                 .iter()
+                                                 .find(|&entry| entry.0.name() == *data_name &&
+                                                                entry.1 == *message_id) {
+                entry.clone()
+            } else {
+                return Err(InternalError::FailedToFindCachedRequest(*message_id));
+            };
             let _ = self.ongoing_puts.remove(&entry);
         }
 
@@ -557,6 +590,7 @@ impl ImmutableDataManager {
                               pmid_node: &XorName,
                               message_id: &MessageId)
                               -> Result<(), InternalError> {
+        // TODO: The cache has not been refreshed in but the account has
         if let Some(&(ref immutable_data, _)) = self.ongoing_puts
                                                     .iter()
                                                     .find(|&entry| entry.1 == *message_id) {
@@ -629,6 +663,7 @@ impl ImmutableDataManager {
     }
 
     pub fn handle_refresh(&mut self, data_name: XorName, account: Account) {
+        trace!("received chunk {} account {:?}", data_name, account);
         let _ = self.accounts.insert(data_name, account);
     }
 
@@ -802,13 +837,15 @@ impl ImmutableDataManager {
                                 message_id: &MessageId,
                                 account: &mut Account)
                                 -> Option<(XorName, Account)> {
-        trace!("Churning for {} - holders before: {:?}", data_name, account);
+        trace!("vault {:?} Churning chunk {} - holders before: {:?}",
+               routing_node.name(), data_name, account);
         // This function is used to filter accounts for which this node is no longer responsible, so
         // return `None` in this case
         let close_group = if let Some(group) = self.close_group_to(routing_node, &data_name) {
             group
         } else {
-            trace!("no longer part of the IDM group");
+            trace!("vault {:?} no longer part of the IDM group of chunk {:?}",
+                   routing_node.name(), data_name);
             // Remove entry from `ongoing_puts`, as we're not part of the IDM group any more
             let ongoing_puts = mem::replace(&mut self.ongoing_puts, HashSet::new());
             self.ongoing_puts = ongoing_puts.into_iter()
@@ -824,7 +861,8 @@ impl ImmutableDataManager {
                                            })
                                            .cloned()
                                            .collect();
-        trace!("Churning for {} - holders after: {:?}", data_name, account);
+        trace!("vault {:?} Churning chunk {} - holders after: {:?}",
+               routing_node.name(), data_name, account);
         if account.pmid_nodes().is_empty() {
             error!("Chunk lost - No valid nodes left to retrieve chunk");
             return None;
@@ -845,13 +883,14 @@ impl ImmutableDataManager {
                !self.handle_churn_for_ongoing_gets(data_name, &close_group) {
                 // Create a new entry and send Get requests to each of the current holders
                 let entry = MetadataForGetRequest::new(message_id, &account);
-                trace!("Created ongoing get entry for {} - {:?}", data_name, entry);
+                trace!("vault {:?} Created ongoing get entry for {} - {:?}",
+                        routing_node.name(), data_name, entry);
                 entry.send_get_requests(routing_node, data_name, *message_id);
                 let _ = self.ongoing_gets.insert(*data_name, entry);
             }
         }
-
-        self.send_refresh(routing_node, &data_name, &account, &message_id);
+        trace!("vault {:?} refreshing account {:?}", routing_node.name(), account);
+        self.send_refresh(routing_node, &data_name, account, &message_id);
         Some((*data_name, account.clone()))
     }
 
@@ -912,9 +951,11 @@ impl ImmutableDataManager {
                     // This is already a holder - skip
                     continue;
                 }
-                trace!("Replicating {} - sending Put to {}",
+                trace!("vault {:?} Replicating {} - sending Put to {}, with account {:?}",
+                       routing_node.name(),
                        data_name,
-                       group_member);
+                       group_member,
+                       account);
                 let src = Authority::NaeManager(*data_name);
                 let dst = Authority::NodeManager(*group_member);
                 let _ = routing_node.send_put_request(src,
@@ -952,8 +993,9 @@ impl ImmutableDataManager {
     fn send_refresh(&self,
                     routing_node: &RoutingNode,
                     data_name: &XorName,
-                    account: &Account,
+                    account: &mut Account,
                     message_id: &MessageId) {
+        account.sort();
         let src = Authority::NaeManager(*data_name);
         let refresh = Refresh::new(data_name,
                                    RefreshValue::ImmutableDataManagerAccount(account.clone()));
@@ -990,6 +1032,7 @@ impl ImmutableDataManager {
                                      data_name: &XorName,
                                      message_id: &MessageId)
                                      -> Result<(), InternalError> {
+        let mut im_data : Option<ImmutableData> = None;
         let mut finished = false;
         let mut new_pmid_nodes = HashSet::<DataHolder>::new();
         if let Some(metadata) = self.ongoing_gets.get_mut(&data_name) {
@@ -1015,6 +1058,7 @@ impl ImmutableDataManager {
                                                                 data,
                                                                 &metadata.pmid_nodes,
                                                                 message_id));
+                im_data = Some(data.clone());
                 finished = true;
             } else {
                 // Recover the data from backup and/or sacrificial locations
@@ -1030,17 +1074,22 @@ impl ImmutableDataManager {
         }
 
         if !new_pmid_nodes.is_empty() {
-            trace!("Replicating {} - new holders: {:?}",
+            trace!("vault {:?} Replicating {} - new holders: {:?}",
+                   routing_node.name(),
                    data_name,
                    new_pmid_nodes);
             if let Some(account) = self.accounts.get_mut(data_name) {
-                trace!("Replicating {} - account before: {:?}", data_name, account);
+                trace!("vault {:?} Replicating {} - account before: {:?}",
+                       routing_node.name(), data_name, account);
                 *account.pmid_nodes_mut() = account.pmid_nodes()
                                                    .union(&new_pmid_nodes)
                                                    .cloned()
                                                    .collect();
-                trace!("Replicating {} - account after:  {:?}", data_name, account);
+                trace!("vault {:?} Replicating {} - account after:  {:?}",
+                       routing_node.name(), data_name, account);
             }
+            // TODO: the message_id better to be deduced from (data_name + churn_node)
+            self.ongoing_puts.insert((unwrap_option!(im_data, ""), message_id.clone()));
         }
 
         Ok(())
@@ -1058,6 +1107,7 @@ impl ImmutableDataManager {
             match *queried_pmid_node {
                 DataHolder::Good(ref name) => {
                     let _ = good_nodes.insert(DataHolder::Good(*name));
+                    nodes_to_exclude.push(name);
                 }
                 DataHolder::Failed(ref name) => {
                     nodes_to_exclude.push(name);
@@ -1066,8 +1116,10 @@ impl ImmutableDataManager {
             }
         }
         let data_name = data.name();
-        trace!("Replicating {} - good nodes: {:?}", data_name, good_nodes);
-        trace!("Replicating {} - nodes to be excluded: {:?}",
+        trace!("vault {:?} Replicating {} - good nodes: {:?}",
+               routing_node.name(), data_name, good_nodes);
+        trace!("vault {:?} Replicating {} - nodes to be excluded: {:?}",
+               routing_node.name(),
                data_name,
                nodes_to_exclude);
         let target_pmid_nodes = match try!(routing_node.close_group(data_name)) {
@@ -1083,11 +1135,15 @@ impl ImmutableDataManager {
             None => return Err(InternalError::NotInCloseGroup),
         };
 
-        trace!("Replicating {} - target nodes: {:?}",
+        trace!("vault {:?} Replicating {} - target nodes: {:?}",
+               routing_node.name(),
                data_name,
                target_pmid_nodes);
-        for new_pmid_node in target_pmid_nodes.difference(&good_nodes).into_iter() {
-            trace!("Replicating {} - sending Put to {}",
+        // the node in target_pmid_nodes having pending status, meanwhile good_nodes are in good
+        // status. This makes them always to be different.
+        for new_pmid_node in &target_pmid_nodes {
+            trace!("vault {:?} Replicating {} - sending Put to {}",
+                   routing_node.name(),
                    data_name,
                    new_pmid_node.name());
             let src = Authority::NaeManager(data_name);

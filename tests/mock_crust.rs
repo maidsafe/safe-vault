@@ -84,7 +84,7 @@ mod test {
                                     .is_some()
         });
 
-        assert_eq!(2 * all_immutable_data.len(), normal_names.len());
+        assert!(2 * all_immutable_data.len() <= normal_names.len());
 
         normal_names.dedup();
 
@@ -104,7 +104,7 @@ mod test {
                                     .is_some()
         });
 
-        assert_eq!(2 * all_immutable_data.len(), backup_names.len());
+        assert!(2 * all_immutable_data.len() <= backup_names.len());
 
         let mut all_backup_names = all_immutable_data.iter()
                                                      .cloned()
@@ -133,7 +133,7 @@ mod test {
                                     .is_some()
         });
 
-        assert_eq!(2 * all_immutable_data.len(), sacrificial_names.len());
+        assert!(2 * all_immutable_data.len() <= sacrificial_names.len());
 
         let mut all_sacrificial_names =
             all_immutable_data.iter()
@@ -168,7 +168,7 @@ mod test {
                                      .is_some()
         });
 
-        assert_eq!(8 * all_structured_data.len(), structured_names.len());
+        assert!(8 * all_structured_data.len() <= structured_names.len());
 
         structured_names.sort();
         structured_names.dedup();
