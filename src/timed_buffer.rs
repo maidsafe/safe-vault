@@ -68,7 +68,7 @@ impl<Key: Hash + PartialOrd + Ord + Clone, Value: Clone> TimedBuffer<Key, Value>
     }
 
     /// Returns true if the map contains a value for the specified key.
-    pub fn contains_key(&self, key: &Key) -> bool {
+    pub fn _contains_key(&self, key: &Key) -> bool {
         self.map.contains_key(key)
     }
 
@@ -115,9 +115,9 @@ mod test {
         let insertions = 10;
 
         for i in 0..insertions {
-            assert!(!timed_buffer.contains_key(&i));
+            assert!(!timed_buffer._contains_key(&i));
             let _ = timed_buffer.insert(i, i);
-            assert!(timed_buffer.contains_key(&i));
+            assert!(timed_buffer._contains_key(&i));
         }
 
         thread::sleep(::std::time::Duration::from_millis(100));

@@ -25,7 +25,7 @@ use kademlia_routing_table::GROUP_SIZE;
 use safe_network_common::client_errors::GetError;
 use timed_buffer::TimedBuffer;
 use maidsafe_utilities::serialisation;
-use routing::{self, Authority, Data, DataRequest, ImmutableData, ImmutableDataType, MessageId,
+use routing::{Authority, Data, DataRequest, ImmutableData, ImmutableDataType, MessageId,
               PlainData, RequestContent, RequestMessage, ResponseContent, ResponseMessage};
 use time::Duration;
 use types::{Refresh, RefreshValue};
@@ -109,57 +109,78 @@ impl MetadataForGetRequest {
         };
 
         if self.data_holders.is_empty() {
+            error!("Lost data chunk {}.", data_name);
+            return;
             // There are no "Good" holders for this type, so send Get to other types' DMs
-            let mut msg_id = message_id;
-            let (normal_name, backup_name, sacrificial_name) = match self.requested_data_type {
-                ImmutableDataType::Normal => {
-                    (None,
-                     Some(routing::normal_to_backup(data_name)),
-                     Some(routing::normal_to_sacrificial(data_name)))
-                }
-                ImmutableDataType::Backup => {
-                    (Some(routing::backup_to_normal(data_name)),
-                     None,
-                     Some(routing::backup_to_sacrificial(data_name)))
-                }
-                ImmutableDataType::Sacrificial => {
-                    (Some(routing::sacrificial_to_normal(data_name)),
-                     Some(routing::sacrificial_to_backup(data_name)),
-                     None)
-                }
-            };
-            if let Some(normal_name) = normal_name {
-                let dst = Authority::NaeManager(normal_name);
-                let data_type = ImmutableDataType::Normal;
-                log(&data_type, &normal_name, &dst);
-                let data_request = DataRequest::Immutable(normal_name, data_type);
-                msg_id = MessageId::increment_first_byte(&msg_id);
-                let _ = routing_node.send_get_request(src.clone(), dst, data_request, msg_id);
-            }
-            if let Some(backup_name) = backup_name {
-                let dst = Authority::NaeManager(backup_name);
-                let data_type = ImmutableDataType::Backup;
-                log(&data_type, &backup_name, &dst);
-                let data_request = DataRequest::Immutable(backup_name, data_type);
-                msg_id = MessageId::increment_first_byte(&msg_id);
-                let _ = routing_node.send_get_request(src.clone(), dst, data_request, msg_id);
-            }
-            if let Some(sacrificial_name) = sacrificial_name {
-                let dst = Authority::NaeManager(sacrificial_name);
-                let data_type = ImmutableDataType::Sacrificial;
-                log(&data_type, &sacrificial_name, &dst);
-                let data_request = DataRequest::Immutable(sacrificial_name, data_type);
-                msg_id = MessageId::increment_first_byte(&msg_id);
-                let _ = routing_node.send_get_request(src.clone(), dst, data_request, msg_id);
-            }
+            // let mut msg_id = message_id;
+            // let (normal_name, backup_name, sacrificial_name) = match self.requested_data_type {
+            //     ImmutableDataType::Normal => {
+            //         (None,
+            //          Some(routing::normal_to_backup(data_name)),
+            //          Some(routing::normal_to_sacrificial(data_name)))
+            //     }
+            //     ImmutableDataType::Backup => {
+            //         (Some(routing::backup_to_normal(data_name)),
+            //          None,
+            //          Some(routing::backup_to_sacrificial(data_name)))
+            //     }
+            //     ImmutableDataType::Sacrificial => {
+            //         (Some(routing::sacrificial_to_normal(data_name)),
+            //          Some(routing::sacrificial_to_backup(data_name)),
+            //          None)
+            //     }
+            // };
+            // if let Some(normal_name) = normal_name {
+            //     let dst = Authority::NaeManager(normal_name);
+            //     let data_type = ImmutableDataType::Normal;
+            //     log(&data_type, &normal_name, &dst);
+            //     let data_request = DataRequest::Immutable(normal_name, data_type);
+            //     msg_id = MessageId::increment_first_byte(&msg_id);
+            //     let _ = routing_node.send_get_request(src.clone(), dst, data_request, msg_id);
+            // }
+            // if let Some(backup_name) = backup_name {
+            //     let dst = Authority::NaeManager(backup_name);
+            //     let data_type = ImmutableDataType::Backup;
+            //     log(&data_type, &backup_name, &dst);
+            //     let data_request = DataRequest::Immutable(backup_name, data_type);
+            //     msg_id = MessageId::increment_first_byte(&msg_id);
+            //     let _ = routing_node.send_get_request(src.clone(), dst, data_request, msg_id);
+            // }
+            // if let Some(sacrificial_name) = sacrificial_name {
+            //     let dst = Authority::NaeManager(sacrificial_name);
+            //     let data_type = ImmutableDataType::Sacrificial;
+            //     log(&data_type, &sacrificial_name, &dst);
+            //     let data_request = DataRequest::Immutable(sacrificial_name, data_type);
+            //     msg_id = MessageId::increment_first_byte(&msg_id);
+            //     let _ = routing_node.send_get_request(src.clone(), dst, data_request, msg_id);
+            // }
         } else {
-            // Send to data_holders (which should be "Good" holders)
-            for (good_node, _) in &self.data_holders {
+            // Send to data_holders.
+            for (good_node, state) in &self.data_holders {
+                if *state == DataHolderState::Failed {
+                    continue;
+                }
                 let dst = Authority::ManagedNode(*good_node);
                 let data_request = DataRequest::Immutable(*data_name,
                                                           self.requested_data_type.clone());
                 log(&self.requested_data_type, data_name, &dst);
                 let _ = routing_node.send_get_request(src.clone(), dst, data_request, message_id);
+            }
+        }
+    }
+
+    fn send_get_failures(&mut self, routing_node: &RoutingNode) {
+        for (original_message_id, request) in self.requests.drain(..) {
+            let src = request.dst.clone();
+            let dst = request.src.clone();
+            trace!("Sending GetFailure back to {:?}", dst);
+            let error = GetError::NoSuchData;
+            if let Ok(external_error_indicator) = serialisation::serialise(&error) {
+                let _ = routing_node.send_get_failure(src,
+                                                      dst,
+                                                      request,
+                                                      external_error_indicator,
+                                                      original_message_id);
             }
         }
     }
@@ -205,6 +226,8 @@ impl MetadataForGetRequest {
                                                   Data::Immutable(data.clone()),
                                                   *message_id);
         } else {
+            // TODO: If message_id < self.message_id, resend the Get request to the PmidManagers
+            // and update self.message_id.
             self.requests.push((*message_id, request.clone()));
         }
     }
@@ -360,7 +383,7 @@ impl ImmutableDataManager {
             message_id = metadata.message_id;
 
             // Reply to any unanswered requests
-            while let Some((original_message_id, request)) = metadata.requests.pop() {
+            for (original_message_id, request) in metadata.requests.drain(..) {
                 let src = request.dst.clone();
                 let dst = request.src;
                 trace!("Sending GetSuccess back to {:?}", dst);
@@ -374,7 +397,7 @@ impl ImmutableDataManager {
                 let _ = metadata.data_holders.insert(*response.src.name(), DataHolderState::Good);
             }
 
-            // Keep the data with the cached metadata in case further get requests arrive for it
+            // Keep the data with the cached metadata in case further Get requests arrive for it.
             if metadata.data.is_none() {
                 metadata.data = Some(data);
             }
@@ -391,7 +414,7 @@ impl ImmutableDataManager {
                               request: &RequestMessage,
                               _external_error_indicator: &[u8])
                               -> Result<(), InternalError> {
-        let mut metadata_message_id = None;
+        let metadata_message_id;
         let data_name = if let Ok((data_name, metadata)) =
                                self.find_ongoing_get_after_failure(request) {
             metadata_message_id = Some(metadata.message_id);
@@ -402,11 +425,7 @@ impl ImmutableDataManager {
             trace!("Metadata for Get {} updated to {:?}", data_name, metadata);
             data_name
         } else {
-            if let RequestContent::Get(ref data_request, _) = request.content {
-                data_request.name()
-            } else {
-                return Err(InternalError::InvalidResponse);
-            }
+            return Err(InternalError::InvalidResponse);
         };
 
         // Mark the responder as "failed" in the account if it was previously marked "good"
@@ -430,7 +449,7 @@ impl ImmutableDataManager {
             try!(self.check_and_replicate_after_get(routing_node, &data_name, &msg_id));
             Ok(())
         } else {
-            Err(InternalError::FailedToFindCachedRequest(*message_id))
+            Err(InternalError::FailedToFindCachedRequest)
         }
     }
 
@@ -448,7 +467,7 @@ impl ImmutableDataManager {
                 // This Vault is the "Normal" DM.  If we've already had one secondary location
                 // failed, reply to requesters as we've exhausted all options
                 if metadata.secondary_location_failed {
-                    Self::send_get_failures(routing_node, metadata);
+                    metadata.send_get_failures(routing_node);
                     // Entry can be removed from cache now.
                     to_remove = Some(data_name);
                 } else {
@@ -480,7 +499,12 @@ impl ImmutableDataManager {
             return Err(InternalError::InvalidResponse);
         }
         let _ = account.data_holders.insert(*pmid_node, DataHolderState::Good);
-        let _ = self.data_cache.remove(&data_name);
+        if account.data_holders
+                  .values()
+                  .filter(|state| **state == DataHolderState::Good)
+                  .count() == REPLICANTS {
+            let _ = self.data_cache.remove(&data_name);
+        }
 
         Ok(())
     }
@@ -676,49 +700,51 @@ impl ImmutableDataManager {
         };
         let data_name = data.name();
         if let Authority::NaeManager(_) = response.src {
-            let (normal_name, backup_name, sacrificial_name) = match *data.get_type_tag() {
-                ImmutableDataType::Normal => {
-                    (None,
-                     Some(routing::normal_to_backup(&data_name)),
-                     Some(routing::normal_to_sacrificial(&data_name)))
-                }
-                ImmutableDataType::Backup => {
-                    (Some(routing::backup_to_normal(&data_name)),
-                     None,
-                     Some(routing::backup_to_sacrificial(&data_name)))
-                }
-                ImmutableDataType::Sacrificial => {
-                    (Some(routing::sacrificial_to_normal(&data_name)),
-                     Some(routing::sacrificial_to_backup(&data_name)),
-                     None)
-                }
-            };
-            let mut found = None;
-            if let Some(normal_name) = normal_name {
-                if self.ongoing_gets.contains_key(&normal_name) {
-                    found = Some((normal_name,
-                                  ImmutableData::new(ImmutableDataType::Normal,
-                                                     data.value().clone())));
-                }
-            }
-            if let Some(backup_name) = backup_name {
-                if found.is_none() && self.ongoing_gets.contains_key(&backup_name) {
-                    found = Some((backup_name,
-                                  ImmutableData::new(ImmutableDataType::Backup,
-                                                     data.value().clone())));
-                }
-            }
-            if let Some(sacrificial_name) = sacrificial_name {
-                if found.is_none() && self.ongoing_gets.contains_key(&sacrificial_name) {
-                    found = Some((sacrificial_name,
-                                  ImmutableData::new(ImmutableDataType::Sacrificial,
-                                                     data.value().clone())));
-                }
-            }
-            if let Some((found_name, converted_data)) = found {
-                let metadata = self.ongoing_gets.get_mut(&found_name).expect("Must exist");
-                return Ok((converted_data, metadata));
-            }
+            error!("GetSuccess received from an NaeManager.");
+            return Err(InternalError::InvalidResponse);
+            // let (normal_name, backup_name, sacrificial_name) = match *data.get_type_tag() {
+            //     ImmutableDataType::Normal => {
+            //         (None,
+            //          Some(routing::normal_to_backup(&data_name)),
+            //          Some(routing::normal_to_sacrificial(&data_name)))
+            //     }
+            //     ImmutableDataType::Backup => {
+            //         (Some(routing::backup_to_normal(&data_name)),
+            //          None,
+            //          Some(routing::backup_to_sacrificial(&data_name)))
+            //     }
+            //     ImmutableDataType::Sacrificial => {
+            //         (Some(routing::sacrificial_to_normal(&data_name)),
+            //          Some(routing::sacrificial_to_backup(&data_name)),
+            //          None)
+            //     }
+            // };
+            // let mut found = None;
+            // if let Some(normal_name) = normal_name {
+            //     if self.ongoing_gets.contains_key(&normal_name) {
+            //         found = Some((normal_name,
+            //                       ImmutableData::new(ImmutableDataType::Normal,
+            //                                          data.value().clone())));
+            //     }
+            // }
+            // if let Some(backup_name) = backup_name {
+            //     if found.is_none() && self.ongoing_gets.contains_key(&backup_name) {
+            //         found = Some((backup_name,
+            //                       ImmutableData::new(ImmutableDataType::Backup,
+            //                                          data.value().clone())));
+            //     }
+            // }
+            // if let Some(sacrificial_name) = sacrificial_name {
+            //     if found.is_none() && self.ongoing_gets.contains_key(&sacrificial_name) {
+            //         found = Some((sacrificial_name,
+            //                       ImmutableData::new(ImmutableDataType::Sacrificial,
+            //                                          data.value().clone())));
+            //     }
+            // }
+            // if let Some((found_name, converted_data)) = found {
+            //     let metadata = self.ongoing_gets.get_mut(&found_name).expect("Must exist");
+            //     return Ok((converted_data, metadata));
+            // }
         } else {
             if let Some(metadata) = self.ongoing_gets.get_mut(&data_name) {
                 return Ok((data.clone(), metadata));
@@ -727,7 +753,7 @@ impl ImmutableDataManager {
         warn!("Failed to find metadata for Get response of {} with msg ID {:?}",
               data_name,
               message_id);
-        Err(InternalError::FailedToFindCachedRequest(*message_id))
+        Err(InternalError::FailedToFindCachedRequest)
     }
 
     // See comments for find_ongoing_get_after_success
@@ -746,44 +772,45 @@ impl ImmutableDataManager {
         };
 
         if let Authority::NaeManager(_) = request.dst {
-            let mut found = None;
-            let (normal_name, backup_name, sacrificial_name) = match *data_request {
-                DataRequest::Immutable(ref data_name, ImmutableDataType::Normal) => {
-                    (None,
-                     Some(routing::normal_to_backup(data_name)),
-                     Some(routing::normal_to_sacrificial(data_name)))
-                }
-                DataRequest::Immutable(ref data_name, ImmutableDataType::Backup) => {
-                    (Some(routing::backup_to_normal(data_name)),
-                     None,
-                     Some(routing::backup_to_sacrificial(data_name)))
-                }
-                DataRequest::Immutable(ref data_name, ImmutableDataType::Sacrificial) => {
-                    (Some(routing::sacrificial_to_normal(data_name)),
-                     Some(routing::sacrificial_to_backup(data_name)),
-                     None)
-                }
-                _ => unreachable!(),  // Safe to use this here since response is from a group
-            };
-            if let Some(normal_name) = normal_name {
-                if self.ongoing_gets.contains_key(&normal_name) {
-                    found = Some(normal_name);
-                }
-            }
-            if let Some(backup_name) = backup_name {
-                if found.is_none() && self.ongoing_gets.contains_key(&backup_name) {
-                    found = Some(backup_name);
-                }
-            }
-            if let Some(sacrificial_name) = sacrificial_name {
-                if found.is_none() && self.ongoing_gets.contains_key(&sacrificial_name) {
-                    found = Some(sacrificial_name);
-                }
-            }
-            if let Some(found_name) = found {
-                let metadata = self.ongoing_gets.get_mut(&found_name).expect("Must exist");
-                return Ok((found_name, metadata));
-            }
+            error!("Received GetFailure from an NaeManager.");
+            // let mut found = None;
+            // let (normal_name, backup_name, sacrificial_name) = match *data_request {
+            //     DataRequest::Immutable(ref data_name, ImmutableDataType::Normal) => {
+            //         (None,
+            //          Some(routing::normal_to_backup(data_name)),
+            //          Some(routing::normal_to_sacrificial(data_name)))
+            //     }
+            //     DataRequest::Immutable(ref data_name, ImmutableDataType::Backup) => {
+            //         (Some(routing::backup_to_normal(data_name)),
+            //          None,
+            //          Some(routing::backup_to_sacrificial(data_name)))
+            //     }
+            //     DataRequest::Immutable(ref data_name, ImmutableDataType::Sacrificial) => {
+            //         (Some(routing::sacrificial_to_normal(data_name)),
+            //          Some(routing::sacrificial_to_backup(data_name)),
+            //          None)
+            //     }
+            //     _ => unreachable!(),  // Safe to use this here since response is from a group
+            // };
+            // if let Some(normal_name) = normal_name {
+            //     if self.ongoing_gets.contains_key(&normal_name) {
+            //         found = Some(normal_name);
+            //     }
+            // }
+            // if let Some(backup_name) = backup_name {
+            //     if found.is_none() && self.ongoing_gets.contains_key(&backup_name) {
+            //         found = Some(backup_name);
+            //     }
+            // }
+            // if let Some(sacrificial_name) = sacrificial_name {
+            //     if found.is_none() && self.ongoing_gets.contains_key(&sacrificial_name) {
+            //         found = Some(sacrificial_name);
+            //     }
+            // }
+            // if let Some(found_name) = found {
+            //     let metadata = self.ongoing_gets.get_mut(&found_name).expect("Must exist");
+            //     return Ok((found_name, metadata));
+            // }
         } else {
             if let Some(metadata) = self.ongoing_gets.get_mut(&data_request.name()) {
                 return Ok((data_request.name(), metadata));
@@ -792,7 +819,7 @@ impl ImmutableDataManager {
         warn!("Failed to find metadata for Get response of {} with msg ID {:?}",
               data_request.name(),
               message_id);
-        Err(InternalError::FailedToFindCachedRequest(*message_id))
+        Err(InternalError::FailedToFindCachedRequest)
     }
 
     fn handle_churn_for_account(&mut self,
@@ -946,26 +973,32 @@ impl ImmutableDataManager {
                                      data_name: &XorName,
                                      message_id: &MessageId)
                                      -> Result<(), InternalError> {
+        // TODO: Refactor this!
         let mut finished = false;
         let mut new_data_holders = Vec::<XorName>::new();
+        let mut opt_data = None;
         if let Some(metadata) = self.ongoing_gets.get_mut(&data_name) {
-            // Count the good holders, but just return from this function if any queried holders
-            // haven't responded yet
-            let mut good_holder_count = 0;
-            for (_, state) in &metadata.data_holders {
-                match *state {
-                    DataHolderState::Pending => return Ok(()),
-                    DataHolderState::Good => good_holder_count += 1,
-                    DataHolderState::Failed => (),
-                }
+            // Return from this function if any queried holders haven't responded yet.
+            if metadata.data_holders.values().any(|state| *state == DataHolderState::Pending) {
+                return Ok(());
             }
+            let good_holder_count = metadata.data_holders
+                                            .values()
+                                            .filter(|state| **state == DataHolderState::Good)
+                                            .count();
             trace!("Have {} good holders for {}", good_holder_count, data_name);
 
             if good_holder_count >= REPLICANTS {
+                if good_holder_count > REPLICANTS {
+                    error!("Found {} replicants instead of {} for data {:?}.",
+                           good_holder_count,
+                           REPLICANTS,
+                           data_name);
+                }
                 // We can now delete this cached get request with no need for further action
                 finished = true;
             } else if let Some(ref data) = metadata.data {
-                assert_eq!(*data_name, data.name());
+                opt_data = Some(data.clone());
                 // Put to new close peers and delete this cached get request
                 new_data_holders = try!(Self::replicate_after_get(routing_node,
                                                                   data,
@@ -973,8 +1006,11 @@ impl ImmutableDataManager {
                                                                   message_id));
                 finished = true;
             } else {
+                error!("Chunk {} lost.", data_name);
+                metadata.send_get_failures(routing_node);
                 // Recover the data from backup and/or sacrificial locations
-                Self::recover_from_other_locations(routing_node, metadata, data_name, message_id);
+                // Self::recover_from_other_locations(routing_node, metadata, data_name, message_id);
+                finished = true;
             }
         } else {
             warn!("Failed to find metadata for check_and_replicate_after_get of {}",
@@ -989,6 +1025,7 @@ impl ImmutableDataManager {
             trace!("Replicating {} - new holders: {:?}",
                    data_name,
                    new_data_holders);
+            let _ = self.data_cache.insert(*data_name, opt_data.expect("Data not found."));
             if let Some(account) = self.accounts.get_mut(data_name) {
                 trace!("Replicating {} - account before: {:?}", data_name, account);
                 for new_holder in new_data_holders {
@@ -1006,30 +1043,20 @@ impl ImmutableDataManager {
                            queried_data_holders: &HashMap<XorName, DataHolderState>,
                            message_id: &MessageId)
                            -> Result<Vec<XorName>, InternalError> {
-        let mut good_nodes = HashSet::<XorName>::new();
-        let mut nodes_to_exclude = HashSet::<XorName>::new();
-        for (name, state) in queried_data_holders {
-            match *state {
-                DataHolderState::Good => {
-                    let _ = good_nodes.insert(*name);
-                    let _ = nodes_to_exclude.insert(*name);
-                }
-                DataHolderState::Failed => {
-                    let _ = nodes_to_exclude.insert(*name);
-                }
-                DataHolderState::Pending => unreachable!(),
-            }
-        }
+        let good_nodes_count = queried_data_holders.values()
+                                                   .filter(|state| {
+                                                       **state == DataHolderState::Good
+                                                   })
+                                                   .count();
         let data_name = data.name();
-        trace!("Replicating {} - good nodes: {:?}", data_name, good_nodes);
-        trace!("Replicating {} - nodes to be excluded: {:?}",
+        trace!("Replicating {} - good nodes count: {}",
                data_name,
-               nodes_to_exclude);
+               good_nodes_count);
         let target_data_holders = match try!(routing_node.close_group(data_name)) {
             Some(target_data_holders) => {
                 target_data_holders.into_iter()
-                                   .filter(|elt| !nodes_to_exclude.contains(elt))
-                                   .take(REPLICANTS - good_nodes.len())
+                                   .filter(|elt| !queried_data_holders.contains_key(elt))
+                                   .take(REPLICANTS - good_nodes_count)
                                    .collect_vec()
             }
             None => return Err(InternalError::NotInCloseGroup),
@@ -1052,37 +1079,21 @@ impl ImmutableDataManager {
         Ok(target_data_holders)
     }
 
-    fn recover_from_other_locations(routing_node: &RoutingNode,
-                                    metadata: &mut MetadataForGetRequest,
-                                    data_name: &XorName,
-                                    message_id: &MessageId) {
+    fn _recover_from_other_locations(routing_node: &RoutingNode,
+                                     metadata: &mut MetadataForGetRequest,
+                                     data_name: &XorName,
+                                     message_id: &MessageId) {
         metadata.data_holders.clear();
         // If this Vault is a Backup or Sacrificial manager just return failure to any requesters
         // waiting for responses.
         match metadata.requested_data_type {
             ImmutableDataType::Backup |
             ImmutableDataType::Sacrificial => {
-                Self::send_get_failures(routing_node, metadata);
+                metadata.send_get_failures(routing_node);
             }
             _ => (),
         }
         metadata.send_get_requests(routing_node, data_name, *message_id);
-    }
-
-    fn send_get_failures(routing_node: &RoutingNode, metadata: &mut MetadataForGetRequest) {
-        while let Some((original_message_id, request)) = metadata.requests.pop() {
-            let src = request.dst.clone();
-            let dst = request.src.clone();
-            trace!("Sending GetFailure back to {:?}", dst);
-            let error = GetError::NoSuchData;
-            if let Ok(external_error_indicator) = serialisation::serialise(&error) {
-                let _ = routing_node.send_get_failure(src,
-                                                      dst,
-                                                      request,
-                                                      external_error_indicator,
-                                                      original_message_id);
-            }
-        }
     }
 
     fn choose_initial_data_holders(&self,

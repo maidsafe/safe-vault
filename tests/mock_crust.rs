@@ -55,7 +55,7 @@ mod test {
     use mock_crust_detail::test_client::TestClient;
     use rand::{random, thread_rng};
     use rand::distributions::{IndependentSample, Range};
-    use routing::{self, Data, DataRequest, ImmutableData, ImmutableDataType, StructuredData};
+    use routing::{Data, DataRequest, ImmutableData, ImmutableDataType, StructuredData};
     use routing::mock_crust::{self, Network};
     use safe_vault::Config;
     use sodiumoxide::crypto::sign;
@@ -87,23 +87,23 @@ mod test {
                 Data::Immutable(data) => {
                     assert_eq!(ImmutableDataType::Normal, *data.get_type_tag());
                     let normal_name = data.name();
-                    let backup_name = routing::normal_to_backup(&normal_name);
-                    let sacrificial_name = routing::normal_to_sacrificial(&normal_name);
+                    // let backup_name = routing::normal_to_backup(&normal_name);
+                    // let sacrificial_name = routing::normal_to_sacrificial(&normal_name);
                     let normal_count = *data_count.get(&normal_name).unwrap_or(&0);
-                    assert!(2 <= normal_count,
+                    assert!(4 <= normal_count,
                             "Only {} copies of normal immutable data {:?}",
                             normal_count,
                             normal_name);
-                    let backup_count = *data_count.get(&backup_name).unwrap_or(&0);
-                    assert!(2 <= backup_count,
-                            "Only {} copies of backup immutable data {:?}",
-                            backup_count,
-                            backup_name);
-                    let sacrificial_count = *data_count.get(&sacrificial_name).unwrap_or(&0);
-                    assert!(2 <= sacrificial_count,
-                            "Only {} copies of sacrificial immutable data {:?}",
-                            sacrificial_count,
-                            sacrificial_name);
+                    // let backup_count = *data_count.get(&backup_name).unwrap_or(&0);
+                    // assert!(2 <= backup_count,
+                    //         "Only {} copies of backup immutable data {:?}",
+                    //         backup_count,
+                    //         backup_name);
+                    // let sacrificial_count = *data_count.get(&sacrificial_name).unwrap_or(&0);
+                    // assert!(2 <= sacrificial_count,
+                    //         "Only {} copies of sacrificial immutable data {:?}",
+                    //         sacrificial_count,
+                    //         sacrificial_name);
                 }
                 Data::Structured(data) => {
                     let count = *data_count.get(&data.name()).unwrap_or(&0);

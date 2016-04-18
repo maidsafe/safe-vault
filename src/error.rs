@@ -20,7 +20,7 @@ use chunk_store;
 use safe_network_common::messaging;
 use safe_network_common::client_errors::{MutationError, GetError};
 use maidsafe_utilities::serialisation::SerialisationError;
-use routing::{Authority, InterfaceError, MessageId, RoutingError, RoutingMessage};
+use routing::{Authority, InterfaceError, RoutingError, RoutingMessage};
 use std::io;
 use types::Refresh;
 
@@ -29,7 +29,7 @@ pub enum InternalError {
     ChunkStore(chunk_store::Error),
     ClientGet(GetError),
     ClientMutation(MutationError),
-    FailedToFindCachedRequest(MessageId),
+    FailedToFindCachedRequest,
     FileHandler(config_file_handler::Error),
     InvalidResponse,
     Io(io::Error),

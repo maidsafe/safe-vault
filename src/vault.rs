@@ -149,7 +149,7 @@ impl Vault {
     #[cfg(not(feature = "use-mock-crust"))]
     pub fn run(&mut self) -> Result<(), InternalError> {
         let (routing_sender, routing_receiver) = mpsc::channel();
-        let routing_node = try!(RoutingNode::new(routing_sender, true));
+        let routing_node = try!(RoutingNode::new(routing_sender, false));
         let routing_node0 = Arc::new(Mutex::new(Some(routing_node)));
         let routing_node1 = routing_node0.clone();
 
@@ -324,9 +324,7 @@ impl Vault {
                 self.structured_data_manager.handle_delete(routing_node, &request)
             }
             // ================== Refresh ==================
-            (src,
-             dst,
-             &RequestContent::Refresh(ref serialised_refresh, _)) => {
+            (src, dst, &RequestContent::Refresh(ref serialised_refresh, _)) => {
                 self.on_refresh(routing_node, src, dst, serialised_refresh)
             }
             // ================== Invalid Request ==================

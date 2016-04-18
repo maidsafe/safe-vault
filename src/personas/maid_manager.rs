@@ -113,7 +113,7 @@ impl MaidManager {
                 let _ = routing_node.send_put_success(src, dst, *data_name, *message_id);
                 Ok(())
             }
-            None => Err(InternalError::FailedToFindCachedRequest(*message_id)),
+            None => Err(InternalError::FailedToFindCachedRequest),
         }
     }
 
@@ -134,7 +134,7 @@ impl MaidManager {
                     try!(serialisation::deserialise::<MutationError>(external_error_indicator));
                 self.reply_with_put_failure(routing_node, client_request, *message_id, &error)
             }
-            None => Err(InternalError::FailedToFindCachedRequest(*message_id)),
+            None => Err(InternalError::FailedToFindCachedRequest),
         }
     }
 
@@ -732,10 +732,9 @@ mod test {
         // Invalid case.
         message_id = MessageId::new();
 
-        if let Err(InternalError::FailedToFindCachedRequest(id)) =
+        if let Err(InternalError::FailedToFindCachedRequest) =
                env.maid_manager
                   .handle_put_success(&env.routing, &data.name(), &message_id) {
-            assert_eq!(message_id, id);
         } else {
             unreachable!()
         }
@@ -818,10 +817,9 @@ mod test {
         // Invalid case.
         message_id = MessageId::new();
         if let Ok(error_indicator) = serialisation::serialise(&error) {
-            if let Err(InternalError::FailedToFindCachedRequest(id)) =
+            if let Err(InternalError::FailedToFindCachedRequest) =
                    env.maid_manager
                       .handle_put_failure(&env.routing, &message_id, &error_indicator[..]) {
-                assert_eq!(message_id, id);
             } else {
                 unreachable!()
             }
