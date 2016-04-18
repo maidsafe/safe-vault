@@ -15,11 +15,16 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+use itertools::Itertools;
 use std::hash::Hash;
 use std::collections::HashMap;
 use time::{Duration, SteadyTime};
 
-/// TimedBuffer
+/// A map whose entries can time out.
+///
+/// This is similar to an LRU cache, but never silently drops entries without returning them.
+/// Expired entries need to be retrieved with `get_expired`, so that every expiry can be acted
+/// upon.
 pub struct TimedBuffer<Key, Value> {
     map: HashMap<Key, (Value, SteadyTime)>,
     time_to_live: Duration,
@@ -62,9 +67,19 @@ impl<Key: Hash + PartialOrd + Ord + Clone, Value: Clone> TimedBuffer<Key, Value>
             .collect()
     }
 
-    // Returns true if the map contains a value for the specified key.
-    pub fn contains_key(&self, key: &Key) -> bool {
+    /// Returns true if the map contains a value for the specified key.
+    pub fn _contains_key(&self, key: &Key) -> bool {
         self.map.contains_key(key)
+    }
+
+    /// Removes all entries where the key matches the predicate.
+    pub fn remove_keys<F>(&mut self, f: F)
+        where F: FnMut(&&Key) -> bool
+    {
+        let keys = self.map.keys().filter(f).cloned().collect_vec();
+        for key in keys {
+            let _ = self.map.remove(&key);
+        }
     }
 
     /// Returns the number of entries.
@@ -100,9 +115,9 @@ mod test {
         let insertions = 10;
 
         for i in 0..insertions {
-            assert!(!timed_buffer.contains_key(&i));
+            assert!(!timed_buffer._contains_key(&i));
             let _ = timed_buffer.insert(i, i);
-            assert!(timed_buffer.contains_key(&i));
+            assert!(timed_buffer._contains_key(&i));
         }
 
         thread::sleep(::std::time::Duration::from_millis(100));

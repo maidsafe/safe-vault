@@ -57,6 +57,10 @@ impl TestNode {
     pub fn get_stored_names(&self) -> Vec<XorName> {
         self.vault.get_stored_names()
     }
+
+    pub fn get_maid_manager_put_count(&self, client_name: &XorName) -> Option<u64> {
+        self.vault.get_maid_manager_put_count(client_name)
+    }
 }
 
 pub fn create_nodes(network: &Network, size: usize, config: Option<Config>) -> Vec<TestNode> {
@@ -90,16 +94,14 @@ pub fn _add_nodes(network: &Network, mut nodes: &mut Vec<TestNode>, size: usize)
     }
 }
 
-pub fn _add_node(network: &Network, nodes: &mut Vec<TestNode>) {
+pub fn add_node(network: &Network, nodes: &mut Vec<TestNode>) {
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
     nodes.push(TestNode::new(network, Some(config.clone()), None));
-    poll::nodes(nodes);
 }
 
-pub fn _drop_node(nodes: &mut Vec<TestNode>, index: usize) {
+pub fn drop_node(nodes: &mut Vec<TestNode>, index: usize) {
     let node = nodes.remove(index);
     drop(node);
-    _poll_all(nodes);
 }
 
 /// Process all events

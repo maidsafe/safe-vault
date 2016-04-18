@@ -18,6 +18,7 @@
 use std::mem;
 use std::convert::From;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::Entry;
 
 use error::InternalError;
 use safe_network_common::client_errors::MutationError;
@@ -37,6 +38,7 @@ const MAX_FULL_RATIO: f32 = 0.5;
 pub struct Account {
     data_stored: u64,
     space_available: u64,
+    version: u64,
 }
 
 impl Default for Account {
@@ -44,6 +46,7 @@ impl Default for Account {
         Account {
             data_stored: 0,
             space_available: DEFAULT_ACCOUNT_SIZE,
+            version: 0,
         }
     }
 }
@@ -55,12 +58,14 @@ impl Account {
         }
         self.data_stored += 1;
         self.space_available -= 1;
+        self.version += 1;
         Ok(())
     }
 
     fn delete_data(&mut self) {
         self.data_stored -= 1;
         self.space_available += 1;
+        self.version += 1;
     }
 }
 
@@ -108,7 +113,7 @@ impl MaidManager {
                 let _ = routing_node.send_put_success(src, dst, *data_name, *message_id);
                 Ok(())
             }
-            None => Err(InternalError::FailedToFindCachedRequest(*message_id)),
+            None => Err(InternalError::FailedToFindCachedRequest),
         }
     }
 
@@ -129,15 +134,31 @@ impl MaidManager {
                     try!(serialisation::deserialise::<MutationError>(external_error_indicator));
                 self.reply_with_put_failure(routing_node, client_request, *message_id, &error)
             }
-            None => Err(InternalError::FailedToFindCachedRequest(*message_id)),
+            None => Err(InternalError::FailedToFindCachedRequest),
         }
     }
 
-    pub fn handle_refresh(&mut self, name: XorName, account: Account) {
-        let _ = self.accounts.insert(name, account);
+    pub fn handle_refresh(&mut self,
+                          routing_node: &RoutingNode,
+                          maid_name: XorName,
+                          account: Account) {
+        match routing_node.close_group(maid_name) {
+            Ok(None) | Err(_) => return,
+            Ok(Some(_)) => (),
+        }
+        match self.accounts.entry(maid_name) {
+            Entry::Vacant(entry) => {
+                let _ = entry.insert(account);
+            }
+            Entry::Occupied(mut entry) => {
+                if entry.get().version < account.version {
+                    let _ = entry.insert(account);
+                }
+            }
+        }
     }
 
-    pub fn handle_churn(&mut self, routing_node: &RoutingNode, node_changed: &XorName) {
+    pub fn handle_node_added(&mut self, routing_node: &RoutingNode, node_name: &XorName) {
         // Only retain accounts for which we're still in the close group
         let accounts = mem::replace(&mut self.accounts, HashMap::new());
         self.accounts = accounts.into_iter()
@@ -157,9 +178,9 @@ impl MaidManager {
                                         }
                                         Ok(Some(_)) => {
                                             self.send_refresh(routing_node,
-                                                              maid_name,
-                                                              account,
-                                                              node_changed);
+                                                  maid_name,
+                                                  account,
+                                                  MessageId::from_added_node(*node_name));
                                             true
                                         }
                                         Err(error) => {
@@ -173,11 +194,20 @@ impl MaidManager {
                                 .collect();
     }
 
+    pub fn handle_node_lost(&mut self, routing_node: &RoutingNode, node_name: &XorName) {
+        for (maid_name, account) in &self.accounts {
+            self.send_refresh(routing_node,
+                              maid_name,
+                              account,
+                              MessageId::from_lost_node(*node_name));
+        }
+    }
+
     fn send_refresh(&self,
                     routing_node: &RoutingNode,
                     maid_name: &XorName,
                     account: &Account,
-                    node_changed: &XorName) {
+                    message_id: MessageId) {
         let src = Authority::ClientManager(*maid_name);
         let refresh = Refresh::new(maid_name, RefreshValue::MaidManagerAccount(account.clone()));
         if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
@@ -185,10 +215,12 @@ impl MaidManager {
             let _ = routing_node.send_refresh_request(src.clone(),
                                                       src.clone(),
                                                       serialised_refresh,
-                                                      MessageId::from_lost_node(*node_changed));
+                                                      message_id);
         }
     }
 
+    #[cfg_attr(feature="clippy", allow(cast_possible_truncation, cast_precision_loss,
+                                       cast_sign_loss))]
     fn handle_put_immutable_data(&mut self,
                                  routing_node: &RoutingNode,
                                  full_pmid_nodes: &HashSet<XorName>,
@@ -202,23 +234,21 @@ impl MaidManager {
                                                    &MutationError::InvalidOperation);
             }
 
-            match routing_node.close_group(utils::client_name(&request.src)) {
-                Ok(Some(ref close_group)) => {
-                    if full_pmid_nodes.intersection(&close_group.iter()
-                                                                .cloned()
-                                                                .collect::<HashSet<XorName>>())
-                                      .count() >=
-                       (close_group.len() as f32 * MAX_FULL_RATIO) as usize {
-                        return self.reply_with_put_failure(routing_node,
-                                                           request.clone(),
-                                                           message_id,
-                                                           &MutationError::NetworkFull);
-                    }
+            if let Ok(Some(ref close_group)) =
+                   routing_node.close_group(utils::client_name(&request.src)) {
+                if full_pmid_nodes.intersection(&close_group.iter()
+                                                            .cloned()
+                                                            .collect::<HashSet<XorName>>())
+                                  .count() >=
+                   (close_group.len() as f32 * MAX_FULL_RATIO) as usize {
+                    return self.reply_with_put_failure(routing_node,
+                                                       request.clone(),
+                                                       message_id,
+                                                       &MutationError::NetworkFull);
                 }
-                _ => {
-                    error!("Failed to get close group.");
-                    return Ok(());
-                }
+            } else {
+                error!("Failed to get close group.");
+                return Ok(());
             }
 
             self.forward_put_request(routing_node,
@@ -273,6 +303,12 @@ impl MaidManager {
                          .get_mut(&client_name)
                          .ok_or(MutationError::NoSuchAccount)
                          .and_then(|account| account.put_data());
+        if result.is_ok() {
+            self.send_refresh(routing_node,
+                              &client_name,
+                              self.accounts.get(&client_name).expect("Account not found."),
+                              MessageId::zero());
+        }
         if let Err(error) = result {
             trace!("MM responds put_failure of data {}, due to error {:?}",
                    data.name(),
@@ -312,6 +348,11 @@ impl MaidManager {
                                               external_error_indicator,
                                               message_id);
         Ok(())
+    }
+
+    #[cfg(feature = "use-mock-crust")]
+    pub fn get_put_count(&self, client_name: &XorName) -> Option<u64> {
+        self.accounts.get(client_name).map(|account| account.data_stored)
     }
 }
 
@@ -691,10 +732,9 @@ mod test {
         // Invalid case.
         message_id = MessageId::new();
 
-        if let Err(InternalError::FailedToFindCachedRequest(id)) =
+        if let Err(InternalError::FailedToFindCachedRequest) =
                env.maid_manager
                   .handle_put_success(&env.routing, &data.name(), &message_id) {
-            assert_eq!(message_id, id);
         } else {
             unreachable!()
         }
@@ -777,10 +817,9 @@ mod test {
         // Invalid case.
         message_id = MessageId::new();
         if let Ok(error_indicator) = serialisation::serialise(&error) {
-            if let Err(InternalError::FailedToFindCachedRequest(id)) =
+            if let Err(InternalError::FailedToFindCachedRequest) =
                    env.maid_manager
                       .handle_put_failure(&env.routing, &message_id, &error_indicator[..]) {
-                assert_eq!(message_id, id);
             } else {
                 unreachable!()
             }
@@ -841,16 +880,22 @@ mod test {
         let mut env = environment_setup();
         create_account(&mut env);
 
-        env.routing.node_added_event(get_close_node(&env));
-        env.maid_manager.handle_churn(&env.routing, &random::<XorName>());
-
-        let mut refresh_count = 0;
+        let mut refresh_count = 1;
         let mut refresh_requests = env.routing.refresh_requests_given();
+        assert_eq!(refresh_requests.len(), refresh_count);
+        assert_eq!(refresh_requests[0].src, env.our_authority);
+        assert_eq!(refresh_requests[0].dst, env.our_authority);
+
+        env.routing.node_added_event(get_close_node(&env));
+        env.maid_manager.handle_node_added(&env.routing, &random::<XorName>());
+
+        refresh_requests = env.routing.refresh_requests_given();
 
         if let Ok(Some(_)) = env.routing.close_group(utils::client_name(&env.client)) {
-            assert_eq!(refresh_requests.len(), 1);
-            assert_eq!(refresh_requests[0].src, env.our_authority);
-            assert_eq!(refresh_requests[0].dst, env.our_authority);
+            assert_eq!(refresh_requests.len(), refresh_count + 1);
+            assert_eq!(refresh_requests[refresh_count].src, env.our_authority);
+            assert_eq!(refresh_requests[refresh_count].dst, env.our_authority);
+            refresh_count += 1;
 
             if let RequestContent::Refresh(ref serialised_refresh, _) = refresh_requests[0]
                                                                             .content {
@@ -863,13 +908,12 @@ mod test {
             } else {
                 unreachable!()
             }
-            refresh_count += 1;
         } else {
-            assert!(refresh_requests.is_empty());
+            assert_eq!(refresh_requests.len(), refresh_count);
         }
 
         env.routing.node_lost_event(lose_close_node(&env));
-        env.maid_manager.handle_churn(&env.routing, &random::<XorName>());
+        env.maid_manager.handle_node_lost(&env.routing, &random::<XorName>());
 
         refresh_requests = env.routing.refresh_requests_given();
 
@@ -877,6 +921,7 @@ mod test {
             assert_eq!(refresh_requests.len(), refresh_count + 1);
             assert_eq!(refresh_requests[refresh_count].src, env.our_authority);
             assert_eq!(refresh_requests[refresh_count].dst, env.our_authority);
+            // refresh_count += 1;
 
             if let RequestContent::Refresh(ref serialised_refresh, _) =
                    refresh_requests[refresh_count].content {
@@ -889,7 +934,6 @@ mod test {
             } else {
                 unreachable!()
             }
-            // refresh_count += 1;
         } else {
             assert_eq!(refresh_requests.len(), refresh_count);
         }

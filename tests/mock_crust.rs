@@ -29,30 +29,41 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![allow(unused_extern_crates)]
+#![cfg(feature = "use-mock-crust")]
+#![cfg(test)]
+
+extern crate itertools;
+extern crate kademlia_routing_table;
+#[macro_use]
+extern crate log;
 #[macro_use]
 extern crate maidsafe_utilities;
 extern crate rand;
 extern crate routing;
+extern crate safe_network_common;
+extern crate safe_vault;
 extern crate sodiumoxide;
 extern crate xor_name;
-extern crate safe_vault;
 
-#[cfg(feature = "use-mock-crust")]
 mod mock_crust_detail;
 
-#[cfg(feature = "use-mock-crust")]
-#[cfg(test)]
 mod test {
-    use mock_crust_detail::{self, poll, test_client, test_node};
+    use itertools::Itertools;
+    use kademlia_routing_table::GROUP_SIZE;
+    use mock_crust_detail::{self, poll, test_node};
+    use mock_crust_detail::test_node::TestNode;
+    use mock_crust_detail::test_client::TestClient;
     use rand::{random, thread_rng};
     use rand::distributions::{IndependentSample, Range};
-    use routing::{self, Data, DataRequest, ImmutableData, ImmutableDataType, StructuredData};
+    use routing::{Data, DataRequest, ImmutableData, ImmutableDataType, StructuredData};
     use routing::mock_crust::{self, Network};
+    use safe_vault::Config;
     use sodiumoxide::crypto::sign;
+    use std::cmp;
+    use std::collections::HashMap;
     use xor_name::XorName;
 
-    fn random_structured_data(type_tag: u64) -> StructuredData {
+    fn random_structured_data(type_tag: u64, key: sign::SecretKey) -> StructuredData {
         let keys = sign::gen_keypair();
 
         unwrap_result!(StructuredData::new(type_tag,
@@ -61,134 +72,247 @@ mod test {
                                            mock_crust_detail::generate_random_vec_u8(10),
                                            vec![keys.0],
                                            vec![],
-                                           Some(&keys.1)))
+                                           Some(&key)))
     }
 
-    fn check_data(all_immutable_data: Vec<Data>,
-                  all_structured_data: Vec<Data>,
-                  mut all_stored_names: Vec<XorName>) {
-        all_stored_names.sort();
+    /// Checks that the given `nodes` store the expected number of copies of the given data.
+    fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
+        let mut data_count: HashMap<XorName, usize> = HashMap::new();
+        for name in nodes.iter().flat_map(TestNode::get_stored_names) {
+            *data_count.entry(name).or_insert(0) += 1;
+        }
 
-        let mut all_immutable_data_names = all_immutable_data.iter()
-                                                             .cloned()
-                                                             .map(|data| data.name().clone())
-                                                             .collect::<Vec<XorName>>();
+        for data in all_data {
+            match data {
+                Data::Immutable(data) => {
+                    assert_eq!(ImmutableDataType::Normal, *data.get_type_tag());
+                    let normal_name = data.name();
+                    // let backup_name = routing::normal_to_backup(&normal_name);
+                    // let sacrificial_name = routing::normal_to_sacrificial(&normal_name);
+                    let normal_count = *data_count.get(&normal_name).unwrap_or(&0);
+                    assert!(4 <= normal_count,
+                            "Only {} copies of normal immutable data {:?}",
+                            normal_count,
+                            normal_name);
+                    // let backup_count = *data_count.get(&backup_name).unwrap_or(&0);
+                    // assert!(2 <= backup_count,
+                    //         "Only {} copies of backup immutable data {:?}",
+                    //         backup_count,
+                    //         backup_name);
+                    // let sacrificial_count = *data_count.get(&sacrificial_name).unwrap_or(&0);
+                    // assert!(2 <= sacrificial_count,
+                    //         "Only {} copies of sacrificial immutable data {:?}",
+                    //         sacrificial_count,
+                    //         sacrificial_name);
+                }
+                Data::Structured(data) => {
+                    let count = *data_count.get(&data.name()).unwrap_or(&0);
+                    assert!(5 <= count,
+                            "Only {} copies of structured data {:?}.",
+                            count,
+                            data.name());
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
 
-        all_immutable_data_names.sort();
+    #[test]
+    fn maid_manager_churn() {
+        let network = Network::new();
+        let node_count = 15;
+        let mut nodes = test_node::create_nodes(&network, node_count, None);
+        let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+        let mut client = TestClient::new(&network, Some(config));
 
-        let mut normal_names = all_stored_names.clone();
+        client.ensure_connected(&mut nodes);
+        client.create_account(&mut nodes);
 
-        normal_names.retain(|&stored_name| {
-            all_immutable_data_names.iter()
-                                    .find(|&&name| name == stored_name)
-                                    .is_some()
-        });
+        let mut rng = thread_rng();
 
-        assert_eq!(2 * all_immutable_data.len(), normal_names.len());
+        let mut put_count = 1; // Login packet.
+        let client_key = client.signing_private_key().clone();
 
-        normal_names.dedup();
+        for i in 0..10 {
+            for data in (0..4).map(|_| {
+                Data::Structured(random_structured_data(100000, client_key.clone()))
+            }) {
+                client.put(data.clone());
+                put_count += 1;
+            }
+            trace!("Churn {}", i);
+            if nodes.len() <= GROUP_SIZE + 2 || random() {
+                trace!("Adding node.");
+                test_node::add_node(&network, &mut nodes);
+            } else {
+                let number = Range::new(1, 4).ind_sample(&mut rng);
+                trace!("Removing {} node(s).", number);
+                for _ in 0..number {
+                    let node_index = Range::new(1, nodes.len()).ind_sample(&mut rng);
+                    test_node::drop_node(&mut nodes, node_index);
+                }
+            }
+            poll::nodes_and_client(&mut nodes, &mut client);
+            assert!(GROUP_SIZE - 3 <=
+                    nodes.iter()
+                         .filter(|node| {
+                             match node.get_maid_manager_put_count(client.name()) {
+                                 None => false,
+                                 Some(count) => count == put_count,
+                             }
+                         })
+                         .count());
+        }
+    }
 
-        assert_eq!(all_immutable_data_names.iter()
-                                           .zip(normal_names)
-                                           .filter(|&(data_name, normal_name)| {
-                                               *data_name == normal_name
-                                           })
-                                           .count(),
-                   all_immutable_data.len());
+    #[test]
+    fn immutable_data_churn() {
+        let _ = ::maidsafe_utilities::log::init(false);
+        let network = Network::new();
+        let node_count = 15;
+        let mut nodes = test_node::create_nodes(&network, node_count, None);
+        let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+        let mut client = TestClient::new(&network, Some(config));
+        const DATA_COUNT: usize = 5;
+        const DATA_PER_ITER: usize = 2;
 
-        let mut backup_names = all_stored_names.clone();
+        client.ensure_connected(&mut nodes);
+        client.create_account(&mut nodes);
 
-        backup_names.retain(|&stored_name| {
-            all_immutable_data_names.iter()
-                                    .find(|&&name| routing::normal_to_backup(&name) == stored_name)
-                                    .is_some()
-        });
+        let mut all_data = vec![];
+        let mut rng = thread_rng();
 
-        assert_eq!(2 * all_immutable_data.len(), backup_names.len());
+        for i in 0..10 {
+            for _ in 0..(cmp::min(DATA_PER_ITER, DATA_COUNT - all_data.len())) {
+                let data =
+                    Data::Immutable(ImmutableData::new(ImmutableDataType::Normal,
+                                       mock_crust_detail::generate_random_vec_u8(10)));
+                trace!("Putting data {:?}.", data.name());
+                client.put(data.clone());
+                all_data.push(data);
+            }
+            trace!("Churn {}", i);
+            if nodes.len() <= GROUP_SIZE + 2 || random() {
+                trace!("Adding node.");
+                test_node::add_node(&network, &mut nodes);
+            } else {
+                let number = Range::new(3, 4).ind_sample(&mut rng);
+                trace!("Removing {} node(s).", number);
+                for _ in 0..number {
+                    let node_range = Range::new(1, nodes.len());
+                    let node_index = node_range.ind_sample(&mut rng);
+                    test_node::drop_node(&mut nodes, node_index);
+                }
+            }
+            poll::nodes_and_client(&mut nodes, &mut client);
 
-        let mut all_backup_names = all_immutable_data.iter()
-                                                     .cloned()
-                                                     .map(|data| {
-                                                         routing::normal_to_backup(&data.name())
-                                                     })
-                                                     .collect::<Vec<XorName>>();
+            check_data(all_data.clone(), &nodes);
+        }
 
-        all_backup_names.sort();
-        backup_names.sort();
-        backup_names.dedup();
+        for data in &all_data {
+            match *data {
+                Data::Immutable(ref sent_data) => {
+                    match client.get(DataRequest::Immutable(sent_data.name(),
+                                                            sent_data.get_type_tag().clone()),
+                                     &mut nodes) {
+                        Data::Immutable(recovered_data) => {
+                            assert_eq!(recovered_data, *sent_data);
+                        }
+                        unexpected_data => panic!("Got unexpected data: {:?}", unexpected_data),
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
 
-        assert_eq!(all_backup_names.iter()
-                                   .zip(backup_names)
-                                   .filter(|&(data_name, backup_name)| *data_name == backup_name)
-                                   .count(),
-                   all_immutable_data.len());
+    #[test]
+    fn structured_data_churn() {
+        let network = Network::new();
+        let node_count = 15;
+        let mut nodes = test_node::create_nodes(&network, node_count, None);
+        let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+        let mut client = TestClient::new(&network, Some(config));
 
-        let mut sacrificial_names = all_stored_names.clone();
+        client.ensure_connected(&mut nodes);
+        client.create_account(&mut nodes);
 
-        sacrificial_names.retain(|&stored_name| {
-            all_immutable_data_names.iter()
-                                    .find(|&&name| {
-                                        routing::normal_to_sacrificial(&name) == stored_name
-                                    })
-                                    .is_some()
-        });
+        let mut all_data = vec![];
+        let mut rng = thread_rng();
 
-        assert_eq!(2 * all_immutable_data.len(), sacrificial_names.len());
+        for i in 0..10 {
+            for _ in 0..4 {
+                if all_data.is_empty() || random() {
+                    let data =
+                        Data::Structured(random_structured_data(100000,
+                                                                client.signing_private_key()
+                                                                      .clone()));
+                    trace!("Putting data {:?}.", data.name());
+                    client.put(data.clone());
+                    all_data.push(data);
+                } else {
+                    let j = Range::new(0, all_data.len()).ind_sample(&mut rng);
+                    let data = Data::Structured(if let Data::Structured(sd) = all_data[j]
+                                                                                  .clone() {
+                        unwrap_result!(StructuredData::new(sd.get_type_tag(),
+                                                           *sd.get_identifier(),
+                                                           sd.get_version() + 1,
+                                                           mock_crust_detail::generate_random_vec_u8(10),
+                                                           sd.get_owner_keys().clone(),
+                                                           vec![],
+                                                           Some(client.signing_private_key())))
+                    } else {
+                        panic!("Non-structured data found.");
+                    });
+                    trace!("Posting data {:?}.", data.name());
+                    all_data[j] = data.clone();
+                    client.post(data);
+                }
+            }
+            trace!("Churn {}", i);
+            if nodes.len() <= GROUP_SIZE + 2 || random() {
+                trace!("Adding node.");
+                test_node::add_node(&network, &mut nodes);
+            } else {
+                let number = Range::new(3, 4).ind_sample(&mut rng);
+                trace!("Removing {} node(s).", number);
+                for _ in 0..number {
+                    let node_range = Range::new(1, nodes.len());
+                    let node_index = node_range.ind_sample(&mut rng);
+                    test_node::drop_node(&mut nodes, node_index);
+                }
+            }
+            poll::nodes_and_client(&mut nodes, &mut client);
 
-        let mut all_sacrificial_names =
-            all_immutable_data.iter()
-                              .cloned()
-                              .map(|data| routing::normal_to_sacrificial(&data.name()))
-                              .collect::<Vec<XorName>>();
+            check_data(all_data.clone(), &nodes);
 
-        all_sacrificial_names.sort();
-        sacrificial_names.sort();
-        sacrificial_names.dedup();
-
-        assert_eq!(all_sacrificial_names.iter()
-                                        .zip(sacrificial_names)
-                                        .filter(|&(data_name, sacrificial_name)| {
-                                            *data_name == sacrificial_name
-                                        })
-                                        .count(),
-                   all_immutable_data.len());
-
-        let mut all_structured_data_names = all_structured_data.iter()
-                                                               .cloned()
-                                                               .map(|data| data.name().clone())
-                                                               .collect::<Vec<XorName>>();
-
-        all_structured_data_names.sort();
-
-        let mut structured_names = all_stored_names.clone();
-
-        structured_names.retain(|&stored_name| {
-            all_structured_data_names.iter()
-                                     .find(|&&name| name == stored_name)
-                                     .is_some()
-        });
-
-        assert_eq!(8 * all_structured_data.len(), structured_names.len());
-
-        structured_names.sort();
-        structured_names.dedup();
-
-        assert_eq!(all_structured_data_names.iter()
-                                            .zip(structured_names)
-                                            .filter(|&(data_name, structured_name)| {
-                                                *data_name == structured_name
-                                            })
-                                            .count(),
-                   all_structured_data.len());
+            for data in &all_data {
+                match *data {
+                    Data::Structured(ref sent_structured_data) => {
+                        match client.get(DataRequest::Structured(sent_structured_data.get_identifier()
+                                                                                     .clone(),
+                                                                 sent_structured_data.get_type_tag()),
+                                         &mut nodes) {
+                            Data::Structured(recovered_structured_data) => {
+                                assert_eq!(recovered_structured_data.name(),
+                                           sent_structured_data.name());
+                            }
+                            unexpected_data => panic!("Got unexpected data: {:?}", unexpected_data),
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
     }
 
     #[test]
     fn data_confirmation() {
         let network = Network::new();
-        let node_count = 2 * 8;
+        let node_count = 24;
         let mut nodes = test_node::create_nodes(&network, node_count, None);
         let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-        let mut client = test_client::TestClient::new(&network, Some(config));
+        let mut client = TestClient::new(&network, Some(config));
 
         client.ensure_connected(&mut nodes);
         client.create_account(&mut nodes);
@@ -209,13 +333,14 @@ mod test {
                 let immutable_data = ImmutableData::new(ImmutableDataType::Normal, content);
                 all_data.push(Data::Immutable(immutable_data));
             } else {
-                let structured_data = random_structured_data(structured_range.ind_sample(&mut rng));
+                let structured_data = random_structured_data(structured_range.ind_sample(&mut rng),
+                                                             client.signing_private_key().clone());
                 all_data.push(Data::Structured(structured_data));
             }
         }
 
         for data in &all_data {
-            client.put(data.clone(), &mut nodes);
+            unwrap_result!(client.put_and_verify(data.clone(), &mut nodes));
         }
 
         for data in &all_data {
@@ -252,17 +377,13 @@ mod test {
 
         poll::nodes_and_client(&mut nodes, &mut client);
 
-        let mut all_stored_names = Vec::new();
+        check_data(all_immutable_data.iter()
+                                     .chain(all_structured_data.iter())
+                                     .cloned()
+                                     .collect_vec(),
+                   &nodes);
 
-        for node in &nodes {
-            all_stored_names.append(&mut node.get_stored_names());
-        }
-
-        check_data(all_immutable_data.clone(),
-                   all_structured_data.clone(),
-                   all_stored_names.clone());
-
-        //for _ in 0..10 {
+        // for _ in 0..10 {
         //    for _ in 0..3 {
         //        let node_range = Range::new(1, nodes.len());
         //        let node_index = node_range.ind_sample(&mut rng);
@@ -292,15 +413,50 @@ mod test {
         //    check_data(all_immutable_data.clone(),
         //               all_structured_data.clone(),
         //               all_stored_names.clone());
-        //}
+        // }
+    }
+
+    // TODO: This is still flaky and occasionally fails with `Err(Empty)` in
+    // `TestClient::put_and_verify`.
+    #[ignore]
+    #[test]
+    fn fill_network() {
+        let network = Network::new();
+        let config = Config {
+            wallet_address: None,
+            max_capacity: Some(7000),
+        };
+        let mut nodes = test_node::create_nodes(&network, 24, Some(config));
+        let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+        let mut client = TestClient::new(&network, Some(crust_config));
+
+        client.ensure_connected(&mut nodes);
+        client.create_account(&mut nodes);
+
+        let mut content = vec![0u8; 1024];
+        let mut index = 0;
+        loop {
+            content[index] ^= 1u8;
+            let immutable_data = ImmutableData::new(ImmutableDataType::Normal, content.clone());
+            match client.put_and_verify(Data::Immutable(immutable_data), &mut nodes) {
+                Ok(()) => trace!("\nStored chunk {}\n=================\n", index),
+                Err(response) => {
+                    trace!("\nFailed storing chunk {}\n=================\n{:?}\n",
+                           index,
+                           response);
+                    break;
+                }
+            }
+            index += 1;
+        }
     }
 
     #[test]
     fn put_get_when_churn() {
         let network = Network::new();
-        let mut nodes = test_node::create_nodes(&network, 2 * 8, None);
-        let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-        let mut client = test_client::TestClient::new(&network, Some(config));
+        let mut nodes = test_node::create_nodes(&network, 24, None);
+        let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+        let mut client = TestClient::new(&network, Some(crust_config));
 
         client.ensure_connected(&mut nodes);
         client.create_account(&mut nodes);
@@ -319,15 +475,16 @@ mod test {
         // let node_index_range = Range::new(1, nodes.len() - 1);
         // Churn every 10 put_requests, thats 10 churn in total
         for i in 0..all_immutable_data.len() {
-            client.put(Data::Immutable(all_immutable_data[i].clone()), &mut nodes);
+            unwrap_result!(client.put_and_verify(Data::Immutable(all_immutable_data[i].clone()),
+                                                 &mut nodes));
             // TODO: Re-enable churn.
-            //if i % 10 == 0 {
+            // if i % 10 == 0 {
             //    if i % 20 == 0 {
             //        test_node::drop_node(&mut nodes, node_index_range.ind_sample(&mut rng));
             //    } else {
             //        test_node::add_node(&network, &mut nodes);
             //    }
-            //}
+            // }
         }
         poll::nodes_and_client(&mut nodes, &mut client);
         // Churn every 10 put_requests, thats 10 churn in total
@@ -342,13 +499,13 @@ mod test {
                 data => panic!("Got unexpected data: {:?}", data),
             }
             // TODO: Re-enable churn.
-            //if i % 10 == 0 {
+            // if i % 10 == 0 {
             //    if i % 20 == 0 {
             //        test_node::drop_node(&mut nodes, node_index_range.ind_sample(&mut rng));
             //    } else {
             //        test_node::add_node(&network, &mut nodes);
             //    }
-            //}
+            // }
         }
         poll::nodes_and_client(&mut nodes, &mut client);
 

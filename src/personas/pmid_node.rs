@@ -83,10 +83,10 @@ impl PmidNode {
             unreachable!("Error in vault demuxing")
         };
         let data_name = data.name();
-        info!("pmid_node {:?} storing {:?}", request.dst.name(), data_name);
         let serialised_data = try!(serialisation::serialise(&data));
         if self.chunk_store.has_space(serialised_data.len() as u64) {
             if let Ok(_) = self.chunk_store.put(&data_name, &serialised_data) {
+                trace!("pmid_node {} stored {}", request.dst.name(), data_name);
                 let _ = self.notify_managers_of_success(routing_node,
                                                         &data_name,
                                                         &message_id,
@@ -97,7 +97,7 @@ impl PmidNode {
 
         let src = request.dst.clone();
         let dst = request.src.clone();
-        trace!("As {:?} sending Put failure of data {} to {:?} ",
+        debug!("As {:?} sending Put failure of data {} to {:?} ",
                src,
                data_name,
                dst);
@@ -110,7 +110,7 @@ impl PmidNode {
         Ok(())
     }
 
-    pub fn handle_churn(&mut self, routing_node: &RoutingNode) {
+    pub fn handle_node_added(&mut self, routing_node: &RoutingNode) {
         // Only retain chunks for which we're still in the close group
         let chunk_names = self.chunk_store.names();
         for chunk_name in chunk_names {
@@ -453,7 +453,7 @@ mod test {
         let name = get_close_node(&env);
 
         env.routing.node_added_event(name);
-        env.pmid_node.handle_churn(&env.routing);
+        env.pmid_node.handle_node_added(&env.routing);
 
         let message_id = MessageId::new();
         let name = if let Authority::ManagedNode(name) = env.our_authority {

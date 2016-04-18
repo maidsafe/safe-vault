@@ -56,8 +56,8 @@ impl Account {
 
 pub struct PmidManager {
     accounts: HashMap<XorName, Account>,
-    // key -- (message_id, targeted pmid_node)
-    ongoing_puts: TimedBuffer<(MessageId, XorName), RequestMessage>,
+    // key -- (data name, targeted pmid_node)
+    ongoing_puts: TimedBuffer<(XorName, XorName), RequestMessage>,
 }
 
 impl PmidManager {
@@ -88,7 +88,7 @@ impl PmidManager {
         trace!("PM forwarding put request of data {} targeting PN {}",
                data.name(),
                dst.name());
-        let _ = self.ongoing_puts.insert((*message_id, *request.dst.name()), request.clone());
+        let _ = self.ongoing_puts.insert((data.name(), *request.dst.name()), request.clone());
         let _ = routing_node.send_put_request(src, dst, Data::Immutable(data.clone()), *message_id);
         Ok(())
     }
@@ -121,7 +121,7 @@ impl PmidManager {
                               data_name: &XorName,
                               message_id: &MessageId)
                               -> Result<(), InternalError> {
-        if let Some(request) = self.ongoing_puts.remove(&(*message_id, *pmid_node)) {
+        if let Some(request) = self.ongoing_puts.remove(&(*data_name, *pmid_node)) {
             if request.src.name() != data_name {
                 error!("Got PutSuccess for {:?} with data name {:?} instead of {:?}.",
                        message_id,
@@ -139,18 +139,22 @@ impl PmidManager {
     }
 
     // This is handling the put_failure response from PN to PM
-    // The `request` is the original request from NAE to PM
     pub fn handle_put_failure(&mut self,
                               routing_node: &RoutingNode,
                               request: &RequestMessage)
                               -> Result<(), InternalError> {
-        let message_id = if let RequestContent::Put(_, ref message_id) = request.content {
-            message_id
+        let data_name = if let RequestContent::Put(ref data, _) = request.content {
+            data.name()
         } else {
             unreachable!("Error in vault demuxing")
         };
-        let _ = self.ongoing_puts.remove(&(*message_id, *request.dst.name()));
-        self.notify_put_failure(routing_node, request)
+        if let Some(removed_request) = self.ongoing_puts
+                                           .remove(&(data_name, *request.dst.name())) {
+            if routing_node.close_group(*request.dst.name()).ok().is_some() {
+                let _ = self.notify_put_failure(routing_node, &removed_request);
+            }
+        }
+        Ok(())
     }
 
     // Posting from DM to PM is only used to notify a get_failure
@@ -166,7 +170,7 @@ impl PmidManager {
         let _ = self.accounts.insert(name, account);
     }
 
-    pub fn handle_churn(&mut self, routing_node: &RoutingNode, node_changed: &XorName) {
+    pub fn handle_node_added(&mut self, routing_node: &RoutingNode, node_name: &XorName) {
         // Only retain accounts for which we're still in the close group
         let accounts = mem::replace(&mut self.accounts, HashMap::new());
         self.accounts = accounts.into_iter()
@@ -174,14 +178,16 @@ impl PmidManager {
                                     match routing_node.close_group(*pmid_node) {
                                         Ok(None) => {
                                             trace!("No longer a PM for {}", pmid_node);
+                                            self.ongoing_puts
+                                                .remove_keys(|&&(_, name)| name == *pmid_node);
                                             false
                                         }
                                         Ok(Some(_)) => {
                                             self.send_refresh(routing_node,
                                                               pmid_node,
                                                               account,
-                                                              &MessageId::from_lost_node(
-                                                                    *node_changed));
+                                                              MessageId::from_added_node(
+                                                                    *node_name));
                                             true
                                         }
                                         Err(error) => {
@@ -195,11 +201,21 @@ impl PmidManager {
                                 .collect();
     }
 
-    // The `request` is the original request from NAE to PM
-    pub fn notify_put_failure(&mut self,
-                              routing_node: &RoutingNode,
-                              request: &RequestMessage)
-                              -> Result<(), InternalError> {
+    pub fn handle_node_lost(&mut self, routing_node: &RoutingNode, node_name: &XorName) {
+        let _ = self.accounts.remove(&node_name);
+        self.ongoing_puts.remove_keys(|&&(_, name)| name == *node_name);
+        for (pmid_node, account) in &self.accounts {
+            self.send_refresh(routing_node,
+                              pmid_node,
+                              account,
+                              MessageId::from_lost_node(*node_name));
+        }
+    }
+
+    fn notify_put_failure(&mut self,
+                          routing_node: &RoutingNode,
+                          request: &RequestMessage)
+                          -> Result<(), InternalError> {
         let (data, message_id) = if let RequestContent::Put(Data::Immutable(ref data),
                                                             ref message_id) = request.content {
             (data.clone(), message_id)
@@ -226,7 +242,7 @@ impl PmidManager {
                     routing_node: &RoutingNode,
                     pmid_node: &XorName,
                     account: &Account,
-                    message_id: &MessageId) {
+                    message_id: MessageId) {
         let src = Authority::NodeManager(*pmid_node);
         let refresh = Refresh::new(pmid_node, RefreshValue::PmidManagerAccount(account.clone()));
         if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
@@ -234,7 +250,7 @@ impl PmidManager {
             let _ = routing_node.send_refresh_request(src.clone(),
                                                       src.clone(),
                                                       serialised_refresh,
-                                                      *message_id);
+                                                      message_id);
         }
     }
 }
@@ -268,7 +284,6 @@ mod test {
 
     struct Environment {
         our_authority: Authority,
-        from_authority: Authority,
         routing: RoutingNode,
         pmid_manager: PmidManager,
     }
@@ -296,7 +311,6 @@ mod test {
 
         Environment {
             our_authority: Authority::NodeManager(our_name),
-            from_authority: Authority::NaeManager(from_name),
             routing: routing,
             pmid_manager: PmidManager::default(),
         }
@@ -352,7 +366,7 @@ mod test {
         let immutable_data = get_close_data(&env);
         let message_id = MessageId::new();
         let valid_request = RequestMessage {
-            src: env.from_authority.clone(),
+            src: Authority::NaeManager(immutable_data.name()),
             dst: env.our_authority.clone(),
             content: RequestContent::Put(Data::Immutable(immutable_data.clone()), message_id),
         };
@@ -384,8 +398,9 @@ mod test {
 
         let immutable_data = get_close_data(&env);
         let message_id = MessageId::new();
+        let from_authority = Authority::NaeManager(immutable_data.name());
         let valid_request = RequestMessage {
-            src: env.from_authority.clone(),
+            src: from_authority.clone(),
             dst: env.our_authority.clone(),
             content: RequestContent::Put(Data::Immutable(immutable_data.clone()), message_id),
         };
@@ -415,7 +430,7 @@ mod test {
 
         assert_eq!(put_failures.len(), 1);
         assert_eq!(put_failures[0].src, env.our_authority);
-        assert_eq!(put_failures[0].dst, env.from_authority);
+        assert_eq!(put_failures[0].dst, from_authority);
 
         if let ResponseContent::PutFailure { ref id, ref request, ref external_error_indicator } =
                put_failures[0].content {
@@ -500,8 +515,9 @@ mod test {
         let mut env = environment_setup();
         let immutable_data = get_close_data(&env);
         let message_id = MessageId::new();
+        let from_authority = Authority::NaeManager(immutable_data.name());
         let valid_request = RequestMessage {
-            src: env.from_authority.clone(),
+            src: from_authority.clone(),
             dst: env.our_authority.clone(),
             content: RequestContent::Put(Data::Immutable(immutable_data.clone()), message_id),
         };
@@ -524,7 +540,7 @@ mod test {
             unreachable!()
         }
 
-        if let Ok(()) = env.pmid_manager.handle_put_failure(&env.routing, &valid_request) {} else {
+        if let Ok(()) = env.pmid_manager.handle_put_failure(&env.routing, &put_requests[0]) {} else {
             unreachable!()
         }
 
@@ -532,7 +548,7 @@ mod test {
 
         assert_eq!(put_failures.len(), 1);
         assert_eq!(put_failures[0].src, env.our_authority);
-        assert_eq!(put_failures[0].dst, env.from_authority);
+        assert_eq!(put_failures[0].dst, from_authority);
 
         if let ResponseContent::PutFailure { ref id, ref request, ref external_error_indicator } =
                put_failures[0].content {
@@ -550,7 +566,7 @@ mod test {
         let immutable_data = get_close_data(&env);
         let message_id = MessageId::new();
         let valid_request = RequestMessage {
-            src: env.from_authority.clone(),
+            src: Authority::NaeManager(immutable_data.name()),
             dst: env.our_authority.clone(),
             content: RequestContent::Put(Data::Immutable(immutable_data.clone()), message_id),
         };
@@ -574,7 +590,7 @@ mod test {
         }
 
         env.routing.node_added_event(get_close_node(&env));
-        env.pmid_manager.handle_churn(&env.routing, &random::<XorName>());
+        env.pmid_manager.handle_node_added(&env.routing, &random::<XorName>());
 
         let mut refresh_count = 0;
         let mut refresh_requests = env.routing.refresh_requests_given();
@@ -601,7 +617,7 @@ mod test {
         }
 
         env.routing.node_lost_event(lose_close_node(&env));
-        env.pmid_manager.handle_churn(&env.routing, &random::<XorName>());
+        env.pmid_manager.handle_node_lost(&env.routing, &random::<XorName>());
 
         refresh_requests = env.routing.refresh_requests_given();
 

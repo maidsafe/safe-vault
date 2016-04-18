@@ -46,7 +46,7 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy, clippy_pedantic))]
-#![cfg_attr(feature="clippy", allow(use_debug))]
+#![cfg_attr(feature="clippy", allow(use_debug, similar_names))] // "mpid" and "maid" are similar.
 
 #[macro_use]
 extern crate log;
@@ -56,7 +56,7 @@ extern crate chunk_store;
 extern crate config_file_handler;
 #[cfg(not(feature = "use-mock-crust"))]
 extern crate ctrlc;
-#[cfg(test)]
+extern crate itertools;
 extern crate kademlia_routing_table;
 #[cfg(test)]
 extern crate rand;

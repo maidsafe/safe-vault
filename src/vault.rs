@@ -67,6 +67,9 @@ pub struct Vault {
     routing_receiver: Receiver<Event>,
 }
 
+// TODO: Consider specifying allowances in percent instead of using f64 to avoid floating point
+// issues.
+#[cfg_attr(feature="clippy", allow(cast_possible_truncation, cast_precision_loss, cast_sign_loss))]
 fn init_components(optional_config: Option<Config>)
                    -> Result<(ImmutableDataManager,
                               MaidManager,
@@ -146,7 +149,7 @@ impl Vault {
     #[cfg(not(feature = "use-mock-crust"))]
     pub fn run(&mut self) -> Result<(), InternalError> {
         let (routing_sender, routing_receiver) = mpsc::channel();
-        let routing_node = try!(RoutingNode::new(routing_sender, true));
+        let routing_node = try!(RoutingNode::new(routing_sender, false));
         let routing_node0 = Arc::new(Mutex::new(Some(routing_node)));
         let routing_node1 = routing_node0.clone();
 
@@ -159,7 +162,7 @@ impl Vault {
         });
 
         for event in routing_receiver.iter() {
-            let routing_node = unwrap_result!(routing_node1.lock());
+            let routing_node = routing_node1.lock().expect("Node mutex poisoned.");
 
             if let Some(routing_node) = routing_node.as_ref() {
                 self.process_event(routing_node, event);
@@ -178,7 +181,7 @@ impl Vault {
         let routing_node = self.routing_node.take().expect("routing_node should never be None");
         let mut result = routing_node.poll();
 
-        if let Ok(event) = self.routing_receiver.try_recv() {
+        while let Ok(event) = self.routing_receiver.try_recv() {
             self.process_event(&routing_node, event);
             result = true
         }
@@ -198,6 +201,12 @@ impl Vault {
                        .iter())
             .cloned()
             .collect()
+    }
+
+    /// Get the number of put requests the network processed for the given client.
+    #[cfg(feature = "use-mock-crust")]
+    pub fn get_maid_manager_put_count(&self, client_name: &XorName) -> Option<u64> {
+        self.maid_manager.get_put_count(client_name)
     }
 
     fn process_event(&mut self, routing_node: &RoutingNode, event: Event) {
@@ -316,7 +325,7 @@ impl Vault {
             }
             // ================== Refresh ==================
             (src, dst, &RequestContent::Refresh(ref serialised_refresh, _)) => {
-                self.on_refresh(src, dst, serialised_refresh)
+                self.on_refresh(routing_node, src, dst, serialised_refresh)
             }
             // ================== Invalid Request ==================
             _ => Err(InternalError::UnknownMessageType(RoutingMessage::Request(request.clone()))),
@@ -362,8 +371,8 @@ impl Vault {
             }
             (&Authority::NodeManager(ref pmid_node),
              &Authority::NaeManager(_),
-             &ResponseContent::PutSuccess(ref name, ref message_id)) => {
-                self.immutable_data_manager.handle_put_success(pmid_node, name, message_id)
+             &ResponseContent::PutSuccess(ref name, _)) => {
+                self.immutable_data_manager.handle_put_success(pmid_node, name)
             }
             (&Authority::ManagedNode(ref pmid_node),
              &Authority::NodeManager(_),
@@ -382,9 +391,13 @@ impl Vault {
             }
             (&Authority::NodeManager(ref pmid_node),
              &Authority::NaeManager(_),
-             &ResponseContent::PutFailure { ref id, .. }) => {
+             &ResponseContent::PutFailure { ref id,
+                    request: RequestMessage {
+                        content: RequestContent::Put(Data::Immutable(ref data), _), .. },
+             ..
+             }) => {
                 let _ = self.full_pmid_nodes.insert(*pmid_node);
-                self.immutable_data_manager.handle_put_failure(routing_node, pmid_node, id)
+                self.immutable_data_manager.handle_put_failure(routing_node, pmid_node, data, id)
             }
             (&Authority::ManagedNode(_),
              &Authority::NodeManager(_),
@@ -405,11 +418,11 @@ impl Vault {
                      routing_node: &RoutingNode,
                      node_added: XorName)
                      -> Result<(), InternalError> {
-        self.maid_manager.handle_churn(routing_node, &node_added);
+        self.maid_manager.handle_node_added(routing_node, &node_added);
         self.immutable_data_manager.handle_node_added(routing_node, &node_added);
-        self.structured_data_manager.handle_churn(routing_node, &node_added);
-        self.pmid_manager.handle_churn(routing_node, &node_added);
-        self.pmid_node.handle_churn(routing_node);
+        self.structured_data_manager.handle_node_added(routing_node, &node_added);
+        self.pmid_manager.handle_node_added(routing_node, &node_added);
+        self.pmid_node.handle_node_added(routing_node);
         self.mpid_manager.handle_churn(routing_node, &node_added);
         Ok(())
     }
@@ -419,11 +432,10 @@ impl Vault {
                     node_lost: XorName)
                     -> Result<(), InternalError> {
         let _ = self.full_pmid_nodes.remove(&node_lost);
-        self.maid_manager.handle_churn(routing_node, &node_lost);
+        self.maid_manager.handle_node_lost(routing_node, &node_lost);
         self.immutable_data_manager.handle_node_lost(routing_node, &node_lost);
-        self.structured_data_manager.handle_churn(routing_node, &node_lost);
-        self.pmid_manager.handle_churn(routing_node, &node_lost);
-        self.pmid_node.handle_churn(routing_node);
+        self.structured_data_manager.handle_node_lost(routing_node, &node_lost);
+        self.pmid_manager.handle_node_lost(routing_node, &node_lost);
         self.mpid_manager.handle_churn(routing_node, &node_lost);
         Ok(())
     }
@@ -441,6 +453,7 @@ impl Vault {
     }
 
     fn on_refresh(&mut self,
+                  routing_node: &RoutingNode,
                   src: &Authority,
                   dst: &Authority,
                   serialised_refresh: &[u8])
@@ -450,7 +463,7 @@ impl Vault {
             (&Authority::ClientManager(_),
              &Authority::ClientManager(_),
              &RefreshValue::MaidManagerAccount(ref account)) => {
-                Ok(self.maid_manager.handle_refresh(refresh.name, account.clone()))
+                Ok(self.maid_manager.handle_refresh(routing_node, refresh.name, account.clone()))
             }
             (&Authority::ClientManager(_),
              &Authority::ClientManager(_),
@@ -468,7 +481,7 @@ impl Vault {
             (&Authority::NaeManager(_),
              &Authority::NaeManager(_),
              &RefreshValue::StructuredDataManager(ref structured_data)) => {
-                self.structured_data_manager.handle_refresh(structured_data.clone())
+                self.structured_data_manager.handle_refresh(routing_node, structured_data.clone())
             }
             (&Authority::NodeManager(_),
              &Authority::NodeManager(_),

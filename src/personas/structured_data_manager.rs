@@ -105,6 +105,7 @@ impl StructuredDataManager {
             return Err(From::from(error));
         }
 
+        // TODO: Reconsider this. The client manager should check whether the network is full.
         // Check there aren't too many full nodes in the close group to this data
         match try!(routing_node.close_group(data_name)) {
             Some(mut close_group) => {
@@ -143,6 +144,7 @@ impl StructuredDataManager {
                                                   response_dst,
                                                   data_name,
                                                   *message_id);
+            self.send_refresh(routing_node, &data_name, MessageId::zero());
             Ok(())
         }
     }
@@ -171,6 +173,7 @@ impl StructuredDataManager {
                                                                    request.src.clone(),
                                                                    new_data.name(),
                                                                    *message_id);
+                            self.send_refresh(routing_node, &new_data.name(), MessageId::zero());
                             return Ok(());
                         }
                     }
@@ -212,6 +215,7 @@ impl StructuredDataManager {
                                                                  request.src.clone(),
                                                                  data.name(),
                                                                  *message_id);
+                        // TODO: Send a refresh message.
                         return Ok(());
                     }
                 }
@@ -226,12 +230,24 @@ impl StructuredDataManager {
         Ok(())
     }
 
-    pub fn handle_refresh(&mut self, structured_data: StructuredData) -> Result<(), InternalError> {
+    pub fn handle_refresh(&mut self,
+                          routing_node: &RoutingNode,
+                          structured_data: StructuredData)
+                          -> Result<(), InternalError> {
+        match routing_node.close_group(structured_data.name()) {
+            Ok(None) | Err(_) => return Ok(()),
+            Ok(Some(_)) => (),
+        }
         if self.chunk_store.has_chunk(&structured_data.name()) {
             if let Ok(serialised_data) = self.chunk_store.get(&structured_data.name()) {
                 if let Ok(existing_data) =
                        serialisation::deserialise::<StructuredData>(&serialised_data) {
-                    if existing_data.validate_self_against_successor(&structured_data).is_ok() {
+                    // Make sure we don't 'update' to a lower version due to delayed accumulation.
+                    // We do accept any greater version, however, in case we missed some update,
+                    // e. g. because an earlier refresh hasn't accumulated yet. The validity of the
+                    // new data is not checked here: If the group has reached consensus, a quorum
+                    // has already been reached by the nodes that checked it.
+                    if existing_data.get_version() < structured_data.get_version() {
                         // chunk_store::put() deletes the old data automatically
                         let serialised_data = try!(serialisation::serialise(&structured_data));
                         return Ok(try!(self.chunk_store
@@ -247,21 +263,33 @@ impl StructuredDataManager {
         Ok(())
     }
 
-    pub fn handle_churn(&mut self, routing_node: &RoutingNode, node_changed: &XorName) {
+    pub fn handle_node_added(&mut self, routing_node: &RoutingNode, node_name: &XorName) {
         // Only retain data for which we're still in the close group
         let data_names = self.chunk_store.names();
         for data_name in data_names {
             match routing_node.close_group(data_name) {
                 Ok(None) => {
-                    trace!("No longer a SDM for {}", data_name);
+                    trace!("{} added. No longer a SDM for {}", node_name, data_name);
                     let _ = self.chunk_store.delete(&data_name);
                 }
-                Ok(Some(_)) => self.send_refresh(routing_node, &data_name, node_changed),
+                Ok(Some(_)) => {
+                    self.send_refresh(routing_node,
+                                      &data_name,
+                                      MessageId::from_added_node(*node_name))
+                }
                 Err(error) => {
                     error!("Failed to get close group: {:?} for {}", error, data_name);
                     let _ = self.chunk_store.delete(&data_name);
                 }
             }
+        }
+    }
+
+    pub fn handle_node_lost(&mut self, routing_node: &RoutingNode, node_name: &XorName) {
+        for data_name in self.chunk_store.names() {
+            self.send_refresh(routing_node,
+                              &data_name,
+                              MessageId::from_lost_node(*node_name));
         }
     }
 
@@ -273,7 +301,7 @@ impl StructuredDataManager {
     fn send_refresh(&self,
                     routing_node: &RoutingNode,
                     data_name: &XorName,
-                    node_changed: &XorName) {
+                    message_id: MessageId) {
         let serialised_data = match self.chunk_store.get(data_name) {
             Ok(data) => data,
             _ => return,
@@ -293,7 +321,7 @@ impl StructuredDataManager {
             let _ = routing_node.send_refresh_request(src.clone(),
                                                       src.clone(),
                                                       serialised_refresh,
-                                                      MessageId::from_lost_node(*node_changed));
+                                                      message_id);
         }
     }
 }
@@ -828,7 +856,7 @@ mod test {
         assert_eq!(None, env.get_from_chunkstore(&put_env.sd_data.name()));
 
         // block refresh in after deletion
-        let _ = env.structured_data_manager.handle_refresh(put_env.sd_data.clone());
+        let _ = env.structured_data_manager.handle_refresh(&env.routing, put_env.sd_data.clone());
         assert_eq!(None, env.get_from_chunkstore(&put_env.sd_data.name()));
     }
 
@@ -840,13 +868,17 @@ mod test {
 
         let lost_node = env.lose_close_node(&put_env.sd_data.name());
         env.routing.remove_node_from_routing_table(&lost_node);
-        let _ = env.structured_data_manager.handle_churn(&env.routing, &random::<XorName>());
+        let _ = env.structured_data_manager.handle_node_lost(&env.routing, &random::<XorName>());
 
         let refresh_requests = env.routing.refresh_requests_given();
-        assert_eq!(refresh_requests.len(), 1);
+        assert_eq!(refresh_requests.len(), 2);
         assert_eq!(refresh_requests[0].src,
                    Authority::NaeManager(put_env.sd_data.name()));
         assert_eq!(refresh_requests[0].dst,
+                   Authority::NaeManager(put_env.sd_data.name()));
+        assert_eq!(refresh_requests[1].src,
+                   Authority::NaeManager(put_env.sd_data.name()));
+        assert_eq!(refresh_requests[1].dst,
                    Authority::NaeManager(put_env.sd_data.name()));
         if let RequestContent::Refresh(received_serialised_refresh, _) = refresh_requests[0]
                                                                              .content
@@ -869,34 +901,28 @@ mod test {
         // Refresh a structured_data in
         let mut env = Environment::new();
         let keys = sign::gen_keypair();
-        let sd_data = unwrap_result!(StructuredData::new(0,
-                                                         random(),
-                                                         0,
-                                                         utils::generate_random_vec_u8(1024),
-                                                         vec![keys.0],
-                                                         vec![],
-                                                         Some(&keys.1)));
-        let _ = env.structured_data_manager.handle_refresh(sd_data.clone());
+        let sd_data = env.get_close_data(keys.clone());
+        let _ = env.structured_data_manager.handle_refresh(&env.routing, sd_data.clone());
         assert_eq!(Some(sd_data.clone()),
                    env.get_from_chunkstore(&sd_data.name()));
         // Refresh an incorrect version new structured_data in
         let sd_bad = unwrap_result!(StructuredData::new(0,
+                                                        *sd_data.get_identifier(),
+                                                        0,
+                                                        sd_data.get_data().clone(),
+                                                        vec![keys.0],
+                                                        vec![],
+                                                        Some(&keys.1)));
+        let _ = env.structured_data_manager.handle_refresh(&env.routing, sd_bad.clone());
+        // Refresh a correct version new structured_data in
+        let sd_new = unwrap_result!(StructuredData::new(0,
                                                         *sd_data.get_identifier(),
                                                         3,
                                                         sd_data.get_data().clone(),
                                                         vec![keys.0],
                                                         vec![],
                                                         Some(&keys.1)));
-        let _ = env.structured_data_manager.handle_refresh(sd_bad.clone());
-        // Refresh a correct version new structured_data in
-        let sd_new = unwrap_result!(StructuredData::new(0,
-                                                        *sd_data.get_identifier(),
-                                                        1,
-                                                        sd_data.get_data().clone(),
-                                                        vec![keys.0],
-                                                        vec![],
-                                                        Some(&keys.1)));
-        let _ = env.structured_data_manager.handle_refresh(sd_new.clone());
+        let _ = env.structured_data_manager.handle_refresh(&env.routing, sd_new.clone());
         assert_eq!(Some(sd_new.clone()),
                    env.get_from_chunkstore(&sd_data.name()));
     }
