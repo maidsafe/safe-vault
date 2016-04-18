@@ -173,7 +173,9 @@ impl MetadataForGetRequest {
                                 .iter()
                                 .filter_map(|(name, state)| {
                                     match *state {
-                                        DataHolderState::Good => Some((*name, *state)),
+                                        DataHolderState::Good => {
+                                            Some((*name, DataHolderState::Pending))
+                                        }
                                         DataHolderState::Failed | DataHolderState::Pending => None,
                                     }
                                 })
@@ -186,6 +188,24 @@ impl MetadataForGetRequest {
             data: None,
             requested_data_type: account.data_type.clone(),
             secondary_location_failed: false,
+        }
+    }
+
+    fn reply_with_data_else_cache_request(&mut self,
+                                          routing_node: &RoutingNode,
+                                          request: &RequestMessage,
+                                          message_id: &MessageId) {
+        // If we've already received the chunk, send it to the new requester.  Otherwise add the
+        // request to the others for later handling.
+        if let Some(ref data) = self.data {
+            let src = request.dst.clone();
+            let dst = request.src.clone();
+            let _ = routing_node.send_get_success(src,
+                                                  dst,
+                                                  Data::Immutable(data.clone()),
+                                                  *message_id);
+        } else {
+            self.requests.push((*message_id, request.clone()));
         }
     }
 }
@@ -248,14 +268,11 @@ impl ImmutableDataManager {
             return Ok(());
         }
 
-        {
-            // If there's already a cached get request, handle it here and return
-            if let Some(mut metadata) = self.ongoing_gets.get_mut(&data_name) {
-                return Ok(Self::reply_with_data_else_cache_request(routing_node,
-                                                                   request,
-                                                                   message_id,
-                                                                   metadata));
-            }
+        // If there's already a cached get request, handle it here and return
+        if let Some(mut metadata) = self.ongoing_gets.get_mut(&data_name) {
+            return Ok(metadata.reply_with_data_else_cache_request(routing_node,
+                                                                  request,
+                                                                  message_id));
         }
 
         // This is new cache entry
@@ -490,25 +507,24 @@ impl ImmutableDataManager {
 
         // Find a replacement - first node in close_group not already tried
         let data_name = immutable_data.name();
-        match try!(routing_node.close_group(data_name)) {
-            Some(target_data_holders) => {
-                if let Some(new_holder) = target_data_holders.iter()
-                                                             .filter(|elt| {
-                                                                 !account.data_holders
-                                                                         .contains_key(elt)
-                                                             })
-                                                             .next() {
-                    let src = Authority::NaeManager(immutable_data.name());
-                    let dst = Authority::NodeManager(*new_holder);
-                    let data = Data::Immutable(immutable_data.clone());
-                    let _ = routing_node.send_put_request(src, dst, data, *message_id);
-                    let _ = account.data_holders.insert(*new_holder, DataHolderState::Pending);
-                } else {
-                    error!("Failed to find a new storage node for {}.", data_name);
-                    return Err(InternalError::UnableToAllocateNewPmidNode);
-                }
-            }
+        let target_data_holders = match try!(routing_node.close_group(data_name)) {
             None => return Err(InternalError::NotInCloseGroup),
+            Some(target_data_holders) => target_data_holders,
+        };
+
+        if let Some(new_holder) = target_data_holders.iter()
+                                                     .find(|elt| {
+                                                         !account.data_holders
+                                                                 .contains_key(elt)
+                                                     }) {
+            let src = Authority::NaeManager(immutable_data.name());
+            let dst = Authority::NodeManager(*new_holder);
+            let data = Data::Immutable(immutable_data.clone());
+            let _ = routing_node.send_put_request(src, dst, data, *message_id);
+            let _ = account.data_holders.insert(*new_holder, DataHolderState::Pending);
+        } else {
+            error!("Failed to find a new storage node for {}.", data_name);
+            return Err(InternalError::UnableToAllocateNewPmidNode);
         }
 
         Ok(())
@@ -922,24 +938,6 @@ impl ImmutableDataManager {
                                                       src.clone(),
                                                       serialised_refresh,
                                                       *message_id);
-        }
-    }
-
-    fn reply_with_data_else_cache_request(routing_node: &RoutingNode,
-                                          request: &RequestMessage,
-                                          message_id: &MessageId,
-                                          metadata: &mut MetadataForGetRequest) {
-        // If we've already received the chunk, send it to the new requester.  Otherwise add the
-        // request to the others for later handling.
-        if let Some(ref data) = metadata.data {
-            let src = request.dst.clone();
-            let dst = request.src.clone();
-            let _ = routing_node.send_get_success(src,
-                                                  dst,
-                                                  Data::Immutable(data.clone()),
-                                                  *message_id);
-        } else {
-            metadata.requests.push((*message_id, request.clone()));
         }
     }
 
