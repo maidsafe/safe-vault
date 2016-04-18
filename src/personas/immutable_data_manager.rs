@@ -32,37 +32,7 @@ use types::{Refresh, RefreshValue};
 use vault::RoutingNode;
 use xor_name::{self, XorName};
 
-pub const REPLICANTS: usize = 2;
-
-// Collection of PmidNodes holding a copy of the chunk
-#[derive(Clone, PartialEq, Eq, Debug, RustcEncodable, RustcDecodable)]
-pub struct Account {
-    data_type: ImmutableDataType,
-    data_holders: HashSet<DataHolder>,
-}
-
-impl Account {
-    pub fn new(data_type: &ImmutableDataType, data_holders: HashSet<DataHolder>) -> Account {
-        Account {
-            data_type: data_type.clone(),
-            data_holders: data_holders,
-        }
-    }
-
-    pub fn data_holders(&self) -> &HashSet<DataHolder> {
-        &self.data_holders
-    }
-
-    pub fn data_holders_mut(&mut self) -> &mut HashSet<DataHolder> {
-        &mut self.data_holders
-    }
-
-    pub fn data_type(&self) -> ImmutableDataType {
-        self.data_type.clone()
-    }
-}
-
-
+pub const REPLICANTS: usize = 4;
 
 // This is the name of a PmidNode which has been chosen to store the data on.  It is associated with
 // a specific piece of `ImmutableData`.  It is marked as `Pending` until the response of the Put
@@ -71,22 +41,30 @@ impl Account {
 // until it disconnects or moves out of the close group for the chunk, when it is removed from the
 // list of holders.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, RustcEncodable, RustcDecodable)]
-pub enum DataHolder {
-    Good(XorName),
-    Failed(XorName),
-    Pending(XorName),
+pub enum DataHolderState {
+    Good,
+    Failed,
+    Pending,
 }
 
-impl DataHolder {
-    pub fn name(&self) -> &XorName {
-        match *self {
-            DataHolder::Good(ref name) |
-            DataHolder::Failed(ref name) |
-            DataHolder::Pending(ref name) => name,
+
+// Collection of PmidNodes holding a copy of the chunk
+#[derive(Clone, PartialEq, Eq, Debug, RustcEncodable, RustcDecodable)]
+pub struct Account {
+    data_type: ImmutableDataType,
+    data_holders: HashMap<XorName, DataHolderState>,
+}
+
+impl Account {
+    pub fn new(data_type: &ImmutableDataType, data_holders: Vec<XorName>) -> Account {
+        Account {
+            data_type: data_type.clone(),
+            data_holders: data_holders.into_iter()
+                                      .map(|name| (name, DataHolderState::Pending))
+                                      .collect(),
         }
     }
 }
-
 
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -96,7 +74,7 @@ struct MetadataForGetRequest {
     pub message_id: MessageId,
     // The incoming requests that need to be responded to once we receive the data.
     pub requests: Vec<(MessageId, RequestMessage)>,
-    pub data_holders: Vec<DataHolder>,
+    pub data_holders: HashMap<XorName, DataHolderState>,
     pub data: Option<ImmutableData>,
     pub requested_data_type: ImmutableDataType,
     // Whether we already received a `GetFailure` from the IDM of one of the two other data types.
@@ -176,8 +154,8 @@ impl MetadataForGetRequest {
             }
         } else {
             // Send to data_holders (which should be "Good" holders)
-            for good_node in &self.data_holders {
-                let dst = Authority::ManagedNode(*good_node.name());
+            for (good_node, _) in &self.data_holders {
+                let dst = Authority::ManagedNode(*good_node);
                 let data_request = DataRequest::Immutable(*data_name,
                                                           self.requested_data_type.clone());
                 log(&self.requested_data_type, data_name, &dst);
@@ -191,16 +169,12 @@ impl MetadataForGetRequest {
                  account: &Account)
                  -> MetadataForGetRequest {
         // We only want to try and get data from "good" holders
-        let good_nodes = account.data_holders()
+        let good_nodes = account.data_holders
                                 .iter()
-                                .cloned()
-                                .filter_map(|pmid_node| {
-                                    match pmid_node {
-                                        DataHolder::Good(pmid_node) => {
-                                            Some(DataHolder::Pending(pmid_node))
-                                        }
-                                        DataHolder::Failed(_) |
-                                        DataHolder::Pending(_) => None,
+                                .filter_map(|(name, state)| {
+                                    match *state {
+                                        DataHolderState::Good => Some((*name, *state)),
+                                        DataHolderState::Failed | DataHolderState::Pending => None,
                                     }
                                 })
                                 .collect();
@@ -210,7 +184,7 @@ impl MetadataForGetRequest {
             requests: requests,
             data_holders: good_nodes,
             data: None,
-            requested_data_type: account.data_type(),
+            requested_data_type: account.data_type.clone(),
             secondary_location_failed: false,
         }
     }
@@ -248,7 +222,7 @@ impl ImmutableDataManager {
             };
 
         // If the data doesn't exist, respond with GetFailure
-        let data_holders = if let Some(account) = self.accounts.get(&data_name) {
+        let account = if let Some(account) = self.accounts.get(&data_name) {
             account
         } else {
             let src = request.dst.clone();
@@ -285,7 +259,7 @@ impl ImmutableDataManager {
         }
 
         // This is new cache entry
-        let entry = MetadataForGetRequest::with_message(message_id, request, data_holders);
+        let entry = MetadataForGetRequest::with_message(message_id, request, account);
         entry.send_get_requests(routing_node, &data_name, *message_id);
         let _ = self.ongoing_gets.insert(*data_name, entry);
         Ok(())
@@ -332,27 +306,27 @@ impl ImmutableDataManager {
         // Send the message on to the PmidNodes' managers.
         for pmid_node in target_data_holders {
             let src = Authority::NaeManager(data_name);
-            let dst = Authority::NodeManager(*pmid_node.name());
+            let dst = Authority::NodeManager(pmid_node);
             let _ = routing_node.send_put_request(src,
                                                   dst,
                                                   Data::Immutable(data.clone()),
                                                   *message_id);
         }
 
-        // If this is a "Normal" copy, we need to Put the "Backup" and "Sacrificial" copies too.
-        if let ImmutableDataType::Normal = *data.get_type_tag() {
-            let backup = ImmutableData::new(ImmutableDataType::Backup, data.value().clone());
-            let _ = routing_node.send_put_request(request.dst.clone(),
-                                                  Authority::NaeManager(backup.name()),
-                                                  Data::Immutable(backup),
-                                                  *message_id);
-            let sacrificial = ImmutableData::new(ImmutableDataType::Sacrificial,
-                                                 data.value().clone());
-            let _ = routing_node.send_put_request(request.dst.clone(),
-                                                  Authority::NaeManager(sacrificial.name()),
-                                                  Data::Immutable(sacrificial),
-                                                  *message_id);
-        }
+        // // If this is a "Normal" copy, we need to Put the "Backup" and "Sacrificial" copies too.
+        // if let ImmutableDataType::Normal = *data.get_type_tag() {
+        //     let backup = ImmutableData::new(ImmutableDataType::Backup, data.value().clone());
+        //     let _ = routing_node.send_put_request(request.dst.clone(),
+        //                                           Authority::NaeManager(backup.name()),
+        //                                           Data::Immutable(backup),
+        //                                           *message_id);
+        //     let sacrificial = ImmutableData::new(ImmutableDataType::Sacrificial,
+        //                                          data.value().clone());
+        //     let _ = routing_node.send_put_request(request.dst.clone(),
+        //                                           Authority::NaeManager(sacrificial.name()),
+        //                                           Data::Immutable(sacrificial),
+        //                                           *message_id);
+        // }
 
         Ok(())
     }
@@ -379,20 +353,8 @@ impl ImmutableDataManager {
                                                       original_message_id);
             }
 
-            // If the src is a PmidNode, mark the responder as "good"
-            if let Authority::ManagedNode(_) = response.src {
-                let predicate = |elt: &DataHolder| {
-                    match *elt {
-                        DataHolder::Pending(ref name) => name == response.src.name(),
-                        _ => false,
-                    }
-                };
-                if let Some(pmid_node_index) = metadata.data_holders.iter().position(predicate) {
-                    let good_holder = DataHolder::Good(*metadata.data_holders
-                                                                .remove(pmid_node_index)
-                                                                .name());
-                    metadata.data_holders.push(good_holder);
-                }
+            if Some(&DataHolderState::Pending) == metadata.data_holders.get(response.src.name()) {
+                let _ = metadata.data_holders.insert(*response.src.name(), DataHolderState::Good);
             }
 
             // Keep the data with the cached metadata in case further get requests arrive for it
@@ -417,18 +379,8 @@ impl ImmutableDataManager {
                                self.find_ongoing_get_after_failure(request) {
             metadata_message_id = Some(metadata.message_id);
 
-            // Mark the responder as "failed" in the cached get request
-            let predicate = |elt: &DataHolder| {
-                match *elt {
-                    DataHolder::Pending(ref name) => name == pmid_node,
-                    _ => false,
-                }
-            };
-            if let Some(pmid_node_index) = metadata.data_holders.iter().position(predicate) {
-                let failed_holder = DataHolder::Failed(*metadata.data_holders
-                                                                .remove(pmid_node_index)
-                                                                .name());
-                metadata.data_holders.push(failed_holder);
+            if Some(&DataHolderState::Pending) == metadata.data_holders.get(request.dst.name()) {
+                let _ = metadata.data_holders.insert(*request.dst.name(), DataHolderState::Failed);
             }
             trace!("Metadata for Get {} updated to {:?}", data_name, metadata);
             data_name
@@ -442,16 +394,17 @@ impl ImmutableDataManager {
 
         // Mark the responder as "failed" in the account if it was previously marked "good"
         if let Some(account) = self.accounts.get_mut(&data_name) {
-            if account.data_holders_mut().remove(&DataHolder::Good(*pmid_node)) {
+            if Some(&DataHolderState::Good) == account.data_holders.get(pmid_node) {
+                let _ = account.data_holders.insert(*pmid_node, DataHolderState::Failed);
                 // Notify the failed PN's managers
                 let src = Authority::NaeManager(data_name);
                 let dst = Authority::NodeManager(*pmid_node);
+                // TODO: This should be send_delete_request, after the API has been changed.
                 let _ = routing_node.send_post_request(src,
                                                        dst,
                                                        Data::Plain(PlainData::new(data_name,
                                                                                   vec![])),
                                                        *message_id);
-                account.data_holders_mut().insert(DataHolder::Failed(*pmid_node));
             }
             trace!("Account for {} updated to {:?}", data_name, account);
         }
@@ -505,11 +458,11 @@ impl ImmutableDataManager {
             return Err(InternalError::InvalidResponse);
         };
 
-        if !account.data_holders_mut().remove(&DataHolder::Pending(*pmid_node)) {
-            debug!("Failed to remove {} - {:?}", pmid_node, account);
+        if Some(&DataHolderState::Pending) != account.data_holders.get(pmid_node) {
+            debug!("Failed to update {} - {:?}", pmid_node, account);
             return Err(InternalError::InvalidResponse);
         }
-        account.data_holders_mut().insert(DataHolder::Good(*pmid_node));
+        let _ = account.data_holders.insert(*pmid_node, DataHolderState::Good);
         let _ = self.data_cache.remove(&data_name);
 
         Ok(())
@@ -529,11 +482,11 @@ impl ImmutableDataManager {
         };
 
         // Mark the holder as Failed
-        if !account.data_holders_mut().remove(&DataHolder::Pending(*pmid_node)) {
-            debug!("Failed to remove {} - {:?}", pmid_node, account);
+        if Some(&DataHolderState::Pending) != account.data_holders.get(pmid_node) {
+            debug!("Failed to update {} - {:?}", pmid_node, account);
             return Err(InternalError::InvalidResponse);
         }
-        account.data_holders_mut().insert(DataHolder::Failed(*pmid_node));
+        let _ = account.data_holders.insert(*pmid_node, DataHolderState::Failed);
 
         // Find a replacement - first node in close_group not already tried
         let data_name = immutable_data.name();
@@ -541,18 +494,15 @@ impl ImmutableDataManager {
             Some(target_data_holders) => {
                 if let Some(new_holder) = target_data_holders.iter()
                                                              .filter(|elt| {
-                                                                 !account.data_holders()
-                                                                         .iter()
-                                                                         .any(|exclude| {
-                                                                             elt == &exclude.name()
-                                                                         })
+                                                                 !account.data_holders
+                                                                         .contains_key(elt)
                                                              })
                                                              .next() {
                     let src = Authority::NaeManager(immutable_data.name());
                     let dst = Authority::NodeManager(*new_holder);
                     let data = Data::Immutable(immutable_data.clone());
                     let _ = routing_node.send_put_request(src, dst, data, *message_id);
-                    account.data_holders_mut().insert(DataHolder::Pending(*new_holder));
+                    let _ = account.data_holders.insert(*new_holder, DataHolderState::Pending);
                 } else {
                     error!("Failed to find a new storage node for {}.", data_name);
                     return Err(InternalError::UnableToAllocateNewPmidNode);
@@ -569,22 +519,24 @@ impl ImmutableDataManager {
             let message_id;
             {
                 // Safe to unwrap here as we just got all these keys via `get_expired`
-                let mut metadata = self.ongoing_gets
-                                       .get_mut(data_name)
-                                       .expect("Logic error in TimedBuffer");
-                for pmid_node in &mut metadata.data_holders {
-                    // Get timed-out PmidNodes
-                    if let DataHolder::Pending(name) = *pmid_node {
-                        warn!("PmidNode {} failed to reply to Get request for {}.",
-                              name,
-                              data_name);
-                        // Mark it as failed in the cache
-                        *pmid_node = DataHolder::Failed(name);
-                        // Mark it as "failed" in the account if it was previously marked "good"
-                        if let Some(account) = self.accounts.get_mut(data_name) {
-                            if account.data_holders_mut().remove(&DataHolder::Good(name)) {
-                                account.data_holders_mut().insert(DataHolder::Failed(name));
-                            }
+                let metadata = self.ongoing_gets
+                                   .get_mut(data_name)
+                                   .expect("Logic error in TimedBuffer");
+                let pending_nodes = metadata.data_holders
+                                            .iter()
+                                            .filter(|&(_, state)| {
+                                                *state == DataHolderState::Pending
+                                            })
+                                            .map(|(name, _)| *name)
+                                            .collect_vec();
+                for name in pending_nodes {
+                    warn!("PmidNode {} failed to reply to Get request for {}.",
+                          name,
+                          data_name);
+                    // Mark it as "failed" in the account if it was previously marked "good"
+                    if let Some(account) = self.accounts.get_mut(data_name) {
+                        if Some(&DataHolderState::Good) == account.data_holders.get(&name) {
+                            let _ = account.data_holders.insert(name, DataHolderState::Failed);
                         }
                     }
                 }
@@ -629,22 +581,25 @@ impl ImmutableDataManager {
                                         return None;
                                     };
                                     if close_group.contains(node_name) {
-                                        *account.data_holders_mut() =
-                    account.data_holders()
+                                        account.data_holders =
+                    account.data_holders
                            .iter()
-                           .filter(|pmid_node| {
+                           .filter_map(|(pmid_name, state)| {
                                // Remove this data holder if it has been pushed out of the close
                                // group by the new node, i. e. if it is now too far away from the
                                // data. If Routing would suppress NodeAdded events on the side of
                                // the joining node, we could instead do this here:
                                // close_group.contains(pmid_node.name())
-                               close_group.get(GROUP_SIZE - 1).into_iter().all(|name| {
-                                   xor_name::closer_to_target_or_equal(pmid_node.name(),
+                               if close_group.get(GROUP_SIZE - 1).into_iter().all(|name| {
+                                   xor_name::closer_to_target_or_equal(pmid_name,
                                                                        name,
                                                                        &data_name)
-                               })
+                               }) {
+                                   Some((*pmid_name, *state))
+                               } else {
+                                   None
+                               }
                            })
-                           .cloned()
                            .collect();
                                     }
                                     let _ = self.handle_churn_for_account(routing_node,
@@ -661,11 +616,15 @@ impl ImmutableDataManager {
         let message_id = MessageId::from_lost_node(*node_name);
         let mut accounts = mem::replace(&mut self.accounts, HashMap::new());
         accounts.iter_mut().foreach(|(data_name, account)| {
-            *account.data_holders_mut() = account.data_holders()
-                                                 .iter()
-                                                 .filter(|pmid_node| pmid_node.name() != node_name)
-                                                 .cloned()
-                                                 .collect();
+            account.data_holders = account.data_holders
+                                          .iter()
+                                          .filter_map(|(pmid_name, state)| if pmid_name ==
+                                                                              node_name {
+                                              None
+                                          } else {
+                                              Some((*pmid_name, *state))
+                                          })
+                                          .collect();
             if let Some(close_group) = self.close_group_to(routing_node, &data_name) {
                 let _ = self.handle_churn_for_account(routing_node,
                                                       data_name,
@@ -872,19 +831,11 @@ impl ImmutableDataManager {
     }
 
     fn new_replicants_count(account: &Account) -> usize {
-        let mut holder_count = 0;
-        for pmid_node in account.data_holders() {
-            match *pmid_node {
-                DataHolder::Pending(_) |
-                DataHolder::Good(_) => holder_count += 1,
-                DataHolder::Failed(_) => (),
-            }
-        }
-        if holder_count < REPLICANTS {
-            REPLICANTS - holder_count
-        } else {
-            0
-        }
+        let holder_count = account.data_holders
+                                  .iter()
+                                  .filter(|&(_, state)| *state == DataHolderState::Good)
+                                  .count();
+        REPLICANTS.saturating_sub(holder_count)
     }
 
     fn handle_churn_for_ongoing_puts(&mut self,
@@ -902,9 +853,7 @@ impl ImmutableDataManager {
 
         // We have an entry in the `data_cache`, so replicate to new peers
         for group_member in close_group {
-            if account.data_holders()
-                      .iter()
-                      .any(|&pmid_node| pmid_node.name() == group_member) {
+            if account.data_holders.contains_key(&group_member) {
                 // This is already a holder - skip
                 continue;
             }
@@ -917,7 +866,7 @@ impl ImmutableDataManager {
                                                   dst,
                                                   Data::Immutable(data.clone()),
                                                   *message_id);
-            account.data_holders_mut().insert(DataHolder::Pending(*group_member));
+            let _ = account.data_holders.insert(*group_member, DataHolderState::Pending);
             new_replicants_count -= 1;
             if new_replicants_count == 0 {
                 return true;
@@ -935,12 +884,22 @@ impl ImmutableDataManager {
         if let Some(mut metadata) = self.ongoing_gets.get_mut(&data_name) {
             trace!("Already getting {} - {:?}", data_name, metadata);
             // Remove any holders which no longer belong in the cache entry
-            metadata.data_holders
-                    .retain(|pmid_node| {
-                        close_group.get(GROUP_SIZE - 1).into_iter().all(|name| {
-                            xor_name::closer_to_target_or_equal(pmid_node.name(), name, data_name)
+            let lost_holders =
+                metadata.data_holders
+                        .iter()
+                        .filter_map(|(pmid_name, _)| {
+                            if close_group.get(GROUP_SIZE - 1).into_iter().all(|name| {
+                                xor_name::closer_to_target_or_equal(pmid_name, name, data_name)
+                            }) {
+                                None
+                            } else {
+                                Some(*pmid_name)
+                            }
                         })
-                    });
+                        .collect_vec();
+            for lost_holder in lost_holders {
+                let _ = metadata.data_holders.remove(&lost_holder);
+            }
             trace!("Updated ongoing get for {} to {:?}", data_name, metadata);
             true
         } else {
@@ -990,16 +949,16 @@ impl ImmutableDataManager {
                                      message_id: &MessageId)
                                      -> Result<(), InternalError> {
         let mut finished = false;
-        let mut new_data_holders = HashSet::<DataHolder>::new();
+        let mut new_data_holders = Vec::<XorName>::new();
         if let Some(metadata) = self.ongoing_gets.get_mut(&data_name) {
             // Count the good holders, but just return from this function if any queried holders
             // haven't responded yet
             let mut good_holder_count = 0;
-            for queried_pmid_node in &metadata.data_holders {
-                match *queried_pmid_node {
-                    DataHolder::Pending(_) => return Ok(()),
-                    DataHolder::Good(_) => good_holder_count += 1,
-                    DataHolder::Failed(_) => (),
+            for (_, state) in &metadata.data_holders {
+                match *state {
+                    DataHolderState::Pending => return Ok(()),
+                    DataHolderState::Good => good_holder_count += 1,
+                    DataHolderState::Failed => (),
                 }
             }
             trace!("Have {} good holders for {}", good_holder_count, data_name);
@@ -1034,10 +993,9 @@ impl ImmutableDataManager {
                    new_data_holders);
             if let Some(account) = self.accounts.get_mut(data_name) {
                 trace!("Replicating {} - account before: {:?}", data_name, account);
-                *account.data_holders_mut() = account.data_holders()
-                                                     .union(&new_data_holders)
-                                                     .cloned()
-                                                     .collect();
+                for new_holder in new_data_holders {
+                    let _ = account.data_holders.insert(new_holder, DataHolderState::Pending);
+                }
                 trace!("Replicating {} - account after:  {:?}", data_name, account);
             }
         }
@@ -1047,21 +1005,21 @@ impl ImmutableDataManager {
 
     fn replicate_after_get(routing_node: &RoutingNode,
                            data: &ImmutableData,
-                           queried_data_holders: &[DataHolder],
+                           queried_data_holders: &HashMap<XorName, DataHolderState>,
                            message_id: &MessageId)
-                           -> Result<HashSet<DataHolder>, InternalError> {
-        let mut good_nodes = HashSet::<DataHolder>::new();
+                           -> Result<Vec<XorName>, InternalError> {
+        let mut good_nodes = HashSet::<XorName>::new();
         let mut nodes_to_exclude = HashSet::<XorName>::new();
-        for queried_pmid_node in queried_data_holders {
-            match *queried_pmid_node {
-                DataHolder::Good(name) => {
-                    let _ = good_nodes.insert(DataHolder::Good(name));
-                    let _ = nodes_to_exclude.insert(name);
+        for (name, state) in queried_data_holders {
+            match *state {
+                DataHolderState::Good => {
+                    let _ = good_nodes.insert(*name);
+                    let _ = nodes_to_exclude.insert(*name);
                 }
-                DataHolder::Failed(name) => {
-                    let _ = nodes_to_exclude.insert(name);
+                DataHolderState::Failed => {
+                    let _ = nodes_to_exclude.insert(*name);
                 }
-                DataHolder::Pending(_) => unreachable!(),
+                DataHolderState::Pending => unreachable!(),
             }
         }
         let data_name = data.name();
@@ -1074,8 +1032,7 @@ impl ImmutableDataManager {
                 target_data_holders.into_iter()
                                    .filter(|elt| !nodes_to_exclude.contains(elt))
                                    .take(REPLICANTS - good_nodes.len())
-                                   .map(DataHolder::Pending)
-                                   .collect::<HashSet<DataHolder>>()
+                                   .collect_vec()
             }
             None => return Err(InternalError::NotInCloseGroup),
         };
@@ -1083,12 +1040,12 @@ impl ImmutableDataManager {
         trace!("Replicating {} - target nodes: {:?}",
                data_name,
                target_data_holders);
-        for new_pmid_node in &target_data_holders {
+        for new_pmid_name in &target_data_holders {
             trace!("Replicating {} - sending Put to {}",
                    data_name,
-                   new_pmid_node.name());
+                   new_pmid_name);
             let src = Authority::NaeManager(data_name);
-            let dst = Authority::NodeManager(*new_pmid_node.name());
+            let dst = Authority::NodeManager(*new_pmid_name);
             let _ = routing_node.send_put_request(src,
                                                   dst,
                                                   Data::Immutable(data.clone()),
@@ -1132,16 +1089,14 @@ impl ImmutableDataManager {
 
     fn choose_initial_data_holders(&self,
                                    routing_node: &RoutingNode,
-                                   full_pmid_nodes: &HashSet<XorName>,
+                                   _full_pmid_nodes: &HashSet<XorName>,
                                    data_name: &XorName)
-                                   -> Result<HashSet<DataHolder>, InternalError> {
+                                   -> Result<Vec<XorName>, InternalError> {
         match try!(routing_node.close_group(*data_name)) {
             Some(mut target_data_holders) => {
-                target_data_holders.retain(|target| !full_pmid_nodes.contains(target));
+                // target_data_holders.retain(|target| !full_pmid_nodes.contains(target));
                 target_data_holders.truncate(REPLICANTS);
-                Ok(target_data_holders.into_iter()
-                                      .map(DataHolder::Pending)
-                                      .collect::<HashSet<DataHolder>>())
+                Ok(target_data_holders)
             }
             None => Err(InternalError::NotInCloseGroup),
         }
