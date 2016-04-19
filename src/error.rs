@@ -20,7 +20,7 @@ use chunk_store;
 use safe_network_common::messaging;
 use safe_network_common::client_errors::{MutationError, GetError};
 use maidsafe_utilities::serialisation::SerialisationError;
-use routing::{Authority, InterfaceError, MessageId, RoutingError, RoutingMessage};
+use routing::{InterfaceError, MessageId, RoutingError, RoutingMessage}; //Authority,
 use std::io;
 
 #[derive(Debug)]
@@ -30,16 +30,16 @@ pub enum InternalError {
     ClientMutation(MutationError),
     FailedToFindCachedRequest(MessageId),
     FileHandler(config_file_handler::Error),
-    InvalidResponse,
+    // InvalidResponse,
     Io(io::Error),
     MpidMessaging(messaging::Error),
-    NotInCloseGroup,
+    // NotInCloseGroup,
     Routing(InterfaceError),
     RoutingInternal(RoutingError),
     Serialisation(SerialisationError),
-    UnableToAllocateNewPmidNode,
+    // UnableToAllocateNewPmidNode,
     UnknownMessageType(RoutingMessage),
-    UnknownRefreshType(Authority, Authority),
+    // UnknownRefreshType(Authority, Authority),
 }
 
 impl From<MutationError> for InternalError {

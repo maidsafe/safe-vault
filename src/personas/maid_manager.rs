@@ -342,7 +342,6 @@ impl Default for MaidManager {
 mod test {
     use super::*;
     use super::Refresh;
-    use std::collections::HashSet;
     use error::InternalError;
     use safe_network_common::client_errors::MutationError;
     use maidsafe_utilities::serialisation;
@@ -697,9 +696,9 @@ mod test {
         assert_eq!(put_successes[0].src, env.our_authority);
         assert_eq!(put_successes[0].dst, env.client);
 
-        if let ResponseContent::PutSuccess(ref name, ref id) = put_successes[0].content {
+        if let ResponseContent::PutSuccess(ref data_id, ref id) = put_successes[0].content {
             assert_eq!(*id, msg_id);
-            assert_eq!(*name, data.identifier());
+            assert_eq!(data_id.name(), data.name());
         } else {
             unreachable!()
         }
@@ -877,9 +876,8 @@ mod test {
 
             if let RequestContent::Refresh(ref serialised_refresh, _) = refresh_requests[0]
                                                                             .content {
-                if let Ok(refresh) = serialisation::deserialise(&serialised_refresh) {
-                    let refresh: Refresh = refresh;
-                    assert_eq!(refresh.0, utils::client_name(&env.client));
+                if let Ok(Refresh(refresh_name, _)) = serialisation::deserialise(&serialised_refresh) {
+                    assert_eq!(refresh_name, utils::client_name(&env.client));
                 } else {
                     unreachable!()
                 }
@@ -903,9 +901,8 @@ mod test {
 
             if let RequestContent::Refresh(ref serialised_refresh, _) =
                    refresh_requests[refresh_count].content {
-                if let Ok(refresh) = serialisation::deserialise(&serialised_refresh) {
-                    let refresh: Refresh = refresh;
-                    assert_eq!(refresh.0, utils::client_name(&env.client));
+                if let Ok(Refresh(refresh_name, _)) = serialisation::deserialise(&serialised_refresh) {
+                    assert_eq!(refresh_name, utils::client_name(&env.client));
                 } else {
                     unreachable!()
                 }

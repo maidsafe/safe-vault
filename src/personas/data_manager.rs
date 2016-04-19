@@ -273,10 +273,7 @@ impl DataManager {
 mod test {
     use super::*;
     use super::Refresh;
-
-    use std::collections::HashSet;
     use std::sync::mpsc;
-
     use maidsafe_utilities::{log, serialisation};
     use rand::distributions::{IndependentSample, Range};
     use rand::{random, thread_rng};
@@ -837,7 +834,11 @@ mod test {
                                                                              .clone() {
             let parsed_refresh = unwrap_result!(serialisation::deserialise::<Refresh>(
                     &received_serialised_refresh[..]));
-            assert_eq!(parsed_refresh.0, Data::Structured(put_env.sd_data.clone()));
+            if let Refresh(Data::Structured(received_data)) = parsed_refresh {
+                assert_eq!(received_data, put_env.sd_data);
+            } else {
+                panic!("Received unexpected refresh value {:?}", parsed_refresh);
+            }
         } else {
             panic!("Received unexpected refresh {:?}", refresh_requests[0]);
         }
