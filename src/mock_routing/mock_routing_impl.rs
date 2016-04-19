@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-use mock_routing::kademlia_routing_table::{ContactInfo, RoutingTable};
+use kademlia_routing_table::{ContactInfo, RoutingTable};
 use maidsafe_utilities::thread::RaiiThreadJoiner;
 use rand::random;
 use routing::{Authority, Data, DataIdentifier, Event, InterfaceError, MessageId, RequestContent,
