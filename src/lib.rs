@@ -58,8 +58,8 @@ extern crate config_file_handler;
 extern crate ctrlc;
 // #[cfg(feature = "use-mock-crust")]
 // extern crate kademlia_routing_table;
-// #[cfg(test)]
-// extern crate rand;
+#[cfg(test)]
+extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate safe_network_common;
