@@ -58,12 +58,14 @@ extern crate config_file_handler;
 extern crate ctrlc;
 #[cfg(all(test, not(feature = "use-mock-crust")))]
 extern crate kademlia_routing_table;
+extern crate message_filter;
 #[cfg(all(test, not(feature = "use-mock-crust")))]
 extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;
 extern crate safe_network_common;
 extern crate sodiumoxide;
+extern crate time;
 extern crate xor_name;
 
 mod config_handler;
