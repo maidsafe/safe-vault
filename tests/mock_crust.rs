@@ -80,7 +80,7 @@ mod test {
                               .flat_map(TestNode::get_stored_names)
                               .filter_map(|data_id| {
                                   if deleted_data_ids.contains(&data_id) {
-                                      Some(data_id.name())
+                                      Some(data_id)
                                   } else {
                                       None
                                   }
@@ -267,7 +267,7 @@ mod test {
                         panic!("Non-structured data found.");
                     });
                     // FIXME: Fix the delete-while-churn scenario and re-enable this.
-                    if false && Range::new(0, 3).ind_sample(&mut rng) == 0 {
+                    if Range::new(0, 3).ind_sample(&mut rng) == 0 {
                         trace!("Deleting data {:?} with name {:?}",
                                data.identifier(),
                                data.name());

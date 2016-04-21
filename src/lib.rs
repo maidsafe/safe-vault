@@ -58,6 +58,7 @@ extern crate config_file_handler;
 extern crate ctrlc;
 #[cfg(all(test, not(feature = "use-mock-crust")))]
 extern crate kademlia_routing_table;
+extern crate lru_time_cache;
 #[cfg(all(test, not(feature = "use-mock-crust")))]
 extern crate rand;
 extern crate routing;
