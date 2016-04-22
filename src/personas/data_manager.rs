@@ -20,9 +20,11 @@ use std::fmt::{self, Debug, Formatter};
 
 use chunk_store::ChunkStore;
 use error::InternalError;
+use message_filter::MessageFilter;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, Data, DataIdentifier, MessageId, RequestMessage, StructuredData};
 use safe_network_common::client_errors::{MutationError, GetError};
+use time::Duration;
 use vault::{CHUNK_STORE_PREFIX, RoutingNode};
 use xor_name::XorName;
 
@@ -33,6 +35,7 @@ struct Refresh(Data);
 
 pub struct DataManager {
     chunk_store: ChunkStore<DataIdentifier, Data>,
+    deletions: MessageFilter<DataIdentifier>,
     immutable_data_count: u64,
     structured_data_count: u64,
 }
@@ -51,6 +54,7 @@ impl DataManager {
     pub fn new(capacity: u64) -> Result<DataManager, InternalError> {
         Ok(DataManager {
             chunk_store: try!(ChunkStore::new(CHUNK_STORE_PREFIX, capacity)),
+            deletions: MessageFilter::with_expiry_duration(Duration::seconds(30)),
             immutable_data_count: 0,
             structured_data_count: 0,
         })
@@ -117,6 +121,8 @@ impl DataManager {
                                                   *msg_id);
             return Err(From::from(error));
         }
+
+        let _ = self.deletions.remove(&data.identifier());
 
         if let Err(err) = self.chunk_store
                               .put(&data_identifier, data) {
@@ -197,7 +203,16 @@ impl DataManager {
                                                              request.src.clone(),
                                                              data.identifier(),
                                                              *msg_id);
-                    // TODO: Send a refresh message.
+                    let _ = self.deletions.insert(&new_data.identifier());
+                    // TODO: ideally, the new_data shall be already in the special defined format
+                    let deletion = try!(StructuredData::new(new_data.get_type_tag(),
+                                                            *new_data.get_identifier(),
+                                                            1010,
+                                                            vec![],
+                                                            vec![],
+                                                            vec![],
+                                                            None));
+                    self.send_refresh_with_data(routing_node, Data::Structured(deletion), *msg_id);
                     return Ok(());
                 }
             }
@@ -220,6 +235,21 @@ impl DataManager {
             Ok(None) | Err(_) => return Ok(()),
             Ok(Some(_)) => (),
         }
+
+        if self.deletions.contains(&data.identifier()) {
+            trace!("DM rejected the refreshed in data {:?} as it is in the deletion list",
+                   data.identifier());
+            return Ok(());
+        }
+        if let Data::Structured(ref struct_data) = data {
+            if struct_data.get_version() == 1010 && struct_data.get_data().is_empty() {
+                trace!("DM received refreshing deletion of data {:?}", data.identifier());
+                let _ = self.chunk_store.delete(&data.identifier());
+                let _ = self.deletions.insert(&data.identifier());
+                return Ok(());
+            }
+        }
+
         let new_data = if let Ok(Data::Structured(struct_data)) = self.chunk_store
                                                                       .get(&data.identifier()) {
             // Make sure we don't 'update' to a lower version due to delayed accumulation.
@@ -299,11 +329,17 @@ impl DataManager {
             Ok(data) => data,
             _ => return,
         };
+        self.send_refresh_with_data(routing_node, data, msg_id)
+    }
 
-        let src = Authority::NaeManager(data_id.name());
-        let refresh = Refresh(data);
+    fn send_refresh_with_data(&self,
+                              routing_node: &RoutingNode,
+                              data: Data,
+                              msg_id: MessageId) {
+        let src = Authority::NaeManager(data.name());
+        let refresh = Refresh(data.clone());
         if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
-            trace!("DM sending refresh for {:?}", data_id);
+            trace!("DM sending refresh for {:?}", data.identifier());
             let _ = routing_node.send_refresh_request(src.clone(), src, serialised_refresh, msg_id);
         }
     }
