@@ -539,14 +539,17 @@ impl DataManager {
                 exclude_peer: Option<XorName>,
                 single: bool)
                 -> Result<(), InternalError> {
-        let close_group = match self.routing_node
+        let own_name = try!(self.routing_node.name());
+        // TODO: routing_node provides other_close_group to exclude self directly
+        let close_group : Vec<XorName> = match self.routing_node
                                     .close_group(data_id.name()) {
             Ok(Some(close_group)) => {
-                if let Some(to_exclude) = exclude_peer {
+                let excluded_close_group = if let Some(to_exclude) = exclude_peer {
                     close_group.into_iter().filter(|name| *name != to_exclude).collect()
                 } else {
                     close_group
-                }
+                };
+                excluded_close_group.into_iter().filter(|name| *name != own_name).collect()
             }
             Ok(None) => {
                 trace!("Not a DM for {:?}", data_id);
@@ -557,7 +560,7 @@ impl DataManager {
                 return Err(From::from(error));
             }
         };
-        let src = Authority::ManagedNode(try!(self.routing_node.name()));
+        let src = Authority::ManagedNode(own_name);
         if single {
             let index = rand::random::<usize>() % close_group.len();
             let dst = Authority::ManagedNode(close_group[index]);
@@ -1256,8 +1259,10 @@ mod test_sd {
             panic!("Failed to serialise {:?}.", data_list_2);
         };
 
-        let close_group = unwrap_option!(
-            unwrap_result!(env.routing.close_group(sd_data.name())), "");
+        let own_name = unwrap_result!(env.routing.name());
+        let close_group : Vec<XorName> = unwrap_option!(
+            unwrap_result!(env.routing.close_group(sd_data.name())), "")
+            .into_iter().filter(|name| *name != own_name).collect();
 
         for i in 0..10 {
             if i % 2 == 0 {
@@ -1270,12 +1275,10 @@ mod test_sd {
             }
             if i  == 4 {
                 let get_requests = env.routing.get_requests_given();
-                assert_eq!(get_requests.len(), GROUP_SIZE);
-                for j in 0..GROUP_SIZE {
-                    assert_eq!(get_requests[j].src,
-                               Authority::ManagedNode(unwrap_result!(env.routing.name())));
-                    assert_eq!(get_requests[j].dst,
-                               Authority::ManagedNode(close_group[j]));
+                assert_eq!(get_requests.len(), close_group.len());
+                for j in 0..close_group.len() {
+                    assert_eq!(get_requests[j].src, Authority::ManagedNode(own_name.clone()));
+                    assert_eq!(get_requests[j].dst, Authority::ManagedNode(close_group[j]));
                     if let RequestContent::Get(ref data_identifier, _) = get_requests[j].content {
                         assert_eq!(*data_identifier, sd_data.identifier());
                     } else {
@@ -1285,28 +1288,29 @@ mod test_sd {
             }
             if i  == 8 {
                 let get_requests = env.routing.get_requests_given();
-                assert_eq!(get_requests.len(), GROUP_SIZE + 1);
-                assert_eq!(get_requests[GROUP_SIZE].src,
-                           Authority::ManagedNode(unwrap_result!(env.routing.name())));
-                assert!(close_group.contains(get_requests[GROUP_SIZE].dst.name()));
+                assert_eq!(get_requests.len(), close_group.len() + 1);
+                assert_eq!(get_requests[close_group.len()].src,
+                           Authority::ManagedNode(own_name.clone()));
+                assert!(close_group.contains(get_requests[close_group.len()].dst.name()));
                 if let RequestContent::Get(ref data_identifier, _) =
-                        get_requests[GROUP_SIZE].content {
+                        get_requests[close_group.len()].content {
                     assert_eq!(*data_identifier, sd_data.identifier());
                 } else {
-                    panic!("Received unexpected get request {:?}", get_requests[GROUP_SIZE]);
+                    panic!("Received unexpected get request {:?}", get_requests[close_group.len()]);
                 }
             }
             if i  == 9 {
                 let get_requests = env.routing.get_requests_given();
-                assert_eq!(get_requests.len(), GROUP_SIZE + 2);
-                assert_eq!(get_requests[GROUP_SIZE + 1].src,
-                           Authority::ManagedNode(unwrap_result!(env.routing.name())));
-                assert!(close_group.contains(get_requests[GROUP_SIZE + 1].dst.name()));
+                assert_eq!(get_requests.len(), close_group.len() + 2);
+                assert_eq!(get_requests[close_group.len() + 1].src,
+                           Authority::ManagedNode(own_name.clone()));
+                assert!(close_group.contains(get_requests[close_group.len() + 1].dst.name()));
                 if let RequestContent::Get(ref data_identifier, _) =
-                        get_requests[GROUP_SIZE + 1].content {
+                        get_requests[close_group.len() + 1].content {
                     assert_eq!(*data_identifier, sd_data.identifier());
                 } else {
-                    panic!("Received unexpected get request {:?}", get_requests[GROUP_SIZE + 1]);
+                    panic!("Received unexpected get request {:?}",
+                           get_requests[close_group.len() + 1]);
                 }
             }
         }
@@ -1601,8 +1605,11 @@ mod test_im {
         } else {
             panic!("Failed to serialise {:?}.", data_list);
         };
-        let close_group = unwrap_option!(
-            unwrap_result!(env.routing.close_group(im_data.name())), "");
+
+        let own_name = unwrap_result!(env.routing.name());
+        let close_group : Vec<XorName> = unwrap_option!(
+            unwrap_result!(env.routing.close_group(im_data.name())), "")
+            .into_iter().filter(|name| *name != own_name).collect();
 
         for i in 0..GROUP_SIZE {
             let _ = env.data_manager.handle_refresh(&serialised_data_list, &MessageId::new());
@@ -1612,8 +1619,7 @@ mod test_im {
             if i  == 4 {
                 let get_requests = env.routing.get_requests_given();
                 assert_eq!(get_requests.len(), 1);
-                assert_eq!(get_requests[0].src,
-                           Authority::ManagedNode(unwrap_result!(env.routing.name())));
+                assert_eq!(get_requests[0].src, Authority::ManagedNode(own_name.clone()));
                 assert!(close_group.contains(get_requests[0].dst.name()));
                 if let RequestContent::Get(ref data_identifier, _) = get_requests[0].content {
                     assert_eq!(*data_identifier, im_data.identifier());
