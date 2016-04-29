@@ -44,7 +44,7 @@ const GET_FROM_DATA_HOLDER_TIMEOUT_SECS: u64 = 60;
 /// The timeout for message_filter deletion.
 const MESSAGE_FILTER_TIMEOUT_SECS: u64 = 60;
 /// The version for structured_data delete notification.
-const DELETION_VERSION: u64 = 18_446_744_073_709_551_615;
+const DELETION_VERSION: u64 = ::std::u64::MAX;
 
 /// Specification of a particular version of a data chunk. For immutable data, the `u64` is always
 /// 0; for structured data, it specifies the version.
@@ -58,11 +58,13 @@ pub struct DataManager {
     data_holders: HashMap<XorName, HashSet<DataIdentifier>>,
     /// Maps the peers to the data chunks we requested from them, and the timestamp of the request.
     ongoing_gets: HashMap<XorName, (Instant, DataIdentifier)>,
+    /// Deletion cache to prevent zombie data being restored through refresh
+    deletions: MessageFilter<DataIdentifier>,
     routing_node: Rc<RoutingNode>,
     immutable_data_count: u64,
     structured_data_count: u64,
-    /// Deletion cache to prevent zombie data being restored through refresh
-    deletions: MessageFilter<DataIdentifier>,
+    ongoing_gets_count: usize,
+    data_holder_items_count: usize,
 }
 
 impl Debug for DataManager {
@@ -84,11 +86,13 @@ impl DataManager {
                                            Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
             data_holders: HashMap::new(),
             ongoing_gets: HashMap::new(),
+            deletions: MessageFilter::with_expiry_duration(
+                            Duration::from_secs(MESSAGE_FILTER_TIMEOUT_SECS)),
             routing_node: routing_node,
             immutable_data_count: 0,
             structured_data_count: 0,
-            deletions: MessageFilter::with_expiry_duration(
-                            Duration::from_secs(MESSAGE_FILTER_TIMEOUT_SECS)),
+            ongoing_gets_count: 0,
+            data_holder_items_count: 0,
         })
     }
 
@@ -433,9 +437,16 @@ impl DataManager {
                 }
             }
         }
-        debug!("Stats - Expecting {} Get responses. {} entries in data_holders.",
-               self.ongoing_gets.len(),
-               self.data_holders.values().map(HashSet::len).fold(0, Add::add));
+        let new_og_count = self.ongoing_gets.len();
+        let new_dhi_count = self.data_holders.values().map(HashSet::len).fold(0, Add::add);
+        if new_og_count != self.ongoing_gets_count ||
+           new_dhi_count != self.data_holder_items_count {
+            self.ongoing_gets_count = new_og_count;
+            self.data_holder_items_count = new_dhi_count;
+            info!("Stats - Expecting {} Get responses. {} entries in data_holders.",
+                  new_og_count,
+                  new_dhi_count);
+        }
         // TODO: Check whether we can do without a return value.
         Ok(())
     }
@@ -486,6 +497,7 @@ impl DataManager {
         if !data_list.is_empty() {
             let _ = self.send_refresh(Authority::ManagedNode(*node_name), data_list);
         }
+        info!("{:?}", self);
     }
 
     /// Get all names and hashes of all data. // [TODO]: Can be optimised - 2016-04-23 09:11pm
@@ -1149,7 +1161,8 @@ mod test_sd {
         assert_eq!(refresh_requests.len(), 1);
         assert_eq!(refresh_requests[0].src,
                    Authority::ManagedNode(unwrap_result!(env.routing.name())));
-        assert_eq!(refresh_requests[0].dst, Authority::NaeManager(put_env.sd_data.name()));
+        assert_eq!(refresh_requests[0].dst,
+                   Authority::NaeManager(put_env.sd_data.name()));
 
         // handle_node_lost
         let lost_node = env.lose_close_node(&put_env.sd_data.name());
@@ -1162,11 +1175,12 @@ mod test_sd {
                    Authority::ManagedNode(unwrap_result!(env.routing.name())));
         let close_group = unwrap_option!(unwrap_result!(env.routing
                                                            .close_group(put_env.sd_data.name())),
-                                     "");
+                                         "");
         assert_eq!(refresh_requests[1].dst,
                    Authority::ManagedNode(close_group[GROUP_SIZE - 1]));
-        if let RequestContent::Refresh(received_serialised_refresh, _) =
-               refresh_requests[1].content.clone() {
+        if let RequestContent::Refresh(received_serialised_refresh, _) = refresh_requests[1]
+                                                                             .content
+                                                                             .clone() {
             let parsed_data_list = unwrap_result!(serialisation::deserialise::<Vec<IdAndVersion>>(
                     &received_serialised_refresh[..]));
             assert_eq!(parsed_data_list.len(), 1);
@@ -1187,8 +1201,9 @@ mod test_sd {
                    Authority::ManagedNode(unwrap_result!(env.routing.name())));
         assert_eq!(refresh_requests[2].dst,
                    Authority::ManagedNode(node_added.clone()));
-        if let RequestContent::Refresh(received_serialised_refresh, _) =
-               refresh_requests[2].content.clone() {
+        if let RequestContent::Refresh(received_serialised_refresh, _) = refresh_requests[2]
+                                                                             .content
+                                                                             .clone() {
             let parsed_data_list = unwrap_result!(serialisation::deserialise::<Vec<IdAndVersion>>(
                     &received_serialised_refresh[..]));
             assert_eq!(parsed_data_list.len(), 1);
@@ -1479,7 +1494,8 @@ mod test_im {
         assert_eq!(refresh_requests.len(), 1);
         assert_eq!(refresh_requests[0].src,
                    Authority::ManagedNode(unwrap_result!(env.routing.name())));
-        assert_eq!(refresh_requests[0].dst, Authority::NaeManager(put_env.im_data.name()));
+        assert_eq!(refresh_requests[0].dst,
+                   Authority::NaeManager(put_env.im_data.name()));
 
         // handle_node_lost
         let lost_node = env.lose_close_node(&put_env.im_data.name());
@@ -1492,10 +1508,12 @@ mod test_im {
                    Authority::ManagedNode(unwrap_result!(env.routing.name())));
         let close_group = unwrap_option!(unwrap_result!(env.routing
                                                            .close_group(put_env.im_data.name())),
-                                     "");
-        assert_eq!(refresh_requests[1].dst, Authority::ManagedNode(close_group[GROUP_SIZE - 1]));
-        if let RequestContent::Refresh(received_serialised_refresh, _) =
-               refresh_requests[1].content.clone() {
+                                         "");
+        assert_eq!(refresh_requests[1].dst,
+                   Authority::ManagedNode(close_group[GROUP_SIZE - 1]));
+        if let RequestContent::Refresh(received_serialised_refresh, _) = refresh_requests[1]
+                                                                             .content
+                                                                             .clone() {
             let parsed_data_list = unwrap_result!(serialisation::deserialise::<Vec<IdAndVersion>>(
                     &received_serialised_refresh[..]));
             assert_eq!(parsed_data_list.len(), 1);
@@ -1514,9 +1532,11 @@ mod test_im {
         assert_eq!(refresh_requests.len(), 3);
         assert_eq!(refresh_requests[2].src,
                    Authority::ManagedNode(unwrap_result!(env.routing.name())));
-        assert_eq!(refresh_requests[2].dst, Authority::ManagedNode(node_added.clone()));
-        if let RequestContent::Refresh(received_serialised_refresh, _) =
-               refresh_requests[2].content.clone() {
+        assert_eq!(refresh_requests[2].dst,
+                   Authority::ManagedNode(node_added.clone()));
+        if let RequestContent::Refresh(received_serialised_refresh, _) = refresh_requests[2]
+                                                                             .content
+                                                                             .clone() {
             let parsed_data_list = unwrap_result!(serialisation::deserialise::<Vec<IdAndVersion>>(
                     &received_serialised_refresh[..]));
             assert_eq!(parsed_data_list.len(), 1);
@@ -1531,7 +1551,7 @@ mod test_im {
     fn handle_refresh() {
         let mut env = Environment::new();
         let im_data = env.get_close_data();
-        let data_list : Vec<IdAndVersion>= vec![(im_data.identifier(), 0)];
+        let data_list: Vec<IdAndVersion> = vec![(im_data.identifier(), 0)];
         let serialised_data_list = if let Ok(serialised_data) =
                                           serialisation::serialise(&data_list) {
             serialised_data
