@@ -847,11 +847,9 @@ mod test {
         let mut env = environment_setup();
         create_account(&mut env);
 
-        let mut refresh_count = 1;
+        let mut refresh_count = 0;
         let mut refresh_requests = env.routing.refresh_requests_given();
         assert_eq!(refresh_requests.len(), refresh_count);
-        assert_eq!(refresh_requests[0].src, env.our_authority);
-        assert_eq!(refresh_requests[0].dst, env.our_authority);
 
         env.routing.node_added_event(get_close_node(&env));
         env.maid_manager.handle_node_added(&random::<XorName>());
