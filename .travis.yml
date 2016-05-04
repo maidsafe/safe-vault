@@ -83,6 +83,7 @@ matrix:
         TARGET=x86_64-apple-darwin
         PLATFORM=osx-x64
         FEATURES=use-mock-crust
+        RUST_TEST_THREADS=1
 
     - os: osx
       env: >

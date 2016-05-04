@@ -58,6 +58,7 @@ pub struct DataManager {
     routing_node: Rc<RoutingNode>,
     immutable_data_count: u64,
     structured_data_count: u64,
+    client_get_requests: u64,
     ongoing_gets_count: usize,
     data_holder_items_count: usize,
 }
@@ -74,7 +75,8 @@ fn id_and_version_of(data: &Data) -> IdAndVersion {
 impl Debug for DataManager {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter,
-               "Stats - Data stored - ID {} - SD {} - total {} bytes",
+               "Stats : Client Get requests received {} ; Data stored - ID {} - SD {} - total {} bytes",
+               self.client_get_requests,
                self.immutable_data_count,
                self.structured_data_count,
                self.chunk_store.used_space())
@@ -94,6 +96,7 @@ impl DataManager {
             routing_node: routing_node,
             immutable_data_count: 0,
             structured_data_count: 0,
+            client_get_requests: 0,
             ongoing_gets_count: 0,
             data_holder_items_count: 0,
         })
@@ -104,6 +107,10 @@ impl DataManager {
                       data_id: &DataIdentifier,
                       message_id: &MessageId)
                       -> Result<(), InternalError> {
+        if let Authority::Client{..} = request.src {
+            self.client_get_requests += 1;
+            info!("{:?}", self);
+        }
         if let Ok(data) = self.chunk_store.get(&data_id) {
             trace!("As {:?} sending data {:?} to {:?}",
                    request.dst,
@@ -191,7 +198,6 @@ impl DataManager {
         } else {
             self.count_added_data(&data_id);
             trace!("DM sending PutSuccess for data {:?}", data_id);
-            info!("{:?}", self);
             let _ = self.routing_node
                         .send_put_success(response_src, response_dst, data_id, *message_id);
             let data_list = vec![(data_id, version)];
@@ -243,7 +249,6 @@ impl DataManager {
                 if let Ok(()) = self.chunk_store.delete(&data_id) {
                     self.count_removed_data(&data_id);
                     trace!("DM deleted {:?}", data.identifier());
-                    info!("{:?}", self);
                     let _ = self.routing_node
                                 .send_delete_success(request.dst.clone(),
                                                      request.src.clone(),
@@ -305,7 +310,6 @@ impl DataManager {
         if got_new_data {
             self.count_added_data(&data_id);
         }
-        info!("{:?}", self);
         Ok(())
     }
 
@@ -480,7 +484,6 @@ impl DataManager {
         if !data_list.is_empty() {
             let _ = self.send_refresh(Authority::ManagedNode(*node_name), data_list);
         }
-        info!("{:?}", self);
     }
 
     /// Get all names and hashes of all data. // [TODO]: Can be optimised - 2016-04-23 09:11pm
@@ -531,7 +534,6 @@ impl DataManager {
         for (node_name, data_list) in data_lists {
             let _ = self.send_refresh(Authority::ManagedNode(node_name), data_list);
         }
-        info!("{:?}", self);
     }
 
     pub fn check_timeouts(&mut self) {
@@ -588,6 +590,7 @@ impl DataManager {
             DataIdentifier::Structured(_, _) => self.structured_data_count += 1,
             _ => unreachable!(),
         }
+        info!("{:?}", self);
     }
 
     fn count_removed_data(&mut self, data_id: &DataIdentifier) {
@@ -596,6 +599,7 @@ impl DataManager {
             DataIdentifier::Structured(_, _) => self.structured_data_count -= 1,
             _ => unreachable!(),
         }
+        info!("{:?}", self);
     }
 
     /// Returns whether our data uses more than `MAX_FULL_PERCENT` percent of available space.

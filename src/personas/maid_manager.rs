@@ -317,7 +317,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn account_ok() {
+    fn account_struct_normal_updates() {
         let mut account = Account::default();
 
         assert_eq!(0, account.data_stored);
@@ -336,7 +336,7 @@ mod test {
     }
 
     #[test]
-    fn account_err() {
+    fn account_struct_error_updates() {
         let mut account = Account::default();
 
         assert_eq!(0, account.data_stored);
