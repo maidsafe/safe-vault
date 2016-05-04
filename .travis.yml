@@ -17,68 +17,71 @@ language: generic
 
 env:
   global:
-    # TODO: XXX
-    # - secure: GXW0WyMkipF5lh29QHMxSKl6Dpvd4Qqggu5SBGymS5KQ7VPuqgEE2A8YwQDIGf4IEZUoAcAb1W7oPwQ0/kv7omlF2S8gmals1BeGKStU1np6lIIH64B87w4RIDhD+limVAfKgWb3Oldj6PDAm8gjbWjPiZF/6oxH4hd/+d9r2GY=
-    - secure: "S9pBtCDv82O2o80eL5Ny6C/ibOYgB+MOvdHT9yMu84j5lVJmCMva96aSlm5vL617b2uCD/Taa7XbtVm96honFsaXYuGxxlL6zRqWXjcThAGkinaUZnM44u1hMoPrptd9249oxJRbWz+ahSUvPcAo8Tys7QPC0jHVANKg7nr0H7nV62Rr/gI7S4KqnzRQ5uHxCu9esuFeZTMOcEAuak2s/Hcb2YEbbTWIYxYaXSQdRbVEuGtKhcgD2rVr5tjzNOUbdFzj8jzq6LW/JWXCHxUZzeKEeWMFGTg5vAvWrfvFv5FYBRrp32bAzhKW+GMncq7dlM27Vm0d3xE3fAPh0ijj+VPqg+deGOy3yvV6C01T8+D7kTxF7cn4ZsNnbt5hfFl2T30VnI4UaY0vNMyuFnaPd3OTQGY2gHsdnB0ecy00dg2EDkHMPl27HYUfGZ9n60lTdPpGne62YwMKg9My1oUPkDRKL9Q0qDRZAS3htLnSJF8vTyvgBceBTqhNkWmRbSr45trUTyc4s392lQhGxBPm7x5hDz21kQBHP6xba2TV8M6lOscxuKxzKUnZ+2hYzgGMFGMDop2bz62zpN3epwDmvb4nj8OHZBcFU1pSaXfghliwqNf8WPn0EVyD10EWK518WJPdiRanVmbaSanubeVuYCjoTBjXUT03unVJOV+G0h0="
+    - secure: GXW0WyMkipF5lh29QHMxSKl6Dpvd4Qqggu5SBGymS5KQ7VPuqgEE2A8YwQDIGf4IEZUoAcAb1W7oPwQ0/kv7omlF2S8gmals1BeGKStU1np6lIIH64B87w4RIDhD+limVAfKgWb3Oldj6PDAm8gjbWjPiZF/6oxH4hd/+d9r2GY=
     - PROJECT_NAME=safe_vault
     - LibSodiumVersion=1.0.9
 
 matrix:
   include:
-    # - os: linux
-    #   env: >
-    #     TARGET=x86_64-unknown-linux-gnu
-    #     PLATFORM=linux-x64
-    #     FEATURES=use-mock-crust
+    - os: linux
+      env: >
+        TARGET=x86_64-unknown-linux-gnu
+        PLATFORM=linux-x64
+        FEATURES=use-mock-crust
+      addons:
+        apt:
+          packages:
+            - rpm
 
-    # - os: linux
-    #   env: >
-    #     TARGET=i686-unknown-linux-gnu
-    #     PLATFORM=linux-x86
-    #     FEATURES=use-mock-crust
-    #     ONLY_DEPLOY=1
-    #   sudo: required
-    #   addons:
-    #     apt:
-    #       packages:
-    #         - gcc-multilib
+    - os: linux
+      env: >
+        TARGET=i686-unknown-linux-gnu
+        PLATFORM=linux-x86
+        FEATURES=use-mock-crust
+        ONLY_DEPLOY=1
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - gcc-multilib
+            - rpm
 
-    # - os: linux
-    #   env: >
-    #     TARGET=x86_64-unknown-linux-musl
-    #     PLATFORM=linux-musl-x64
-    #     FEATURES=use-mock-crust
-    #     ONLY_DEPLOY=1
-    #     DOCKER_IMAGE=msafe/vault
-    #   sudo: required
-    #   services:
-    #     - docker
-    #   # TODO: uncommend once https://github.com/travis-ci/apt-package-whitelist/issues/369 is resolved
-    #   # addons:
-    #   #   apt:
-    #   #     packages:
-    #   #       - musl-tools
+    - os: linux
+      env: >
+        TARGET=x86_64-unknown-linux-musl
+        PLATFORM=linux-musl-x64
+        FEATURES=use-mock-crust
+        ONLY_DEPLOY=1
+        DOCKER_IMAGE=msafe/vault
+      sudo: required
+      services:
+        - docker
+      # TODO: uncommend once https://github.com/travis-ci/apt-package-whitelist/issues/369 is resolved
+      # addons:
+      #   apt:
+      #     packages:
+      #       - musl-tools
 
-    # - os: linux
-    #   env: >
-    #     TARGET=armv7-unknown-linux-gnueabihf
-    #     PLATFORM=armv7
-    #     FEATURES=use-mock-crust
-    #     ONLY_DEPLOY=1
-    #   sudo: required
-    #   addons:
-    #     apt:
-    #       packages:
-    #         # Cross compiler and cross compiled C libraries
-    #         - gcc-arm-linux-gnueabihf
-    #         - libc6-armhf-cross
-    #         - libc6-dev-armhf-cross
+    - os: linux
+      env: >
+        TARGET=armv7-unknown-linux-gnueabihf
+        PLATFORM=armv7
+        FEATURES=use-mock-crust
+        ONLY_DEPLOY=1
+      sudo: required
+      addons:
+        apt:
+          packages:
+            # Cross compiler and cross compiled C libraries
+            - gcc-arm-linux-gnueabihf
+            - libc6-armhf-cross
+            - libc6-dev-armhf-cross
 
-    # - os: linux
-    #   env: >
-    #     CHANNEL=nightly
-    #     FEATURES="clippy use-mock-crust"
-    #   allow_failures: true
+    - os: linux
+      env: >
+        CHANNEL=nightly
+        FEATURES="clippy use-mock-crust"
+      allow_failures: true
 
     - os: osx
       env: >
@@ -87,11 +90,11 @@ matrix:
         FEATURES=use-mock-crust
         SKIP_SIGN_PACKAGE=1
 
-    # - os: osx
-    #   env: >
-    #     CHANNEL=nightly
-    #     FEATURES="clippy use-mock-crust"
-    #   allow_failures: true
+    - os: osx
+      env: >
+        CHANNEL=nightly
+        FEATURES="clippy use-mock-crust"
+      allow_failures: true
 
   # Add "allow_failures: true" to rows which are allowed to fail without making
   # the whole build fail. This is useful for nightly builds.
@@ -102,9 +105,7 @@ matrix:
 
 branches:
   only:
-    # TODO: XXX
-    # - master
-    - installer
+    - master
 
 cache:
   directories:
@@ -112,6 +113,7 @@ cache:
     - $HOME/musl
     - $HOME/.cargo
     - $TRAVIS_BUILD_DIR/target
+    - $HOME/.gem
 
 before_install:
   - export PROJECT_VERSION=$(git log -1 | grep -i "version change to" | sed "s/.*[vV]ersion change to v\{0,1\}//")
@@ -157,19 +159,38 @@ deploy:
         ("$PLATFORM" = "osx-x64") &&
         (-n "$PROJECT_VERSION") &&
         ("${CHANNEL:-stable}"=stable)
-      # TODO: XXX
-      all_branches: true
 
-  - provider: script
-    script: ./ci/travis/deploy_linux_packages.sh
+  # Deploy linux 64bit deb and rpm packages to Github releases
+  # TODO: deploy to MaidSafe repositories instead
+  - provider: releases
+    api_key: ${GH_TOKEN}
+    file:
+      - ./packages/linux/SysV-style/${PROJECT_NAME//_/-}_${PROJECT_VERSION}_amd64.deb
+      - ./packages/linux/SysV-style/${PROJECT_NAME}-${PROJECT_VERSION//-/_}-1.x86_64.rpm
     skip_cleanup: true
+    draft: true
+    tag_name: ${PROJECT_VERSION}
     on:
       condition: >
-        (("$PLATFORM" = "linux-x64") || ("$PLATFORM" = "linux-x86")) &&
+        ("$PLATFORM" = "linux-x64") &&
         (-n "$PROJECT_VERSION") &&
         ("${CHANNEL:-stable}"=stable)
-      # TODO: XXX
-      all_branches: true
+
+  # Deploy linux 32bit deb and rpm packages to Github releases
+  # TODO: deploy to MaidSafe repositories instead
+  - provider: releases
+    api_key: ${GH_TOKEN}
+    file:
+      - ./packages/linux/SysV-style/${PROJECT_NAME//_/-}_${PROJECT_VERSION}_i386.deb
+      - ./packages/linux/SysV-style/${PROJECT_NAME}-${PROJECT_VERSION//-/_}-1.i386.rpm
+    skip_cleanup: true
+    draft: true
+    tag_name: ${PROJECT_VERSION}
+    on:
+      condition: >
+        ("$PLATFORM" = "linux-x86") &&
+        (-n "$PROJECT_VERSION") &&
+        ("${CHANNEL:-stable}"=stable)
 
   # Deploy docker image to Docker Hub.
   - provider: script
