@@ -2,7 +2,7 @@
 #
 # Create a package for Vault Release binaries
 
-set -ev
+set -e
 
 # Get current version and executable's name from Cargo.toml
 RootDir=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
