@@ -160,35 +160,13 @@ deploy:
         (-n "$PROJECT_VERSION") &&
         ("${CHANNEL:-stable}"=stable)
 
-  # Deploy linux 64bit deb and rpm packages to Github releases
-  # TODO: deploy to MaidSafe repositories instead
-  - provider: releases
-    api_key: ${GH_TOKEN}
-    file:
-      - ./packages/linux/SysV-style/${PROJECT_NAME//_/-}_${PROJECT_VERSION}_amd64.deb
-      - ./packages/linux/SysV-style/${PROJECT_NAME}-${PROJECT_VERSION//-/_}-1.x86_64.rpm
+  # Deploy linux deb and rpm packages to MaidSafe repositories
+  - provider: script
+    script: ./ci/travis/deploy_linux_packages.sh
     skip_cleanup: true
-    draft: true
-    tag_name: ${PROJECT_VERSION}
     on:
       condition: >
-        ("$PLATFORM" = "linux-x64") &&
-        (-n "$PROJECT_VERSION") &&
-        ("${CHANNEL:-stable}"=stable)
-
-  # Deploy linux 32bit deb and rpm packages to Github releases
-  # TODO: deploy to MaidSafe repositories instead
-  - provider: releases
-    api_key: ${GH_TOKEN}
-    file:
-      - ./packages/linux/SysV-style/${PROJECT_NAME//_/-}_${PROJECT_VERSION}_i386.deb
-      - ./packages/linux/SysV-style/${PROJECT_NAME}-${PROJECT_VERSION//-/_}-1.i386.rpm
-    skip_cleanup: true
-    draft: true
-    tag_name: ${PROJECT_VERSION}
-    on:
-      condition: >
-        ("$PLATFORM" = "linux-x86") &&
+        (("$PLATFORM" = "linux-x64") || ("$PLATFORM" = "linux-x86")) &&
         (-n "$PROJECT_VERSION") &&
         ("${CHANNEL:-stable}"=stable)
 
