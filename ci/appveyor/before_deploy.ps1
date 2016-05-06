@@ -25,3 +25,10 @@ Copy-Item installer\bundle\* staging\$NAME
 cd staging
 7z a ../$NAME.zip *
 Push-AppveyorArtifact ../$NAME.zip
+
+# Create the installer
+$ADVANCED_INSTALLER_VERSION="12.8"
+$ADVANCED_INSTALLER_URL="http://www.advancedinstaller.com/downloads/$ADVANCED_INSTALLER_VERSION/advinst.msi"
+Start-FileDownload "$ADVANCED_INSTALLER_URL"
+
+msiexec /i advinst.msi /qn

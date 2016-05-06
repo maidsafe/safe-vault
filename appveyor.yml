@@ -8,7 +8,8 @@ environment:
     - RUST_VERSION: stable
 branches:
   only:
-    - master
+    # - master
+    - installer
 
 clone_depth: 50
 skip_tags: true
