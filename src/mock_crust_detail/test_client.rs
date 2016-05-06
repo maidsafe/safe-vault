@@ -263,32 +263,34 @@ impl TestClient {
         let request_message_id = MessageId::new();
         unwrap_result!(self.routing_client.send_put_request(dst, data.clone(), request_message_id));
         let _ = poll::nodes_and_client(nodes, self);
-
-        match self.routing_rx.try_recv() {
-            Ok(Event::Response(ResponseMessage{
-                content: ResponseContent::PutSuccess(_, response_message_id),
-                ..
-            })) => {
-                assert_eq!(request_message_id, response_message_id);
-                Ok(())
-            }
-            Ok(Event::Response(ResponseMessage{
-                content: ResponseContent::PutFailure{ id: response_id, request, external_error_indicator: response_error },
-                ..
-            })) => {
-                assert_eq!(request_message_id, response_id);
-                if let RequestContent::Put(returned_data, returned_id) = request.content {
-                    assert!(data == returned_data);
-                    assert_eq!(request_message_id, returned_id);
-                } else {
-                    panic!("Got wrong request included in Put response");
+        loop {
+            match self.routing_rx.try_recv() {
+                Ok(Event::Response(ResponseMessage{
+                    content: ResponseContent::PutSuccess(_, response_message_id),
+                    ..
+                })) => {
+                    assert_eq!(request_message_id, response_message_id);
+                    return Ok(());
                 }
-                let parsed_error = unwrap_result!(serialisation::deserialise(&response_error));
-                Err(Some(parsed_error))
+                Ok(Event::Response(ResponseMessage{
+                    content: ResponseContent::PutFailure{
+                        id: response_id, request, external_error_indicator: response_error },
+                    ..
+                })) => {
+                    assert_eq!(request_message_id, response_id);
+                    if let RequestContent::Put(returned_data, returned_id) = request.content {
+                        assert!(data == returned_data);
+                        assert_eq!(request_message_id, returned_id);
+                    } else {
+                        panic!("Got wrong request included in Put response");
+                    }
+                    let parsed_error = unwrap_result!(serialisation::deserialise(&response_error));
+                    return Err(Some(parsed_error));
+                }
+                Ok(response) => warn!("Unexpected Put response : {:?}", response),
+                // TODO: Once the network guarantees that every request gets a response, panic!
+                Err(_) => return Err(None),
             }
-            Ok(response) => panic!("Unexpected Put response : {:?}", response),
-            // TODO: Once the network guarantees that every request gets a response, panic!
-            Err(_) => Err(None),
         }
     }
     /// Return a full id for this client
