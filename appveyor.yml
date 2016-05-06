@@ -1,18 +1,29 @@
 environment:
   global:
     GH_TOKEN:
-      secure: Plf6CbvLc5BWpB51EU9Sk/RMow47fZp74uSKt1Wv20kFRf1OQS2pVuEzgXQPuyhW
+    # TODO: XXX
+    #   secure: Plf6CbvLc5BWpB51EU9Sk/RMow47fZp74uSKt1Wv20kFRf1OQS2pVuEzgXQPuyhW
+      secure: H46Isgt6cj7QSVGk1lGDbD5qudCe//5WprY2OA7hbTVUCjPe7dctJlbpLEK0uoUY
+
+    # INSTALLER_CERT_SECRET:
+    #   secure: GfkiZSo2sN4Hk8QgXca5HFcgYcw7eSGSa+XLklQb0WpLpEZbPnt83/umucg5EQz9xqouUN14WMOFlmfbgtXMgDZHsbNoN402ZFktN05Qn+U=
+
     PROJECT_NAME: safe_vault
     RUST_BACKTRACE: 1
   matrix:
     - RUST_VERSION: stable
 branches:
   only:
+    # TODO: XXX
     # - master
     - installer
 
 clone_depth: 50
 skip_tags: true
+
+cache:
+  - '%USERPROFILE%\.cargo'
+  - '%APPVEYOR_BUILD_FOLDER%\target'
 
 install:
   - ps: |
@@ -39,10 +50,14 @@ configuration:
   - Release
 
 build_script:
-  - ps: . ".\Build.ps1"
+  - ps: echo "[Build script placeholder]"
+# TODO: XXX
+#   - ps: . ".\Build.ps1"
 
 test_script:
-  - ps: . ".\Run Tests.ps1"
+  - ps: echo "[Test script placeholder]"
+# TODO: XXX
+#   - ps: . ".\Run Tests.ps1"
 
 before_deploy:
   - ps: . ".\ci\appveyor\before_deploy.ps1"
@@ -50,8 +65,8 @@ before_deploy:
 deploy:
   provider: GitHub
   auth_token: $(GH_TOKEN)
-  # All the zipped artifacts will be deployed
-  artifact: /.*\.zip/
+  # Deploy the archive (zip) and the installer (exe)
+  artifact: /.*\.zip|.*\.exe/
   draft: true
   tag: $(PROJECT_VERSION)
   on:
