@@ -19,8 +19,13 @@ $NAME = "$env:PROJECT_NAME-v$env:PROJECT_VERSION-windows-$env:PLATFORM"
 
 New-Item -ItemType directory -Path staging
 New-Item -ItemType directory -Path staging\$NAME
+New-Item -ItemType directory -Path config
+
+$RELEASE_CONFIG_REPO_NAME = "maidsafe/release_config"
+git clone "https://$env:GH_TOKEN@github.com/$RELEASE_CONFIG_REPO_NAME" config
+
 Copy-Item target\release\$env:PROJECT_NAME.exe staging\$NAME
-Copy-Item installer\bundle\* staging\$NAME
+Copy-Item config\safe_vault\* staging\$NAME
 
 cd staging
 7z a ../$NAME.zip *
