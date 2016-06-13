@@ -27,7 +27,7 @@ use personas::data_manager::DataManager;
 #[cfg(feature = "use-mock-crust")]
 use personas::data_manager::IdAndVersion;
 
-use routing::{Authority, Data, Request, Response, XorName};
+use routing::{self, Authority, Data, Request, Response, XorName};
 use sodiumoxide;
 
 pub const CHUNK_STORE_PREFIX: &'static str = "safe-vault";
@@ -121,6 +121,12 @@ impl Vault {
     #[cfg(feature = "use-mock-crust")]
     pub fn name(&self) -> XorName {
         unwrap_result!(self.routing_node.name())
+    }
+
+    /// Vault routing_table
+    #[cfg(feature = "use-mock-crust")]
+    pub fn routing_table(&self) -> routing::RoutingTable {
+        self.routing_node.routing_table()
     }
 
     fn process_event(&mut self, event: Event) -> Option<bool> {
