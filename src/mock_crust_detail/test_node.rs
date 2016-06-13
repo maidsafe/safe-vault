@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
-use routing::XorName;
+use routing::{RoutingTable, XorName};
 use vault::Vault;
 use config_handler::Config;
 
@@ -82,6 +82,10 @@ impl TestNode {
     /// name of vault.
     pub fn name(&self) -> XorName {
         self.vault.name()
+    }
+    /// routing_table of vault.
+    pub fn routing_table(&self) -> RoutingTable {
+        self.vault.routing_table()
     }
 }
 

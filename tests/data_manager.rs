@@ -78,6 +78,7 @@ fn immutable_data_operations_with_churn() {
         trace!("Processed {} events.", event_count);
 
         mock_crust_detail::check_data(all_data.clone(), &nodes);
+        mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);
     }
 
     for data in &all_data {
