@@ -189,5 +189,6 @@ fn maid_manager_account_updates_with_churn() {
         for &(_, count) in &node_count_stats {
             assert!(count == Some(put_count), "{:?}", node_count_stats);
         }
+        mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);
     }
 }
