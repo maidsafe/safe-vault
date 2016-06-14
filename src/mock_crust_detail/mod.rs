@@ -23,8 +23,7 @@ pub mod test_client;
 pub mod test_node;
 
 use itertools::Itertools;
-use routing::Data;
-use routing::{GROUP_SIZE, XorName};
+use routing::{self, GROUP_SIZE, Data, XorName};
 use std::collections::{HashMap, HashSet};
 use mock_crust_detail::test_node::TestNode;
 use personas::data_manager::IdAndVersion;
@@ -82,5 +81,13 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
                 data_id,
                 expected_data_holders,
                 data_holders);
+    }
+}
+
+/// Verify that the kademlia invariant is upheld for all nodes.
+pub fn verify_kademlia_invariant_for_all_nodes(nodes: &[TestNode]) {
+    let routing_tables = nodes.iter().map(|node| node.routing_table()).collect();
+    for node_index in 0..nodes.len() {
+        routing::verify_kademlia_invariant(&routing_tables, node_index);
     }
 }
