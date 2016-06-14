@@ -23,23 +23,24 @@ env:
 
 matrix:
   include:
-    - os: linux
-      env: >
-        TARGET=x86_64-unknown-linux-gnu
-        PLATFORM=linux-x64
-        FEATURES=use-mock-crust
+    # XXX:
+    # - os: linux
+    #   env: >
+    #     TARGET=x86_64-unknown-linux-gnu
+    #     PLATFORM=linux-x64
+    #     FEATURES=use-mock-crust
 
-    - os: linux
-      env: >
-        TARGET=i686-unknown-linux-gnu
-        PLATFORM=linux-x86
-        FEATURES=use-mock-crust
-        ONLY_DEPLOY=1
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - gcc-multilib
+    # - os: linux
+    #   env: >
+    #     TARGET=i686-unknown-linux-gnu
+    #     PLATFORM=linux-x86
+    #     FEATURES=use-mock-crust
+    #     ONLY_DEPLOY=1
+    #   sudo: required
+    #   addons:
+    #     apt:
+    #       packages:
+    #         - gcc-multilib
 
     - os: linux
       env: >
@@ -47,7 +48,9 @@ matrix:
         PLATFORM=linux-musl-x64
         FEATURES=use-mock-crust
         ONLY_DEPLOY=1
-        DOCKER_IMAGE=msafe/vault
+        DOCKER_IMAGE=madadam/vault
+      # XXX:
+      # DOCKER_IMAGE=msafe/vault
       sudo: required
       services:
         - docker
@@ -57,38 +60,38 @@ matrix:
       #     packages:
       #       - musl-tools
 
-    - os: linux
-      env: >
-        TARGET=armv7-unknown-linux-gnueabihf
-        PLATFORM=armv7
-        FEATURES=use-mock-crust
-        ONLY_DEPLOY=1
-      sudo: required
-      addons:
-        apt:
-          packages:
-            # Cross compiler and cross compiled C libraries
-            - gcc-arm-linux-gnueabihf
-            - libc6-armhf-cross
-            - libc6-dev-armhf-cross
+    # - os: linux
+    #   env: >
+    #     TARGET=armv7-unknown-linux-gnueabihf
+    #     PLATFORM=armv7
+    #     FEATURES=use-mock-crust
+    #     ONLY_DEPLOY=1
+    #   sudo: required
+    #   addons:
+    #     apt:
+    #       packages:
+    #         # Cross compiler and cross compiled C libraries
+    #         - gcc-arm-linux-gnueabihf
+    #         - libc6-armhf-cross
+    #         - libc6-dev-armhf-cross
 
-    - os: linux
-      env: >
-        CHANNEL=nightly
-        FEATURES="clippy use-mock-crust"
-      allow_failures: true
+    # - os: linux
+    #   env: >
+    #     CHANNEL=nightly
+    #     FEATURES="clippy use-mock-crust"
+    #   allow_failures: true
 
-    - os: osx
-      env: >
-        TARGET=x86_64-apple-darwin
-        PLATFORM=osx-x64
-        FEATURES=use-mock-crust
+    # - os: osx
+    #   env: >
+    #     TARGET=x86_64-apple-darwin
+    #     PLATFORM=osx-x64
+    #     FEATURES=use-mock-crust
 
-    - os: osx
-      env: >
-        CHANNEL=nightly
-        FEATURES="clippy use-mock-crust"
-      allow_failures: true
+    # - os: osx
+    #   env: >
+    #     CHANNEL=nightly
+    #     FEATURES="clippy use-mock-crust"
+    #   allow_failures: true
 
   # Add "allow_failures: true" to rows which are allowed to fail without making
   # the whole build fail. This is useful for nightly builds.
@@ -99,7 +102,9 @@ matrix:
 
 branches:
   only:
-    - master
+    # XXX:
+    # - master
+    - release-config
 
 cache:
   directories:
@@ -134,6 +139,8 @@ deploy:
     draft: true
     tag_name: ${PROJECT_VERSION}
     on:
+      # XXX:
+      all_branches: true
       condition: >
         (-n "$PROJECT_VERSION") &&
         (-n "$PLATFORM") &&
@@ -142,6 +149,8 @@ deploy:
     script: ./ci/travis/deploy_docker_image.sh
     skip_cleanup: true
     on:
+      # XXX:
+      all_branches: true
       condition: >
         (-n "$DOCKER_IMAGE") &&
         (-n "$DOCKER_EMAIL") &&
