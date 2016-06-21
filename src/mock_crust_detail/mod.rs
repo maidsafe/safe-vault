@@ -86,7 +86,7 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
 
 /// Verify that the kademlia invariant is upheld for all nodes.
 pub fn verify_kademlia_invariant_for_all_nodes(nodes: &[TestNode]) {
-    let routing_tables = nodes.iter().map(|node| node.routing_table()).collect();
+    let routing_tables = nodes.iter().map(TestNode::routing_table).collect();
     for node_index in 0..nodes.len() {
         routing::verify_kademlia_invariant(&routing_tables, node_index);
     }
