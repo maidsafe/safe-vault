@@ -34,7 +34,7 @@ const TEST_NET_SIZE: usize = 20;
 
 #[test]
 fn immutable_data_operations_with_churn() {
-    let network = Network::new();
+    let network = Network::new(None);
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -97,7 +97,7 @@ fn immutable_data_operations_with_churn() {
 
 #[test]
 fn structured_data_operations_with_churn() {
-    let network = Network::new();
+    let network = Network::new(None);
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -216,7 +216,7 @@ fn structured_data_operations_with_churn() {
 
 #[test]
 fn handle_put_get_normal_flow() {
-    let network = Network::new();
+    let network = Network::new(None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -244,7 +244,7 @@ fn handle_put_get_normal_flow() {
 
 #[test]
 fn handle_put_get_error_flow() {
-    let network = Network::new();
+    let network = Network::new(None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -287,7 +287,7 @@ fn handle_put_get_error_flow() {
 
 #[test]
 fn handle_post_error_flow() {
-    let network = Network::new();
+    let network = Network::new(None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -373,7 +373,7 @@ fn handle_post_error_flow() {
 
 #[test]
 fn handle_delete_error_flow() {
-    let network = Network::new();
+    let network = Network::new(None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);

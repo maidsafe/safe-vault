@@ -39,7 +39,7 @@ impl TestNode {
                -> Self {
         let handle = network.new_service_handle(crust_config, None);
         let mut vault = mock_crust::make_current(&handle,
-                                                 || unwrap_result!(Vault::new(first_node)));
+                                                 || unwrap_result!(Vault::new(first_node, true)));
         if let Some(replacement_config) = config {
             unwrap_result!(vault.apply_config(replacement_config));
         }
