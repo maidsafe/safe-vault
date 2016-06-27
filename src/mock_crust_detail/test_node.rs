@@ -37,12 +37,36 @@ impl TestNode {
                config: Option<Config>,
                first_node: bool)
                -> Self {
+        use std::env;
+        use rand::{self, Rng};
+        use rustc_serialize::hex::ToHex;
+
         let handle = network.new_service_handle(crust_config, None);
         let mut vault = mock_crust::make_current(&handle,
                                                  || unwrap_result!(Vault::new(first_node)));
-        if let Some(replacement_config) = config {
-            unwrap_result!(vault.apply_config(replacement_config));
-        }
+
+        let temp_root = env::temp_dir();
+        let chunk_store_root = temp_root.join(rand::thread_rng().gen_iter()
+                                                                .take(8)
+                                                                .collect::<Vec<u8>>()
+                                                                .to_hex());
+        let vault_config = match config {
+            Some(config) => {
+                Config {
+                    wallet_address: config.wallet_address,
+                    max_capacity: config.max_capacity,
+                    chunk_store_root: Some(format!("{}", chunk_store_root.display())),
+                }
+            }
+            None => {
+                Config {
+                    wallet_address: None,
+                    max_capacity: None,
+                    chunk_store_root: Some(format!("{}", chunk_store_root.display())),
+                }
+            }
+        };
+        unwrap_result!(vault.apply_config(vault_config));
 
         TestNode {
             handle: handle,
