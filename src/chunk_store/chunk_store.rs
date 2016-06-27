@@ -20,6 +20,7 @@ use std::io::{self, ErrorKind, Read, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
+use error::InternalError;
 use maidsafe_utilities::serialisation::{self, SerialisationError};
 use rustc_serialize::{Decodable, Encodable};
 use rustc_serialize::hex::{FromHex, ToHex};
@@ -83,7 +84,10 @@ impl<Key, Value> ChunkStore<Key, Value>
             // to create it, which will cause one of them raise AlreadyExists error during
             // fs::create_dir_all. A re-attempt needs to be carried out in that case.
             Err(ref e) if e.kind() == ErrorKind::AlreadyExists => {
-                let _ = fs::create_dir_all(&root);
+                match fs::create_dir_all(&root) {
+                    Ok(_) => {}
+                    Err(e) => return Err(From::from(e)),
+                }
             }
             Err(e) => return Err(From::from(e)),
         }
@@ -184,6 +188,24 @@ impl<Key, Value> ChunkStore<Key, Value>
     /// Returns the amount of storage space already used by this ChunkStore.
     pub fn used_space(&self) -> u64 {
         self.used_space
+    }
+
+    /// Cleans up the chunk_store dir.
+    #[cfg(not(feature = "use-mock-crust"))]
+    pub fn reset_store(&self) -> Result<(), InternalError> {
+        match fs::remove_dir_all(&self.rootdir) {
+            Ok(_) => {}
+            Err(e) => return Err(From::from(e)),
+        }
+        match fs::remove_dir_all(&self.rootdir) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(From::from(e)),
+        }
+    }
+
+    #[cfg(feature = "use-mock-crust")]
+    pub fn reset_store(&self) -> Result<(), InternalError> {
+        Ok(())
     }
 
     fn do_delete(&mut self, file_path: &Path) -> Result<(), Error> {

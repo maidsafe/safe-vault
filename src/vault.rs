@@ -17,7 +17,7 @@
 
 use std::env;
 use std::rc::Rc;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::mpsc::{self, Receiver};
 
 #[cfg(feature = "use-mock-crust")]
@@ -45,7 +45,6 @@ pub struct Vault {
     data_manager: DataManager,
     routing_node: Rc<RoutingNode>,
     routing_receiver: Receiver<Event>,
-    chunk_store_root: PathBuf,
 }
 
 impl Vault {
@@ -54,8 +53,10 @@ impl Vault {
         sodiumoxide::init();
 
         let config = config_handler::read_config_file().ok().unwrap_or_default();
-        let mut chunk_store_root = if config.chunk_store_root.is_none() {
-            env::temp_dir()
+        let chunk_store_root = if config.chunk_store_root.is_none() {
+            let mut store_root = env::temp_dir();
+            store_root.push(CHUNK_STORE_DIR);
+            store_root
         } else {
             let path_str = config.chunk_store_root.unwrap();
             let root_path = Path::new(&path_str);
@@ -64,10 +65,11 @@ impl Vault {
             } else {
                 warn!("configured chunk_store_root {:?} is not a directory",
                       root_path);
-                env::temp_dir()
+                let mut store_root = env::temp_dir();
+                store_root.push(CHUNK_STORE_DIR);
+                store_root
             }
         };
-        chunk_store_root.push(CHUNK_STORE_DIR);
 
         let (routing_sender, routing_receiver) = mpsc::channel();
         let routing_node = Rc::new(try!(RoutingNode::new(routing_sender, first_vault)));
@@ -75,12 +77,11 @@ impl Vault {
         Ok(Vault {
             maid_manager: MaidManager::new(routing_node.clone()),
             data_manager: try!(DataManager::new(routing_node.clone(),
-                                                chunk_store_root.clone(),
+                                                chunk_store_root,
                                                 config.max_capacity
                                                     .unwrap_or(DEFAULT_MAX_CAPACITY))),
             routing_node: routing_node.clone(),
             routing_receiver: routing_receiver,
-            chunk_store_root: chunk_store_root,
         })
     }
 
@@ -89,8 +90,17 @@ impl Vault {
     #[cfg(feature = "use-mock-crust")]
     pub fn apply_config(&mut self, config: Config) -> Result<(), InternalError> {
         let max_capacity = config.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY);
+        let chunk_store_root = if config.chunk_store_root.is_none() {
+            let mut store_root = env::temp_dir();
+            store_root.push(CHUNK_STORE_DIR);
+            store_root
+        } else {
+            let path_str = config.chunk_store_root.unwrap();
+            let root_path = Path::new(&path_str);
+            root_path.to_path_buf()
+        };
         self.data_manager =
-            try!(DataManager::new(self.routing_node.clone(), env::temp_dir(), max_capacity));
+            try!(DataManager::new(self.routing_node.clone(), chunk_store_root, max_capacity));
         Ok(())
     }
 
@@ -295,20 +305,8 @@ impl Vault {
         Ok(())
     }
 
-    #[cfg(not(feature = "use-mock-crust"))]
     fn on_connected(&self) -> Result<(), InternalError> {
-        use std::fs;
-        // TODO: what is expected to be done here?
-        debug!("Vault connected");
-        let _ = fs::remove_dir_all(&self.chunk_store_root);
-        let _ = fs::create_dir_all(&self.chunk_store_root);
-        Ok(())
+        self.data_manager.reset_store()
     }
 
-    #[cfg(feature = "use-mock-crust")]
-    fn on_connected(&self) -> Result<(), InternalError> {
-        // TODO: what is expected to be done here?
-        debug!("Vault connected, current chunk_store_root is {:?}", self.chunk_store_root);
-        Ok(())
-    }
 }
