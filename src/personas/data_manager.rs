@@ -29,7 +29,7 @@ use error::InternalError;
 use itertools::Itertools;
 use kademlia_routing_table::RoutingTable;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, Data, DataIdentifier, MessageId, StructuredData, XorName, GROUP_SIZE};
+use routing::{Authority, Data, DataIdentifier, ImmutableData, MessageId, StructuredData, XorName, GROUP_SIZE};
 use safe_network_common::client_errors::{MutationError, GetError};
 use vault::RoutingNode;
 
@@ -297,8 +297,13 @@ impl DataManager {
                chunk_store_root: PathBuf,
                capacity: u64)
                -> Result<DataManager, InternalError> {
+        use rand::{self, Rng};
+        let mut chunk_store = try!(ChunkStore::new(chunk_store_root, capacity));
+        let data = Data::Immutable(ImmutableData::new(rand::thread_rng().gen_iter().take(10).collect()));
+        try!(chunk_store.verify_workable(&data.identifier(), &data));
+
         Ok(DataManager {
-            chunk_store: try!(ChunkStore::new(chunk_store_root, capacity)),
+            chunk_store: chunk_store,
             refresh_accumulator:
                 Accumulator::with_duration(ACCUMULATOR_QUORUM,
                                            Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
