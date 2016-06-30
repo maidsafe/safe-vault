@@ -25,6 +25,9 @@ use maidsafe_utilities::serialisation::{self, SerialisationError};
 use rustc_serialize::{Decodable, Encodable};
 use rustc_serialize::hex::{FromHex, ToHex};
 
+/// The interval for print status log.
+const MAX_CHUNK_FILE_NAME_U8_LENGTH: usize = 52;
+
 quick_error! {
     /// `ChunkStore` error.
     #[derive(Debug)]
@@ -88,12 +91,31 @@ impl<Key, Value> ChunkStore<Key, Value>
             }
             Err(e) => return Err(From::from(e)),
         }
+        try!(Self::verify_workable(&root));
         Ok(ChunkStore {
             rootdir: root,
             max_space: max_space,
             used_space: 0,
             phantom: PhantomData,
         })
+    }
+
+    fn verify_workable(root: &PathBuf) -> Result<(), Error> {
+        let file_name: Vec<u8> = vec![0; MAX_CHUNK_FILE_NAME_U8_LENGTH];
+        let file_path = root.join(file_name.to_hex());
+        // Write the testing file.
+        try!(fs::File::create(&file_path)
+            .and_then(|file| file.sync_all() ));
+        // Verify the testing file exists.
+        if let Ok(metadata) = fs::metadata(file_path.clone()) {
+            if !metadata.is_file() {
+                return Err(Error::NotFound);
+            }
+        } else {
+            return Err(Error::NotFound);
+        }
+        // remove the testing file.
+        fs::remove_file(file_path).map_err(From::from)
     }
 
     /// Stores a new data chunk under `key`.
