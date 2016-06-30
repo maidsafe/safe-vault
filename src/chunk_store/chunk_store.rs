@@ -25,6 +25,9 @@ use maidsafe_utilities::serialisation::{self, SerialisationError};
 use rustc_serialize::{Decodable, Encodable};
 use rustc_serialize::hex::{FromHex, ToHex};
 
+/// The max name length for a chunk file.
+const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
+
 quick_error! {
     /// `ChunkStore` error.
     #[derive(Debug)]
@@ -52,6 +55,11 @@ quick_error! {
         NotFound {
             description("Key, Value not found")
             display("Key, Value not found")
+        }
+        /// Could not delete chunk store directory.
+        CouldNotDeleteChunkStoreDir {
+            description("Could not delete chunk store directory")
+            display("Could not delete chunk store directory")
         }
     }
 }
@@ -88,12 +96,20 @@ impl<Key, Value> ChunkStore<Key, Value>
             }
             Err(e) => return Err(From::from(e)),
         }
+        try!(Self::verify_file_creation(&root));
         Ok(ChunkStore {
             rootdir: root,
             max_space: max_space,
             used_space: 0,
             phantom: PhantomData,
         })
+    }
+
+    fn verify_file_creation(root: &PathBuf) -> Result<(), Error> {
+        let name: String = (0..MAX_CHUNK_FILE_NAME_LENGTH).map(|_| '0').collect();
+        let file_path = root.join(name);
+        let _ = try!(fs::File::create(&file_path));
+        fs::remove_file(file_path).map_err(From::from)
     }
 
     /// Stores a new data chunk under `key`.
@@ -189,7 +205,10 @@ impl<Key, Value> ChunkStore<Key, Value>
 
     /// Cleans up the chunk_store dir.
     pub fn reset_store(&self) -> Result<(), InternalError> {
-        try!(fs::remove_dir_all(&self.rootdir));
+        let _ = fs::remove_dir_all(&self.rootdir); // If it exists, remove it.
+        if self.rootdir.as_path().exists() {
+            return Err(Error::CouldNotDeleteChunkStoreDir.into());
+        }
         try!(fs::create_dir_all(&self.rootdir));
         Ok(())
     }
