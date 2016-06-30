@@ -96,6 +96,16 @@ impl<Key, Value> ChunkStore<Key, Value>
         })
     }
 
+    /// Verifies a chunk_store instance is workable
+    pub fn verify_workable(&mut self, key: &Key, value: &Value) -> Result<(), Error> {
+        try!(self.put(key, &value));
+        if !self.has(key) {
+            return Err(Error::NotFound);
+        }
+        try!(self.delete(key));
+        Ok(())
+    }
+
     /// Stores a new data chunk under `key`.
     ///
     /// If there is not enough storage space available, returns `Error::NotEnoughSpace`.  In case of
