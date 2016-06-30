@@ -61,7 +61,6 @@ extern crate config_file_handler;
 #[allow(unused_extern_crates)]
 #[macro_use]
 extern crate quick_error;
-#[cfg(any(test, feature = "use-mock-crust"))]
 extern crate rand;
 extern crate routing;
 extern crate rustc_serialize;

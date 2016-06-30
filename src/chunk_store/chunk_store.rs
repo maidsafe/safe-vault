@@ -88,12 +88,38 @@ impl<Key, Value> ChunkStore<Key, Value>
             }
             Err(e) => return Err(From::from(e)),
         }
+        try!(Self::verify_workable(root.clone()));
         Ok(ChunkStore {
             rootdir: root,
             max_space: max_space,
             used_space: 0,
             phantom: PhantomData,
         })
+    }
+
+    fn verify_workable(root: PathBuf) -> Result<(), Error> {
+        use rand::{self, Rng};
+        let file_path = root.join(rand::thread_rng().gen_iter()
+                                                    .take(54)
+                                                    .collect::<Vec<u8>>()
+                                                    .to_hex());
+        let value = rand::thread_rng().gen_iter().take(10).collect::<Vec<u8>>();
+        // Write the testing file.
+        try!(fs::File::create(&file_path)
+            .and_then(|mut file| {
+                file.write_all(&value)
+                    .and_then(|()| file.sync_all())
+            }));
+        // Verify the testing file exists.
+        if let Ok(metadata) = fs::metadata(file_path.clone()) {
+            if !metadata.is_file() {
+                return Err(Error::NotFound);
+            }
+        } else {
+            return Err(Error::NotFound);
+        }
+        // remove the testing file.
+        fs::remove_file(file_path).map_err(From::from)
     }
 
     /// Stores a new data chunk under `key`.
