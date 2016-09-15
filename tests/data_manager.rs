@@ -166,39 +166,7 @@ fn structured_data_parallel_posts() {
             })
             .collect();
 
-        // A custom implementation of poll_and_resend_unacknowledged that handles more than one
-        // client and handles only one event per round for each node and client, to better simulate
-        // simultaneous requests.
-        loop {
-            let mut new_count = 0;
-            loop {
-                let prev_count = new_count;
-                for node in &mut nodes {
-                    if node.poll_once() {
-                        new_count += 1;
-                    }
-                }
-                for client in &mut clients {
-                    if client.poll_once() {
-                        new_count += 1;
-                    }
-                }
-                if prev_count == new_count {
-                    break;
-                }
-            }
-            event_count += new_count;
-            let mut result = false;
-            for node in &mut nodes {
-                result = result || node.resend_unacknowledged()
-            }
-            for client in &mut clients {
-                result = result || client.resend_unacknowledged();
-            }
-            if !result && new_count == 0 {
-                break;
-            }
-        }
+        event_count += poll::poll_and_resend_unacknowledged_parallel(&mut nodes, &mut clients);
         for node in &mut nodes {
             node.clear_state();
         }
@@ -429,6 +397,142 @@ fn handle_pub_appendable_normal_flow() {
     ad.append(appended_data);
     assert_eq!(Data::PubAppendable(ad),
                client.get(data.identifier(), &mut nodes));
+}
+
+#[test]
+fn appendable_data_operations_with_churn_with_cache() {
+    appendable_data_operations_with_churn(true);
+}
+
+#[test]
+fn appendable_data_operations_with_churn_without_cache() {
+    appendable_data_operations_with_churn(false);
+}
+
+fn appendable_data_operations_with_churn(use_cache: bool) {
+    let network = Network::new(None);
+    let node_count = TEST_NET_SIZE;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, use_cache);
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+    let full_id = client.full_id().clone();
+    let mut rng = network.new_rng();
+    let mut ad = test_utils::random_pub_appendable_data(&full_id, &mut rng);
+    let (pub_key, secret_key) = sign::gen_keypair();
+    let data = Data::PubAppendable(ad.clone());
+    let _ = client.put_and_verify(data.clone(), &mut nodes);
+    assert_eq!(data, client.get(data.identifier(), &mut nodes));
+    let mut event_count = 0;
+
+    for i in 0..10 {
+        trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
+        let pointer = DataIdentifier::Structured(rng.gen(), 12345);
+        let appended_data = unwrap_result!(AppendedData::new(pointer, pub_key, &secret_key));
+        let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
+        client.append(wrapper);
+
+        if nodes.len() <= GROUP_SIZE + 2 || Range::new(0, 4).ind_sample(&mut rng) < 3 {
+            let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
+            test_node::add_node(&network, &mut nodes, index, use_cache);
+            trace!("Adding node {:?} with bootstrap node {}.",
+                   nodes[index].name(),
+                   index);
+        } else {
+            let number = Range::new(3, 4).ind_sample(&mut rng);
+            let mut removed_nodes = Vec::new();
+            for _ in 0..number {
+                let node_range = Range::new(1, nodes.len());
+                let node_index = node_range.ind_sample(&mut rng);
+                removed_nodes.push(nodes[node_index].name());
+                test_node::drop_node(&mut nodes, node_index);
+            }
+            trace!("Removing {} node(s). {:?}", number, removed_nodes);
+        }
+        event_count += poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
+
+        for node in &mut nodes {
+            node.clear_state();
+        }
+        ad.append(appended_data);
+        assert_eq!(Data::PubAppendable(ad.clone()),
+                   client.get(data.identifier(), &mut nodes));
+        trace!("Processed {} events.", event_count);
+    }
+}
+
+#[test]
+fn appendable_data_parallel_append() {
+    let network = Network::new(None);
+    let mut rng = network.new_rng();
+    let node_count = TEST_NET_SIZE;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+    let mut clients: Vec<_> = (0..2)
+        .map(|_| {
+            let endpoint = unwrap_option!(rng.choose(&nodes), "no nodes found").endpoint();
+            let config = mock_crust::Config::with_contacts(&[endpoint]);
+            TestClient::new(&network, Some(config.clone()))
+        })
+        .collect();
+    for client in &mut clients {
+        client.ensure_connected(&mut nodes);
+        client.create_account(&mut nodes);
+    }
+
+    let full_id = clients[0].full_id().clone();
+    let mut ad = test_utils::random_pub_appendable_data(&full_id, &mut rng);
+    let (pub_key, secret_key) = sign::gen_keypair();
+    let data = Data::PubAppendable(ad.clone());
+    let _ = clients[0].put_and_verify(data.clone(), &mut nodes);
+    assert_eq!(data, clients[0].get(data.identifier(), &mut nodes));
+
+    let mut event_count = 0;
+    let mut successes: usize = 0;
+
+    for i in 0..5 {
+        trace!("Iteration {}", i + 1);
+        let new_data: Vec<AppendedData> = clients.iter_mut()
+            .map(|client| {
+                let pointer = DataIdentifier::Structured(rng.gen(), 12345);
+                let appended_data = unwrap_result!(AppendedData::new(pointer, pub_key, &secret_key));
+                let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
+                client.append(wrapper);
+                appended_data
+            })
+            .collect();
+
+        event_count += poll::poll_and_resend_unacknowledged_parallel(&mut nodes, &mut clients);
+        for node in &mut nodes {
+            node.clear_state();
+        }
+        trace!("Processed {} events.", event_count);
+
+        'client_loop: for (client, data) in clients.iter_mut().zip(new_data) {
+            while let Ok(event) = client.try_recv() {
+                match event {
+                    Event::Response { response: Response::AppendSuccess(..), .. } => {
+                        trace!("Client {:?} received AppendSuccess.", client.name());
+                        ad.append(data);
+                        successes += 1;   
+                        continue 'client_loop;
+                    }
+                    Event::Response { response: Response::AppendFailure { .. }, .. } => {
+                        trace!("Client {:?} received AppendFailure.", client.name());
+                        continue 'client_loop;
+                    }
+                    _ => (),
+                }
+            }
+            trace!("No response received for client {:?} in iteration {:?}.",
+                   client.name(), i + 1);
+        }
+    }
+
+    assert_eq!(Data::PubAppendable(ad.clone()), clients[0].get(data.identifier(), &mut nodes));
+    // It could be both clients failed, both succeeded, or one succeed the other fail.
+    assert!(successes > 2, "Low success rate.");
 }
 
 #[test]
