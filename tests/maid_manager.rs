@@ -24,6 +24,7 @@ use rand::distributions::{IndependentSample, Range};
 use routing::{Data, GROUP_SIZE, ImmutableData, XorName};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Network};
+use rust_sodium::crypto::box_;
 use safe_vault::Config;
 use safe_vault::mock_crust_detail::{self, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
@@ -54,6 +55,44 @@ fn handle_put_without_account() {
             "put_count {} found with {} nodes",
             count,
             node_count);
+}
+
+#[test]
+fn put_oversized_data() {
+    let network = Network::new(None);
+    let node_count = TEST_NET_SIZE;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+    let mut rng = network.new_rng();
+
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    match client.put_and_verify(Data::Immutable(test_utils::random_immutable_data(1048576, &mut rng)), &mut nodes) {
+        Err(Some(error)) => assert_eq!(error, MutationError::DataTooLarge),
+        unexpected => panic!("Got unexpected response: {:?}", unexpected),
+    }
+
+    let sd = Data::Structured(test_utils::random_structured_data_with_size(10000, client.full_id(), 102400, &mut rng));
+    match client.put_and_verify(sd, &mut nodes) {
+        Err(Some(error)) => assert_eq!(error, MutationError::DataTooLarge),
+        unexpected => panic!("Got unexpected response: {:?}", unexpected),
+    }
+
+    let pub_ad = Data::PubAppendable(test_utils::random_pub_appendable_data_with_size(client.full_id(), 102400, &mut rng));
+    match client.put_and_verify(pub_ad, &mut nodes) {
+        Err(Some(error)) => assert_eq!(error, MutationError::DataTooLarge),
+        unexpected => panic!("Got unexpected response: {:?}", unexpected),
+    }
+
+    let (pub_encrypt_key, _) = box_::gen_keypair();
+    let priv_ad = Data::PrivAppendable(test_utils::random_priv_appendable_data_with_size(client.full_id(), pub_encrypt_key, 102400, &mut rng));
+    match client.put_and_verify(priv_ad, &mut nodes) {
+        Err(Some(error)) => assert_eq!(error, MutationError::DataTooLarge),
+        unexpected => panic!("Got unexpected response: {:?}", unexpected),
+    }
+    // After serialisation, the len of SD, pub_ad and priv_ad is : 102604, 128216, 128256
 }
 
 #[test]
