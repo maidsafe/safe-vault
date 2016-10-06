@@ -163,7 +163,7 @@ impl Vault {
     /// Vault node name
     #[cfg(feature = "use-mock-crust")]
     pub fn name(&self) -> XorName {
-        unwrap_result!(self._routing_node.name())
+        unwrap!(self._routing_node.name())
     }
 
     /// Vault routing_table

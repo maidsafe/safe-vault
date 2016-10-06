@@ -72,11 +72,11 @@ pub fn pub_appendable_data_version_up<R: Rng>(full_id: &FullId,
         new_ad.append(data.clone());
     }
     let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-    let appended_data = unwrap_result!(AppendedData::new(pointer,
-                                                         full_id.public_id()
-                                                             .signing_public_key()
-                                                             .clone(),
-                                                         full_id.signing_private_key()));
+    let appended_data = unwrap!(AppendedData::new(pointer,
+                                                  full_id.public_id()
+                                                      .signing_public_key()
+                                                      .clone(),
+                                                  full_id.signing_private_key()));
     new_ad.append(appended_data);
     let _ = new_ad.add_signature(full_id.signing_private_key());
     new_ad

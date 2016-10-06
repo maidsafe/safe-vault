@@ -50,6 +50,8 @@ extern crate config_file_handler;
 extern crate docopt;
 extern crate rustc_serialize;
 extern crate safe_vault;
+#[macro_use]
+extern crate unwrap;
 
 use docopt::Docopt;
 use safe_vault::Vault;
@@ -95,7 +97,7 @@ pub fn main() {
 
     let mut message = String::from("Running ");
     message.push_str(&name_and_version);
-    let underline = unwrap_result!(String::from_utf8(vec!['=' as u8; message.len()]));
+    let underline = unwrap!(String::from_utf8(vec!['=' as u8; message.len()]));
     info!("\n\n{}\n{}", message, underline);
 
     loop {

@@ -118,7 +118,7 @@ fn structured_data_parallel_posts() {
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
     let mut clients: Vec<_> = (0..3)
         .map(|_| {
-            let endpoint = unwrap_option!(rng.choose(&nodes), "no nodes found").endpoint();
+            let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
             let config = mock_crust::Config::with_contacts(&[endpoint]);
             TestClient::new(&network, Some(config.clone()))
         })
@@ -137,7 +137,7 @@ fn structured_data_parallel_posts() {
         trace!("Putting data {:?} with name {:?}.",
                data.identifier(),
                data.name());
-        unwrap_result!(clients[0].put_and_verify(data.clone(), &mut nodes));
+        unwrap!(clients[0].put_and_verify(data.clone(), &mut nodes));
         all_data.push(data);
     }
 
@@ -149,13 +149,13 @@ fn structured_data_parallel_posts() {
         let new_data: Vec<Data> = clients.iter_mut()
             .map(|client| {
                 let data = Data::Structured(if let Data::Structured(sd) = all_data[j].clone() {
-                    unwrap_result!(StructuredData::new(sd.get_type_tag(),
-                                                       *sd.name(),
-                                                       sd.get_version() + 1,
-                                                       rng.gen_iter().take(10).collect(),
-                                                       sd.get_owner_keys().clone(),
-                                                       vec![],
-                                                       Some(&key)))
+                    unwrap!(StructuredData::new(sd.get_type_tag(),
+                                                *sd.name(),
+                                                sd.get_version() + 1,
+                                                rng.gen_iter().take(10).collect(),
+                                                sd.get_owner_keys().clone(),
+                                                vec![],
+                                                Some(&key)))
                 } else {
                     panic!("Non-structured data found.");
                 });
@@ -254,14 +254,14 @@ fn structured_data_operations_with_churn() {
                                sd.name());
                         continue;
                     }
-                    unwrap_result!(StructuredData::new(sd.get_type_tag(),
-                                                       *sd.name(),
-                                                       sd.get_version() + 1,
-                                                       rng.gen_iter().take(10).collect(),
-                                                       sd.get_owner_keys().clone(),
-                                                       vec![],
-                                                       Some(client.full_id()
-                                                           .signing_private_key())))
+                    unwrap!(StructuredData::new(sd.get_type_tag(),
+                                                *sd.name(),
+                                                sd.get_version() + 1,
+                                                rng.gen_iter().take(10).collect(),
+                                                sd.get_owner_keys().clone(),
+                                                vec![],
+                                                Some(client.full_id()
+                                                    .signing_private_key())))
                 } else {
                     panic!("Non-structured data found.");
                 });
@@ -352,12 +352,10 @@ fn handle_priv_appendable_normal_flow() {
     let _ = client.put_and_verify(data.clone(), &mut nodes);
     assert_eq!(data, client.get(data.identifier(), &mut nodes));
     let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-    let appended_data = unwrap_result!(AppendedData::new(pointer, pub_key, &secret_key));
-    let pad = unwrap_result!(PrivAppendedData::new(&appended_data, &pub_encrypt_key));
-    let wrapper = unwrap_result!(AppendWrapper::new_priv(*data.name(),
-                                                         pad.clone(),
-                                                         (&pub_key, &secret_key),
-                                                         0));
+    let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
+    let pad = unwrap!(PrivAppendedData::new(&appended_data, &pub_encrypt_key));
+    let wrapper =
+        unwrap!(AppendWrapper::new_priv(*data.name(), pad.clone(), (&pub_key, &secret_key), 0));
     let _ = client.append_and_verify(wrapper, &mut nodes);
     ad.append(pad, &pub_key);
     assert_eq!(Data::PrivAppendable(ad),
@@ -382,7 +380,7 @@ fn handle_pub_appendable_normal_flow() {
     let _ = client.put_and_verify(data.clone(), &mut nodes);
     assert_eq!(data, client.get(data.identifier(), &mut nodes));
     let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-    let appended_data = unwrap_result!(AppendedData::new(pointer, pub_key, &secret_key));
+    let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
     let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
     let _ = client.append_and_verify(wrapper, &mut nodes);
     ad.append(appended_data);
@@ -414,10 +412,9 @@ fn appendable_data_operations_with_churn() {
 
         if rng.gen() {
             let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-            let appended_data = unwrap_result!(AppendedData::new(pointer, pub_key, &secret_key));
-            let wrapper = AppendWrapper::new_pub(*data.name(),
-                                                 appended_data.clone(),
-                                                 ad.get_version());
+            let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
+            let wrapper =
+                AppendWrapper::new_pub(*data.name(), appended_data.clone(), ad.get_version());
             client.append(wrapper);
             ad.append(appended_data);
         } else {
@@ -464,7 +461,7 @@ fn appendable_data_parallel_append() {
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
     let mut clients: Vec<_> = (0..2)
         .map(|_| {
-            let endpoint = unwrap_option!(rng.choose(&nodes), "no nodes found").endpoint();
+            let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
             let config = mock_crust::Config::with_contacts(&[endpoint]);
             TestClient::new(&network, Some(config.clone()))
         })
@@ -489,7 +486,7 @@ fn appendable_data_parallel_append() {
         let new_data: Vec<AppendedData> = clients.iter_mut()
             .map(|client| {
                 let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-                let appended_data = unwrap_result!(AppendedData::new(pointer, pub_key, &secret_key));
+                let appended_data = unwrap!(AppendedData::new(pointer, pub_key, &secret_key));
                 let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
                 client.append(wrapper);
                 appended_data
@@ -519,11 +516,13 @@ fn appendable_data_parallel_append() {
                 }
             }
             trace!("No response received for client {:?} in iteration {:?}.",
-                   client.name(), i + 1);
+                   client.name(),
+                   i + 1);
         }
     }
 
-    assert_eq!(Data::PubAppendable(ad.clone()), clients[0].get(data.identifier(), &mut nodes));
+    assert_eq!(Data::PubAppendable(ad.clone()),
+               clients[0].get(data.identifier(), &mut nodes));
     // It could be both clients failed, both succeeded, or one succeed the other fail.
     assert!(successes > 2, "Low success rate.");
 }
@@ -536,7 +535,7 @@ fn appendable_data_parallel_post() {
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
     let mut clients: Vec<_> = (0..2)
         .map(|_| {
-            let endpoint = unwrap_option!(rng.choose(&nodes), "no nodes found").endpoint();
+            let endpoint = unwrap!(rng.choose(&nodes), "no nodes found").endpoint();
             let config = mock_crust::Config::with_contacts(&[endpoint]);
             TestClient::new(&network, Some(config.clone()))
         })
@@ -599,11 +598,13 @@ fn appendable_data_parallel_post() {
                 }
             }
             trace!("No response received for client {:?} in iteration {:?}.",
-                   client.name(), i + 1);
+                   client.name(),
+                   i + 1);
         }
     }
 
-    assert_eq!(Data::PubAppendable(ad.clone()), clients[0].get(data.identifier(), &mut nodes));
+    assert_eq!(Data::PubAppendable(ad.clone()),
+               clients[0].get(data.identifier(), &mut nodes));
     // It could be both clients failed or one succeed the other fail.
     assert!(successes > 2, "Low success rate.");
     assert!(failures >= 5, "Low failure rate.");

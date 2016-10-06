@@ -48,7 +48,7 @@ impl TestClient {
 
         let handle = network.new_service_handle(config, None);
         let client = mock_crust::make_current(&handle, || {
-            unwrap_result!(routing::Client::new(routing_tx, Some(full_id.clone())))
+            unwrap!(routing::Client::new(routing_tx, Some(full_id.clone())))
         });
 
         TestClient {
@@ -101,9 +101,9 @@ impl TestClient {
     /// create an account and store it
     pub fn create_account(&mut self, nodes: &mut [TestNode]) {
         let account =
-            unwrap_result!(StructuredData::new(0, self.rng.gen(), 0, vec![], vec![], vec![], None));
+            unwrap!(StructuredData::new(0, self.rng.gen(), 0, vec![], vec![], vec![], None));
 
-        unwrap_result!(self.put_and_verify(Data::Structured(account), nodes));
+        unwrap!(self.put_and_verify(Data::Structured(account), nodes));
     }
 
     fn flush(&mut self) {
@@ -125,7 +125,7 @@ impl TestClient {
         let request_message_id = MessageId::new();
         self.flush();
 
-        unwrap_result!(self.routing_client.send_get_request(dst, request, request_message_id));
+        unwrap!(self.routing_client.send_get_request(dst, request, request_message_id));
         let _ = poll::nodes_and_client(nodes, self);
 
         loop {
@@ -154,7 +154,7 @@ impl TestClient {
         let dst = Authority::NaeManager(*request.name());
         let request_message_id = MessageId::new();
         self.flush();
-        unwrap_result!(self.routing_client
+        unwrap!(self.routing_client
             .send_get_request(dst.clone(), request, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the get_response",
@@ -176,7 +176,7 @@ impl TestClient {
                     assert_eq!(request_message_id, id);
                     assert_eq!(src, dst);
                     let parsed_error: GetError =
-                        unwrap_result!(serialisation::deserialise(&external_error_indicator));
+                        unwrap!(serialisation::deserialise(&external_error_indicator));
                     return Err(Some(parsed_error));
                 }
                 Ok(response) => panic!("Unexpected Get response : {:?}", response),
@@ -192,7 +192,7 @@ impl TestClient {
                          -> Result<DataIdentifier, Option<MutationError>> {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap_result!(self.routing_client
+        unwrap!(self.routing_client
             .send_post_request(dst.clone(), data, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the post_response",
@@ -214,7 +214,7 @@ impl TestClient {
                     assert_eq!(request_message_id, id);
                     assert_eq!(src, dst);
                     let parsed_error: MutationError =
-                        unwrap_result!(serialisation::deserialise(&external_error_indicator));
+                        unwrap!(serialisation::deserialise(&external_error_indicator));
                     return Err(Some(parsed_error));
                 }
                 Ok(response) => panic!("Unexpected Post response : {:?}", response),
@@ -230,7 +230,7 @@ impl TestClient {
                            -> Result<DataIdentifier, Option<MutationError>> {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap_result!(self.routing_client
+        unwrap!(self.routing_client
             .send_delete_request(dst.clone(), data, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the delete_response",
@@ -252,7 +252,7 @@ impl TestClient {
                     assert_eq!(request_message_id, id);
                     assert_eq!(src, dst);
                     let parsed_error: MutationError =
-                        unwrap_result!(serialisation::deserialise(&external_error_indicator));
+                        unwrap!(serialisation::deserialise(&external_error_indicator));
                     return Err(Some(parsed_error));
                 }
                 Ok(response) => panic!("Unexpected Delete response : {:?}", response),
@@ -268,7 +268,7 @@ impl TestClient {
         let request_message_id = MessageId::new();
         self.flush();
         let dst = Authority::ClientManager(*self.public_id.name());
-        unwrap_result!(self.routing_client
+        unwrap!(self.routing_client
             .send_get_account_info_request(dst, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the get_account_info_response",
@@ -288,7 +288,7 @@ impl TestClient {
                 }) => {
                     assert_eq!(request_message_id, id);
                     let parsed_error: GetError =
-                        unwrap_result!(serialisation::deserialise(&external_error_indicator));
+                        unwrap!(serialisation::deserialise(&external_error_indicator));
                     return Err(Some(parsed_error));
                 }
                 Ok(response) => panic!("Unexpected GetAccountInfo response : {:?}", response),
@@ -301,21 +301,21 @@ impl TestClient {
     pub fn post(&mut self, data: Data) {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap_result!(self.routing_client.send_post_request(dst, data, request_message_id));
+        unwrap!(self.routing_client.send_post_request(dst, data, request_message_id));
     }
 
     /// Put request
     pub fn put(&mut self, data: Data) {
         let dst = Authority::ClientManager(*self.public_id.name());
         let request_message_id = MessageId::new();
-        unwrap_result!(self.routing_client.send_put_request(dst, data, request_message_id));
+        unwrap!(self.routing_client.send_put_request(dst, data, request_message_id));
     }
 
     /// Delete request
     pub fn delete(&mut self, data: Data) {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
-        unwrap_result!(self.routing_client.send_delete_request(dst, data, request_message_id));
+        unwrap!(self.routing_client.send_delete_request(dst, data, request_message_id));
     }
 
     /// Put data and read from mock network
@@ -325,7 +325,7 @@ impl TestClient {
                           -> Result<(), Option<MutationError>> {
         let dst = Authority::ClientManager(*self.public_id.name());
         let request_message_id = MessageId::new();
-        unwrap_result!(self.routing_client.send_put_request(dst, data.clone(), request_message_id));
+        unwrap!(self.routing_client.send_put_request(dst, data.clone(), request_message_id));
         let _ = poll::poll_and_resend_unacknowledged(nodes, self);
 
         match self.routing_rx.try_recv() {
@@ -340,7 +340,7 @@ impl TestClient {
                 }, .. }) => {
                 assert_eq!(request_message_id, response_id);
                 assert!(data.identifier() == data_id);
-                let parsed_error = unwrap_result!(serialisation::deserialise(&response_error));
+                let parsed_error = unwrap!(serialisation::deserialise(&response_error));
                 Err(Some(parsed_error))
             }
             Ok(response) => panic!("Unexpected Put response : {:?}", response),
@@ -365,7 +365,7 @@ impl TestClient {
         let request_data_id = wrapper.identifier();
         let dst = Authority::NaeManager(*request_data_id.name());
         let request_message_id = MessageId::new();
-        unwrap_result!(self.routing_client.send_append_request(dst, wrapper, request_message_id));
+        unwrap!(self.routing_client.send_append_request(dst, wrapper, request_message_id));
         let _ = poll::poll_and_resend_unacknowledged(nodes, self);
 
         match self.routing_rx.try_recv() {
@@ -383,7 +383,7 @@ impl TestClient {
                 }, .. }) => {
                 assert_eq!(request_message_id, response_id);
                 assert_eq!(request_data_id, data_id);
-                let parsed_error = unwrap_result!(serialisation::deserialise(&response_error));
+                let parsed_error = unwrap!(serialisation::deserialise(&response_error));
                 Err(Some(parsed_error))
             }
             Ok(response) => panic!("Unexpected Append response : {:?}", response),
