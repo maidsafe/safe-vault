@@ -73,7 +73,7 @@ fn handle_put_with_account() {
     let default_account_size = 100;
     let mut expected_data_stored = 1;
     let mut expected_space_available = default_account_size - expected_data_stored;
-    assert_eq!(unwrap_result!(client.get_account_info_response(&mut nodes)),
+    assert_eq!(unwrap!(client.get_account_info_response(&mut nodes)),
                (expected_data_stored, expected_space_available));
 
     let immutable_data = ImmutableData::new(rng.gen_iter().take(1024).collect());
@@ -92,7 +92,7 @@ fn handle_put_with_account() {
     mock_crust_detail::check_data(stored_immutable, &nodes);
     expected_data_stored += 1;
     expected_space_available = default_account_size - expected_data_stored;
-    assert_eq!(unwrap_result!(client.get_account_info_response(&mut nodes)),
+    assert_eq!(unwrap!(client.get_account_info_response(&mut nodes)),
                (expected_data_stored, expected_space_available));
 }
 

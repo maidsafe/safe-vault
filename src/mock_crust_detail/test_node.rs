@@ -70,7 +70,7 @@ impl TestNode {
             }
         };
         let vault = mock_crust::make_current(&handle, || {
-            unwrap_result!(Vault::new_with_config(first_node, use_cache, vault_config))
+            unwrap!(Vault::new_with_config(first_node, use_cache, vault_config))
         });
         TestNode {
             handle: handle,

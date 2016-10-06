@@ -42,6 +42,8 @@ extern crate rand;
 extern crate routing;
 extern crate rust_sodium;
 extern crate safe_vault;
+#[macro_use]
+extern crate unwrap;
 
 mod network;
 mod maid_manager;
