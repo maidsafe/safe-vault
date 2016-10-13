@@ -476,6 +476,16 @@ impl DataManager {
                        message_id: MessageId)
                        -> Result<(), InternalError> {
         let data_id = new_data.identifier();
+
+        if !new_data.validate_size() {
+            let error = MutationError::DataTooLarge;
+            let post_error = try!(serialisation::serialise(&error));
+            trace!("DM sending post_failure for data {:?}, data exceeds size limit.",
+                   data_id);
+            return Ok(try!(self.routing_node
+                .send_post_failure(dst, src, data_id, post_error, message_id)));
+        }
+
         let update_result = match (new_data, self.chunk_store.get(&data_id)) {
             (_, Err(error)) => {
                 trace!("DM sending post_failure for: {:?} with {:?} - {:?}",
@@ -598,6 +608,14 @@ impl DataManager {
         };
 
         if let Some(data) = append_result {
+            if !data.validate_size() {
+                let error = MutationError::DataTooLarge;
+                let append_error = try!(serialisation::serialise(&error));
+                trace!("DM sending append_failure for data {:?}, data exceeds size limit.",
+                       data_id);
+                return Ok(try!(self.routing_node
+                    .send_post_failure(dst, src, data_id, append_error, message_id)));
+            }
             self.update_pending_writes(data, PendingWriteType::Append, src, dst, message_id)
         } else {
             trace!("DM sending append_failure for: {:?} with {:?}",
@@ -605,7 +623,7 @@ impl DataManager {
                    message_id);
             let append_error = try!(serialisation::serialise(&MutationError::InvalidSuccessor));
             Ok(try!(self.routing_node
-                .send_append_failure(dst.clone(), src, data_id, append_error, message_id)))
+                .send_append_failure(dst, src, data_id, append_error, message_id)))
         }
     }
 

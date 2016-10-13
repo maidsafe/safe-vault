@@ -33,10 +33,19 @@ pub fn random_structured_data<R: Rng>(type_tag: u64,
                                       full_id: &FullId,
                                       rng: &mut R)
                                       -> StructuredData {
+    random_structured_data_with_size(type_tag, full_id, 10, rng)
+}
+
+/// Creates random structured data with size - tests only
+pub fn random_structured_data_with_size<R: Rng>(type_tag: u64,
+                                                full_id: &FullId,
+                                                size: usize,
+                                                rng: &mut R)
+                                                -> StructuredData {
     StructuredData::new(type_tag,
                         rng.gen(),
                         0,
-                        rng.gen_iter().take(10).collect(),
+                        rng.gen_iter().take(size).collect(),
                         vec![full_id.public_id().signing_public_key().clone()],
                         vec![],
                         Some(full_id.signing_private_key()))
@@ -45,9 +54,20 @@ pub fn random_structured_data<R: Rng>(type_tag: u64,
 
 /// Creates random public appendable data - tests only
 pub fn random_pub_appendable_data<R: Rng>(full_id: &FullId, rng: &mut R) -> PubAppendableData {
+    random_pub_appendable_data_with_size(full_id, 0, rng)
+}
+
+/// Creates random public appendable data with size - tests only
+pub fn random_pub_appendable_data_with_size<R: Rng>(full_id: &FullId, size: usize, rng: &mut R) -> PubAppendableData {
+    let mut current_owner_keys = vec![full_id.public_id().signing_public_key().clone()];
+    if size > 0 {
+        for _ in 0..size / 32 {
+            current_owner_keys.push(full_id.public_id().signing_public_key().clone());
+        }
+    }
     PubAppendableData::new(rng.gen(),
                            0,
-                           vec![full_id.public_id().signing_public_key().clone()],
+                           current_owner_keys,
                            vec![],
                            BTreeSet::new(),
                            Filter::black_list(None),
@@ -87,9 +107,24 @@ pub fn random_priv_appendable_data<R: Rng>(full_id: &FullId,
                                            encrypt_key: box_::PublicKey,
                                            rng: &mut R)
                                            -> PrivAppendableData {
+    random_priv_appendable_data_with_size(full_id, encrypt_key, 0, rng)
+}
+
+/// Creates random private appendable data with size - tests only
+pub fn random_priv_appendable_data_with_size<R: Rng>(full_id: &FullId,
+                                                     encrypt_key: box_::PublicKey,
+                                                     size: usize,
+                                                     rng: &mut R)
+                                                     -> PrivAppendableData {
+    let mut current_owner_keys = vec![full_id.public_id().signing_public_key().clone()];
+    if size > 0 {
+        for _ in 0..size / 32 {
+            current_owner_keys.push(full_id.public_id().signing_public_key().clone());
+        }
+    }
     PrivAppendableData::new(rng.gen(),
                             0,
-                            vec![full_id.public_id().signing_public_key().clone()],
+                            current_owner_keys,
                             vec![],
                             BTreeSet::new(),
                             Filter::black_list(None),

@@ -454,6 +454,72 @@ fn appendable_data_operations_with_churn() {
 }
 
 #[test]
+fn append_oversized_appendable_data() {
+    let network = Network::new(None);
+    let mut rng = network.new_rng();
+    let node_count = TEST_NET_SIZE;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+    let full_id = client.full_id().clone();
+
+    let ad = test_utils::random_pub_appendable_data_with_size(&full_id, 76560, &mut rng);
+    let (pub_key, secret_key) = sign::gen_keypair();
+    let data = Data::PubAppendable(ad);
+    let _ = client.put_and_verify(data.clone(), &mut nodes);
+    assert_eq!(data, client.get(data.identifier(), &mut nodes));
+
+    let pointer = DataIdentifier::Structured(rng.gen(), 12345);
+    let appended_data = unwrap_result!(AppendedData::new(pointer, pub_key, &secret_key));
+    let wrapper = AppendWrapper::new_pub(*data.name(), appended_data.clone(), 0);
+    client.append(wrapper);
+
+    while let Ok(event) = client.try_recv() {
+        match event {
+            Event::Response { response: Response::AppendSuccess(..), .. } => {
+                panic!("reveived unexpected append success");
+            }
+            Event::Response { response: Response::AppendFailure { .. }, .. } => (),
+            _ => panic!("reveived unexpected response"),
+        }
+    }
+}
+
+#[test]
+fn post_oversized_appendable_data() {
+    let network = Network::new(None);
+    let mut rng = network.new_rng();
+    let node_count = TEST_NET_SIZE;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+    let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+    let full_id = client.full_id().clone();
+
+    let ad = test_utils::random_pub_appendable_data_with_size(&full_id, 76560, &mut rng);
+    let data = Data::PubAppendable(ad.clone());
+    let _ = client.put_and_verify(data.clone(), &mut nodes);
+    assert_eq!(data, client.get(data.identifier(), &mut nodes));
+
+    let new_data = Data::PubAppendable(test_utils::pub_appendable_data_version_up(&full_id, &ad, &mut rng));
+    client.post(new_data);
+    while let Ok(event) = client.try_recv() {
+        match event {
+            Event::Response { response: Response::PostSuccess(..), .. } => {
+                panic!("reveived unexpected post success");
+            }
+            Event::Response { response: Response::PostFailure { .. }, .. } => (),
+            _ => panic!("reveived unexpected response"),
+        }
+    }
+}
+
+#[test]
 fn appendable_data_parallel_append() {
     let network = Network::new(None);
     let mut rng = network.new_rng();
@@ -766,6 +832,24 @@ fn handle_post_error_flow() {
         .expect("Cannot create structured data for test");
     match client.post_response(Data::Structured(new_sd), &mut nodes) {
         Ok(data_id) => assert_eq!(data_id, sd.identifier()),
+        unexpected => panic!("Got unexpected response: {:?}", unexpected),
+    }
+
+    // Posting with oversized data
+    let oversized_sd = StructuredData::new(100000,
+                                           *sd.name(),
+                                           2,
+                                           rng.gen_iter().take(102400).collect(),
+                                           vec![new_full_id.public_id()
+                                                    .signing_public_key()
+                                                    .clone()],
+                                           vec![new_full_id.public_id()
+                                                    .signing_public_key()
+                                                    .clone()],
+                                           Some(new_full_id.signing_private_key()))
+        .expect("Cannot create structured data for test");
+    match client.post_response(Data::Structured(oversized_sd), &mut nodes) {
+        Err(Some(error)) => assert_eq!(error, MutationError::DataTooLarge),
         unexpected => panic!("Got unexpected response: {:?}", unexpected),
     }
 }

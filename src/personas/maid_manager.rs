@@ -97,6 +97,14 @@ impl MaidManager {
                       data: Data,
                       msg_id: MessageId)
                       -> Result<(), InternalError> {
+        if !data.validate_size() {
+            return self.reply_with_put_failure(src,
+                                               dst,
+                                               data.identifier(),
+                                               msg_id,
+                                               &MutationError::DataTooLarge);
+        }
+
         match data {
             Data::Immutable(immut_data) => {
                 self.handle_put_immutable_data(src, dst, immut_data, msg_id)
