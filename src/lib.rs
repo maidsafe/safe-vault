@@ -236,6 +236,9 @@ extern crate rustc_serialize;
 extern crate rust_sodium;
 #[cfg(test)]
 extern crate tempdir;
+#[cfg(any(test, feature = "use-mock-crust"))]
+#[macro_use]
+extern crate unwrap;
 
 mod cache;
 mod chunk_store;
