@@ -23,6 +23,15 @@ use routing::{AppendedData, DataIdentifier, Filter, FullId, ImmutableData, PrivA
 use rust_sodium::crypto::box_;
 use std::collections::BTreeSet;
 
+/// Toggle iterations for quick test environment variable
+pub fn iterations() -> usize {
+    use std::env;
+    match env::var("QUICK_TEST") {
+        Ok(_) => 4,
+        Err(_) => 10,
+    }
+}
+
 /// Creates random immutable data - tests only
 pub fn random_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableData {
     ImmutableData::new(rng.gen_iter().take(size).collect())

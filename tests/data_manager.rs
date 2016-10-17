@@ -62,7 +62,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
     let mut rng = network.new_rng();
     let mut event_count = 0;
 
-    for i in 0..10 {
+    for i in 0..test_utils::iterations() {
         trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
         for _ in 0..(cmp::min(DATA_PER_ITER, DATA_COUNT - all_data.len())) {
             let data = Data::Immutable(ImmutableData::new(rng.gen_iter().take(10).collect()));
@@ -143,7 +143,7 @@ fn structured_data_parallel_posts() {
 
     let key = clients[0].full_id().signing_private_key().clone();
     let mut successes: usize = 0;
-    for i in 0..30 {
+    for i in 0..test_utils::iterations() {
         trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
         let j = Range::new(0, all_data.len()).ind_sample(&mut rng);
         let new_data: Vec<Data> = clients.iter_mut()
@@ -229,7 +229,7 @@ fn structured_data_operations_with_churn() {
     let mut rng = network.new_rng();
     let mut event_count = 0;
 
-    for i in 0..10 {
+    for i in 0..test_utils::iterations() {
         trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
         let mut new_data = vec![];
         let mut mutated_data = HashSet::new();
@@ -407,7 +407,7 @@ fn appendable_data_operations_with_churn() {
     assert_eq!(data, client.get(data.identifier(), &mut nodes));
     let mut event_count = 0;
 
-    for i in 0..10 {
+    for i in 0..test_utils::iterations() {
         trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
 
         if rng.gen() {
@@ -481,7 +481,7 @@ fn appendable_data_parallel_append() {
     let mut event_count = 0;
     let mut successes: usize = 0;
 
-    for i in 0..5 {
+    for i in 0..test_utils::iterations() {
         trace!("Iteration {}", i + 1);
         let new_data: Vec<AppendedData> = clients.iter_mut()
             .map(|client| {
@@ -555,7 +555,8 @@ fn appendable_data_parallel_post() {
     let mut successes: usize = 0;
     let mut failures: usize = 0;
 
-    for i in 0..5 {
+    let iterations = test_utils::iterations();
+    for i in 0..iterations {
         trace!("Iteration {}", i + 1);
         let new_data: Vec<PubAppendableData> = clients.iter_mut()
             .map(|client| {
@@ -607,7 +608,7 @@ fn appendable_data_parallel_post() {
                clients[0].get(data.identifier(), &mut nodes));
     // It could be both clients failed or one succeed the other fail.
     assert!(successes > 2, "Low success rate.");
-    assert!(failures >= 5, "Low failure rate.");
+    assert!(failures >= iterations / 2, "Low failure rate.");
 }
 
 #[test]
@@ -624,7 +625,7 @@ fn handle_put_get_normal_flow() {
     let mut all_data: Vec<Data> = vec![];
     let mut rng = network.new_rng();
 
-    for i in 0..GROUP_SIZE {
+    for i in 0..test_utils::iterations() {
         let data = if i % 2 == 0 {
             Data::Structured(test_utils::random_structured_data(100000, &full_id, &mut rng))
         } else {
@@ -633,7 +634,7 @@ fn handle_put_get_normal_flow() {
         let _ = client.put_and_verify(data.clone(), &mut nodes);
         all_data.push(data);
     }
-    for i in 0..GROUP_SIZE {
+    for i in 0..test_utils::iterations() {
         let data = client.get(all_data[i].identifier(), &mut nodes);
         assert_eq!(data, all_data[i]);
     }

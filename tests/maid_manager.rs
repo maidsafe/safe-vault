@@ -158,7 +158,7 @@ fn maid_manager_account_adding_with_churn() {
     let full_id = client.full_id().clone();
     let mut event_count = 0;
 
-    for i in 0..10 {
+    for i in 0..test_utils::iterations() {
         for data in (0..4).map(|_| {
             Data::Structured(test_utils::random_structured_data(100000, &full_id, &mut rng))
         }) {
@@ -215,7 +215,7 @@ fn maid_manager_account_decrease_with_churn() {
     let chunks_per_iter = 4;
     let mut data_list = Vec::new();
 
-    for i in 0..10 {
+    for i in 0..test_utils::iterations() as u64 {
         trace!("Churning on {} nodes, iteration {}", nodes.len(), i);
         if nodes.len() <= GROUP_SIZE + 2 || rng.gen() {
             let index = Range::new(1, nodes.len()).ind_sample(&mut rng);

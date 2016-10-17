@@ -127,6 +127,7 @@ install:
   - ./ci/travis/install.sh
 
 script:
+  - export QUICK_TEST=true
   - ./ci/travis/script.sh
 
 after_success:
