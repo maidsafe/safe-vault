@@ -362,8 +362,7 @@ fn id_and_version_of(data: &Data) -> IdAndVersion {
         Data::Structured(ref sd) => sd.get_version(),
         Data::PubAppendable(ref ad) => ad.get_version(),
         Data::PrivAppendable(ref ad) => ad.get_version(),
-        Data::Immutable(_) |
-        Data::Plain(_) => 0,
+        Data::Immutable(_) => 0,
     })
 }
 
@@ -467,7 +466,6 @@ impl DataManager {
                     let _ = self.routing_node.send_put_success(dst, src, data_id, message_id);
                     return Ok(());
                 }
-                _ => unimplemented!(),
             }
         }
 
@@ -707,7 +705,6 @@ impl DataManager {
                     return Ok(()); // Immutable data is already there.
                 }
             }
-            DataIdentifier::Plain(..) => unreachable!("Unexpected data type."),
         }
 
         self.clean_chunk_store();
@@ -771,10 +768,6 @@ impl DataManager {
                             Ok(Data::PrivAppendable(ad)) => ad.get_version() <= *version,
                             Ok(_) => unreachable!(),
                         }
-                    }
-                    _ => {
-                        error!("Received unexpected refresh for {:?}.", data_id);
-                        continue;
                     }
                 };
                 if !data_needed {
@@ -1037,7 +1030,6 @@ impl DataManager {
                     }
                 }
             }
-            DataIdentifier::Plain(..) => unreachable!(),
         }
     }
 
@@ -1047,7 +1039,6 @@ impl DataManager {
             DataIdentifier::Structured(..) => self.structured_data_count += 1,
             DataIdentifier::PubAppendable(..) |
             DataIdentifier::PrivAppendable(..) => self.appendable_data_count += 1,
-            DataIdentifier::Plain(..) => unreachable!(),
         }
     }
 
@@ -1057,7 +1048,6 @@ impl DataManager {
             DataIdentifier::Structured(_, _) => self.structured_data_count -= 1,
             DataIdentifier::PubAppendable(..) |
             DataIdentifier::PrivAppendable(..) => self.appendable_data_count -= 1,
-            DataIdentifier::Plain(..) => unreachable!(),
         }
     }
 

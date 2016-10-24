@@ -120,13 +120,6 @@ impl MaidManager {
                 let client_name = utils::client_name(&src);
                 self.forward_put_request(src, dst, client_name, data, msg_id)
             }
-            _ => {
-                self.reply_with_put_failure(src,
-                                            dst,
-                                            data.identifier(),
-                                            msg_id,
-                                            &MutationError::InvalidOperation)
-            }
         }
     }
 
