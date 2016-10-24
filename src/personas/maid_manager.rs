@@ -169,10 +169,7 @@ impl MaidManager {
                         if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
                             trace!("MM sending delete refresh for account {}", src.name());
                             let _ = self.routing_node
-                                .send_refresh_request(dst.clone(),
-                                                      dst.clone(),
-                                                      serialised_refresh,
-                                                      msg_id);
+                                .send_refresh_request(dst, dst, serialised_refresh, msg_id);
                         }
                         MutationError::AccountExists
                     }
@@ -274,7 +271,7 @@ impl MaidManager {
         if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
             trace!("MM sending refresh for account {}", src.name());
             let _ = self.routing_node
-                .send_refresh_request(src.clone(), src.clone(), serialised_refresh, msg_id);
+                .send_refresh_request(src, src, serialised_refresh, msg_id);
         }
     }
 
@@ -340,7 +337,7 @@ impl MaidManager {
         }
         {
             // forwarding data_request to NAE Manager
-            let src = dst.clone();
+            let src = dst;
             let dst = Authority::NaeManager(*data.name());
             trace!("MM forwarding put request to {:?}", dst);
             let _ = self.routing_node.send_put_request(src, dst, data, msg_id);

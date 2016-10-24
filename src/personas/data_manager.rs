@@ -548,7 +548,7 @@ impl DataManager {
                        error);
                 let post_error = try!(serialisation::serialise(&MutationError::InvalidSuccessor));
                 return Ok(try!(self.routing_node
-                    .send_post_failure(dst.clone(), src, data_id, post_error, message_id)));
+                    .send_post_failure(dst, src, data_id, post_error, message_id)));
             }
         };
         self.update_pending_writes(data, PendingMutationType::Post, src, dst, message_id)
@@ -891,7 +891,7 @@ impl DataManager {
                     let (data_id, _) = data_idv;
                     let dst = Authority::ManagedNode(idle_holder);
                     let msg_id = MessageId::new();
-                    let _ = self.routing_node.send_get_request(src.clone(), dst, data_id, msg_id);
+                    let _ = self.routing_node.send_get_request(src, dst, data_id, msg_id);
                 }
             }
         }
