@@ -28,6 +28,7 @@ mod test {
     use safe_vault::mock_crust_detail::test_client::TestClient;
     use safe_vault::test_utils;
 
+    #[ignore]
     #[test]
     fn fill_network() {
         let network = Network::new(None);

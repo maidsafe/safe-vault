@@ -17,11 +17,9 @@
 
 
 use error::InternalError;
-use itertools::Itertools;
-use kademlia_routing_table::RoutingTable;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, Data, DataIdentifier, GROUP_SIZE, ImmutableData, MessageId,
-              StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
+use routing::{Authority, Data, DataIdentifier, ImmutableData, MessageId, StructuredData,
+              TYPE_TAG_SESSION_PACKET, XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -230,40 +228,35 @@ impl MaidManager {
         Ok(())
     }
 
-    pub fn handle_node_added(&mut self,
-                             node_name: &XorName,
-                             routing_table: &RoutingTable<XorName>) {
-        // Remove all accounts which we are no longer responsible for.
-        let not_close = |name: &&XorName| !routing_table.is_close(*name, GROUP_SIZE);
-        let accounts_to_delete = self.accounts.keys().filter(not_close).cloned().collect_vec();
-        // Remove all requests from the cache that we are no longer responsible for.
-        let msg_ids_to_delete = self.request_cache
-            .iter()
-            .filter(|&(_, &(ref src, _))| accounts_to_delete.contains(src.name()))
-            .map(|(msg_id, _)| *msg_id)
-            .collect_vec();
-        for msg_id in msg_ids_to_delete {
-            let _ = self.request_cache.remove(&msg_id);
-        }
-        if !accounts_to_delete.is_empty() {
-            info!("Stats - {} client accounts.",
-                  self.accounts.len() - accounts_to_delete.len());
-        }
-        for maid_name in accounts_to_delete {
-            trace!("No longer a MM for {}", maid_name);
-            let _ = self.accounts.remove(&maid_name);
-        }
-        // Send refresh messages for the remaining accounts.
-        for (maid_name, account) in &self.accounts {
-            self.send_refresh(maid_name, account, MessageId::from_added_node(*node_name));
-        }
-    }
+    // pub fn handle_group_split(&mut self, prefix: Prefix<XorName>) {
+    //     // Remove all accounts which we are no longer responsible for.
+    //     let not_close = |name: &&XorName| !prefix.matches(*name);
+    //     let accounts_to_delete = self.accounts.keys().filter(not_close).cloned().collect_vec();
+    //     // Remove all requests from the cache that we are no longer responsible for.
+    //     let msg_ids_to_delete = self.request_cache
+    //         .iter()
+    //         .filter(|&(_, &(ref src, _))| accounts_to_delete.contains(src.name()))
+    //         .map(|(msg_id, _)| *msg_id)
+    //         .collect_vec();
+    //     for msg_id in msg_ids_to_delete {
+    //         let _ = self.request_cache.remove(&msg_id);
+    //     }
+    //     if !accounts_to_delete.is_empty() {
+    //         info!("Stats - {} client accounts.",
+    //               self.accounts.len() - accounts_to_delete.len());
+    //     }
+    //     for maid_name in accounts_to_delete {
+    //         trace!("No longer a MM for {}", maid_name);
+    //         let _ = self.accounts.remove(&maid_name);
+    //     }
+    // }
 
-    pub fn handle_node_lost(&mut self, node_name: &XorName) {
-        for (maid_name, account) in &self.accounts {
-            self.send_refresh(maid_name, account, MessageId::from_lost_node(*node_name));
-        }
-    }
+    // pub fn handle_node_added(&mut self, node_name: &XorName) {
+    //     // Send refresh messages for the remaining accounts.
+    //     for (maid_name, account) in &self.accounts {
+    //         self.send_refresh(maid_name, account, MessageId::from_added_node(*node_name));
+    //     }
+    // }
 
     fn send_refresh(&self, maid_name: &XorName, account: &Account, msg_id: MessageId) {
         let src = Authority::ClientManager(*maid_name);

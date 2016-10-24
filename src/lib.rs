@@ -220,7 +220,6 @@ extern crate fs2;
 extern crate log;
 extern crate lru_time_cache;
 extern crate itertools;
-extern crate kademlia_routing_table;
 #[macro_use]
 extern crate maidsafe_utilities;
 extern crate config_file_handler;

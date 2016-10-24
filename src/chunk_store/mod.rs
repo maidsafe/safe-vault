@@ -163,6 +163,7 @@ impl<Key, Value> ChunkStore<Key, Value>
     }
 
     /// Lists all keys of currently-data stored.
+    #[allow(unused)] // TODO: remove after disjoint groups implementation
     pub fn keys(&self) -> Vec<Key> {
         fs::read_dir(&self.rootdir)
             .and_then(|dir_entries| {

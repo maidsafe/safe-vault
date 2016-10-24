@@ -9,6 +9,7 @@ environment:
 branches:
   only:
     - master
+    - dev
 
 clone_depth: 50
 skip_tags: true

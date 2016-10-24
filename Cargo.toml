@@ -18,12 +18,11 @@ docopt = "~0.6.86"
 fs2 = "~0.2.5"
 itertools = "~0.5.2"
 lru_time_cache = "~0.5.0"
-kademlia_routing_table = "~0.6.0"
 log = "~0.3.6"
 maidsafe_utilities = "~0.10.0"
 quick-error = "~1.1.0"
 rand = "~0.3.14"
-routing = { git = "https://github.com/maidsafe/routing.git", branch = "stable" }
+routing = { git = "https://github.com/maidsafe/routing.git", branch = "master" }
 rustc-serialize = "~0.3.19"
 rust_sodium = "~0.1.2"
 unwrap = "~1.1.0"

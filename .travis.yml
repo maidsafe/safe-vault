@@ -110,6 +110,7 @@ matrix:
 branches:
   only:
     - master
+    - dev
 
 cache:
   directories:

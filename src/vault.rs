@@ -19,13 +19,13 @@
 use cache::Cache;
 use config_handler::{self, Config};
 use error::InternalError;
-use kademlia_routing_table::RoutingTable;
 use personas::data_manager::DataManager;
 #[cfg(feature = "use-mock-crust")]
 use personas::data_manager::IdAndVersion;
 use personas::maid_manager::MaidManager;
-
-use routing::{Authority, Data, NodeBuilder, Request, Response, XorName};
+use routing::{Authority, Data, NodeBuilder, Request, Response};
+#[cfg(feature = "use-mock-crust")]
+use routing::XorName;
 use rust_sodium;
 use std::env;
 use std::path::Path;
@@ -166,24 +166,12 @@ impl Vault {
         unwrap!(self._routing_node.name())
     }
 
-    /// Vault routing_table
-    #[cfg(feature = "use-mock-crust")]
-    pub fn routing_table(&self) -> RoutingTable<XorName> {
-        self._routing_node.routing_table()
-    }
-
     fn process_event(&mut self, event: Event) -> Option<bool> {
         let mut ret = None;
 
         if let Err(error) = match event {
             Event::Request { request, src, dst } => self.on_request(request, src, dst),
             Event::Response { response, src, dst } => self.on_response(response, src, dst),
-            Event::NodeAdded(node_added, routing_table) => {
-                self.on_node_added(node_added, routing_table)
-            }
-            Event::NodeLost(node_lost, routing_table) => {
-                self.on_node_lost(node_lost, routing_table)
-            }
             Event::RestartRequired => {
                 warn!("Restarting Vault");
                 ret = Some(false);
@@ -193,6 +181,10 @@ impl Vault {
                 ret = Some(true);
                 Ok(())
             }
+            Event::NodeAdded(_, _) |
+            Event::NodeLost(_, _) |
+            Event::GroupSplit(_) |
+            Event::GroupMerge(_) => unimplemented!(),
             Event::Connected | Event::Tick => Ok(()),
         } {
             debug!("Failed to handle event: {:?}", error);
@@ -301,23 +293,5 @@ impl Vault {
             // ================== Invalid Response ==================
             (_, _, response) => Err(InternalError::UnknownResponseType(response)),
         }
-    }
-
-    fn on_node_added(&mut self,
-                     node_added: XorName,
-                     routing_table: RoutingTable<XorName>)
-                     -> Result<(), InternalError> {
-        self.maid_manager.handle_node_added(&node_added, &routing_table);
-        self.data_manager.handle_node_added(&node_added, &routing_table);
-        Ok(())
-    }
-
-    fn on_node_lost(&mut self,
-                    node_lost: XorName,
-                    routing_table: RoutingTable<XorName>)
-                    -> Result<(), InternalError> {
-        self.maid_manager.handle_node_lost(&node_lost);
-        self.data_manager.handle_node_lost(&node_lost, &routing_table);
-        Ok(())
     }
 }
