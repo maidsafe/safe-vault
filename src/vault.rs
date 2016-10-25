@@ -23,9 +23,7 @@ use personas::data_manager::DataManager;
 #[cfg(feature = "use-mock-crust")]
 use personas::data_manager::IdAndVersion;
 use personas::maid_manager::MaidManager;
-use routing::{Authority, Data, NodeBuilder, Request, Response};
-#[cfg(feature = "use-mock-crust")]
-use routing::XorName;
+use routing::{Authority, Data, NodeBuilder, Prefix, Request, Response, XorName};
 use rust_sodium;
 use std::env;
 use std::path::Path;
@@ -181,10 +179,18 @@ impl Vault {
                 ret = Some(true);
                 Ok(())
             }
-            Event::NodeAdded(_, _) |
-            Event::NodeLost(_, _) |
-            Event::GroupSplit(_) |
-            Event::GroupMerge(_) => unimplemented!(),
+            Event::NodeAdded(node_added) => {
+                self.on_node_added(node_added)
+            }
+            Event::NodeLost(node_lost) => {
+                self.on_node_lost(node_lost)
+            }
+            Event::GroupSplit(prefix) => {
+                self.on_group_split(prefix)
+            }
+            Event::GroupMerge(_prefix) => {
+                self.on_group_merge()
+            }
             Event::Connected | Event::Tick => Ok(()),
         } {
             debug!("Failed to handle event: {:?}", error);
@@ -293,5 +299,28 @@ impl Vault {
             // ================== Invalid Response ==================
             (_, _, response) => Err(InternalError::UnknownResponseType(response)),
         }
+    }
+
+    fn on_node_added(&mut self, node_added: XorName) -> Result<(), InternalError> {
+        self.maid_manager.handle_node_added(&node_added);
+        self.data_manager.handle_node_added(&node_added);
+        Ok(())
+    }
+
+    fn on_node_lost(&mut self, node_lost: XorName) -> Result<(), InternalError> {
+        self.data_manager.handle_node_lost(&node_lost);
+        Ok(())
+    }
+
+    fn on_group_split(&mut self, prefix: Prefix<XorName>) -> Result<(), InternalError> {
+        self.maid_manager.handle_group_split(&prefix);
+        self.data_manager.handle_group_split(&prefix);
+        Ok(())
+    }
+
+    fn on_group_merge(&mut self) -> Result<(), InternalError> {
+        self.maid_manager.handle_group_merge();
+        self.data_manager.handle_group_merge();
+        Ok(())
     }
 }

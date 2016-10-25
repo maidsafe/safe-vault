@@ -18,7 +18,7 @@
 
 use error::InternalError;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, Data, DataIdentifier, ImmutableData, MessageId, StructuredData,
+use routing::{Authority, Data, DataIdentifier, ImmutableData, MessageId, Prefix, StructuredData,
               TYPE_TAG_SESSION_PACKET, XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::HashMap;
@@ -228,6 +228,13 @@ impl MaidManager {
         Ok(())
     }
 
+    pub fn handle_group_merge(&mut self) {
+        unimplemented!()
+    }
+
+    pub fn handle_group_split(&mut self, _prefix: &Prefix<XorName>) {
+        unimplemented!()
+    }
     // pub fn handle_group_split(&mut self, prefix: Prefix<XorName>) {
     //     // Remove all accounts which we are no longer responsible for.
     //     let not_close = |name: &&XorName| !prefix.matches(*name);
@@ -251,6 +258,9 @@ impl MaidManager {
     //     }
     // }
 
+    pub fn handle_node_added(&mut self, _node_name: &XorName) {
+        unimplemented!()
+    }
     // pub fn handle_node_added(&mut self, node_name: &XorName) {
     //     // Send refresh messages for the remaining accounts.
     //     for (maid_name, account) in &self.accounts {

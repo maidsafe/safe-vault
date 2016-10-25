@@ -23,7 +23,8 @@ use chunk_store::ChunkStore;
 use error::InternalError;
 use itertools::Itertools;
 use maidsafe_utilities::{self, serialisation};
-use routing::{AppendWrapper, Authority, Data, DataIdentifier, MessageId, StructuredData, XorName};
+use routing::{AppendWrapper, Authority, Data, DataIdentifier, MessageId, Prefix, StructuredData,
+              XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::From;
@@ -906,6 +907,17 @@ impl DataManager {
         }
     }
 
+    pub fn handle_group_merge(&mut self) {
+        unimplemented!()
+    }
+
+    pub fn handle_group_split(&mut self, _prefix: &Prefix<XorName>) {
+        unimplemented!()
+    }
+
+    pub fn handle_node_added(&mut self, _node_name: &XorName) {
+        unimplemented!()
+    }
     // pub fn handle_node_added(&mut self, node_name: &XorName) {
     //     self.cache.prune_data_holders(routing_table);
     //     if self.cache.prune_ongoing_gets(routing_table) {
@@ -948,6 +960,9 @@ impl DataManager {
     //     }
     // }
 
+    pub fn handle_node_lost(&mut self, _node_name: &XorName) {
+        unimplemented!()
+    }
     // /// Get all names and hashes of all data. // [TODO]: Can be optimised - 2016-04-23 09:11pm
     // /// Send to all members of group of data.
     // pub fn handle_node_lost(&mut self, node_name: &XorName) {
