@@ -15,7 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![allow(unused)] // TODO: Remove after disjoint groups implementation.
 
 
 use accumulator::Accumulator;
@@ -183,55 +182,58 @@ impl Cache {
         let _ = self.data_holders.remove(lost_node);
     }
 
+    /// Removes entries from `data_holders` that are no longer valid due to churn.
+    fn prune_data_holders_for_split(&mut self, prefix: &Prefix<XorName>) {
+        let left_nodes = self.data_holders
+            .keys()
+            .filter(|node| !prefix.matches(node))
+            .cloned()
+            .collect_vec();
+        for left_node in &left_nodes {
+            let _ = self.data_holders.remove(left_node);
+        }
+
+        let mut empty_holders = Vec::new();
+        for (holder, data_idvs) in &mut self.data_holders {
+            let lost_idvs = data_idvs.iter()
+                .filter(|&&(ref data_id, _)| !prefix.matches(data_id.name()))
+                .cloned()
+                .collect_vec();
+            for lost_idv in lost_idvs {
+                let _ = data_idvs.remove(&lost_idv);
+            }
+            if data_idvs.is_empty() {
+                empty_holders.push(*holder);
+            }
+        }
+        for holder in &empty_holders {
+            let _ = self.data_holders.remove(holder);
+        }
+    }
+
     /// Removes the lost_node's entry from `ongoing_gets` due to churn..
     fn prune_ongoing_gets_for_lost_node(&mut self, lost_node: &XorName) -> bool {
         self.ongoing_gets.remove(lost_node).is_some()
     }
 
-    // /// Removes entries from `data_holders` that are no longer valid due to churn.
-    // fn prune_data_holders(&mut self, routing_table: &RoutingTable<XorName>) {
-    //     let mut empty_holders = Vec::new();
-    //     for (holder, data_idvs) in &mut self.data_holders {
-    //         let lost_idvs = data_idvs.iter()
-    //             .filter(|&&(ref data_id, _)| {
-    //                 // The data needs to be removed if either we are not close to it anymore, i. e.
-    //                 // other_close_nodes returns None, or `holder` is not in it anymore.
-    //                 routing_table.other_close_nodes(data_id.name(), GROUP_SIZE)
-    //                     .map_or(true, |group| !group.contains(holder))
-    //             })
-    //             .cloned()
-    //             .collect_vec();
-    //         for lost_idv in lost_idvs {
-    //             let _ = data_idvs.remove(&lost_idv);
-    //         }
-    //         if data_idvs.is_empty() {
-    //             empty_holders.push(*holder);
-    //         }
-    //     }
-    //     for holder in empty_holders {
-    //         let _ = self.data_holders.remove(&holder);
-    //     }
-    // }
-
-    // /// Remove entries from `ongoing_gets` that are no longer responsible for the data or that
-    // /// disconnected.
-    // fn prune_ongoing_gets(&mut self, routing_table: &RoutingTable<XorName>) -> bool {
-    //     let lost_gets = self.ongoing_gets
-    //         .iter()
-    //         .filter(|&(holder, &(_, (ref data_id, _)))| {
-    //             routing_table.other_close_nodes(data_id.name(), GROUP_SIZE)
-    //                 .map_or(true, |group| !group.contains(holder))
-    //         })
-    //         .map(|(holder, _)| *holder)
-    //         .collect_vec();
-    //     if !lost_gets.is_empty() {
-    //         for holder in lost_gets {
-    //             let _ = self.ongoing_gets.remove(&holder);
-    //         }
-    //         return true;
-    //     }
-    //     false
-    // }
+    /// Removes entries from `ongoing_gets` that are no longer responsible for the data or that
+    /// disconnected.
+    fn prune_ongoing_gets_for_split(&mut self, prefix: &Prefix<XorName>) -> bool {
+        let lost_gets = self.ongoing_gets
+            .iter()
+            .filter(|&(holder, &(_, (ref data_id, _)))| {
+                !prefix.matches(holder) || !prefix.matches(data_id.name())
+            })
+            .map(|(holder, _)| *holder)
+            .collect_vec();
+        if !lost_gets.is_empty() {
+            for holder in lost_gets {
+                let _ = self.ongoing_gets.remove(&holder);
+            }
+            return true;
+        }
+        false
+    }
 
     fn needed_data(&mut self) -> Vec<(XorName, IdAndVersion)> {
         let empty_holders = self.data_holders
@@ -418,10 +420,7 @@ impl DataManager {
                       -> Result<(), InternalError> {
         if let Authority::Client { .. } = src {
             self.client_get_requests += 1;
-            if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
-                self.logging_time = Instant::now();
-                info!("{:?}", self);
-            }
+            self.print_stats();
         }
         if let Ok(data) = self.chunk_store.get(&data_id) {
             trace!("As {:?} sending data {:?} to {:?}", dst, data, src);
@@ -723,10 +722,7 @@ impl DataManager {
         try!(self.chunk_store.put(&data_id, &data));
         if got_new_data {
             self.count_added_data(&data_id);
-            if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
-                self.logging_time = Instant::now();
-                info!("{:?}", self);
-            }
+            self.print_stats();
         }
         Ok(())
     }
@@ -821,10 +817,7 @@ impl DataManager {
                             if !already_existed {
                                 self.count_added_data(&data_id);
                             }
-                            if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
-                                self.logging_time = Instant::now();
-                                info!("{:?}", self);
-                            }
+                            self.print_stats();
                             trace!("DM sending PutSuccess for data {:?}", data_id);
                             self.routing_node.send_put_success(dst, src, data_id, message_id)
                         }
@@ -839,7 +832,12 @@ impl DataManager {
             } else {
                 trace!("{:?} did not accumulate. Sending failure", data_id);
                 let error = MutationError::NetworkOther("Concurrent modification.".to_owned());
-                try!(self.send_failure(mutate_type, src, dst, data.identifier(), message_id, error));
+                try!(self.send_failure(mutate_type,
+                                       src,
+                                       dst,
+                                       data.identifier(),
+                                       message_id,
+                                       error));
             }
         }
         Ok(())
@@ -921,8 +919,35 @@ impl DataManager {
         unimplemented!()
     }
 
-    pub fn handle_group_split(&mut self, _prefix: &Prefix<XorName>) {
-        unimplemented!()
+    pub fn handle_group_split(&mut self, prefix: &Prefix<XorName>) {
+        self.cache.prune_data_holders_for_split(prefix);
+        if self.cache.prune_ongoing_gets_for_split(prefix) {
+            let _ = self.send_gets_for_needed_data();
+        }
+
+        let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
+            .keys()
+            .into_iter()
+            .filter_map(|data_id| self.to_id_and_version(data_id)));
+        let mut has_pruned_data = false;
+        // Only retain data for which we're still in the close group.
+        for (data_id, _) in data_idvs {
+            if !prefix.matches(data_id.name()) {
+                trace!("No longer a DM for {:?}", data_id);
+                if self.chunk_store.has(&data_id) && !self.cache.is_in_unneeded(&data_id) {
+                    self.count_removed_data(&data_id);
+                    has_pruned_data = true;
+                    if let DataIdentifier::Immutable(..) = data_id {
+                        self.cache.add_as_unneeded(data_id);
+                    } else {
+                        let _ = self.chunk_store.delete(&data_id);
+                    }
+                }
+            }
+        }
+        if has_pruned_data {
+            self.print_stats();
+        }
     }
 
     pub fn handle_node_added(&mut self, node_name: &XorName) {
@@ -1051,6 +1076,13 @@ impl DataManager {
                 warn!("Failed to serialise data: {:?}", error);
                 Err(From::from(error))
             }
+        }
+    }
+
+    fn print_stats(&mut self) {
+        if self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
+            self.logging_time = Instant::now();
+            info!("{:?}", self);
         }
     }
 }

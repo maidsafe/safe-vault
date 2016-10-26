@@ -179,18 +179,10 @@ impl Vault {
                 ret = Some(true);
                 Ok(())
             }
-            Event::NodeAdded(node_added) => {
-                self.on_node_added(node_added)
-            }
-            Event::NodeLost(node_lost) => {
-                self.on_node_lost(node_lost)
-            }
-            Event::GroupSplit(prefix) => {
-                self.on_group_split(prefix)
-            }
-            Event::GroupMerge(_prefix) => {
-                self.on_group_merge()
-            }
+            Event::NodeAdded(node_added) => self.on_node_added(node_added),
+            Event::NodeLost(node_lost) => self.on_node_lost(node_lost),
+            Event::GroupSplit(prefix) => self.on_group_split(prefix),
+            Event::GroupMerge(_prefix) => self.on_group_merge(),
             Event::Connected | Event::Tick => Ok(()),
         } {
             debug!("Failed to handle event: {:?}", error);
