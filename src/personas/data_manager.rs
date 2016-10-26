@@ -147,7 +147,7 @@ impl Cache {
         self.unneeded_chunks.push_back(data_id);
     }
 
-    fn chain_records_in_cache<I>(&self, records_in_store: I) -> HashSet<IdAndVersion>
+    fn chain_records_in_cache<I>(&self, records_in_store: I) -> Vec<IdAndVersion>
         where I: IntoIterator<Item = IdAndVersion>
     {
         let mut records: HashSet<_> = self.data_holders
@@ -159,7 +159,7 @@ impl Cache {
         for data_id in &self.unneeded_chunks {
             let _ = records.remove(&(*data_id, 0));
         }
-        records
+        records.iter().cloned().collect()
     }
 
     // fn prune_unneeded_chunks(&mut self, routing_table: &RoutingTable<XorName>) -> u64 {
@@ -915,50 +915,15 @@ impl DataManager {
         unimplemented!()
     }
 
-    pub fn handle_node_added(&mut self, _node_name: &XorName) {
-        unimplemented!()
+    pub fn handle_node_added(&mut self, node_name: &XorName) {
+        let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
+            .keys()
+            .into_iter()
+            .filter_map(|data_id| self.to_id_and_version(data_id)));
+        if !data_idvs.is_empty() {
+            let _ = self.send_refresh(Authority::ManagedNode(*node_name), data_idvs);
+        }
     }
-    // pub fn handle_node_added(&mut self, node_name: &XorName) {
-    //     self.cache.prune_data_holders(routing_table);
-    //     if self.cache.prune_ongoing_gets(routing_table) {
-    //         let _ = self.send_gets_for_needed_data();
-    //     }
-    // let _data_idvs = self.cache.chain_records_in_cache(self.chunk_store
-    //     .keys()
-    //     .into_iter()
-    //     .filter_map(|data_id| self.to_id_and_version(data_id)));
-    //     let mut has_pruned_data = false;
-    //     // Only retain data for which we're still in the close group.
-    //     let mut data_list = Vec::new();
-    //     for (data_id, version) in data_idvs {
-    //         match routing_table.other_close_nodes(data_id.name(), GROUP_SIZE) {
-    //             None => {
-    //                 trace!("No longer a DM for {:?}", data_id);
-    //                 if self.chunk_store.has(&data_id) && !self.cache.is_in_unneeded(&data_id) {
-    //                     self.count_removed_data(&data_id);
-    //                     has_pruned_data = true;
-    //                     if let DataIdentifier::Immutable(..) = data_id {
-    //                         self.cache.add_as_unneeded(data_id);
-    //                     } else {
-    //                         let _ = self.chunk_store.delete(&data_id);
-    //                     }
-    //                 }
-    //             }
-    //             Some(close_group) => {
-    //                 if close_group.contains(node_name) {
-    //                     data_list.push((data_id, version));
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     if !data_list.is_empty() {
-    //         let _ = self.send_refresh(Authority::ManagedNode(*node_name), data_list);
-    //     }
-    //     if has_pruned_data && self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
-    //         self.logging_time = Instant::now();
-    //         info!("{:?}", self);
-    //     }
-    // }
 
     pub fn handle_node_lost(&mut self, _node_name: &XorName) {
         unimplemented!()
