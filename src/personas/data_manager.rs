@@ -161,17 +161,11 @@ impl Cache {
         records.iter().cloned().collect()
     }
 
-    // fn prune_unneeded_chunks(&mut self, routing_table: &RoutingTable<XorName>) -> u64 {
-    //     let pruned_unneeded_chunks: HashSet<_> = self.unneeded_chunks
-    //         .iter()
-    //         .filter(|data_id| routing_table.is_close(data_id.name(), GROUP_SIZE))
-    //         .cloned()
-    //         .collect();
-    //     if !pruned_unneeded_chunks.is_empty() {
-    //         self.unneeded_chunks.retain(|data_id| !pruned_unneeded_chunks.contains(data_id));
-    //     }
-    //     pruned_unneeded_chunks.len() as u64
-    // }
+    fn prune_unneeded_chunks(&mut self, prefix: &Prefix<XorName>) -> u64 {
+        let len_before = self.unneeded_chunks.len();
+        self.unneeded_chunks.retain(|data_id| !prefix.matches(data_id.name()));
+        (len_before - self.unneeded_chunks.len()) as u64
+    }
 
     fn pop_unneeded_chunk(&mut self) -> Option<DataIdentifier> {
         self.unneeded_chunks.pop_front()
@@ -915,8 +909,23 @@ impl DataManager {
         }
     }
 
-    pub fn handle_group_merge(&mut self) {
-        unimplemented!()
+    pub fn handle_group_merge(&mut self, prefix: &Prefix<XorName>) {
+        let pruned_unneeded = self.cache.prune_unneeded_chunks(prefix);
+        if pruned_unneeded > 0 {
+            self.immutable_data_count += pruned_unneeded;
+            self.print_stats();
+            self.cache.print_stats();
+        }
+
+        let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
+            .keys()
+            .into_iter()
+            .filter_map(|data_id| self.to_id_and_version(data_id)));
+        if !data_idvs.is_empty() {
+            if let Ok(name) = self.routing_node.name() {
+                let _ = self.send_refresh(Authority::NaeManager(name), data_idvs);
+            }
+        }
     }
 
     pub fn handle_group_split(&mut self, prefix: &Prefix<XorName>) {

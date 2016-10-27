@@ -182,7 +182,7 @@ impl Vault {
             Event::NodeAdded(node_added) => self.on_node_added(node_added),
             Event::NodeLost(node_lost) => self.on_node_lost(node_lost),
             Event::GroupSplit(prefix) => self.on_group_split(prefix),
-            Event::GroupMerge(_prefix) => self.on_group_merge(),
+            Event::GroupMerge(prefix) => self.on_group_merge(prefix),
             Event::Connected | Event::Tick => Ok(()),
         } {
             debug!("Failed to handle event: {:?}", error);
@@ -310,9 +310,9 @@ impl Vault {
         Ok(())
     }
 
-    fn on_group_merge(&mut self) -> Result<(), InternalError> {
+    fn on_group_merge(&mut self, prefix: Prefix<XorName>) -> Result<(), InternalError> {
         self.maid_manager.handle_group_merge();
-        self.data_manager.handle_group_merge();
+        self.data_manager.handle_group_merge(&prefix);
         Ok(())
     }
 }
