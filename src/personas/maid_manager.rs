@@ -17,6 +17,7 @@
 
 
 use error::InternalError;
+use itertools::Itertools;
 use maidsafe_utilities::serialisation;
 use routing::{Authority, Data, DataIdentifier, ImmutableData, MessageId, Prefix, StructuredData,
               TYPE_TAG_SESSION_PACKET, XorName};
@@ -229,44 +230,63 @@ impl MaidManager {
     }
 
     pub fn handle_group_merge(&mut self) {
-        unimplemented!()
+        for (maid_name, account) in &self.accounts {
+            // TODO: as only half of the new merged group sends accounts belongs to its pre-merge
+            //       group, this will have accumulation issue when `quorum` means majority
+            //       depends on the routing's change on `quorum`, a vault accumulation (like in DM)
+            //       maybe required.
+            self.send_refresh(maid_name, account, MessageId::zero());
+        }
     }
 
-    pub fn handle_group_split(&mut self, _prefix: &Prefix<XorName>) {
-        unimplemented!()
-    }
-    // pub fn handle_group_split(&mut self, prefix: Prefix<XorName>) {
-    //     // Remove all accounts which we are no longer responsible for.
-    //     let not_close = |name: &&XorName| !prefix.matches(*name);
-    //     let accounts_to_delete = self.accounts.keys().filter(not_close).cloned().collect_vec();
-    //     // Remove all requests from the cache that we are no longer responsible for.
-    //     let msg_ids_to_delete = self.request_cache
-    //         .iter()
-    //         .filter(|&(_, &(ref src, _))| accounts_to_delete.contains(src.name()))
-    //         .map(|(msg_id, _)| *msg_id)
-    //         .collect_vec();
-    //     for msg_id in msg_ids_to_delete {
-    //         let _ = self.request_cache.remove(&msg_id);
-    //     }
-    //     if !accounts_to_delete.is_empty() {
-    //         info!("Stats - {} client accounts.",
-    //               self.accounts.len() - accounts_to_delete.len());
-    //     }
-    //     for maid_name in accounts_to_delete {
-    //         trace!("No longer a MM for {}", maid_name);
-    //         let _ = self.accounts.remove(&maid_name);
-    //     }
-    // }
+    pub fn handle_group_split(&mut self, prefix: &Prefix<XorName>) {
+        // Remove all accounts which we are no longer responsible for.
+        let not_close = |name: &&XorName| !prefix.matches(*name);
+        let accounts_to_delete = self.accounts.keys().filter(not_close).cloned().collect_vec();
+        // Remove all requests from the cache that we are no longer responsible for.
+        let msg_ids_to_delete = self.request_cache
+            .iter()
+            .filter(|&(_, &(ref src, _))| accounts_to_delete.contains(src.name()))
+            .map(|(msg_id, _)| *msg_id)
+            .collect_vec();
+        for msg_id in msg_ids_to_delete {
+            let _ = self.request_cache.remove(&msg_id);
+        }
 
-    pub fn handle_node_added(&mut self, _node_name: &XorName) {
-        unimplemented!()
+        for maid_name in &accounts_to_delete {
+            trace!("No longer a MM for {}", maid_name);
+            let _ = self.accounts.remove(maid_name);
+        }
+        if !accounts_to_delete.is_empty() {
+            info!("Stats - {} client accounts.", self.accounts.len());
+        }
     }
-    // pub fn handle_node_added(&mut self, node_name: &XorName) {
-    //     // Send refresh messages for the remaining accounts.
-    //     for (maid_name, account) in &self.accounts {
-    //         self.send_refresh(maid_name, account, MessageId::from_added_node(*node_name));
-    //     }
-    // }
+
+    pub fn handle_node_added(&mut self, node_name: &XorName) {
+        for (maid_name, account) in &self.accounts {
+            self.send_node_refresh(node_name,
+                                   maid_name,
+                                   account,
+                                   MessageId::from_added_node(*node_name));
+        }
+    }
+
+    fn send_node_refresh(&self,
+                         node_name: &XorName,
+                         maid_name: &XorName,
+                         account: &Account,
+                         msg_id: MessageId) {
+        let src = Authority::ClientManager(*maid_name);
+        let dst = Authority::ManagedNode(*node_name);
+        let refresh = Refresh::Update(*maid_name, account.clone());
+        if let Ok(serialised_refresh) = serialisation::serialise(&refresh) {
+            trace!("MM sending refresh for account {} to {:?}",
+                   src.name(),
+                   node_name);
+            let _ = self.routing_node
+                .send_refresh_request(src, dst, serialised_refresh, msg_id);
+        }
+    }
 
     fn send_refresh(&self, maid_name: &XorName, account: &Account, msg_id: MessageId) {
         let src = Authority::ClientManager(*maid_name);

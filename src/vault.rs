@@ -239,6 +239,9 @@ impl Vault {
             // ================== Refresh ==================
             (Authority::ClientManager(_),
              Authority::ClientManager(_),
+             Request::Refresh(serialised_msg, _)) |
+            (Authority::ClientManager(_),
+             Authority::ManagedNode(_),
              Request::Refresh(serialised_msg, _)) => {
                 self.maid_manager.handle_refresh(&serialised_msg)
             }
