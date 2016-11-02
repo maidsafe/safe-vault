@@ -327,25 +327,28 @@ impl TestClient {
         let request_message_id = MessageId::new();
         unwrap!(self.routing_client.send_put_request(dst, data.clone(), request_message_id));
         let _ = poll::poll_and_resend_unacknowledged(nodes, self);
-
-        match self.routing_rx.try_recv() {
-            Ok(Event::Response { response: Response::PutSuccess(_, response_message_id), .. }) => {
-                assert_eq!(request_message_id, response_message_id);
-                Ok(())
+        let mut result: Result<(), Option<MutationError>> = Ok(());
+        loop {
+            match self.routing_rx.try_recv() {
+                Ok(Event::Response { response: Response::PutSuccess(_, response_message_id),
+                                     .. }) => {
+                    assert_eq!(request_message_id, response_message_id);
+                }
+                Ok(Event::Response { response: Response::PutFailure {
+                        id: response_id,
+                        data_id,
+                        external_error_indicator: response_error
+                    }, .. }) => {
+                    assert_eq!(request_message_id, response_id);
+                    assert!(data.identifier() == data_id);
+                    let parsed_error = unwrap!(serialisation::deserialise(&response_error));
+                    result = Err(Some(parsed_error));
+                    trace!("returning with {:?}", result);
+                }
+                Ok(response) => println!("Unexpected Put response : {:?}", response),
+                // TODO: Once the network guarantees that every request gets a response, panic!
+                Err(_) => return result,
             }
-            Ok(Event::Response { response: Response::PutFailure {
-                    id: response_id,
-                    data_id,
-                    external_error_indicator: response_error
-                }, .. }) => {
-                assert_eq!(request_message_id, response_id);
-                assert!(data.identifier() == data_id);
-                let parsed_error = unwrap!(serialisation::deserialise(&response_error));
-                Err(Some(parsed_error))
-            }
-            Ok(response) => panic!("Unexpected Put response : {:?}", response),
-            // TODO: Once the network guarantees that every request gets a response, panic!
-            Err(_) => Err(None),
         }
     }
 

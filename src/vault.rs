@@ -164,6 +164,15 @@ impl Vault {
         unwrap!(self._routing_node.name())
     }
 
+    /// Returns the number of nodes in the close_group to the given name.
+    #[cfg(feature = "use-mock-crust")]
+    pub fn close_group_len(&self, name: XorName) -> usize {
+        match self._routing_node.close_group(name) {
+            Ok(Some(close_members)) => close_members.len(),
+            _ => 0,
+        }
+    }
+
     fn process_event(&mut self, event: Event) -> Option<bool> {
         let mut ret = None;
 

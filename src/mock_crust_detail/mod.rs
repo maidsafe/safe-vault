@@ -64,7 +64,7 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
             Data::Structured(data) => (data.identifier(), data.get_version()),
             _ => unreachable!(),
         };
-        let data_holders = data_holders_map.get(&(data_id, data_version))
+        let mut data_holders = data_holders_map.get(&(data_id, data_version))
             .cloned()
             .unwrap_or_else(Vec::new)
             .into_iter()
@@ -74,7 +74,15 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
             .map(TestNode::name)
             .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
-        expected_data_holders.truncate(MIN_GROUP_SIZE);
+        let mut expected_num_of_holders = 0;
+        if let Some(ref node) = nodes.iter()
+            .find(|ref node| node.name() == expected_data_holders[0]) {
+            expected_num_of_holders = node.close_group_len(*data_id.name());
+        }
+        assert!(expected_num_of_holders >= MIN_GROUP_SIZE);
+
+        expected_data_holders.truncate(expected_num_of_holders);
+        data_holders.truncate(expected_num_of_holders);
 
         assert!(expected_data_holders == data_holders,
                 "Data: {:?}. expected = {:?}, actual = {:?}",

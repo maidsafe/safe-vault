@@ -29,10 +29,14 @@ use rust_sodium::crypto::box_;
 use safe_vault::mock_crust_detail::{self, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::test_utils;
+use std::cmp;
 
 const TEST_NET_SIZE: usize = 20;
 
-#[ignore]
+// This needs to be kept in sync with maid_manager.rs
+// Ideally, a setter is preferred, so that this test can be completed quicker.
+const DEFAULT_ACCOUNT_SIZE: u64 = 10;
+
 #[test]
 fn handle_put_without_account() {
     let network = Network::new(None);
@@ -58,7 +62,6 @@ fn handle_put_without_account() {
             node_count);
 }
 
-#[ignore]
 #[test]
 fn put_oversized_data() {
     let network = Network::new(None);
@@ -108,7 +111,6 @@ fn put_oversized_data() {
     // After serialisation, the len of SD, pub_ad and priv_ad is : 102604, 128216, 128256
 }
 
-#[ignore]
 #[test]
 fn handle_put_with_account() {
     let network = Network::new(None);
@@ -124,9 +126,8 @@ fn handle_put_with_account() {
     assert_eq!(result, Err(Some(GetError::NoSuchAccount)));
 
     client.create_account(&mut nodes);
-    let default_account_size = 100;
     let mut expected_data_stored = 1;
-    let mut expected_space_available = default_account_size - expected_data_stored;
+    let mut expected_space_available = DEFAULT_ACCOUNT_SIZE - expected_data_stored;
     assert_eq!(unwrap!(client.get_account_info_response(&mut nodes)),
                (expected_data_stored, expected_space_available));
 
@@ -137,7 +138,7 @@ fn handle_put_with_account() {
     let count = nodes.iter()
         .filter(|node| node.get_maid_manager_put_count(client.name()).is_some())
         .count();
-    assert!(MIN_GROUP_SIZE == count,
+    assert!(MIN_GROUP_SIZE <= count,
             "client account {} found on {} nodes",
             count,
             node_count);
@@ -145,17 +146,15 @@ fn handle_put_with_account() {
     stored_immutable.push(Data::Immutable(immutable_data));
     mock_crust_detail::check_data(stored_immutable, &nodes);
     expected_data_stored += 1;
-    expected_space_available = default_account_size - expected_data_stored;
+    expected_space_available = DEFAULT_ACCOUNT_SIZE - expected_data_stored;
     assert_eq!(unwrap!(client.get_account_info_response(&mut nodes)),
                (expected_data_stored, expected_space_available));
 }
 
-#[ignore]
 #[test]
 fn create_account_twice() {
-    let default_account_size = 100;
     let expected_data_stored = 1;
-    let expected_space_available = default_account_size - expected_data_stored;
+    let expected_space_available = DEFAULT_ACCOUNT_SIZE - expected_data_stored;
     let acct_info = (expected_data_stored, expected_space_available);
     let acct_err = Err(Some(GetError::NoSuchAccount));
     let acct_exists = Err(Some(MutationError::AccountExists));
@@ -212,7 +211,6 @@ fn create_account_twice() {
     assert_eq!(client1.get_account_info_response(&mut nodes), acct_err);
 }
 
-#[ignore]
 #[test]
 #[should_panic] // TODO Look at using std::panic::catch_unwind (1.9)
 fn invalid_put_for_previously_created_account() {
@@ -227,12 +225,8 @@ fn invalid_put_for_previously_created_account() {
     client.create_account(&mut nodes);
 }
 
-#[ignore]
 #[test]
 fn storing_till_client_account_full() {
-    // This needs to be kept in sync with maid_manager.rs
-    // Ideally, a setter is preferred, so that this test can be completed quicker.
-    const DEFAULT_ACCOUNT_SIZE: u64 = 100;
     let network = Network::new(None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
@@ -259,7 +253,6 @@ fn storing_till_client_account_full() {
     }
 }
 
-#[ignore]
 #[test]
 fn maid_manager_account_adding_with_churn() {
     let network = Network::new(None);
@@ -309,14 +302,13 @@ fn maid_manager_account_adding_with_churn() {
         let node_count_stats: Vec<(XorName, Option<u64>)> = sorted_maid_managers.into_iter()
             .map(|x| (x.name(), x.get_maid_manager_put_count(client.name())))
             .collect();
+        let expected_count = Some(cmp::min(DEFAULT_ACCOUNT_SIZE, put_count));
         for &(_, count) in &node_count_stats {
-            assert!(count == Some(put_count), "{:?}", node_count_stats);
+            assert!(count == expected_count, "{:?}", node_count_stats);
         }
-        mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);
     }
 }
 
-#[ignore]
 #[test]
 fn maid_manager_account_decrease_with_churn() {
     let network = Network::new(None);
@@ -337,7 +329,7 @@ fn maid_manager_account_decrease_with_churn() {
 
     for i in 0..test_utils::iterations() as u64 {
         trace!("Churning on {} nodes, iteration {}", nodes.len(), i);
-        if nodes.len() <= MIN_GROUP_SIZE + 2 || rng.gen() {
+        if nodes.len() <= MIN_GROUP_SIZE + 4 || rng.gen() {
             let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
             trace!("Adding node with bootstrap node {}.", index);
             test_node::add_node(&network, &mut nodes, index, false);
@@ -376,8 +368,10 @@ fn maid_manager_account_decrease_with_churn() {
         let node_count_stats: Vec<(XorName, Option<u64>)> = sorted_maid_managers.into_iter()
             .map(|x| (x.name(), x.get_maid_manager_put_count(client.name())))
             .collect();
+        let expected_count = Some(cmp::min(DEFAULT_ACCOUNT_SIZE,
+                                           chunks_per_iter * (i / 2 + 1) + 1));
         for &(_, count) in &node_count_stats {
-            assert_eq!(count, Some(chunks_per_iter * (i / 2 + 1) + 1));
+            assert_eq!(count, expected_count);
         }
     }
 }

@@ -122,6 +122,11 @@ impl TestNode {
     pub fn name(&self) -> XorName {
         self.vault.name()
     }
+
+    /// Returns the number of nodes in the close_group to the given name.
+    pub fn close_group_len(&self, name: XorName) -> usize {
+        self.vault.close_group_len(name)
+    }
 }
 
 /// Create nodes for mock network

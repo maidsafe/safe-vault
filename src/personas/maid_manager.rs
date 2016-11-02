@@ -33,7 +33,7 @@ use vault::RoutingNode;
 #[cfg(not(feature = "use-mock-crust"))]
 const DEFAULT_ACCOUNT_SIZE: u64 = 500;
 #[cfg(feature = "use-mock-crust")]
-const DEFAULT_ACCOUNT_SIZE: u64 = 100;
+const DEFAULT_ACCOUNT_SIZE: u64 = 10;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Debug, Clone)]
 enum Refresh {
