@@ -167,9 +167,19 @@ impl Vault {
     /// Returns the number of nodes in the close_group to the given name.
     #[cfg(feature = "use-mock-crust")]
     pub fn close_group_len(&self, name: XorName) -> usize {
+        // If the node is not among the close group to the target, will return 0
         match self._routing_node.close_group(name) {
             Ok(Some(close_members)) => close_members.len(),
             _ => 0,
+        }
+    }
+
+    /// Returns whether the target is inside the node's close group.
+    #[cfg(feature = "use-mock-crust")]
+    pub fn is_close(&self, name: &XorName) -> bool {
+        match self._routing_node.close_group(*name) {
+            Ok(Some(close_members)) => close_members.contains(&self.name()),
+            _ => false,
         }
     }
 

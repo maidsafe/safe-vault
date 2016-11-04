@@ -20,7 +20,7 @@ use config_handler::Config;
 
 use personas::data_manager::IdAndVersion;
 use rand::{self, Rng};
-use routing::XorName;
+use routing::{MIN_GROUP_SIZE, XorName};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use rustc_serialize::hex::ToHex;
 use std::env;
@@ -127,6 +127,11 @@ impl TestNode {
     pub fn close_group_len(&self, name: XorName) -> usize {
         self.vault.close_group_len(name)
     }
+
+    /// Returns whether the target is inside the node's close group.
+    pub fn is_close(&self, name: &XorName) -> bool {
+        self.vault.is_close(name)
+    }
 }
 
 /// Create nodes for mock network
@@ -153,6 +158,27 @@ pub fn create_nodes(network: &Network,
         poll::nodes(&mut nodes);
     }
 
+    nodes
+}
+
+/// Keeps creating nodes for mock network till split happens
+pub fn create_nodes_till_split(network: &Network) -> Vec<TestNode> {
+    let use_cache = true;
+    let mut nodes = create_nodes(network, MIN_GROUP_SIZE * 2, None, use_cache);
+    let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let test_target = nodes[0].name();
+    loop {
+        let len = nodes.len();
+        nodes.push(TestNode::new(network,
+                                 Some(crust_config.clone()),
+                                 None,
+                                 false,
+                                 use_cache));
+        poll::nodes(&mut nodes);
+        if nodes[len].close_group_len(test_target) < len {
+            break;
+        }
+    }
     nodes
 }
 

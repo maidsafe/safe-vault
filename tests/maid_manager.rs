@@ -309,6 +309,7 @@ fn maid_manager_account_adding_with_churn() {
     }
 }
 
+#[ignore]
 #[test]
 fn maid_manager_account_decrease_with_churn() {
     let network = Network::new(None);

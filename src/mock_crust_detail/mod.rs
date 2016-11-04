@@ -75,8 +75,8 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
             .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
         let mut expected_num_of_holders = 0;
-        if let Some(ref node) = nodes.iter()
-            .find(|ref node| node.name() == expected_data_holders[0]) {
+        if let Some(node) = nodes.iter()
+            .find(|node| node.name() == expected_data_holders[0]) {
             expected_num_of_holders = node.close_group_len(*data_id.name());
         }
         assert!(expected_num_of_holders >= MIN_GROUP_SIZE);
