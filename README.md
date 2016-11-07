@@ -7,7 +7,7 @@
 |[![](http://meritbadge.herokuapp.com/safe_vault)](https://crates.io/crates/safe_vault)|[![Build Status](https://travis-ci.org/maidsafe/safe_vault.svg?branch=master)](https://travis-ci.org/maidsafe/safe_vault)|[![Build Status](http://ci.maidsafe.net:8080/buildStatus/icon?job=safe_vault_arm_status_badge)](http://ci.maidsafe.net:8080/job/safe_vault_arm_status_badge/)|[![Build status](https://ci.appveyor.com/api/projects/status/ohu678c6ufw8b2bn/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-vault/branch/master)|[![Coverage Status](https://coveralls.io/repos/maidsafe/safe_vault/badge.svg)](https://coveralls.io/r/maidsafe/safe_vault)|[![Stories in Ready](https://badge.waffle.io/maidsafe/safe_vault.png?label=ready&title=Ready)](https://waffle.io/maidsafe/safe_vault)|
 
 
-| [API Documentation - master branch](http://docs.maidsafe.net/safe_vault/master) | [MaidSafe website](http://maidsafe.net) | [SAFE Network Forum](https://forum.safenetwork.io) |
+| [API Documentation - master branch](http://docs.maidsafe.net/safe_vault/master) | [MaidSafe website](http://maidsafe.net) | [SAFE Network Forum](https://safenetforum.org/) |
 |:------:|:-------:|:-------:|:-------:|
 
 ## Overview
