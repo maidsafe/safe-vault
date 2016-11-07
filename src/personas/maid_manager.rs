@@ -321,6 +321,12 @@ impl MaidManager {
         // exist.
         let client_name = utils::client_name(&src);
         if data.get_type_tag() == TYPE_TAG_SESSION_PACKET {
+            if dst.name() != &client_name {
+                trace!("Cannot create account for {:?} as {:?}.", src, dst);
+                let error = MutationError::InvalidOperation;
+                try!(self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error));
+                return Err(From::from(error));
+            }
             if self.accounts.contains_key(&client_name) {
                 let error = MutationError::AccountExists;
                 try!(self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error));
