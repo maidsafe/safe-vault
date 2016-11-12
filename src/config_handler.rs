@@ -34,8 +34,8 @@ pub struct Config {
 /// Reads the default vault config file.
 pub fn read_config_file() -> Result<Config, InternalError> {
     // if the config file is not present, a default one will be generated
-    let file_handler = try!(FileHandler::new(&try!(get_file_name()), false));
-    let cfg = try!(file_handler.read_file());
+    let file_handler = FileHandler::new(&get_file_name()?, false)?;
+    let cfg = file_handler.read_file()?;
     Ok(cfg)
 }
 
@@ -53,16 +53,16 @@ pub fn write_config_file(config: Config) -> Result<::std::path::PathBuf, Interna
     use std::fs::File;
     use std::io::Write;
 
-    let mut config_path = try!(config_file_handler::current_bin_dir());
-    config_path.push(try!(get_file_name()));
-    let mut file = try!(File::create(&config_path));
-    try!(write!(&mut file, "{}", json::as_pretty_json(&config)));
-    try!(file.sync_all());
+    let mut config_path = config_file_handler::current_bin_dir()?;
+    config_path.push(get_file_name()?);
+    let mut file = File::create(&config_path)?;
+    write!(&mut file, "{}", json::as_pretty_json(&config))?;
+    file.sync_all()?;
     Ok(config_path)
 }
 
 fn get_file_name() -> Result<OsString, InternalError> {
-    let mut name = try!(config_file_handler::exe_file_stem());
+    let mut name = config_file_handler::exe_file_stem()?;
     name.push(".vault.config");
     Ok(name)
 }

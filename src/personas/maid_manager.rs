@@ -158,7 +158,7 @@ impl MaidManager {
                                   MessageId::zero());
                 // Send failure response back to client
                 let error = match (data_id,
-                                   try!(serialisation::deserialise(external_error_indicator))) {
+                                   serialisation::deserialise(external_error_indicator)?) {
                     (DataIdentifier::Structured(_, TYPE_TAG_SESSION_PACKET),
                      MutationError::DataExists) => {
                         // We wouldn't have forwarded two `Put` requests for the same account, so
@@ -193,7 +193,7 @@ impl MaidManager {
                                                                     account.space_available,
                                                                     msg_id);
         } else {
-            let external_error_indicator = try!(serialisation::serialise(&GetError::NoSuchAccount));
+            let external_error_indicator = serialisation::serialise(&GetError::NoSuchAccount)?;
             let _ = self.routing_node
                 .send_get_account_info_failure(dst, src, external_error_indicator, msg_id);
         }
@@ -201,7 +201,7 @@ impl MaidManager {
     }
 
     pub fn handle_refresh(&mut self, serialised_msg: &[u8]) -> Result<(), InternalError> {
-        match try!(serialisation::deserialise::<Refresh>(serialised_msg)) {
+        match serialisation::deserialise::<Refresh>(serialised_msg)? {
             Refresh::Update(maid_name, account) => {
                 match self.routing_node.close_group(maid_name) {
                     Ok(None) | Err(_) => return Ok(()),
@@ -324,12 +324,12 @@ impl MaidManager {
             if dst.name() != &client_name {
                 trace!("Cannot create account for {:?} as {:?}.", src, dst);
                 let error = MutationError::InvalidOperation;
-                try!(self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error));
+                self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error)?;
                 return Err(From::from(error));
             }
             if self.accounts.contains_key(&client_name) {
                 let error = MutationError::AccountExists;
-                try!(self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error));
+                self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error)?;
                 return Err(From::from(error));
             }
 
@@ -361,7 +361,7 @@ impl MaidManager {
             trace!("MM responds put_failure of data {}, due to error {:?}",
                    data.name(),
                    error);
-            try!(self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error));
+            self.reply_with_put_failure(src, dst, data.identifier(), msg_id, &error)?;
             return Err(From::from(error));
         }
         {
@@ -389,7 +389,7 @@ impl MaidManager {
                               msg_id: MessageId,
                               error: &MutationError)
                               -> Result<(), InternalError> {
-        let external_error_indicator = try!(serialisation::serialise(error));
+        let external_error_indicator = serialisation::serialise(error)?;
         let _ = self.routing_node
             .send_put_failure(dst, src, data_id, external_error_indicator, msg_id);
         Ok(())

@@ -91,18 +91,18 @@ impl Vault {
         chunk_store_root.push(CHUNK_STORE_DIR);
 
         let (routing_sender, routing_receiver) = mpsc::channel();
-        let routing_node = Rc::new(try!(if use_cache {
+        let routing_node = Rc::new(if use_cache {
             builder.cache(Box::new(Cache::new())).create(routing_sender)
         } else {
             builder.create(routing_sender)
-        }));
+        }?);
 
         Ok(Vault {
             maid_manager: MaidManager::new(routing_node.clone()),
-            data_manager: try!(DataManager::new(routing_node.clone(),
-                                                chunk_store_root,
-                                                config.max_capacity
-                                                    .unwrap_or(DEFAULT_MAX_CAPACITY))),
+            data_manager: DataManager::new(routing_node.clone(),
+                                           chunk_store_root,
+                                           config.max_capacity
+                                               .unwrap_or(DEFAULT_MAX_CAPACITY))?,
             _routing_node: routing_node.clone(),
             routing_receiver: routing_receiver,
         })
