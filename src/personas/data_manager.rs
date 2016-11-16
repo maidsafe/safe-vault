@@ -805,8 +805,20 @@ impl DataManager {
     pub fn handle_group_refresh(&mut self, serialised_refresh: &[u8]) -> Result<(), InternalError> {
         let RefreshData((data_id, version), refresh_hash) =
             serialisation::deserialise(serialised_refresh)?;
-        for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in self.cache
-            .take_pending_writes(&data_id) {
+        let pending_writes = self.cache.take_pending_writes(&data_id);
+
+        if pending_writes.is_empty() {
+            if let Ok(Some(group)) = self.routing_node.close_group(*data_id.name()) {
+                let candidates: Vec<_> = group.iter().take(1).collect();
+                self.cache.insert_into_ongoing_gets(candidates[0], &(data_id, version));
+                let src = Authority::ManagedNode(self.routing_node.name()?);
+                let dst = Authority::ManagedNode(*candidates[0]);
+                let _ = self.routing_node.send_get_request(src, dst, data_id, MessageId::new());
+            }
+            return Ok(());
+        }
+
+        for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in pending_writes {
             if hash == refresh_hash {
                 let already_existed = self.chunk_store.has(&data_id);
                 if let Err(error) = self.chunk_store.put(&data_id, &data) {
@@ -879,23 +891,27 @@ impl DataManager {
     }
 
     fn update_pending_writes(&mut self,
-                             data: Data,
+                             new_data: Data,
                              mutate_type: PendingMutationType,
                              src: Authority,
                              dst: Authority,
                              message_id: MessageId,
                              refresh: bool)
                              -> Result<(), InternalError> {
-        for PendingWrite { mutate_type, src, dst, data, message_id, .. } in self.cache
-            .remove_expired_writes() {
-            let data_id = data.identifier();
-            let error = MutationError::NetworkOther("Request expired.".to_owned());
-            trace!("{:?} did not accumulate. Sending failure", data_id);
-            self.send_failure(mutate_type, src, dst, data_id, message_id, error)?;
+        for PendingWrite { data, .. } in self.cache.remove_expired_writes() {
+            if let Ok(Some(group)) = self.routing_node.close_group(*data.name()) {
+                let candidates: Vec<_> = group.iter().take(1).collect();
+                let data_idv = id_and_version_of(&data);
+                self.cache.insert_into_ongoing_gets(candidates[0], &data_idv);
+                let src = Authority::ManagedNode(self.routing_node.name()?);
+                let dst = Authority::ManagedNode(*candidates[0]);
+                let msg_id = MessageId::new();
+                let _ = self.routing_node.send_get_request(src, dst, data_idv.0, msg_id);
+            }
         }
-        let data_name = *data.name();
+        let data_name = *new_data.name();
         if let Some(refresh_data) = self.cache
-            .insert_pending_write(data, mutate_type, src, dst, message_id) {
+            .insert_pending_write(new_data, mutate_type, src, dst, message_id) {
             if refresh {
                 let _ = self.send_group_refresh(data_name, refresh_data, message_id);
             }
