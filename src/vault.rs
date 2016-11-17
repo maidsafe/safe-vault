@@ -272,7 +272,14 @@ impl Vault {
             // ================== GetSuccess ==================
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetSuccess(data, _)) => self.data_manager.handle_get_success(src_name, data),
+             Response::GetSuccess(data, _)) => {
+                self.data_manager.handle_get_success_single(src_name, data)
+            }
+            (Authority::NaeManager(_),
+             Authority::ManagedNode(_),
+             Response::GetSuccess(data, _)) => {
+                self.data_manager.handle_get_success_group(data)
+            }
             // ================== GetFailure ==================
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
