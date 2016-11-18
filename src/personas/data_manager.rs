@@ -670,13 +670,25 @@ impl DataManager {
         }
     }
 
-    pub fn handle_get_success(&mut self,
-                              src: XorName,
-                              mut data: Data)
-                              -> Result<(), InternalError> {
+    pub fn handle_get_success_single(&mut self,
+                                     src: XorName,
+                                     data: Data)
+                                     -> Result<(), InternalError> {
         let (data_id, version) = id_and_version_of(&data);
         self.cache.handle_get_success(src, &data_id, version);
         self.send_gets_for_needed_data()?;
+        self.handle_get_success(data_id, version, data)
+    }
+
+    pub fn handle_get_success_group(&mut self, data: Data) -> Result<(), InternalError> {
+        let (data_id, version) = id_and_version_of(&data);
+        self.handle_get_success(data_id, version, data)
+    }
+
+    fn handle_get_success(&mut self,
+                          data_id: DataIdentifier,
+                          version: u64,
+                          mut data: Data) -> Result<(), InternalError> {
         // If we're no longer in the close group, return.
         if !self.close_to_address(data_id.name()) {
             return Ok(());
@@ -805,8 +817,10 @@ impl DataManager {
     pub fn handle_group_refresh(&mut self, serialised_refresh: &[u8]) -> Result<(), InternalError> {
         let RefreshData((data_id, version), refresh_hash) =
             serialisation::deserialise(serialised_refresh)?;
-        for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in self.cache
-            .take_pending_writes(&data_id) {
+        let pending_writes = self.cache.take_pending_writes(&data_id);
+
+        let mut success = false;
+        for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in pending_writes {
             if hash == refresh_hash {
                 let already_existed = self.chunk_store.has(&data_id);
                 if let Err(error) = self.chunk_store.put(&data_id, &data) {
@@ -843,12 +857,18 @@ impl DataManager {
                     };
                     let data_list = vec![(data_id, version)];
                     let _ = self.send_refresh(Authority::NaeManager(*data_id.name()), data_list);
+                    success = true;
                 }
             } else {
                 trace!("{:?} did not accumulate. Sending failure", data_id);
                 let error = MutationError::NetworkOther("Concurrent modification.".to_owned());
                 self.send_failure(mutate_type, src, dst, data.identifier(), message_id, error)?;
             }
+        }
+        if !success {
+            let src = Authority::ManagedNode(self.routing_node.name()?);
+            let dst = Authority::NaeManager(*data_id.name());
+            let _ = self.routing_node.send_get_request(src, dst, data_id, MessageId::new());
         }
         Ok(())
     }
