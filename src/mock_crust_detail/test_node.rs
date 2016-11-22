@@ -23,8 +23,8 @@ use rand::{self, Rng};
 use routing::XorName;
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use rustc_serialize::hex::ToHex;
-use std::env;
-use std::fs;
+use std::{env, fs};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use super::poll;
@@ -121,6 +121,12 @@ impl TestNode {
     /// name of vault.
     pub fn name(&self) -> XorName {
         self.vault.name()
+    }
+
+    /// If our group is the closest one to `name`, returns all names in our group *including ours*,
+    /// otherwise returns `None`.
+    pub fn close_group(&self, name: &XorName) -> Option<HashSet<XorName>> {
+        self.vault.close_group(name)
     }
 }
 

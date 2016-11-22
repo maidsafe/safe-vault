@@ -15,78 +15,73 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// For explanation of lint checks, run `rustc -W help` or see
-// https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
+use rand::Rng;
+use rand::distributions::{IndependentSample, Range};
+use routing::{Data, ImmutableData};
+use routing::mock_crust::{self, Network};
+use safe_vault::Config;
+use safe_vault::mock_crust_detail::{poll, test_node};
+use safe_vault::mock_crust_detail::test_client::TestClient;
+use safe_vault::test_utils;
 
-mod test {
-    use rand::Rng;
-    use rand::distributions::{IndependentSample, Range};
-    use routing::{Data, ImmutableData};
-    use routing::mock_crust::{self, Network};
-    use safe_vault::Config;
-    use safe_vault::mock_crust_detail::{poll, test_node};
-    use safe_vault::mock_crust_detail::test_client::TestClient;
-    use safe_vault::test_utils;
+#[ignore]
+#[test]
+fn fill_network() {
+    let network = Network::new(None);
+    let config = Config {
+        wallet_address: None,
+        max_capacity: Some(2000),
+        chunk_store_root: None,
+    };
+    // Use 8 nodes to avoid the case where four target nodes are full: In that case neither the
+    // PutSuccess nor the PutFailure accumulates and client.put_and_verify() would hang.
+    let mut nodes = test_node::create_nodes(&network, 8, Some(config), true);
+    let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(crust_config));
+    let full_id = client.full_id().clone();
+    let mut rng = network.new_rng();
 
-    #[ignore]
-    #[test]
-    fn fill_network() {
-        let network = Network::new(None);
-        let config = Config {
-            wallet_address: None,
-            max_capacity: Some(2000),
-            chunk_store_root: None,
-        };
-        // Use 8 nodes to avoid the case where four target nodes are full: In that case neither the
-        // PutSuccess nor the PutFailure accumulates and client.put_and_verify() would hang.
-        let mut nodes = test_node::create_nodes(&network, 8, Some(config), true);
-        let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
-        let mut client = TestClient::new(&network, Some(crust_config));
-        let full_id = client.full_id().clone();
-        let mut rng = network.new_rng();
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
 
-        client.ensure_connected(&mut nodes);
-        client.create_account(&mut nodes);
-
-        loop {
-            let data = if rng.gen() {
-                let content = rng.gen_iter().take(100).collect();
-                Data::Immutable(ImmutableData::new(content))
-            } else {
-                Data::Structured(test_utils::random_structured_data(100000, &full_id, &mut rng))
-            };
-            let data_id = data.identifier();
-            match client.put_and_verify(data, &mut nodes) {
-                Ok(()) => trace!("Stored chunk {:?}", data_id),
-                Err(None) => trace!("Got no response storing chunk {:?}", data_id),
-                Err(Some(response)) => {
-                    trace!("Failed storing chunk {:?}, response: {:?}",
-                           data_id,
-                           response);
-                    break;
-                }
-            }
-        }
-        for _ in 0..10 {
-            let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
-            trace!("Adding node with bootstrap node {}.", index);
-            test_node::add_node(&network, &mut nodes, index, true);
-            let _ = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
+    loop {
+        let data = if rng.gen() {
             let content = rng.gen_iter().take(100).collect();
-            let data = Data::Immutable(ImmutableData::new(content));
-            let data_id = data.identifier();
-            match client.put_and_verify(data, &mut nodes) {
-                Ok(()) => {
-                    trace!("Stored chunk {:?}", data_id);
-                    return;
-                }
-                Err(opt_response) => {
-                    trace!("Failed storing chunk {:?}, response: {:?}",
-                           data_id,
-                           opt_response);
-                }
+            Data::Immutable(ImmutableData::new(content))
+        } else {
+            Data::Structured(test_utils::random_structured_data(100000, &full_id, &mut rng))
+        };
+        let data_id = data.identifier();
+        match client.put_and_verify(data, &mut nodes) {
+            Ok(()) => trace!("Stored chunk {:?}", data_id),
+            Err(None) => trace!("Got no response storing chunk {:?}", data_id),
+            Err(Some(response)) => {
+                trace!("Failed storing chunk {:?}, response: {:?}",
+                       data_id,
+                       response);
+                break;
             }
         }
-        panic!("Failed to put again after adding nodes.");
     }
+    for _ in 0..10 {
+        let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
+        trace!("Adding node with bootstrap node {}.", index);
+        test_node::add_node(&network, &mut nodes, index, true);
+        let _ = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
+        let content = rng.gen_iter().take(100).collect();
+        let data = Data::Immutable(ImmutableData::new(content));
+        let data_id = data.identifier();
+        match client.put_and_verify(data, &mut nodes) {
+            Ok(()) => {
+                trace!("Stored chunk {:?}", data_id);
+                return;
+            }
+            Err(opt_response) => {
+                trace!("Failed storing chunk {:?}, response: {:?}",
+                       data_id,
+                       opt_response);
+            }
+        }
+    }
+    panic!("Failed to put again after adding nodes.");
 }

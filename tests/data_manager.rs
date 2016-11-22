@@ -15,12 +15,8 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// For explanation of lint checks, run `rustc -W help` or see
-// https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
-
 use routing::{AppendWrapper, AppendedData, Authority, Data, DataIdentifier, Event, FullId,
               ImmutableData, MIN_GROUP_SIZE, PrivAppendedData, PubAppendableData, Response,
               StructuredData};
@@ -339,7 +335,6 @@ fn structured_data_operations_with_churn() {
     }
 }
 
-#[ignore]
 #[test]
 fn handle_priv_appendable_normal_flow() {
     let network = Network::new(None);
@@ -369,7 +364,6 @@ fn handle_priv_appendable_normal_flow() {
                client.get(data.identifier(), &mut nodes));
 }
 
-#[ignore]
 #[test]
 fn handle_pub_appendable_normal_flow() {
     let network = Network::new(None);
@@ -462,7 +456,6 @@ fn appendable_data_operations_with_churn() {
     }
 }
 
-#[ignore]
 #[test]
 fn append_oversized_appendable_data() {
     let network = Network::new(None);
@@ -498,7 +491,6 @@ fn append_oversized_appendable_data() {
     }
 }
 
-#[ignore]
 #[test]
 fn post_oversized_appendable_data() {
     let network = Network::new(None);
@@ -531,7 +523,6 @@ fn post_oversized_appendable_data() {
     }
 }
 
-#[ignore]
 #[test]
 fn appendable_data_parallel_append() {
     let network = Network::new(None);
@@ -606,7 +597,6 @@ fn appendable_data_parallel_append() {
     assert!(successes > 2, "Low success rate.");
 }
 
-#[ignore]
 #[test]
 fn appendable_data_parallel_post() {
     let network = Network::new(None);
@@ -691,7 +681,6 @@ fn appendable_data_parallel_post() {
     assert!(failures >= iterations / 2, "Low failure rate.");
 }
 
-#[ignore]
 #[test]
 fn handle_put_get_normal_flow() {
     let network = Network::new(None);
@@ -721,7 +710,6 @@ fn handle_put_get_normal_flow() {
     }
 }
 
-#[ignore]
 #[test]
 fn handle_put_get_error_flow() {
     let network = Network::new(None);
@@ -794,12 +782,9 @@ fn handle_post_error_flow() {
     let _ = client.put_and_verify(Data::Structured(sd.clone()), &mut nodes);
 
     // Posting with incorrect type_tag
-    let mut incorrect_tag_sd = StructuredData::new(200000,
-                                                   *sd.name(),
-                                                   1,
-                                                   sd.get_data().clone(),
-                                                   owner.clone())
-        .expect("Cannot create structured data for test");
+    let mut incorrect_tag_sd =
+        StructuredData::new(200000, *sd.name(), 1, sd.get_data().clone(), owner.clone())
+            .expect("Cannot create structured data for test");
     let _ = incorrect_tag_sd.add_signature(&(pub_key, priv_key.clone()));
     match client.post_response(Data::Structured(incorrect_tag_sd), &mut nodes) {
         Err(Some(error)) => assert_eq!(error, MutationError::NoSuchData),
@@ -807,12 +792,9 @@ fn handle_post_error_flow() {
     }
 
     // Posting with incorrect version
-    let mut incorrect_version_sd = StructuredData::new(100000,
-                                                       *sd.name(),
-                                                       3,
-                                                       sd.get_data().clone(),
-                                                       owner.clone())
-        .expect("Cannot create structured data for test");
+    let mut incorrect_version_sd =
+        StructuredData::new(100000, *sd.name(), 3, sd.get_data().clone(), owner.clone())
+            .expect("Cannot create structured data for test");
     let _ = incorrect_version_sd.add_signature(&(pub_key, priv_key.clone()));
     match client.post_response(Data::Structured(incorrect_version_sd), &mut nodes) {
         Err(Some(error)) => assert_eq!(error, MutationError::InvalidSuccessor),
@@ -837,12 +819,9 @@ fn handle_post_error_flow() {
     }
 
     // Posting correctly
-    let mut new_sd = StructuredData::new(100000,
-                                         *sd.name(),
-                                         1,
-                                         sd.get_data().clone(),
-                                         owner.clone())
-        .expect("Cannot create structured data for test");
+    let mut new_sd =
+        StructuredData::new(100000, *sd.name(), 1, sd.get_data().clone(), owner.clone())
+            .expect("Cannot create structured data for test");
     let _ = new_sd.add_signature(&(pub_key, priv_key));
     match client.post_response(Data::Structured(new_sd), &mut nodes) {
         Ok(data_id) => assert_eq!(data_id, sd.identifier()),
@@ -896,11 +875,7 @@ fn handle_delete_error_flow() {
     let _ = client.put_and_verify(Data::Structured(sd.clone()), &mut nodes);
 
     // Deleting with incorrect type_tag
-    let mut incorrect_tag_sd = StructuredData::new(200000,
-                                                   *sd.name(),
-                                                   1,
-                                                   vec![],
-                                                   owner0.clone())
+    let mut incorrect_tag_sd = StructuredData::new(200000, *sd.name(), 1, vec![], owner0.clone())
         .expect("Cannot create structured data for test");
     let _ = incorrect_tag_sd.add_signature(&(pub_key0, priv_key0.clone()));
     match client.delete_response(Data::Structured(incorrect_tag_sd), &mut nodes) {
@@ -909,12 +884,9 @@ fn handle_delete_error_flow() {
     }
 
     // Deleting with incorrect version
-    let mut incorrect_version_sd = StructuredData::new(100000,
-                                                       *sd.name(),
-                                                       3,
-                                                       vec![],
-                                                       owner0.clone())
-        .expect("Cannot create structured data for test");
+    let mut incorrect_version_sd =
+        StructuredData::new(100000, *sd.name(), 3, vec![], owner0.clone())
+            .expect("Cannot create structured data for test");
     let _ = incorrect_version_sd.add_signature(&(pub_key0, priv_key0.clone()));
     match client.delete_response(Data::Structured(incorrect_version_sd), &mut nodes) {
         Err(Some(error)) => assert_eq!(error, MutationError::InvalidSuccessor),
@@ -922,12 +894,9 @@ fn handle_delete_error_flow() {
     }
 
     // Deleting with incorrect signature
-    let mut incorrect_signed_sd = StructuredData::new(100000,
-                                                      *sd.name(),
-                                                      1,
-                                                      vec![],
-                                                      owner0.clone())
-        .expect("Cannot create structured data for test");
+    let mut incorrect_signed_sd =
+        StructuredData::new(100000, *sd.name(), 1, vec![], owner0.clone())
+            .expect("Cannot create structured data for test");
     let _ = incorrect_signed_sd.add_signature(&(pub_key0, priv_key1.clone()));
     match client.delete_response(Data::Structured(incorrect_signed_sd), &mut nodes) {
         Err(Some(error)) => assert_eq!(error, MutationError::InvalidSuccessor),
@@ -935,12 +904,9 @@ fn handle_delete_error_flow() {
     }
 
     // Deleting
-    let mut new_sd = StructuredData::new(100000,
-                                         *sd.name(),
-                                         1,
-                                         sd.get_data().clone(),
-                                         owner0.clone())
-        .expect("Cannot create structured data for test");
+    let mut new_sd =
+        StructuredData::new(100000, *sd.name(), 1, sd.get_data().clone(), owner0.clone())
+            .expect("Cannot create structured data for test");
     let _ = new_sd.add_signature(&(pub_key0, priv_key0.clone()));
     let deleted_data = Data::Structured(new_sd);
     match client.delete_response(deleted_data.clone(), &mut nodes) {
@@ -962,12 +928,9 @@ fn handle_delete_error_flow() {
     }
 
     // Deleted data cannot be posted
-    let mut post_sd = StructuredData::new(100000,
-                                          *sd.name(),
-                                          2,
-                                          sd.get_data().clone(),
-                                          owner0.clone())
-        .expect("Cannot create structured data for test");
+    let mut post_sd =
+        StructuredData::new(100000, *sd.name(), 2, sd.get_data().clone(), owner0.clone())
+            .expect("Cannot create structured data for test");
     let _ = post_sd.add_signature(&(pub_key0, priv_key0.clone()));
     match client.post_response(Data::Structured(post_sd), &mut nodes) {
         Err(Some(error)) => assert_eq!(error, MutationError::InvalidOperation),
@@ -975,12 +938,9 @@ fn handle_delete_error_flow() {
     }
 
     // Deleted data cannot be put with version 0
-    let mut incorrect_reput_sd = StructuredData::new(100000,
-                                                     *sd.name(),
-                                                     0,
-                                                     sd.get_data().clone(),
-                                                     owner0.clone())
-        .expect("Cannot create structured data for test");
+    let mut incorrect_reput_sd =
+        StructuredData::new(100000, *sd.name(), 0, sd.get_data().clone(), owner0.clone())
+            .expect("Cannot create structured data for test");
     let _ = incorrect_reput_sd.add_signature(&(pub_key0, priv_key0.clone()));
     match client.put_and_verify(Data::Structured(incorrect_reput_sd), &mut nodes) {
         Err(Some(error)) => assert_eq!(error, MutationError::DataExists),
@@ -989,12 +949,9 @@ fn handle_delete_error_flow() {
 
     // Deleted data can be put with version + 1, even by a different owner.
     let owner1 = iter::once(pub_key1).collect::<BTreeSet<_>>();
-    let mut reput_sd = StructuredData::new(100000,
-                                           *sd.name(),
-                                           2,
-                                           sd.get_data().clone(),
-                                           owner1.clone())
-        .expect("Cannot create structured data for test");
+    let mut reput_sd =
+        StructuredData::new(100000, *sd.name(), 2, sd.get_data().clone(), owner1.clone())
+            .expect("Cannot create structured data for test");
     let _ = reput_sd.add_signature(&(pub_key1, priv_key1.clone()));
     let reput_data = Data::Structured(reput_sd);
     let _ = client.put_and_verify(reput_data.clone(), &mut nodes);
@@ -1015,7 +972,7 @@ fn caching_with_data_not_close_to_proxy_node() {
     client.create_account(&mut nodes);
     let mut rng = network.new_rng();
 
-    let sent_data = gen_random_immutable_data_not_close_to(&nodes[0], &mut rng);
+    let sent_data = generate_cache_data(&nodes[0], &mut rng, false);
     let _ = client.put_and_verify(sent_data.clone(), &mut nodes);
 
     // The first response is not yet cached, so it comes from a NAE manager authority.
@@ -1043,7 +1000,6 @@ fn caching_with_data_not_close_to_proxy_node() {
     }
 }
 
-#[ignore]
 #[test]
 fn caching_with_data_close_to_proxy_node() {
     let network = Network::new(None);
@@ -1057,7 +1013,7 @@ fn caching_with_data_close_to_proxy_node() {
     client.create_account(&mut nodes);
     let mut rng = network.new_rng();
 
-    let sent_data = gen_random_immutable_data_close_to(&nodes[0], &mut rng);
+    let sent_data = generate_cache_data(&nodes[0], &mut rng, true);
     let _ = client.put_and_verify(sent_data.clone(), &mut nodes);
 
     // Send two requests and verify the response is not cached in any of them
@@ -1084,22 +1040,12 @@ fn caching_with_data_close_to_proxy_node() {
     }
 }
 
-fn gen_random_immutable_data_close_to<R: Rng>(_node: &TestNode, _rng: &mut R) -> Data {
-    unimplemented!();
-    // loop {
-    //     let data = Data::Immutable(test_utils::random_immutable_data(10, rng));
-    //     if node.routing_table().is_close(&data.name(), MIN_GROUP_SIZE) {
-    //         return data;
-    //     }
-    // }
-}
-
-fn gen_random_immutable_data_not_close_to<R: Rng>(_node: &TestNode, _rng: &mut R) -> Data {
-    unimplemented!();
-    // loop {
-    //     let data = Data::Immutable(test_utils::random_immutable_data(10, rng));
-    //     if !node.routing_table().is_close(&data.name(), MIN_GROUP_SIZE) {
-    //         return data;
-    //     }
-    // }
+fn generate_cache_data<R: Rng>(node: &TestNode, rng: &mut R, close_to_node: bool) -> Data {
+    loop {
+        let data = Data::Immutable(test_utils::random_immutable_data(10, rng));
+        let is_close_to_node = node.close_group(data.name()).is_some();
+        if (close_to_node && is_close_to_node) || (!close_to_node && !is_close_to_node) {
+            return data;
+        }
+    }
 }

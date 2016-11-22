@@ -15,9 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-// For explanation of lint checks, run `rustc -W help` or see
-// https://github.com/maidsafe/QA/blob/master/Documentation/Rust%20Lint%20Checks.md
-
 use itertools::Itertools;
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
@@ -33,7 +30,6 @@ use std::collections::BTreeSet;
 
 const TEST_NET_SIZE: usize = 20;
 
-#[ignore]
 #[test]
 fn handle_put_without_account() {
     let network = Network::new(None);
@@ -59,7 +55,6 @@ fn handle_put_without_account() {
             node_count);
 }
 
-#[ignore]
 #[test]
 fn put_oversized_data() {
     let network = Network::new(None);
@@ -138,8 +133,8 @@ fn handle_put_with_account() {
     let count = nodes.iter()
         .filter(|node| node.get_maid_manager_put_count(client.name()).is_some())
         .count();
-    assert!(MIN_GROUP_SIZE == count,
-            "client account {} found on {} nodes",
+    assert!(MIN_GROUP_SIZE <= count,
+            "{} instances of client account found on {} nodes",
             count,
             node_count);
     let mut stored_immutable = Vec::new();
@@ -151,7 +146,6 @@ fn handle_put_with_account() {
                (expected_data_stored, expected_space_available));
 }
 
-#[ignore]
 #[test]
 fn create_account_twice() {
     let default_account_size = 100;
@@ -211,7 +205,6 @@ fn create_account_twice() {
     assert_eq!(client1.get_account_info_response(&mut nodes), acct_err);
 }
 
-#[ignore]
 #[test]
 #[should_panic] // TODO Look at using std::panic::catch_unwind (1.9)
 fn invalid_put_for_previously_created_account() {
@@ -226,7 +219,6 @@ fn invalid_put_for_previously_created_account() {
     client.create_account(&mut nodes);
 }
 
-#[ignore]
 #[test]
 fn storing_till_client_account_full() {
     // This needs to be kept in sync with maid_manager.rs
@@ -260,7 +252,7 @@ fn storing_till_client_account_full() {
 
 #[ignore]
 #[test]
-fn maid_manager_account_adding_with_churn() {
+fn account_adding_with_churn() {
     let network = Network::new(None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
@@ -317,7 +309,7 @@ fn maid_manager_account_adding_with_churn() {
 
 #[ignore]
 #[test]
-fn maid_manager_account_decrease_with_churn() {
+fn account_decrease_with_churn() {
     let network = Network::new(None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);

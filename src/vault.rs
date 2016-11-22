@@ -25,6 +25,8 @@ use personas::data_manager::IdAndVersion;
 use personas::maid_manager::MaidManager;
 use routing::{Authority, Data, NodeBuilder, Prefix, Request, Response, XorName};
 use rust_sodium;
+#[cfg(feature = "use-mock-crust")]
+use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 use std::rc::Rc;
@@ -162,6 +164,13 @@ impl Vault {
     #[cfg(feature = "use-mock-crust")]
     pub fn name(&self) -> XorName {
         unwrap!(self._routing_node.name())
+    }
+
+    /// If our group is the closest one to `name`, returns all names in our group *including ours*,
+    /// otherwise returns `None`.
+    #[cfg(feature = "use-mock-crust")]
+    pub fn close_group(&self, name: &XorName) -> Option<HashSet<XorName>> {
+        unwrap!(self._routing_node.close_group(*name))
     }
 
     fn process_event(&mut self, event: Event) -> Option<bool> {

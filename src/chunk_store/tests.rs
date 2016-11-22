@@ -113,10 +113,11 @@ fn successful_put() {
             assert!(chunk_store.used_space() <= chunks.total_size);
         };
 
-        for (index, &(ref data, ref size)) in chunks.data_and_sizes
-            .iter()
-            .enumerate()
-            .rev() {
+        for (index, &(ref data, ref size)) in
+            chunks.data_and_sizes
+                .iter()
+                .enumerate()
+                .rev() {
             put(index, data, size);
         }
     }

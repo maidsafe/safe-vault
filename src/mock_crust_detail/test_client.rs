@@ -22,8 +22,8 @@ use routing::{self, AppendWrapper, Authority, Data, DataIdentifier, Event, FullI
               PublicId, Response, StructuredData, XorName};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
-use std::iter;
 use std::collections::BTreeSet;
+use std::iter;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use super::poll;
 

@@ -68,7 +68,7 @@ fn get_file_name() -> Result<OsString, InternalError> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     #[test]
     fn parse_sample_config_file() {
         use std::path::Path;

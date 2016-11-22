@@ -18,6 +18,8 @@
 //! # Chunk Store
 //! A simple, non-persistent, disk-based key-value store.
 
+mod tests;
+
 use fs2::FileExt;
 use maidsafe_utilities::serialisation::{self, SerialisationError};
 use rustc_serialize::{Decodable, Encodable};
@@ -232,6 +234,3 @@ impl<Key, Value> Drop for ChunkStore<Key, Value> {
         let _ = fs::remove_dir_all(&self.rootdir);
     }
 }
-
-#[cfg(test)]
-mod test;
