@@ -17,7 +17,6 @@
 
 
 use config_handler::Config;
-use kademlia_routing_table::RoutingTable;
 
 use personas::data_manager::IdAndVersion;
 use rand::{self, Rng};
@@ -122,11 +121,6 @@ impl TestNode {
     /// name of vault.
     pub fn name(&self) -> XorName {
         self.vault.name()
-    }
-
-    /// returns the vault's routing_table.
-    pub fn routing_table(&self) -> RoutingTable<XorName> {
-        self.vault.routing_table()
     }
 }
 

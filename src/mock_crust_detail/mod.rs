@@ -23,10 +23,9 @@ pub mod test_client;
 pub mod test_node;
 
 use itertools::Itertools;
-use kademlia_routing_table::RoutingTable;
 use mock_crust_detail::test_node::TestNode;
 use personas::data_manager::IdAndVersion;
-use routing::{self, Data, GROUP_SIZE, XorName};
+use routing::{Data, MIN_GROUP_SIZE, XorName, Xorable};
 use std::collections::{HashMap, HashSet};
 
 /// Checks that none of the given nodes has any copy of the given data left.
@@ -75,7 +74,7 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
             .map(TestNode::name)
             .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
-        expected_data_holders.truncate(GROUP_SIZE);
+        expected_data_holders.truncate(MIN_GROUP_SIZE);
 
         assert!(expected_data_holders == data_holders,
                 "Data: {:?}. expected = {:?}, actual = {:?}",
@@ -86,10 +85,11 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
 }
 
 /// Verify that the kademlia invariant is upheld for all nodes.
-pub fn verify_kademlia_invariant_for_all_nodes(nodes: &[TestNode]) {
-    let routing_tables: Vec<RoutingTable<XorName>> =
-        nodes.iter().map(TestNode::routing_table).collect();
-    for node_index in 0..nodes.len() {
-        routing::verify_kademlia_invariant(&routing_tables, node_index);
-    }
+pub fn verify_kademlia_invariant_for_all_nodes(_nodes: &[TestNode]) {
+    unimplemented!();
+    // let routing_tables: Vec<RoutingTable<XorName>> =
+    //     nodes.iter().map(TestNode::routing_table).collect();
+    // for node_index in 0..nodes.len() {
+    //     routing::verify_kademlia_invariant(&routing_tables, node_index);
+    // }
 }

@@ -19,13 +19,11 @@
 use cache::Cache;
 use config_handler::{self, Config};
 use error::InternalError;
-use kademlia_routing_table::RoutingTable;
 use personas::data_manager::DataManager;
 #[cfg(feature = "use-mock-crust")]
 use personas::data_manager::IdAndVersion;
 use personas::maid_manager::MaidManager;
-
-use routing::{Authority, Data, NodeBuilder, Request, Response, XorName};
+use routing::{Authority, Data, NodeBuilder, Prefix, Request, Response, XorName};
 use rust_sodium;
 use std::env;
 use std::path::Path;
@@ -166,24 +164,12 @@ impl Vault {
         unwrap!(self._routing_node.name())
     }
 
-    /// Vault routing_table
-    #[cfg(feature = "use-mock-crust")]
-    pub fn routing_table(&self) -> RoutingTable<XorName> {
-        self._routing_node.routing_table()
-    }
-
     fn process_event(&mut self, event: Event) -> Option<bool> {
         let mut ret = None;
 
         if let Err(error) = match event {
             Event::Request { request, src, dst } => self.on_request(request, src, dst),
             Event::Response { response, src, dst } => self.on_response(response, src, dst),
-            Event::NodeAdded(node_added, routing_table) => {
-                self.on_node_added(node_added, routing_table)
-            }
-            Event::NodeLost(node_lost, routing_table) => {
-                self.on_node_lost(node_lost, routing_table)
-            }
             Event::RestartRequired => {
                 warn!("Restarting Vault");
                 ret = Some(false);
@@ -192,6 +178,18 @@ impl Vault {
             Event::Terminate => {
                 ret = Some(true);
                 Ok(())
+            }
+            Event::NodeAdded(node_added) => {
+                self.on_node_added(node_added)
+            }
+            Event::NodeLost(node_lost) => {
+                self.on_node_lost(node_lost)
+            }
+            Event::GroupSplit(prefix) => {
+                self.on_group_split(prefix)
+            }
+            Event::GroupMerge(_prefix) => {
+                self.on_group_merge()
             }
             Event::Connected | Event::Tick => Ok(()),
         } {
@@ -303,21 +301,26 @@ impl Vault {
         }
     }
 
-    fn on_node_added(&mut self,
-                     node_added: XorName,
-                     routing_table: RoutingTable<XorName>)
-                     -> Result<(), InternalError> {
-        self.maid_manager.handle_node_added(&node_added, &routing_table);
-        self.data_manager.handle_node_added(&node_added, &routing_table);
+    fn on_node_added(&mut self, node_added: XorName) -> Result<(), InternalError> {
+        self.maid_manager.handle_node_added(&node_added);
+        self.data_manager.handle_node_added(&node_added);
         Ok(())
     }
 
-    fn on_node_lost(&mut self,
-                    node_lost: XorName,
-                    routing_table: RoutingTable<XorName>)
-                    -> Result<(), InternalError> {
-        self.maid_manager.handle_node_lost(&node_lost);
-        self.data_manager.handle_node_lost(&node_lost, &routing_table);
+    fn on_node_lost(&mut self, node_lost: XorName) -> Result<(), InternalError> {
+        self.data_manager.handle_node_lost(&node_lost);
+        Ok(())
+    }
+
+    fn on_group_split(&mut self, prefix: Prefix<XorName>) -> Result<(), InternalError> {
+        self.maid_manager.handle_group_split(&prefix);
+        self.data_manager.handle_group_split(&prefix);
+        Ok(())
+    }
+
+    fn on_group_merge(&mut self) -> Result<(), InternalError> {
+        self.maid_manager.handle_group_merge();
+        self.data_manager.handle_group_merge();
         Ok(())
     }
 }
