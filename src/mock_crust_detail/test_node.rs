@@ -162,14 +162,16 @@ pub fn create_nodes(network: &Network,
     nodes
 }
 
-/// Create a mock network of nodes handling cache data with two disjoint groups
-pub fn create_nodes_with_cache_till_split(network: &Network) -> Vec<TestNode> {
-    let mut nodes = vec![TestNode::new(network, None, None, true, true)];
+/// Add nodes to an existing network until it has multiple groups
+pub fn add_nodes_until_split(network: &Network,
+                             nodes: &mut Vec<TestNode>,
+                             config: Option<Config>,
+                             use_cache: bool) {
+    assert!(nodes.len() > 0);
     while nodes[0].routing_table().our_group_prefix().bit_count() == 0 {
-        add_node(network, &mut nodes, 0, true);
-        let _ = poll::poll_and_resend_unacknowledged_parallel(&mut nodes, &mut []);
+        add_node_with_config(network, nodes, config.clone(), 0, use_cache);
+        let _ = poll::poll_and_resend_unacknowledged_parallel(nodes, &mut []);
     }
-    nodes
 }
 
 /// Add node to the mock network
@@ -181,11 +183,11 @@ pub fn add_node(network: &Network, nodes: &mut Vec<TestNode>, index: usize, use_
 /// Add node to the mock network with specified config
 pub fn add_node_with_config(network: &Network,
                             nodes: &mut Vec<TestNode>,
-                            config: Config,
+                            config: Option<Config>,
                             index: usize,
                             use_cache: bool) {
     let crust_config = mock_crust::Config::with_contacts(&[nodes[index].endpoint()]);
-    nodes.push(TestNode::new(network, Some(crust_config), Some(config), false, use_cache));
+    nodes.push(TestNode::new(network, Some(crust_config), config, false, use_cache));
 }
 
 /// remove this node from the mock network
