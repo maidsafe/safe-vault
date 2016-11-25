@@ -16,15 +16,13 @@
 // relating to use of the SAFE Network Software.
 
 use rand::Rng;
-use rand::distributions::{IndependentSample, Range};
-use routing::{Data, ImmutableData};
+use routing::{Data, ImmutableData, MIN_GROUP_SIZE};
 use routing::mock_crust::{self, Network};
 use safe_vault::Config;
-use safe_vault::mock_crust_detail::{poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
+use safe_vault::mock_crust_detail::test_node;
 use safe_vault::test_utils;
 
-#[ignore]
 #[test]
 fn fill_network() {
     let network = Network::new(None);
@@ -33,9 +31,10 @@ fn fill_network() {
         max_capacity: Some(2000),
         chunk_store_root: None,
     };
-    // Use 8 nodes to avoid the case where four target nodes are full: In that case neither the
-    // PutSuccess nor the PutFailure accumulates and client.put_and_verify() would hang.
-    let mut nodes = test_node::create_nodes(&network, 8, Some(config), true);
+    // Use a group of minimum size to ensure there are enough nodes to meet the quorum: otherwise
+    // neither the PutSuccess nor the PutFailure messages would accumulate and
+    // `client.put_and_verify()` would hang.
+    let mut nodes = test_node::create_nodes(&network, MIN_GROUP_SIZE, Some(config.clone()), true);
     let crust_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(crust_config));
     let full_id = client.full_id().clone();
@@ -63,25 +62,22 @@ fn fill_network() {
             }
         }
     }
-    for _ in 0..10 {
-        let index = Range::new(1, nodes.len()).ind_sample(&mut rng);
-        trace!("Adding node with bootstrap node {}.", index);
-        test_node::add_node(&network, &mut nodes, index, true);
-        let _ = poll::poll_and_resend_unacknowledged(&mut nodes, &mut client);
-        let content = rng.gen_iter().take(100).collect();
-        let data = Data::Immutable(ImmutableData::new(content));
-        let data_id = data.identifier();
-        match client.put_and_verify(data, &mut nodes) {
-            Ok(()) => {
-                trace!("Stored chunk {:?}", data_id);
-                return;
-            }
-            Err(opt_response) => {
-                trace!("Failed storing chunk {:?}, response: {:?}",
-                       data_id,
-                       opt_response);
-            }
+
+    // Let the network split
+    test_node::add_nodes_until_split(&network, &mut nodes, Some(config), true);
+    // Now try adding data:
+    let content = rng.gen_iter().take(100).collect();
+    let data = Data::Immutable(ImmutableData::new(content));
+    let data_id = data.identifier();
+    match client.put_and_verify(data, &mut nodes) {
+        Ok(()) => {
+            trace!("Stored chunk {:?}", data_id);
+            return;
+        }
+        Err(opt_response) => {
+            panic!("Failed to put again after adding nodes: chunk {:?}, response: {:?}",
+                   data_id,
+                   opt_response);
         }
     }
-    panic!("Failed to put again after adding nodes.");
 }
