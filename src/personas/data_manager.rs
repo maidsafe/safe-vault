@@ -359,11 +359,11 @@ pub struct DataManager {
 fn id_and_version_of(data: &Data) -> IdAndVersion {
     (data.identifier(),
      match *data {
-        Data::Structured(ref sd) => sd.get_version(),
-        Data::PubAppendable(ref ad) => ad.get_version(),
-        Data::PrivAppendable(ref ad) => ad.get_version(),
-        Data::Immutable(_) => 0,
-    })
+         Data::Structured(ref sd) => sd.get_version(),
+         Data::PubAppendable(ref ad) => ad.get_version(),
+         Data::PrivAppendable(ref ad) => ad.get_version(),
+         Data::Immutable(_) => 0,
+     })
 }
 
 impl Debug for DataManager {
@@ -782,8 +782,8 @@ impl DataManager {
     pub fn handle_group_refresh(&mut self, serialised_refresh: &[u8]) -> Result<(), InternalError> {
         let RefreshData((data_id, version), refresh_hash) =
             serialisation::deserialise(serialised_refresh)?;
-        for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in self.cache
-            .take_pending_writes(&data_id) {
+        for PendingWrite { data, mutate_type, src, dst, message_id, hash, .. } in
+            self.cache.take_pending_writes(&data_id) {
             if hash == refresh_hash {
                 let already_existed = self.chunk_store.has(&data_id);
                 if let Err(error) = self.chunk_store.put(&data_id, &data) {
@@ -865,16 +865,16 @@ impl DataManager {
                              dst: Authority,
                              message_id: MessageId)
                              -> Result<(), InternalError> {
-        for PendingWrite { mutate_type, src, dst, data, message_id, .. } in self.cache
-            .remove_expired_writes() {
+        for PendingWrite { mutate_type, src, dst, data, message_id, .. } in
+            self.cache.remove_expired_writes() {
             let data_id = data.identifier();
             let error = MutationError::NetworkOther("Request expired.".to_owned());
             trace!("{:?} did not accumulate. Sending failure", data_id);
             self.send_failure(mutate_type, src, dst, data_id, message_id, error)?;
         }
         let data_name = *data.name();
-        if let Some(refresh_data) = self.cache
-            .insert_pending_write(data, mutate_type, src, dst, message_id) {
+        if let Some(refresh_data) =
+            self.cache.insert_pending_write(data, mutate_type, src, dst, message_id) {
             let _ = self.send_group_refresh(data_name, refresh_data, message_id);
         }
         Ok(())

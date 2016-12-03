@@ -85,9 +85,8 @@ pub fn random_pub_appendable_data_with_size<R: Rng>(full_id: &FullId,
 
     for _ in 0..size / 128 {
         let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-        let appended_data = unwrap!(AppendedData::new(pointer,
-                                                      owner_pubkey,
-                                                      full_id.signing_private_key()));
+        let appended_data =
+            unwrap!(AppendedData::new(pointer, owner_pubkey, full_id.signing_private_key()));
         ad.append(appended_data);
     }
 
@@ -112,9 +111,8 @@ pub fn pub_appendable_data_version_up<R: Rng>(full_id: &FullId,
         new_ad.append(data.clone());
     }
     let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-    let appended_data = unwrap!(AppendedData::new(pointer,
-                                                  owner_pubkey,
-                                                  full_id.signing_private_key()));
+    let appended_data =
+        unwrap!(AppendedData::new(pointer, owner_pubkey, full_id.signing_private_key()));
     new_ad.append(appended_data);
     let _ = new_ad.add_signature(&(owner_pubkey, full_id.signing_private_key().clone()));
     new_ad
@@ -146,9 +144,8 @@ pub fn random_priv_appendable_data_with_size<R: Rng>(full_id: &FullId,
 
     for _ in 0..size / 128 {
         let pointer = DataIdentifier::Structured(rng.gen(), 12345);
-        let appended_data = unwrap!(AppendedData::new(pointer,
-                                                      owner_pubkey,
-                                                      full_id.signing_private_key()));
+        let appended_data =
+            unwrap!(AppendedData::new(pointer, owner_pubkey, full_id.signing_private_key()));
         let priv_appended_data = unwrap!(PrivAppendedData::new(&appended_data, &encrypt_key));
         ad.append(priv_appended_data, &owner_pubkey);
     }
