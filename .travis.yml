@@ -83,7 +83,7 @@ matrix:
 
     - os: linux
       env: >
-        CHANNEL=nightly
+        CHANNEL=nightly-2016-11-17
         FEATURES="clippy use-mock-crust"
       allow_failures: true
 
@@ -96,7 +96,7 @@ matrix:
 
     - os: osx
       env: >
-        CHANNEL=nightly
+        CHANNEL=nightly-2016-11-17
         FEATURES="clippy use-mock-crust"
       allow_failures: true
 
