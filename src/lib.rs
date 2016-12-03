@@ -220,7 +220,6 @@ extern crate fs2;
 extern crate log;
 extern crate lru_time_cache;
 extern crate itertools;
-extern crate kademlia_routing_table;
 #[macro_use]
 extern crate maidsafe_utilities;
 extern crate config_file_handler;
@@ -255,3 +254,6 @@ mod vault;
 pub mod mock_crust_detail;
 pub use config_handler::Config;
 pub use vault::Vault;
+
+/// The number of nodes in groups managing data and user accounts.
+pub const GROUP_SIZE: usize = 8;

@@ -16,11 +16,11 @@
 // relating to use of the SAFE Network Software.
 
 
+use ::GROUP_SIZE;
 use error::InternalError;
 use itertools::Itertools;
-use kademlia_routing_table::RoutingTable;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, Data, DataIdentifier, GROUP_SIZE, ImmutableData, MessageId,
+use routing::{Authority, Data, DataIdentifier, ImmutableData, MessageId, RoutingTable,
               StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
 use routing::client_errors::{GetError, MutationError};
 use std::collections::HashMap;
@@ -234,7 +234,7 @@ impl MaidManager {
                              node_name: &XorName,
                              routing_table: &RoutingTable<XorName>) {
         // Remove all accounts which we are no longer responsible for.
-        let not_close = |name: &&XorName| !routing_table.is_close(*name, GROUP_SIZE);
+        let not_close = |name: &&XorName| !routing_table.is_closest(*name, GROUP_SIZE);
         let accounts_to_delete = self.accounts.keys().filter(not_close).cloned().collect_vec();
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete = self.request_cache

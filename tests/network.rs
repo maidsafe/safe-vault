@@ -23,14 +23,14 @@ mod test {
     use rand::distributions::{IndependentSample, Range};
     use routing::{Data, ImmutableData};
     use routing::mock_crust::{self, Network};
+    use safe_vault::{GROUP_SIZE, test_utils};
     use safe_vault::Config;
     use safe_vault::mock_crust_detail::{poll, test_node};
     use safe_vault::mock_crust_detail::test_client::TestClient;
-    use safe_vault::test_utils;
 
     #[test]
     fn fill_network() {
-        let network = Network::new(None);
+        let network = Network::new(GROUP_SIZE, None);
         let config = Config {
             wallet_address: None,
             max_capacity: Some(2000),

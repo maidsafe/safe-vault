@@ -22,18 +22,16 @@ pub mod test_client;
 /// Test full node
 pub mod test_node;
 
+use ::GROUP_SIZE;
 use itertools::Itertools;
-use kademlia_routing_table::RoutingTable;
 use mock_crust_detail::test_node::TestNode;
 use personas::data_manager::IdAndVersion;
-use routing::{self, Data, GROUP_SIZE, XorName};
+use routing::{self, Data, XorName, Xorable};
 use std::collections::{HashMap, HashSet};
 
 /// Checks that none of the given nodes has any copy of the given data left.
 pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
-    let deleted_data_ids: HashSet<_> = deleted_data.iter()
-        .map(Data::identifier)
-        .collect();
+    let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::identifier).collect();
     let mut data_count = HashMap::new();
     nodes.iter()
         .flat_map(TestNode::get_stored_names)
@@ -85,11 +83,8 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
     }
 }
 
-/// Verify that the kademlia invariant is upheld for all nodes.
+/// Verify that the network invariant is upheld for all nodes.
 pub fn verify_kademlia_invariant_for_all_nodes(nodes: &[TestNode]) {
-    let routing_tables: Vec<RoutingTable<XorName>> =
-        nodes.iter().map(TestNode::routing_table).collect();
-    for node_index in 0..nodes.len() {
-        routing::verify_kademlia_invariant(&routing_tables, node_index);
-    }
+    let routing_tables = nodes.iter().map(TestNode::routing_table).collect_vec();
+    routing::verify_network_invariant(routing_tables.iter());
 }

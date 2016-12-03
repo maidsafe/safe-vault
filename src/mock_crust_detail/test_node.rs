@@ -17,11 +17,9 @@
 
 
 use config_handler::Config;
-use kademlia_routing_table::RoutingTable;
-
 use personas::data_manager::IdAndVersion;
 use rand::{self, Rng};
-use routing::XorName;
+use routing::{RoutingTable, XorName};
 use routing::mock_crust::{self, Endpoint, Network, ServiceHandle};
 use rustc_serialize::hex::ToHex;
 use std::env;

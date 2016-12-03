@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 
+use ::GROUP_SIZE;
 use maidsafe_utilities::serialisation;
 use rand::{Rng, XorShiftRng};
 use routing::{self, AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId,
@@ -50,7 +51,7 @@ impl TestClient {
 
         let handle = network.new_service_handle(config, None);
         let client = mock_crust::make_current(&handle, || {
-            unwrap!(routing::Client::new(routing_tx, Some(full_id.clone())))
+            unwrap!(routing::Client::new(routing_tx, Some(full_id.clone()), GROUP_SIZE))
         });
 
         TestClient {

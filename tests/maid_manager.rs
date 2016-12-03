@@ -21,20 +21,20 @@
 use itertools::Itertools;
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
-use routing::{Data, GROUP_SIZE, ImmutableData, StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
+use routing::{Data, ImmutableData, StructuredData, TYPE_TAG_SESSION_PACKET, XorName, Xorable};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Network};
 use rust_sodium::crypto::box_;
+use safe_vault::{GROUP_SIZE, test_utils};
 use safe_vault::mock_crust_detail::{self, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
-use safe_vault::test_utils;
 use std::collections::BTreeSet;
 
 const TEST_NET_SIZE: usize = 20;
 
 #[test]
 fn handle_put_without_account() {
-    let network = Network::new(None);
+    let network = Network::new(GROUP_SIZE, None);
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -59,7 +59,7 @@ fn handle_put_without_account() {
 
 #[test]
 fn put_oversized_data() {
-    let network = Network::new(None);
+    let network = Network::new(GROUP_SIZE, None);
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -108,7 +108,7 @@ fn put_oversized_data() {
 
 #[test]
 fn handle_put_with_account() {
-    let network = Network::new(None);
+    let network = Network::new(GROUP_SIZE, None);
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -156,7 +156,7 @@ fn create_account_twice() {
     let acct_err = Err(Some(GetError::NoSuchAccount));
     let acct_exists = Err(Some(MutationError::AccountExists));
 
-    let network = Network::new(None);
+    let network = Network::new(GROUP_SIZE, None);
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -209,7 +209,7 @@ fn create_account_twice() {
 #[test]
 #[should_panic] // TODO Look at using std::panic::catch_unwind (1.9)
 fn invalid_put_for_previously_created_account() {
-    let network = Network::new(None);
+    let network = Network::new(GROUP_SIZE, None);
     let node_count = TEST_NET_SIZE;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -225,7 +225,7 @@ fn storing_till_client_account_full() {
     // This needs to be kept in sync with maid_manager.rs
     // Ideally, a setter is preferred, so that this test can be completed quicker.
     const DEFAULT_ACCOUNT_SIZE: u64 = 100;
-    let network = Network::new(None);
+    let network = Network::new(GROUP_SIZE, None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, true);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -253,7 +253,7 @@ fn storing_till_client_account_full() {
 
 #[test]
 fn maid_manager_account_adding_with_churn() {
-    let network = Network::new(None);
+    let network = Network::new(GROUP_SIZE, None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
     let config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
@@ -309,7 +309,7 @@ fn maid_manager_account_adding_with_churn() {
 
 #[test]
 fn maid_manager_account_decrease_with_churn() {
-    let network = Network::new(None);
+    let network = Network::new(GROUP_SIZE, None);
     let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
     let client_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
