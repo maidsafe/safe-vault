@@ -884,7 +884,7 @@ impl DataManager {
         let src = Authority::ManagedNode(self.routing_node.name()?);
         let candidates = self.cache.needed_data();
         for (idle_holder, data_idv) in candidates {
-            if let Ok(Some(group)) = self.routing_node.close_group(*data_idv.0.name()) {
+            if let Ok(Some(group)) = self.routing_node.close_group(*data_idv.0.name(), GROUP_SIZE) {
                 if group.contains(&idle_holder) {
                     self.cache.insert_into_ongoing_gets(&idle_holder, &data_idv);
                     let (data_id, _) = data_idv;
@@ -899,7 +899,7 @@ impl DataManager {
     }
 
     fn close_to_address(&self, address: &XorName) -> bool {
-        match self.routing_node.close_group(*address) {
+        match self.routing_node.close_group(*address, GROUP_SIZE) {
             Ok(Some(_)) => true,
             _ => false,
         }
@@ -962,10 +962,10 @@ impl DataManager {
                 info!("{:?}", self);
             }
         }
-        self.cache.prune_data_holders(routing_table);
-        if self.cache.prune_ongoing_gets(routing_table) {
-            let _ = self.send_gets_for_needed_data();
-        }
+        // self.cache.prune_data_holders(routing_table);
+        // if self.cache.prune_ongoing_gets(routing_table) {
+        //     let _ = self.send_gets_for_needed_data();
+        // }
 
         let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
             .keys()

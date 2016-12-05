@@ -204,7 +204,7 @@ impl MaidManager {
     pub fn handle_refresh(&mut self, serialised_msg: &[u8]) -> Result<(), InternalError> {
         match serialisation::deserialise::<Refresh>(serialised_msg)? {
             Refresh::Update(maid_name, account) => {
-                match self.routing_node.close_group(maid_name) {
+                match self.routing_node.close_group(maid_name, GROUP_SIZE) {
                     Ok(None) | Err(_) => return Ok(()),
                     Ok(Some(_)) => (),
                 }
