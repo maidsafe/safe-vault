@@ -962,10 +962,10 @@ impl DataManager {
                 info!("{:?}", self);
             }
         }
-        self.cache.prune_data_holders(routing_table);
-        if self.cache.prune_ongoing_gets(routing_table) {
-            let _ = self.send_gets_for_needed_data();
-        }
+        // self.cache.prune_data_holders(routing_table);
+        // if self.cache.prune_ongoing_gets(routing_table) {
+        //     let _ = self.send_gets_for_needed_data();
+        // }
 
 
         let data_idvs = self.cache.chain_records_in_cache(self.chunk_store

@@ -208,6 +208,9 @@ impl Vault {
                   src: Authority<XorName>,
                   dst: Authority<XorName>)
                   -> Result<(), InternalError> {
+        if !unwrap!(self._routing_node.routing_table()).is_closest(dst.name(), GROUP_SIZE) {
+            return Ok(());
+        }
         match (src, dst, request) {
             // ================== Get ==================
             (src @ Authority::Client { .. },
@@ -276,6 +279,9 @@ impl Vault {
                    src: Authority<XorName>,
                    dst: Authority<XorName>)
                    -> Result<(), InternalError> {
+        if !unwrap!(self._routing_node.routing_table()).is_closest(dst.name(), GROUP_SIZE) {
+            return Ok(());
+        }
         match (src, dst, response) {
             // ================== GetSuccess ==================
             (Authority::ManagedNode(src_name),
