@@ -23,12 +23,12 @@ if [ -n "$TARGET" ]; then
   ARG_TARGET+=( --target "$TARGET" )
 fi
 
-# Build and run tests with all features specified in $FEATURES
-cargo build --release "${ARG_FEATURES[@]}" "${ARG_TARGET[@]}"
-cargo test --release "${ARG_FEATURES[@]}" "${ARG_TARGET[@]}"
-
-# Also build (but don't run) without any features.
-if [ -n "$FEATURES" ]; then
-  cargo build --release "${ARG_TARGET[@]}"
-  cargo test --release --no-run "${ARG_TARGET[@]}"
+if [ "$CHANNEL" = stable ]; then
+  cargo fmt -- --write-mode=diff
+  # Build and run tests with all features specified in $FEATURES
+  cargo build --release "${ARG_FEATURES[@]}" "${ARG_TARGET[@]}"
+  cargo test --release "${ARG_FEATURES[@]}" "${ARG_TARGET[@]}"
+elif [ "${TRAVIS_OS_NAME}" = linux ]; then
+  cargo clippy "${ARG_FEATURES[@]}"
+  cargo clippy --profile test "${ARG_FEATURES[@]}"
 fi

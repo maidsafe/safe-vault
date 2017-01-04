@@ -37,11 +37,6 @@
 #![allow(box_pointers, fat_ptr_transmutes, missing_copy_implementations,
          missing_debug_implementations, variant_size_differences)]
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy))]
-#![cfg_attr(feature="clippy", allow(use_debug))]
-
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -77,7 +72,6 @@ struct Args {
 }
 
 /// Runs a SAFE Network vault.
-#[cfg_attr(feature="clippy", allow(print_stdout))]
 pub fn main() {
     // TODO - remove the following line once maidsafe_utilities is updated to use log4rs v4.
     let _ = fs::remove_file("Node.log");

@@ -31,7 +31,6 @@ use maidsafe_utilities::serialisation;
 use rand::{self, Rng};
 use tempdir::TempDir;
 
-#[cfg_attr(feature="clippy", allow(cast_possible_truncation))]
 fn generate_random_bytes(size: u64) -> Vec<u8> {
     rand::thread_rng().gen_iter().take(size as usize).collect()
 }

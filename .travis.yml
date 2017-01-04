@@ -45,6 +45,18 @@ matrix:
       env: >
         TARGET=x86_64-unknown-linux-gnu
         PLATFORM=linux-x64
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - rpm
+            - sshpass
+
+    - os: linux
+    # TODO: Remove this once the musl build works again.
+      env: >
+        TARGET=x86_64-unknown-linux-gnu
+        PLATFORM=linux-x64
         FEATURES=use-mock-crust
       sudo: required
       addons:
@@ -81,11 +93,22 @@ matrix:
             - libc6-armhf-cross
             - libc6-dev-armhf-cross
 
+    # For running `cargo clippy`
     - os: linux
       env: >
-        CHANNEL=nightly-2016-11-17
-        FEATURES="clippy use-mock-crust"
-      allow_failures: true
+        CHANNEL=nightly-2016-12-19
+
+    # For running `cargo clippy --features use-mock-crust`
+    - os: linux
+      env: >
+        CHANNEL=nightly-2016-12-19
+        FEATURES=use-mock-crust
+
+    - os: osx
+      env: >
+        TARGET=x86_64-apple-darwin
+        PLATFORM=osx-x64
+        SKIP_SIGN_PACKAGE=1
 
     - os: osx
       env: >
@@ -93,19 +116,6 @@ matrix:
         PLATFORM=osx-x64
         FEATURES=use-mock-crust
         SKIP_SIGN_PACKAGE=1
-
-    - os: osx
-      env: >
-        CHANNEL=nightly-2016-11-17
-        FEATURES="clippy use-mock-crust"
-      allow_failures: true
-
-  # Add "allow_failures: true" to rows which are allowed to fail without making
-  # the whole build fail. This is useful for nightly builds.
-  allow_failures:
-    - allow_failures: true
-  # Don't wait for the rows that are allowed to fail.
-  fast_finish: true
 
 branches:
   only:
@@ -127,12 +137,27 @@ before_install:
 install:
   - ./ci/travis/install.sh
 
+before_script:
+  - (which cargo-install-update && cargo install-update cargo-update) || cargo install cargo-update
+  - (which cargo-prune && cargo install-update cargo-prune) || cargo install cargo-prune
+  - if [ -z ${CHANNEL+x} ] || [ "${CHANNEL}" = stable ]; then
+      (which rustfmt && cargo install-update rustfmt) || cargo install rustfmt;
+    elif [ "${TRAVIS_OS_NAME}" = linux ]; then
+      clippy_vers=0.0.104;
+      if ! cargo clippy --version | grep -q $clippy_vers; then
+        cargo install clippy --vers=$clippy_vers --force;
+      fi
+    fi
+
 script:
   - export QUICK_TEST=true
   - travis_wait 60 ./ci/travis/script.sh
 
 after_success:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/after_success.sh | bash
+
+before_cache:
+ - cargo prune
 
 before_deploy:
   - ./ci/travis/before_deploy.sh

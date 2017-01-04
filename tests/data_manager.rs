@@ -702,9 +702,9 @@ fn handle_put_get_normal_flow() {
         let _ = client.put_and_verify(data.clone(), &mut nodes);
         all_data.push(data);
     }
-    for i in 0..test_utils::iterations() {
-        let data = client.get(all_data[i].identifier(), &mut nodes);
-        assert_eq!(data, all_data[i]);
+    for data_item in all_data.iter().take(test_utils::iterations()) {
+        let data = client.get(data_item.identifier(), &mut nodes);
+        assert_eq!(data, *data_item);
     }
 }
 
@@ -1039,7 +1039,7 @@ fn caching_with_data_close_to_proxy_node() {
 fn gen_random_immutable_data_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> Data {
     loop {
         let data = Data::Immutable(test_utils::random_immutable_data(10, rng));
-        if node.routing_table().is_closest(&data.name(), GROUP_SIZE) {
+        if node.routing_table().is_closest(data.name(), GROUP_SIZE) {
             return data;
         }
     }
@@ -1048,7 +1048,7 @@ fn gen_random_immutable_data_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> D
 fn gen_random_immutable_data_not_close_to<R: Rng>(node: &TestNode, rng: &mut R) -> Data {
     loop {
         let data = Data::Immutable(test_utils::random_immutable_data(10, rng));
-        if !node.routing_table().is_closest(&data.name(), GROUP_SIZE) {
+        if !node.routing_table().is_closest(data.name(), GROUP_SIZE) {
             return data;
         }
     }
