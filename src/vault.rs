@@ -186,8 +186,8 @@ impl Vault {
                 ret = Some(true);
                 Ok(())
             }
-            Event::GroupSplit(_prefix) |
-            Event::GroupMerge(_prefix) => Ok(()),
+            Event::SectionSplit(_prefix) |
+            Event::SectionMerge(_prefix) => Ok(()),
             Event::Connected | Event::Tick => Ok(()),
         } {
             debug!("Failed to handle event: {:?}", error);
