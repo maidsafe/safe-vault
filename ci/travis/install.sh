@@ -2,25 +2,9 @@
 
 set -ex
 
-CHANNEL=${CHANNEL:-stable}
-
-case "$TRAVIS_OS_NAME" in
-  linux)
-    HOST=x86_64-unknown-linux-gnu
-    ;;
-  osx)
-    HOST=x86_64-apple-darwin
-    ;;
-esac
-
-# Install rust
-curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain=$CHANNEL
-rustc -V
-cargo -V
-
-# Install crates for cross-compilation
-if [ -n "$TARGET" -a "$HOST" != "$TARGET" ]; then
-  rustup target add $TARGET
+# Add a rustup target for cross-compilation
+if [ -n "$TARGET" ]; then
+  sh ~/rust-installer/rustup.sh --prefix=$HOME/rust --add-target=$TARGET --disable-sudo
 fi
 
 # Configure toolchain
@@ -35,10 +19,10 @@ case "$TARGET" in
 esac
 
 if [ -n "$GCC_PREFIX" ]; then
-  # information about the cross compiler
+  # Information about the cross compiler
   ${GCC_PREFIX}gcc -v
 
-  # tell cargo which linker to use for cross compilation
+  # Tell cargo which linker to use for cross compilation
   mkdir -p .cargo
   echo "[target.$TARGET]" >> .cargo/config
   echo "linker = \"${GCC_PREFIX}gcc\"" >> .cargo/config

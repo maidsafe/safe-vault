@@ -1,17 +1,11 @@
 sudo: false
-# Note: cannot use "rust" here, because that doesn't give us the "rustup"
-# binary, which we need for cross-compilation.
-# As a workaround, we use "generic" and install the rust ecosystem ourselves.
-language: generic
+
+language: rust
 
 # Env variables:
 #
 #   TARGET:      target triplet
 #   PLATFORM:    platform suffix for the release file name (e.g. linux-x64)
-#   CHANNEL:     rust channel: stable/beta/nightly. If not specified, defaults
-#                to stable.
-#   FEATURES:    build with --features "$FEATURES". Will also build (but not
-#                run) without those features.
 #   ONLY_DEPLOY: build this configuration only if we are deploying a release
 #                (on version bump).
 
@@ -19,6 +13,8 @@ env:
   global:
     - secure: GXW0WyMkipF5lh29QHMxSKl6Dpvd4Qqggu5SBGymS5KQ7VPuqgEE2A8YwQDIGf4IEZUoAcAb1W7oPwQ0/kv7omlF2S8gmals1BeGKStU1np6lIIH64B87w4RIDhD+limVAfKgWb3Oldj6PDAm8gjbWjPiZF/6oxH4hd/+d9r2GY=
     - PROJECT_NAME=safe_vault
+    - PATH=$PATH:$HOME/.cargo/bin:$HOME/musl/bin
+    - RUST_BACKTRACE=1
 
 matrix:
   include:
@@ -42,8 +38,8 @@ matrix:
 
     - os: linux
     # TODO: Remove this once the musl build works again.
+      rust: stable
       env: >
-        TARGET=x86_64-unknown-linux-gnu
         PLATFORM=linux-x64
       sudo: required
       addons:
@@ -53,23 +49,10 @@ matrix:
             - sshpass
 
     - os: linux
-    # TODO: Remove this once the musl build works again.
+      rust: stable
       env: >
-        TARGET=x86_64-unknown-linux-gnu
-        PLATFORM=linux-x64
-        FEATURES=use-mock-crust
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - rpm
-            - sshpass
-
-    - os: linux
-      env: >
-        TARGET=i686-unknown-linux-gnu
         PLATFORM=linux-x86
-        FEATURES=use-mock-crust
+        TARGET=i686-unknown-linux-gnu
         ONLY_DEPLOY=1
       sudo: required
       addons:
@@ -79,10 +62,10 @@ matrix:
             - sshpass
 
     - os: linux
+      rust: stable
       env: >
-        TARGET=armv7-unknown-linux-gnueabihf
         PLATFORM=armv7
-        FEATURES=use-mock-crust
+        TARGET=armv7-unknown-linux-gnueabihf
         ONLY_DEPLOY=1
       sudo: required
       addons:
@@ -93,46 +76,25 @@ matrix:
             - libc6-armhf-cross
             - libc6-dev-armhf-cross
 
+    - os: osx
+      rust: stable
+      env: >
+        PLATFORM=osx-x64
+        SKIP_SIGN_PACKAGE=1
+
     # For running `cargo clippy`
     - os: linux
-      env: >
-        CHANNEL=nightly-2016-12-19
-
-    # For running `cargo clippy --features use-mock-crust`
-    - os: linux
-      env: >
-        CHANNEL=nightly-2016-12-19
-        FEATURES=use-mock-crust
-
-    - os: osx
-      env: >
-        TARGET=x86_64-apple-darwin
-        PLATFORM=osx-x64
-        SKIP_SIGN_PACKAGE=1
-
-    - os: osx
-      env: >
-        TARGET=x86_64-apple-darwin
-        PLATFORM=osx-x64
-        FEATURES=use-mock-crust
-        SKIP_SIGN_PACKAGE=1
-
-branches:
-  only:
-    - dev
-    - master
+      rust: nightly-2016-12-19
 
 cache:
+  cargo: true
   directories:
     - $HOME/musl
-    - $HOME/.cargo
-    - $TRAVIS_BUILD_DIR/target
     - $HOME/.gem
 
 before_install:
-  - export PROJECT_VERSION=$(git log -1 | grep -i "version change to" | sed "s/.*[vV]ersion change to v\{0,1\}//")
-  - export PATH="$PATH:$HOME/.cargo/bin:$HOME/musl/bin"
-  - export PKG_CONFIG_ALLOW_CROSS=1
+  # - export PROJECT_VERSION=$(git log -1 | grep -i "version change to" | sed "s/.*[vV]ersion change to v\{0,1\}//")
+  - export PROJECT_VERSION=0.0.0
 
 install:
   - ./ci/travis/install.sh
@@ -140,9 +102,9 @@ install:
 before_script:
   - (which cargo-install-update && cargo install-update cargo-update) || cargo install cargo-update
   - (which cargo-prune && cargo install-update cargo-prune) || cargo install cargo-prune
-  - if [ -z ${CHANNEL+x} ] || [ "${CHANNEL}" = stable ]; then
+  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
       (which rustfmt && cargo install-update rustfmt) || cargo install rustfmt;
-    elif [ "${TRAVIS_OS_NAME}" = linux ]; then
+    elif [ -z "${TARGET}" ] && [ "${TRAVIS_OS_NAME}" = linux ]; then
       clippy_vers=0.0.104;
       if ! cargo clippy --version | grep -q $clippy_vers; then
         cargo install clippy --vers=$clippy_vers --force;
@@ -150,11 +112,8 @@ before_script:
     fi
 
 script:
-  - export QUICK_TEST=true
-  - travis_wait 60 ./ci/travis/script.sh
-
-after_success:
-  - curl -sSL https://github.com/maidsafe/QA/raw/master/Bash%20Scripts/Travis/after_success.sh | bash
+  - export -f travis_wait
+  - sh ./ci/travis/script.sh
 
 before_cache:
  - cargo prune
@@ -163,7 +122,7 @@ before_deploy:
   - ./ci/travis/before_deploy.sh
 
 deploy:
-  # Deploy tarballs to Github releases
+  # Deploy tarballs to GitHub releases
   - provider: releases
     api_key: ${GH_TOKEN}
     file: ${PROJECT_NAME}-v${PROJECT_VERSION}-${PLATFORM}.tar.gz
@@ -172,42 +131,41 @@ deploy:
     tag_name: ${PROJECT_VERSION}
     on:
       condition: >
-        (-n "$PROJECT_VERSION") &&
-        (-n "$PLATFORM") &&
-        ("${CHANNEL:-stable}"=stable)
+        [ -n "$PROJECT_VERSION" ] && [ "${TRAVIS_RUST_VERSION}" = stable ]
 
-  # Deploy osx pkg to Github releases
-  - provider: releases
-    api_key: ${GH_TOKEN}
-    file: ./packages/osx/${PROJECT_NAME}-${PROJECT_VERSION}.pkg
-    skip_cleanup: true
-    draft: true
-    tag_name: ${PROJECT_VERSION}
-    on:
-      condition: >
-        ("$PLATFORM" = "osx-x64") &&
-        (-n "$PROJECT_VERSION") &&
-        ("${CHANNEL:-stable}"=stable)
+# TODO - verify and renable following block
+#   # Deploy osx pkg to Github releases
+#   - provider: releases
+#     api_key: ${GH_TOKEN}
+#     file: ./packages/osx/${PROJECT_NAME}-${PROJECT_VERSION}.pkg
+#     skip_cleanup: true
+#     draft: true
+#     tag_name: ${PROJECT_VERSION}
+#     on:
+#       condition: >
+#         ("$PLATFORM" = "osx-x64") &&
+#         (-n "$PROJECT_VERSION") &&
+#         ("${CHANNEL:-stable}"=stable)
 
-  # Deploy linux deb and rpm packages to MaidSafe repositories
-  - provider: script
-    script: ./ci/travis/deploy_linux_packages.sh
-    skip_cleanup: true
-    on:
-      condition: >
-        (("$PLATFORM" = "linux-x64") || ("$PLATFORM" = "linux-x86")) &&
-        (-n "$PROJECT_VERSION") &&
-        ("${CHANNEL:-stable}"=stable)
+#   # Deploy linux deb and rpm packages to MaidSafe repositories
+#   - provider: script
+#     script: ./ci/travis/deploy_linux_packages.sh
+#     skip_cleanup: true
+#     on:
+#       condition: >
+#         (("$PLATFORM" = "linux-x64") || ("$PLATFORM" = "linux-x86")) &&
+#         (-n "$PROJECT_VERSION") &&
+#         ("${CHANNEL:-stable}"=stable)
 
-  # Deploy docker image to Docker Hub.
-  - provider: script
-    script: ./ci/travis/deploy_docker_image.sh
-    skip_cleanup: true
-    on:
-      condition: >
-        (-n "$DOCKER_IMAGE") &&
-        (-n "$DOCKER_EMAIL") &&
-        (-n "$DOCKER_USERNAME") &&
-        (-n "$DOCKER_PASSWORD") &&
-        (-n "$PROJECT_VERSION") &&
-        ("${CHANNEL:-stable}"=stable)
+#   # Deploy docker image to Docker Hub.
+#   - provider: script
+#     script: ./ci/travis/deploy_docker_image.sh
+#     skip_cleanup: true
+#     on:
+#       condition: >
+#         (-n "$DOCKER_IMAGE") &&
+#         (-n "$DOCKER_EMAIL") &&
+#         (-n "$DOCKER_USERNAME") &&
+#         (-n "$DOCKER_PASSWORD") &&
+#         (-n "$PROJECT_VERSION") &&
+#         ("${CHANNEL:-stable}"=stable)
