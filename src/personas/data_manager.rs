@@ -30,7 +30,6 @@ use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
 use std::ops::Add;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::time::{Duration, Instant};
 use vault::RoutingNode;
 
@@ -353,7 +352,6 @@ impl Cache {
 
 pub struct DataManager {
     chunk_store: ChunkStore<DataIdentifier, Data>,
-    routing_node: Rc<RoutingNode>,
     /// Accumulates refresh messages and the peers we received them from.
     refresh_accumulator: Accumulator<IdAndVersion, XorName>,
     cache: Cache,
@@ -388,17 +386,13 @@ impl Debug for DataManager {
 }
 
 impl DataManager {
-    pub fn new(routing_node: Rc<RoutingNode>,
-               chunk_store_root: PathBuf,
-               capacity: u64)
-               -> Result<DataManager, InternalError> {
+    pub fn new(chunk_store_root: PathBuf, capacity: u64) -> Result<DataManager, InternalError> {
         Ok(DataManager {
             chunk_store: ChunkStore::new(chunk_store_root, capacity)?,
             refresh_accumulator:
                 Accumulator::with_duration(ACCUMULATOR_QUORUM,
                                            Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
             cache: Default::default(),
-            routing_node: routing_node,
             immutable_data_count: 0,
             structured_data_count: 0,
             appendable_data_count: 0,
@@ -408,6 +402,7 @@ impl DataManager {
     }
 
     pub fn handle_get(&mut self,
+                      routing_node: &mut RoutingNode,
                       src: Authority<XorName>,
                       dst: Authority<XorName>,
                       data_id: DataIdentifier,
@@ -422,18 +417,18 @@ impl DataManager {
         }
         if let Ok(data) = self.chunk_store.get(&data_id) {
             trace!("As {:?} sending data {:?} to {:?}", dst, data, src);
-            let _ = self.routing_node.send_get_success(dst, src, data, message_id);
+            let _ = routing_node.send_get_success(dst, src, data, message_id);
             return Ok(());
         }
         trace!("DM sending get_failure of {:?}", data_id);
         let error = GetError::NoSuchData;
         let external_error_indicator = serialisation::serialise(&error)?;
-        self.routing_node
-            .send_get_failure(dst, src, data_id, external_error_indicator, message_id)?;
+        routing_node.send_get_failure(dst, src, data_id, external_error_indicator, message_id)?;
         Ok(())
     }
 
     pub fn handle_put(&mut self,
+                      routing_node: &mut RoutingNode,
                       src: Authority<XorName>,
                       dst: Authority<XorName>,
                       data: Data,
@@ -463,7 +458,7 @@ impl DataManager {
                 DataIdentifier::Immutable(..) => {
                     trace!("DM sending PutSuccess for data {:?}, it already exists.",
                            data_id);
-                    self.routing_node.send_put_success(dst, src, data_id, message_id)?;
+                    routing_node.send_put_success(dst, src, data_id, message_id)?;
                     return Ok(());
                 }
             }
@@ -483,18 +478,24 @@ impl DataManager {
 
         if let Some(error) = error_opt {
             let external_error_indicator = serialisation::serialise(&error)?;
-            self.routing_node
-                .send_put_failure(dst, src, data_id, external_error_indicator, message_id)?;
+            routing_node.send_put_failure(dst, src, data_id, external_error_indicator, message_id)?;
             if is_full {
                 return Err(From::from(error));
             }
         }
 
-        self.update_pending_writes(data, PendingMutationType::Put, src, dst, message_id, !valid)
+        self.update_pending_writes(routing_node,
+                                   data,
+                                   PendingMutationType::Put,
+                                   src,
+                                   dst,
+                                   message_id,
+                                   !valid)
     }
 
     /// Handles a Post request for structured or appendable data.
     pub fn handle_post(&mut self,
+                       routing_node: &mut RoutingNode,
                        src: Authority<XorName>,
                        dst: Authority<XorName>,
                        new_data: Data,
@@ -507,8 +508,7 @@ impl DataManager {
             let post_error = serialisation::serialise(&error)?;
             trace!("DM sending post_failure for data {:?}, data exceeds size limit.",
                    data_id);
-            return Ok(self.routing_node
-                .send_post_failure(dst, src, data_id, post_error, message_id)?);
+            return Ok(routing_node.send_post_failure(dst, src, data_id, post_error, message_id)?);
         }
 
         let mut error_opt = None;
@@ -556,16 +556,17 @@ impl DataManager {
                        message_id,
                        error);
                 let post_error = serialisation::serialise(&error)?;
-                return Ok(self.routing_node
+                return Ok(routing_node
                     .send_post_failure(dst, src, data_id, post_error, message_id)?);
             }
         };
 
         if let Some(ref error) = error_opt {
             let post_error = serialisation::serialise(error)?;
-            self.routing_node.send_post_failure(dst, src, data_id, post_error, message_id)?;
+            routing_node.send_post_failure(dst, src, data_id, post_error, message_id)?;
         }
-        self.update_pending_writes(data,
+        self.update_pending_writes(routing_node,
+                                   data,
                                    PendingMutationType::Post,
                                    src,
                                    dst,
@@ -575,6 +576,7 @@ impl DataManager {
 
     /// The structured_data in the delete request must be a valid updating version of the target
     pub fn handle_delete(&mut self,
+                         routing_node: &mut RoutingNode,
                          src: Authority<XorName>,
                          dst: Authority<XorName>,
                          new_data: StructuredData,
@@ -591,7 +593,8 @@ impl DataManager {
                 } else {
                     Some(MutationError::InvalidSuccessor)
                 };
-                self.update_pending_writes(Data::Structured(data),
+                self.update_pending_writes(routing_node,
+                                           Data::Structured(data),
                                            PendingMutationType::Delete,
                                            src,
                                            dst,
@@ -605,13 +608,14 @@ impl DataManager {
         if let Some(error) = error_opt {
             trace!("DM sending delete_failure for {:?}", new_data.identifier());
             let err_data = serialisation::serialise(&error)?;
-            self.routing_node.send_delete_failure(dst, src, data_id, err_data, message_id)?;
+            routing_node.send_delete_failure(dst, src, data_id, err_data, message_id)?;
         }
         Ok(())
     }
 
     /// Handles a request to append an item to a public or private appendable data chunk.
     pub fn handle_append(&mut self,
+                         routing_node: &mut RoutingNode,
                          src: Authority<XorName>,
                          dst: Authority<XorName>,
                          wrapper: AppendWrapper,
@@ -644,7 +648,7 @@ impl DataManager {
                        message_id,
                        error);
                 let append_error = serialisation::serialise(&MutationError::NoSuchData)?;
-                return Ok(self.routing_node
+                return Ok(routing_node
                     .send_append_failure(dst, src, data_id, append_error, message_id)?);
             }
         };
@@ -655,10 +659,11 @@ impl DataManager {
                 let append_error = serialisation::serialise(&error)?;
                 trace!("DM sending append_failure for data {:?}, data exceeds size limit.",
                        data_id);
-                return Ok(self.routing_node
+                return Ok(routing_node
                     .send_append_failure(dst, src, data_id, append_error, message_id)?);
             }
-            self.update_pending_writes(data,
+            self.update_pending_writes(routing_node,
+                                       data,
                                        PendingMutationType::Append,
                                        src,
                                        dst,
@@ -669,20 +674,20 @@ impl DataManager {
                    data_id,
                    message_id);
             let append_error = serialisation::serialise(&MutationError::InvalidSuccessor)?;
-            Ok(self.routing_node
-                .send_append_failure(dst, src, data_id, append_error, message_id)?)
+            Ok(routing_node.send_append_failure(dst, src, data_id, append_error, message_id)?)
         }
     }
 
     pub fn handle_get_success(&mut self,
+                              routing_node: &mut RoutingNode,
                               src: XorName,
                               mut data: Data)
                               -> Result<(), InternalError> {
         let (data_id, version) = id_and_version_of(&data);
         self.cache.handle_get_success(src, &data_id, version);
-        self.send_gets_for_needed_data()?;
+        self.send_gets_for_needed_data(routing_node)?;
         // If we're no longer in the close group, return.
-        if !self.close_to_address(data_id.name()) {
+        if !self.close_to_address(routing_node, data_id.name()) {
             return Ok(());
         }
         // TODO: Check that the data's hash actually agrees with an accumulated entry.
@@ -750,6 +755,7 @@ impl DataManager {
     }
 
     pub fn handle_get_failure(&mut self,
+                              routing_node: &mut RoutingNode,
                               src: XorName,
                               data_id: DataIdentifier)
                               -> Result<(), InternalError> {
@@ -757,10 +763,11 @@ impl DataManager {
             warn!("Got unexpected GetFailure for data {:?}.", data_id);
             return Err(InternalError::InvalidMessage);
         }
-        self.send_gets_for_needed_data()
+        self.send_gets_for_needed_data(routing_node)
     }
 
     pub fn handle_refresh(&mut self,
+                          routing_node: &mut RoutingNode,
                           src: XorName,
                           serialised_data_list: &[u8])
                           -> Result<(), InternalError> {
@@ -805,11 +812,14 @@ impl DataManager {
                 self.cache.add_records(data_idv, holders);
             }
         }
-        self.send_gets_for_needed_data()
+        self.send_gets_for_needed_data(routing_node)
     }
 
     /// Handles an accumulated refresh message sent from the whole group.
-    pub fn handle_group_refresh(&mut self, serialised_refresh: &[u8]) -> Result<(), InternalError> {
+    pub fn handle_group_refresh(&mut self,
+                                routing_node: &mut RoutingNode,
+                                serialised_refresh: &[u8])
+                                -> Result<(), InternalError> {
         let RefreshData((data_id, version), refresh_hash) =
             serialisation::deserialise(serialised_refresh)?;
         let mut success = false;
@@ -823,17 +833,23 @@ impl DataManager {
                            error);
                     let error = MutationError::NetworkOther(format!("Failed to store chunk: {:?}",
                                                                     error));
-                    self.send_failure(mutate_type, src, dst, data_id, message_id, error)?;
+                    self.send_failure(routing_node,
+                                      mutate_type,
+                                      src,
+                                      dst,
+                                      data_id,
+                                      message_id,
+                                      error)?;
                 } else {
                     trace!("DM updated for: {:?}", data_id);
                     let _ = match mutate_type {
                         PendingMutationType::Append => {
                             trace!("DM sending AppendSuccess for data {:?}", data_id);
-                            self.routing_node.send_append_success(dst, src, data_id, message_id)
+                            routing_node.send_append_success(dst, src, data_id, message_id)
                         }
                         PendingMutationType::Post => {
                             trace!("DM sending PostSuccess for data {:?}", data_id);
-                            self.routing_node.send_post_success(dst, src, data_id, message_id)
+                            routing_node.send_post_success(dst, src, data_id, message_id)
                         }
                         PendingMutationType::Put => {
                             // Put to a deleted data shall not be counted
@@ -845,36 +861,46 @@ impl DataManager {
                                 info!("{:?}", self);
                             }
                             trace!("DM sending PutSuccess for data {:?}", data_id);
-                            self.routing_node.send_put_success(dst, src, data_id, message_id)
+                            routing_node.send_put_success(dst, src, data_id, message_id)
                         }
                         PendingMutationType::Delete => {
                             trace!("DM sending DeleteSuccess for data {:?}", data_id);
-                            self.routing_node.send_delete_success(dst, src, data_id, message_id)
+                            routing_node.send_delete_success(dst, src, data_id, message_id)
                         }
                     };
                     let data_list = vec![(data_id, version)];
-                    let _ = self.send_refresh(Authority::NaeManager(*data_id.name()), data_list);
+                    let _ = self.send_refresh(routing_node,
+                                              Authority::NaeManager(*data_id.name()),
+                                              data_list);
                     success = true;
                 }
             } else if !rejected {
                 trace!("{:?} did not accumulate. Sending failure", data_id);
                 let error = MutationError::NetworkOther("Concurrent modification.".to_owned());
-                self.send_failure(mutate_type, src, dst, data.identifier(), message_id, error)?;
+                self.send_failure(routing_node,
+                                  mutate_type,
+                                  src,
+                                  dst,
+                                  data.identifier(),
+                                  message_id,
+                                  error)?;
             }
         }
         if !success {
-            if let Ok(Some(group)) = self.routing_node.close_group(*data_id.name(), GROUP_SIZE) {
+            if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
                 let data_idv = (data_id, version);
                 for node in &group {
                     let _ = self.cache.register_data_with_holder(node, &data_idv);
                 }
-                self.send_gets_for_needed_data()?;
+                self.send_gets_for_needed_data(routing_node)?;
             }
         }
         Ok(())
     }
 
+    #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
     fn send_failure(&self,
+                    routing_node: &mut RoutingNode,
                     mutate_type: PendingMutationType,
                     src: Authority<XorName>,
                     dst: Authority<XorName>,
@@ -885,21 +911,23 @@ impl DataManager {
         let write_error = serialisation::serialise(&error)?;
         Ok(match mutate_type {
             PendingMutationType::Append => {
-                self.routing_node.send_append_failure(dst, src, data_id, write_error, message_id)
+                routing_node.send_append_failure(dst, src, data_id, write_error, message_id)
             }
             PendingMutationType::Post => {
-                self.routing_node.send_post_failure(dst, src, data_id, write_error, message_id)
+                routing_node.send_post_failure(dst, src, data_id, write_error, message_id)
             }
             PendingMutationType::Put => {
-                self.routing_node.send_put_failure(dst, src, data_id, write_error, message_id)
+                routing_node.send_put_failure(dst, src, data_id, write_error, message_id)
             }
             PendingMutationType::Delete => {
-                self.routing_node.send_delete_failure(dst, src, data_id, write_error, message_id)
+                routing_node.send_delete_failure(dst, src, data_id, write_error, message_id)
             }
         }?)
     }
 
+    #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
     fn update_pending_writes(&mut self,
+                             routing_node: &mut RoutingNode,
                              data: Data,
                              mutate_type: PendingMutationType,
                              src: Authority<XorName>,
@@ -912,28 +940,36 @@ impl DataManager {
             let data_id = data.identifier();
             let error = MutationError::NetworkOther("Request expired.".to_owned());
             trace!("{:?} did not accumulate. Sending failure", data_id);
-            self.send_failure(mutate_type, src, dst, data_id, message_id, error)?;
+            self.send_failure(routing_node,
+                              mutate_type,
+                              src,
+                              dst,
+                              data_id,
+                              message_id,
+                              error)?;
         }
         let data_name = *data.name();
 
         if let Some(refresh_data) =
             self.cache.insert_pending_write(data, mutate_type, src, dst, message_id, rejected) {
-            let _ = self.send_group_refresh(data_name, refresh_data, message_id);
+            let _ = self.send_group_refresh(routing_node, data_name, refresh_data, message_id);
         }
         Ok(())
     }
 
-    fn send_gets_for_needed_data(&mut self) -> Result<(), InternalError> {
-        let src = Authority::ManagedNode(self.routing_node.name()?);
+    fn send_gets_for_needed_data(&mut self,
+                                 routing_node: &mut RoutingNode)
+                                 -> Result<(), InternalError> {
+        let src = Authority::ManagedNode(routing_node.name()?);
         let candidates = self.cache.needed_data();
         for (idle_holder, data_idv) in candidates {
-            if let Ok(Some(group)) = self.routing_node.close_group(*data_idv.0.name(), GROUP_SIZE) {
+            if let Some(group) = routing_node.close_group(*data_idv.0.name(), GROUP_SIZE) {
                 if group.contains(&idle_holder) {
                     self.cache.insert_into_ongoing_gets(&idle_holder, &data_idv);
                     let (data_id, _) = data_idv;
                     let dst = Authority::ManagedNode(idle_holder);
                     let msg_id = MessageId::new();
-                    let _ = self.routing_node.send_get_request(src, dst, data_id, msg_id);
+                    let _ = routing_node.send_get_request(src, dst, data_id, msg_id);
                 }
             }
         }
@@ -941,19 +977,17 @@ impl DataManager {
         Ok(())
     }
 
-    fn close_to_address(&self, address: &XorName) -> bool {
-        match self.routing_node.close_group(*address, GROUP_SIZE) {
-            Ok(Some(_)) => true,
-            _ => false,
-        }
+    fn close_to_address(&self, routing_node: &mut RoutingNode, address: &XorName) -> bool {
+        routing_node.close_group(*address, GROUP_SIZE).is_some()
     }
 
     pub fn handle_node_added(&mut self,
+                             routing_node: &mut RoutingNode,
                              node_name: &XorName,
                              routing_table: &RoutingTable<XorName>) {
         self.cache.prune_data_holders(routing_table);
         if self.cache.prune_ongoing_gets(routing_table) {
-            let _ = self.send_gets_for_needed_data();
+            let _ = self.send_gets_for_needed_data(routing_node);
         }
         let data_idvs = self.cache.chain_records_in_cache(self.chunk_store
             .keys()
@@ -984,7 +1018,7 @@ impl DataManager {
             }
         }
         if !data_list.is_empty() {
-            let _ = self.send_refresh(Authority::ManagedNode(*node_name), data_list);
+            let _ = self.send_refresh(routing_node, Authority::ManagedNode(*node_name), data_list);
         }
         if has_pruned_data && self.logging_time.elapsed().as_secs() > STATUS_LOG_INTERVAL {
             self.logging_time = Instant::now();
@@ -995,6 +1029,7 @@ impl DataManager {
     /// Get all names and hashes of all data. // [TODO]: Can be optimised - 2016-04-23 09:11pm
     /// Send to all members of group of data.
     pub fn handle_node_lost(&mut self,
+                            routing_node: &mut RoutingNode,
                             node_name: &XorName,
                             routing_table: &RoutingTable<XorName>) {
         let pruned_unneeded_chunks = self.cache.prune_unneeded_chunks(routing_table);
@@ -1007,7 +1042,7 @@ impl DataManager {
         }
         self.cache.prune_data_holders(routing_table);
         if self.cache.prune_ongoing_gets(routing_table) {
-            let _ = self.send_gets_for_needed_data();
+            let _ = self.send_gets_for_needed_data(routing_node);
         }
 
 
@@ -1037,12 +1072,12 @@ impl DataManager {
             }
         }
         for (node_name, data_list) in data_lists {
-            let _ = self.send_refresh(Authority::ManagedNode(node_name), data_list);
+            let _ = self.send_refresh(routing_node, Authority::ManagedNode(node_name), data_list);
         }
     }
 
-    pub fn check_timeouts(&mut self) {
-        let _ = self.send_gets_for_needed_data();
+    pub fn check_timeouts(&mut self, routing_node: &mut RoutingNode) {
+        let _ = self.send_gets_for_needed_data(routing_node);
     }
 
     #[cfg(feature = "use-mock-crust")]
@@ -1112,16 +1147,17 @@ impl DataManager {
     }
 
     fn send_refresh(&self,
+                    routing_node: &mut RoutingNode,
                     dst: Authority<XorName>,
                     data_list: Vec<IdAndVersion>)
                     -> Result<(), InternalError> {
-        let src = Authority::ManagedNode(self.routing_node.name()?);
+        let src = Authority::ManagedNode(routing_node.name()?);
         // FIXME - We need to handle >2MB chunks
         match serialisation::serialise(&RefreshDataList(data_list)) {
             Ok(serialised_list) => {
                 trace!("DM sending refresh to {:?}.", dst);
-                let _ = self.routing_node
-                    .send_refresh_request(src, dst, serialised_list, MessageId::new());
+                let _ =
+                    routing_node.send_refresh_request(src, dst, serialised_list, MessageId::new());
                 Ok(())
             }
             Err(error) => {
@@ -1132,6 +1168,7 @@ impl DataManager {
     }
 
     fn send_group_refresh(&self,
+                          routing_node: &mut RoutingNode,
                           name: XorName,
                           refresh_data: RefreshData,
                           msg_id: MessageId)
@@ -1139,11 +1176,10 @@ impl DataManager {
         match serialisation::serialise(&refresh_data) {
             Ok(serialised_data) => {
                 trace!("DM sending refresh data to group {:?}.", name);
-                let _ = self.routing_node
-                    .send_refresh_request(Authority::NaeManager(name),
-                                          Authority::NaeManager(name),
-                                          serialised_data,
-                                          msg_id);
+                let _ = routing_node.send_refresh_request(Authority::NaeManager(name),
+                                                          Authority::NaeManager(name),
+                                                          serialised_data,
+                                                          msg_id);
                 Ok(())
             }
             Err(error) => {

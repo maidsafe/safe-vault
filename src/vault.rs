@@ -24,12 +24,10 @@ use personas::data_manager::DataManager;
 #[cfg(feature = "use-mock-crust")]
 use personas::data_manager::IdAndVersion;
 use personas::maid_manager::MaidManager;
-use routing::{Authority, Data, NodeBuilder, Request, Response, RoutingTable, XorName};
+use routing::{Authority, Data, EventStream, NodeBuilder, Request, Response, RoutingTable, XorName};
 use rust_sodium;
 use std::env;
 use std::path::Path;
-use std::rc::Rc;
-use std::sync::mpsc::{self, Receiver};
 
 pub const CHUNK_STORE_DIR: &'static str = "safe_vault_chunk_store";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
@@ -41,8 +39,7 @@ pub use routing::Node as RoutingNode;
 pub struct Vault {
     maid_manager: MaidManager,
     data_manager: DataManager,
-    _routing_node: Rc<RoutingNode>,
-    routing_receiver: Receiver<Event>,
+    routing_node: RoutingNode,
 }
 
 impl Vault {
@@ -91,29 +88,26 @@ impl Vault {
         };
         chunk_store_root.push(CHUNK_STORE_DIR);
 
-        let (routing_sender, routing_receiver) = mpsc::channel();
-        let routing_node = Rc::new(if use_cache {
-            builder.cache(Box::new(Cache::new())).create(routing_sender, GROUP_SIZE)
+        let routing_node = if use_cache {
+            builder.cache(Box::new(Cache::new())).create(GROUP_SIZE)
         } else {
-            builder.create(routing_sender, GROUP_SIZE)
-        }?);
+            builder.create(GROUP_SIZE)
+        }?;
 
         Ok(Vault {
-            maid_manager: MaidManager::new(routing_node.clone()),
-            data_manager: DataManager::new(routing_node.clone(),
-                                           chunk_store_root,
+            maid_manager: MaidManager::new(),
+            data_manager: DataManager::new(chunk_store_root,
                                            config.max_capacity
                                                .unwrap_or(DEFAULT_MAX_CAPACITY))?,
-            _routing_node: routing_node.clone(),
-            routing_receiver: routing_receiver,
+            routing_node: routing_node,
         })
 
     }
 
     /// Run the event loop, processing events received from Routing.
     pub fn run(&mut self) -> Result<bool, InternalError> {
-        while let Ok(event) = self.routing_receiver.recv() {
-            if let Some(terminate) = self.process_event(event) {
+        while let Ok(ev) = self.routing_node.next_ev() {
+            if let Some(terminate) = self.process_event(ev) {
                 return Ok(terminate);
             }
         }
@@ -125,14 +119,14 @@ impl Vault {
     /// any received, otherwise returns false.
     #[cfg(feature = "use-mock-crust")]
     pub fn poll(&mut self) -> bool {
-        let mut result = self._routing_node.poll();
+        let mut ev_processed = self.routing_node.poll();
 
-        while let Ok(event) = self.routing_receiver.try_recv() {
-            let _ignored_for_mock = self.process_event(event);
-            result = true
+        while let Ok(ev) = self.routing_node.try_next_ev() {
+            let _ = self.process_event(ev);
+            ev_processed = true;
         }
 
-        result
+        ev_processed
     }
 
     /// Get the names of all the data chunks stored in a personas' chunk store.
@@ -149,26 +143,26 @@ impl Vault {
 
     /// Resend all unacknowledged messages.
     #[cfg(feature = "use-mock-crust")]
-    pub fn resend_unacknowledged(&self) -> bool {
-        self._routing_node.resend_unacknowledged()
+    pub fn resend_unacknowledged(&mut self) -> bool {
+        self.routing_node.resend_unacknowledged()
     }
 
     /// Clear routing node state.
     #[cfg(feature = "use-mock-crust")]
-    pub fn clear_state(&self) {
-        self._routing_node.clear_state()
+    pub fn clear_state(&mut self) {
+        self.routing_node.clear_state()
     }
 
     /// Vault node name
     #[cfg(feature = "use-mock-crust")]
     pub fn name(&self) -> XorName {
-        unwrap!(self._routing_node.name())
+        unwrap!(self.routing_node.name())
     }
 
     /// Vault routing_table
     #[cfg(feature = "use-mock-crust")]
     pub fn routing_table(&self) -> RoutingTable<XorName> {
-        unwrap!(self._routing_node.routing_table())
+        unwrap!(self.routing_node.routing_table())
     }
 
     fn process_event(&mut self, event: Event) -> Option<bool> {
@@ -199,7 +193,7 @@ impl Vault {
             debug!("Failed to handle event: {:?}", error);
         }
 
-        self.data_manager.check_timeouts();
+        self.data_manager.check_timeouts(&mut self.routing_node);
         ret
     }
 
@@ -216,42 +210,48 @@ impl Vault {
             (src @ Authority::ManagedNode(_),
              dst @ Authority::ManagedNode(_),
              Request::Get(data_id, msg_id)) => {
-                self.data_manager.handle_get(src, dst, data_id, msg_id)
+                self.data_manager.handle_get(&mut self.routing_node, src, dst, data_id, msg_id)
             }
             // ================== Put ==================
             (src @ Authority::Client { .. },
              dst @ Authority::ClientManager(_),
-             Request::Put(data, msg_id)) => self.maid_manager.handle_put(src, dst, data, msg_id),
+             Request::Put(data, msg_id)) => {
+                self.maid_manager.handle_put(&mut self.routing_node, src, dst, data, msg_id)
+            }
             (src @ Authority::ClientManager(_),
              dst @ Authority::NaeManager(_),
-             Request::Put(data, msg_id)) => self.data_manager.handle_put(src, dst, data, msg_id),
+             Request::Put(data, msg_id)) => {
+                self.data_manager.handle_put(&mut self.routing_node, src, dst, data, msg_id)
+            }
             // ================== Post ==================
             (src @ Authority::Client { .. },
              dst @ Authority::NaeManager(_),
-             Request::Post(data, msg_id)) => self.data_manager.handle_post(src, dst, data, msg_id),
+             Request::Post(data, msg_id)) => {
+                self.data_manager.handle_post(&mut self.routing_node, src, dst, data, msg_id)
+            }
             // ================== Delete ==================
             (src @ Authority::Client { .. },
              dst @ Authority::NaeManager(_),
              Request::Delete(Data::Structured(data), msg_id)) => {
-                self.data_manager.handle_delete(src, dst, data, msg_id)
+                self.data_manager.handle_delete(&mut self.routing_node, src, dst, data, msg_id)
             }
             // ================== Append ==================
             (src @ Authority::Client { .. },
              dst @ Authority::NaeManager(_),
              Request::Append(wrapper, msg_id)) => {
-                self.data_manager.handle_append(src, dst, wrapper, msg_id)
+                self.data_manager.handle_append(&mut self.routing_node, src, dst, wrapper, msg_id)
             }
             // ================== GetAccountInfo ==================
             (src @ Authority::Client { .. },
              dst @ Authority::ClientManager(_),
              Request::GetAccountInfo(msg_id)) => {
-                self.maid_manager.handle_get_account_info(src, dst, msg_id)
+                self.maid_manager.handle_get_account_info(&mut self.routing_node, src, dst, msg_id)
             }
             // ================== Refresh ==================
             (Authority::ClientManager(_),
              Authority::ClientManager(_),
              Request::Refresh(serialised_msg, _)) => {
-                self.maid_manager.handle_refresh(&serialised_msg)
+                self.maid_manager.handle_refresh(&mut self.routing_node, &serialised_msg)
             }
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
@@ -259,12 +259,12 @@ impl Vault {
             (Authority::ManagedNode(src_name),
              Authority::NaeManager(_),
              Request::Refresh(serialised_msg, _)) => {
-                self.data_manager.handle_refresh(src_name, &serialised_msg)
+                self.data_manager.handle_refresh(&mut self.routing_node, src_name, &serialised_msg)
             }
             (Authority::NaeManager(_),
              Authority::NaeManager(_),
              Request::Refresh(serialised_msg, _)) => {
-                self.data_manager.handle_group_refresh(&serialised_msg)
+                self.data_manager.handle_group_refresh(&mut self.routing_node, &serialised_msg)
             }
             // ================== Invalid Request ==================
             (_, _, request) => Err(InternalError::UnknownRequestType(request)),
@@ -280,24 +280,29 @@ impl Vault {
             // ================== GetSuccess ==================
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
-             Response::GetSuccess(data, _)) => self.data_manager.handle_get_success(src_name, data),
+             Response::GetSuccess(data, _)) => {
+                self.data_manager.handle_get_success(&mut self.routing_node, src_name, data)
+            }
             // ================== GetFailure ==================
             (Authority::ManagedNode(src_name),
              Authority::ManagedNode(_),
              Response::GetFailure { data_id, .. }) => {
-                self.data_manager.handle_get_failure(src_name, data_id)
+                self.data_manager.handle_get_failure(&mut self.routing_node, src_name, data_id)
             }
             // ================== PutSuccess ==================
             (Authority::NaeManager(_),
              Authority::ClientManager(_),
              Response::PutSuccess(data_id, msg_id)) => {
-                self.maid_manager.handle_put_success(data_id, msg_id)
+                self.maid_manager.handle_put_success(&mut self.routing_node, data_id, msg_id)
             }
             // ================== PutFailure ==================
             (Authority::NaeManager(_),
              Authority::ClientManager(_),
              Response::PutFailure { id, external_error_indicator, data_id }) => {
-                self.maid_manager.handle_put_failure(id, data_id, &external_error_indicator)
+                self.maid_manager.handle_put_failure(&mut self.routing_node,
+                                                     id,
+                                                     data_id,
+                                                     &external_error_indicator)
             }
             // ================== Invalid Response ==================
             (_, _, response) => Err(InternalError::UnknownResponseType(response)),
@@ -308,8 +313,8 @@ impl Vault {
                      node_added: XorName,
                      routing_table: RoutingTable<XorName>)
                      -> Result<(), InternalError> {
-        self.maid_manager.handle_node_added(&node_added, &routing_table);
-        self.data_manager.handle_node_added(&node_added, &routing_table);
+        self.maid_manager.handle_node_added(&mut self.routing_node, &node_added, &routing_table);
+        self.data_manager.handle_node_added(&mut self.routing_node, &node_added, &routing_table);
         Ok(())
     }
 
@@ -317,8 +322,8 @@ impl Vault {
                     node_lost: XorName,
                     routing_table: RoutingTable<XorName>)
                     -> Result<(), InternalError> {
-        self.maid_manager.handle_node_lost(&node_lost);
-        self.data_manager.handle_node_lost(&node_lost, &routing_table);
+        self.maid_manager.handle_node_lost(&mut self.routing_node, &node_lost);
+        self.data_manager.handle_node_lost(&mut self.routing_node, &node_lost, &routing_table);
         Ok(())
     }
 }

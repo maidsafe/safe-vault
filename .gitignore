@@ -1,6 +1,7 @@
 *.exe
 *.lock
 *.swp
+*.bk
 *.rsproj
 tags*
 build/

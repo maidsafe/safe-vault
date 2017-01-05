@@ -25,7 +25,7 @@ use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
 use std::collections::BTreeSet;
 use std::iter;
-use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::sync::mpsc::TryRecvError;
 use super::poll;
 
 use super::test_node::TestNode;
@@ -34,7 +34,6 @@ use super::test_node::TestNode;
 pub struct TestClient {
     _handle: ServiceHandle,
     routing_client: routing::Client,
-    routing_rx: Receiver<Event>,
     full_id: FullId,
     public_id: PublicId,
     name: XorName,
@@ -44,20 +43,17 @@ pub struct TestClient {
 impl TestClient {
     /// Create a test client for the mock network
     pub fn new(network: &Network, config: Option<Config>) -> Self {
-        let (routing_tx, routing_rx) = mpsc::channel();
-
         let full_id = FullId::new();
         let public_id = *full_id.public_id();
 
         let handle = network.new_service_handle(config, None);
         let client = mock_crust::make_current(&handle, || {
-            unwrap!(routing::Client::new(routing_tx, Some(full_id.clone()), GROUP_SIZE))
+            unwrap!(routing::Client::new(Some(full_id.clone()), GROUP_SIZE))
         });
 
         TestClient {
             _handle: handle,
             routing_client: client,
-            routing_rx: routing_rx,
             full_id: full_id,
             public_id: public_id,
             name: *public_id.name(),
@@ -67,7 +63,7 @@ impl TestClient {
 
     /// Returns the next event received from routing, if any.
     pub fn try_recv(&mut self) -> Result<Event, TryRecvError> {
-        self.routing_rx.try_recv()
+        self.routing_client.try_next_ev()
     }
 
     /// empty this client event loop
@@ -95,7 +91,7 @@ impl TestClient {
     pub fn ensure_connected(&mut self, nodes: &mut [TestNode]) {
         let _ = poll::nodes_and_client(nodes, self);
 
-        match self.routing_rx.try_recv() {
+        match self.try_recv() {
             Ok(Event::Connected) => (),
             e => panic!("Expected Ok(Event::Connected), got {:?}", e),
         }
@@ -112,7 +108,7 @@ impl TestClient {
     }
 
     fn flush(&mut self) {
-        while let Ok(_) = self.routing_rx.try_recv() {}
+        while let Ok(_) = self.try_recv() {}
     }
 
     /// Try and get data from nodes provided.
@@ -134,7 +130,7 @@ impl TestClient {
         let _ = poll::nodes_and_client(nodes, self);
 
         loop {
-            match self.routing_rx.try_recv() {
+            match self.try_recv() {
                 Ok(Event::Response {
                     response: Response::GetSuccess(data, response_message_id),
                     src,
@@ -165,7 +161,7 @@ impl TestClient {
         trace!("totally {} events got processed during the get_response",
                events_count);
         loop {
-            match self.routing_rx.try_recv() {
+            match self.try_recv() {
                 Ok(Event::Response {
                     response: Response::GetSuccess(data, response_message_id),
                     ..
@@ -203,7 +199,7 @@ impl TestClient {
         trace!("totally {} events got processed during the post_response",
                events_count);
         loop {
-            match self.routing_rx.try_recv() {
+            match self.try_recv() {
                 Ok(Event::Response {
                     response: Response::PostSuccess(data_id, response_message_id),
                     ..
@@ -241,7 +237,7 @@ impl TestClient {
         trace!("totally {} events got processed during the delete_response",
                events_count);
         loop {
-            match self.routing_rx.try_recv() {
+            match self.try_recv() {
                 Ok(Event::Response {
                     response: Response::DeleteSuccess(data_id, response_id),
                     ..
@@ -279,7 +275,7 @@ impl TestClient {
         trace!("totally {} events got processed during the get_account_info_response",
                events_count);
         loop {
-            match self.routing_rx.try_recv() {
+            match self.try_recv() {
                 Ok(Event::Response { response: Response::GetAccountInfoSuccess { id,
                                                                        data_stored,
                                                                        space_available },
@@ -333,7 +329,7 @@ impl TestClient {
         unwrap!(self.routing_client.send_put_request(dst, data.clone(), request_message_id));
         let _ = poll::poll_and_resend_unacknowledged(nodes, self);
 
-        match self.routing_rx.try_recv() {
+        match self.try_recv() {
             Ok(Event::Response { response: Response::PutSuccess(_, response_message_id), .. }) => {
                 assert_eq!(request_message_id, response_message_id);
                 Ok(())
@@ -373,7 +369,7 @@ impl TestClient {
         unwrap!(self.routing_client.send_append_request(dst, wrapper, request_message_id));
         let _ = poll::poll_and_resend_unacknowledged(nodes, self);
 
-        match self.routing_rx.try_recv() {
+        match self.try_recv() {
             Ok(Event::Response {
                     response: Response::AppendSuccess(_, response_message_id),
                     ..

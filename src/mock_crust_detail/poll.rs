@@ -37,7 +37,7 @@ pub fn nodes(nodes: &mut [TestNode]) {
 }
 
 /// Resends all unacknowledged messages on all nodes.
-pub fn resend_unacknowledged(nodes: &[TestNode], client: &TestClient) -> bool {
+pub fn resend_unacknowledged(nodes: &mut [TestNode], client: &TestClient) -> bool {
     let mut result = false;
     for node in nodes {
         result = result || node.resend_unacknowledged();

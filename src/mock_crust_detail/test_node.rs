@@ -108,12 +108,12 @@ impl TestNode {
     }
 
     /// Resend all unacknowledged messages.
-    pub fn resend_unacknowledged(&self) -> bool {
+    pub fn resend_unacknowledged(&mut self) -> bool {
         self.vault.resend_unacknowledged()
     }
 
     /// Clear routing node state..
-    pub fn clear_state(&self) {
+    pub fn clear_state(&mut self) {
         self.vault.clear_state()
     }
 
