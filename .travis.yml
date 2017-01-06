@@ -112,8 +112,9 @@ before_script:
     fi
 
 script:
-  - export -f travis_wait
-  - sh ./ci/travis/script.sh
+  - export -f travis_wait &&
+    export -f travis_jigger &&
+    ./ci/travis/script.sh
 
 before_cache:
  - cargo prune
@@ -130,8 +131,8 @@ deploy:
     draft: true
     tag_name: ${PROJECT_VERSION}
     on:
-      condition: >
-        [ -n "$PROJECT_VERSION" ] && [ "${TRAVIS_RUST_VERSION}" = stable ]
+      rust: stable
+      condition: -n "$PROJECT_VERSION"
 
 # TODO - verify and renable following block
 #   # Deploy osx pkg to Github releases
