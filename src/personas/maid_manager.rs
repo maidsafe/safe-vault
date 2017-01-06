@@ -291,8 +291,6 @@ impl MaidManager {
         }
     }
 
-    #[cfg_attr(feature="clippy", allow(cast_possible_truncation, cast_precision_loss,
-                                       cast_sign_loss))]
     fn handle_put_immutable_data(&mut self,
                                  routing_node: &mut RoutingNode,
                                  src: Authority<XorName>,
@@ -410,24 +408,25 @@ impl MaidManager {
 #[cfg(test)]
 mod test {
     use super::*;
+    use super::DEFAULT_ACCOUNT_SIZE;
 
     #[test]
     fn account_struct_normal_updates() {
         let mut account = Account::default();
 
         assert_eq!(0, account.data_stored);
-        assert_eq!(super::DEFAULT_ACCOUNT_SIZE, account.space_available);
-        for _ in 0..super::DEFAULT_ACCOUNT_SIZE {
+        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.space_available);
+        for _ in 0..DEFAULT_ACCOUNT_SIZE {
             assert!(account.add_entry().is_ok());
         }
-        assert_eq!(super::DEFAULT_ACCOUNT_SIZE, account.data_stored);
+        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.data_stored);
         assert_eq!(0, account.space_available);
 
-        for _ in 0..super::DEFAULT_ACCOUNT_SIZE {
+        for _ in 0..DEFAULT_ACCOUNT_SIZE {
             account.remove_entry();
         }
         assert_eq!(0, account.data_stored);
-        assert_eq!(super::DEFAULT_ACCOUNT_SIZE, account.space_available);
+        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.space_available);
     }
 
     #[test]
@@ -435,15 +434,14 @@ mod test {
         let mut account = Account::default();
 
         assert_eq!(0, account.data_stored);
-        assert_eq!(super::DEFAULT_ACCOUNT_SIZE, account.space_available);
-        for _ in 0..super::DEFAULT_ACCOUNT_SIZE {
+        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.space_available);
+        for _ in 0..DEFAULT_ACCOUNT_SIZE {
             assert!(account.add_entry().is_ok());
         }
-        assert_eq!(super::DEFAULT_ACCOUNT_SIZE, account.data_stored);
+        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.data_stored);
         assert_eq!(0, account.space_available);
         assert!(account.add_entry().is_err());
-        assert_eq!(super::DEFAULT_ACCOUNT_SIZE, account.data_stored);
+        assert_eq!(DEFAULT_ACCOUNT_SIZE, account.data_stored);
         assert_eq!(0, account.space_available);
     }
-
 }
