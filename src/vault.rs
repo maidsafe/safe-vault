@@ -48,7 +48,7 @@ impl Vault {
         let config = match config_handler::read_config_file() {
             Ok(cfg) => cfg,
             Err(InternalError::FileHandler(e)) => {
-                error!("Config file could not be parsed : {:?}", e);
+                error!("Config file could not be parsed: {:?}", e);
                 return Err(From::from(e));
             }
             Err(e) => return Err(From::from(e)),
@@ -57,7 +57,7 @@ impl Vault {
         match Self::vault_with_config(builder, use_cache, config.clone()) {
             Ok(vault) => Ok(vault),
             Err(InternalError::ChunkStore(e)) => {
-                error!("Incorrect path {:?} for chunk_store_root : {:?}",
+                error!("Incorrect path {:?} for chunk_store_root: {:?}",
                        config.chunk_store_root,
                        e);
                 Err(From::from(e))

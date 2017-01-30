@@ -98,7 +98,7 @@ pub fn main() {
         let mut vault = match Vault::new(args.flag_first, true) {
             Ok(vault) => vault,
             Err(e) => {
-                println!("Cannot start vault due to error : {:?}", e);
+                println!("Cannot start vault due to error: {:?}", e);
                 return;
             }
         };
