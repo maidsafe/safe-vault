@@ -35,10 +35,8 @@ pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
     let mut data_count = HashMap::new();
     nodes.iter()
         .flat_map(TestNode::get_stored_names)
-        .foreach(|data_idv| {
-            if deleted_data_ids.contains(&data_idv.0) {
-                *data_count.entry(data_idv).or_insert(0) += 1;
-            }
+        .foreach(|data_idv| if deleted_data_ids.contains(&data_idv.0) {
+            *data_count.entry(data_idv).or_insert(0) += 1;
         });
     for (data_id, count) in data_count {
         assert!(count < 5,

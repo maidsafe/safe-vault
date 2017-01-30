@@ -218,7 +218,7 @@ impl MaidManager {
                 match self.accounts.entry(maid_name) {
                     Entry::Vacant(entry) => {
                         let _ = entry.insert(account);
-                        info!("Stats - {} client accounts.", account_count + 1);
+                        info!("Managing {} client accounts.", account_count + 1);
                     }
                     Entry::Occupied(mut entry) => {
                         if entry.get().version < account.version {
@@ -230,7 +230,7 @@ impl MaidManager {
             }
             Refresh::Delete(maid_name) => {
                 let _ = self.accounts.remove(&maid_name);
-                info!("Stats - {} client accounts.", self.accounts.len());
+                info!("Managing {} client accounts.", self.accounts.len());
             }
         }
         Ok(())
@@ -253,7 +253,7 @@ impl MaidManager {
             let _ = self.request_cache.remove(&msg_id);
         }
         if !accounts_to_delete.is_empty() {
-            info!("Stats - {} client accounts.",
+            info!("Managing {} client accounts.",
                   self.accounts.len() - accounts_to_delete.len());
         }
         for maid_name in accounts_to_delete {
@@ -338,7 +338,7 @@ impl MaidManager {
 
             // Create the account, the SD incurs charge later on
             let _ = self.accounts.insert(client_name, Account::default());
-            info!("Stats - {} client accounts.", self.accounts.len());
+            info!("Managing {} client accounts.", self.accounts.len());
         }
         let structured_data = Data::Structured(data);
         self.forward_put_request(routing_node, src, dst, client_name, structured_data, msg_id)

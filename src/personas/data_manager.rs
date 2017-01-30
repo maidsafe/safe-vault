@@ -277,7 +277,7 @@ impl Cache {
            new_dhi_count != self.data_holder_items_count {
             self.ongoing_gets_count = new_og_count;
             self.data_holder_items_count = new_dhi_count;
-            info!("Cache Stats - Expecting {} Get responses. {} entries in data_holders.",
+            info!("Cache Stats: Expecting {} Get responses. {} entries in data_holders.",
                   new_og_count,
                   new_dhi_count);
         }
@@ -375,8 +375,8 @@ fn id_and_version_of(data: &Data) -> IdAndVersion {
 impl Debug for DataManager {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter,
-               "Stats : Client Get requests received {} ; Data stored - ID {} - SD {} - AD {} - \
-               total {} bytes",
+               "This vault has received {} Client Get requests. Chunks stored: Immutable: {}, \
+                Structured: {}, Appendable: {}. Total stored: {} bytes.",
                self.client_get_requests,
                self.immutable_data_count,
                self.structured_data_count,
@@ -514,7 +514,7 @@ impl DataManager {
         let mut error_opt = None;
         let update_result = match (new_data, self.chunk_store.get(&data_id)) {
             (Data::Structured(new_sd), Err(_)) => {
-                warn!("Post operation for nonexistent data. {:?} - {:?}",
+                warn!("Received a Post request for non-existent data. {:?} - {:?}",
                       data_id,
                       message_id);
                 error_opt = Some(MutationError::NoSuchData);
@@ -523,7 +523,7 @@ impl DataManager {
             (_, Err(_)) => Err(MutationError::NoSuchData),
             (Data::Structured(new_sd), Ok(Data::Structured(mut sd))) => {
                 if sd.is_deleted() {
-                    warn!("Post operation for deleted data. {:?} - {:?}",
+                    warn!("Received a Post request for deleted data. {:?} - {:?}",
                           data_id,
                           message_id);
                     error_opt = Some(MutationError::InvalidOperation);
@@ -541,7 +541,7 @@ impl DataManager {
                   .map(|()| Data::PrivAppendable(ad))
                   .map_err(|_| MutationError::InvalidSuccessor),
             (_, Ok(_)) => {
-                warn!("Post operation for Invalid Data Type. {:?} - {:?}",
+                warn!("Received a Post request for an invalid data type. {:?} - {:?}",
                       data_id,
                       message_id);
                 Err(MutationError::InvalidOperation)
@@ -760,7 +760,8 @@ impl DataManager {
                               data_id: DataIdentifier)
                               -> Result<(), InternalError> {
         if !self.cache.handle_get_failure(src, &data_id) {
-            warn!("Got unexpected GetFailure for data {:?}.", data_id);
+            warn!("Received unexpected failure response while getting data {:?}.",
+                  data_id);
             return Err(InternalError::InvalidMessage);
         }
         self.send_gets_for_needed_data(routing_node)
@@ -1055,7 +1056,7 @@ impl DataManager {
         for data_idv in data_idvs {
             match routing_table.other_closest_names(data_idv.0.name(), GROUP_SIZE) {
                 None => {
-                    error!("Moved out of close group of {:?} in a NodeLost event!",
+                    error!("Moved out of close group of {:?} in a NodeLost event.",
                            node_name);
                 }
                 Some(close_group) => {
