@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 
-use ::GROUP_SIZE;
+use GROUP_SIZE;
 use error::InternalError;
 use itertools::Itertools;
 use maidsafe_utilities::serialisation;

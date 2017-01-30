@@ -15,8 +15,9 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-
-use ::GROUP_SIZE;
+use super::poll;
+use super::test_node::TestNode;
+use GROUP_SIZE;
 use maidsafe_utilities::serialisation;
 use rand::{Rng, XorShiftRng};
 use routing::{self, AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId,
@@ -26,9 +27,6 @@ use routing::mock_crust::{self, Config, Network, ServiceHandle};
 use std::collections::BTreeSet;
 use std::iter;
 use std::sync::mpsc::TryRecvError;
-use super::poll;
-
-use super::test_node::TestNode;
 
 /// Client for use in tests only
 pub struct TestClient {

@@ -17,7 +17,7 @@ if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
   cargo rustc ${ARG_TARGET} --verbose --lib -- -Zno-trans
   cargo rustc ${ARG_TARGET} --verbose --bin safe_vault -- -Zno-trans
   # test with mock crust enabled
-  travis_wait 60 cargo test ${ARG_TARGET} --release --verbose --features use-mock-crust
+  env RUSTFLAGS="-C opt-level=2 -C codegen-units=8" cargo test ${ARG_TARGET} --release --verbose --features use-mock-crust
 elif [ "${TRAVIS_OS_NAME}" = linux ]; then
   cargo clippy
   cargo clippy --profile test

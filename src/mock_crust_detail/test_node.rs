@@ -15,7 +15,7 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-
+use super::poll;
 use config_handler::Config;
 use personas::data_manager::IdAndVersion;
 use rand::{self, Rng};
@@ -25,8 +25,6 @@ use rustc_serialize::hex::ToHex;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-
-use super::poll;
 use vault::Vault;
 
 /// Test node for mock network

@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 
-use ::GROUP_SIZE;
+use GROUP_SIZE;
 use cache::Cache;
 use config_handler::{self, Config};
 use error::InternalError;

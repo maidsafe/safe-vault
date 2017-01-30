@@ -22,7 +22,7 @@ pub mod test_client;
 /// Test full node
 pub mod test_node;
 
-use ::GROUP_SIZE;
+use GROUP_SIZE;
 use itertools::Itertools;
 use mock_crust_detail::test_node::TestNode;
 use personas::data_manager::IdAndVersion;

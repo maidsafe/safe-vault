@@ -16,7 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 
-use ::GROUP_SIZE;
+use GROUP_SIZE;
 use accumulator::Accumulator;
 use chunk_store::ChunkStore;
 use error::InternalError;
