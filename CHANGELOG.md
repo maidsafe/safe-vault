@@ -1,5 +1,10 @@
 # Safe Vault - Change Log
 
+## [0.13.0]
+- Migrate to routing 0.28.0.
+- Use a single event loop for routing and safe_vault.
+- Fix issues with account creation and data requests.
+
 ## [0.12.1]
 - Enforce data size caps.
 - Enable new delete mechanism.
