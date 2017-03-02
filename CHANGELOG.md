@@ -1,5 +1,8 @@
 # Safe Vault - Change Log
 
+## [0.13.1]
+- Upgrade to routing 0.28.2.
+
 ## [0.13.0]
 - Migrate to routing 0.28.0.
 - Use a single event loop for routing and safe_vault.
