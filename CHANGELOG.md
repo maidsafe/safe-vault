@@ -1,5 +1,8 @@
 # Safe Vault - Change Log
 
+## [0.13.2]
+- Upgrade to routing 0.28.4.
+
 ## [0.13.1]
 - Upgrade to routing 0.28.2.
 
