@@ -84,7 +84,7 @@ matrix:
 
     # For running `cargo clippy`
     - os: linux
-      rust: nightly-2016-03-16
+      rust: nightly-2017-03-16
 
 cache:
   cargo: true

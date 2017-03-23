@@ -35,10 +35,6 @@
 extern crate itertools;
 #[macro_use]
 extern crate log;
-#[macro_use]
-#[cfg_attr(feature="cargo-clippy", allow(useless_attribute))]
-#[allow(unused_extern_crates)] // Only using macros from maidsafe_utilites
-extern crate maidsafe_utilities;
 extern crate rand;
 extern crate routing;
 extern crate rust_sodium;

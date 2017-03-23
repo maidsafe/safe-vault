@@ -334,7 +334,7 @@ impl TestClient {
                     external_error_indicator: response_error
                 }, .. }) => {
                 assert_eq!(request_message_id, response_id);
-                assert!(data.identifier() == data_id);
+                assert_eq!(data.identifier(), data_id);
                 let parsed_error = unwrap!(serialisation::deserialise(&response_error));
                 Err(Some(parsed_error))
             }

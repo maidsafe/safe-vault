@@ -51,10 +51,11 @@ fn handle_put_without_account() {
     let count = nodes.iter()
         .filter(|node| node.get_maid_manager_put_count(client.name()).is_some())
         .count();
-    assert!(0 == count,
-            "put_count {} found with {} nodes",
-            count,
-            node_count);
+    assert_eq!(0,
+               count,
+               "put_count {} found with {} nodes",
+               count,
+               node_count);
 }
 
 #[test]
@@ -135,10 +136,11 @@ fn handle_put_with_account() {
     let count = nodes.iter()
         .filter(|node| node.get_maid_manager_put_count(client.name()).is_some())
         .count();
-    assert!(GROUP_SIZE == count,
-            "client account {} found on {} nodes",
-            count,
-            node_count);
+    assert_eq!(GROUP_SIZE,
+               count,
+               "client account {} found on {} nodes",
+               count,
+               node_count);
     let mut stored_immutable = Vec::new();
     stored_immutable.push(Data::Immutable(immutable_data));
     mock_crust_detail::check_data(stored_immutable, &nodes);
@@ -306,7 +308,7 @@ fn maid_manager_account_adding_with_churn() {
             .map(|x| (x.name(), x.get_maid_manager_put_count(client.name())))
             .collect();
         for &(_, count) in &node_count_stats {
-            assert!(count == Some(put_count), "{:?}", node_count_stats);
+            assert_eq!(count, Some(put_count), "{:?}", node_count_stats);
         }
         mock_crust_detail::verify_kademlia_invariant_for_all_nodes(&nodes);
     }
