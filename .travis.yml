@@ -84,7 +84,7 @@ matrix:
 
     # For running `cargo clippy`
     - os: linux
-      rust: nightly-2016-12-19
+      rust: nightly-2017-03-16
 
 cache:
   cargo: true
@@ -104,7 +104,7 @@ before_script:
   - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
       (which rustfmt && cargo install-update rustfmt) || cargo install rustfmt;
     elif [ -z "${TARGET}" ] && [ "${TRAVIS_OS_NAME}" = linux ]; then
-      clippy_vers=0.0.104;
+      clippy_vers=0.0.120;
       if ! cargo clippy --version | grep -q $clippy_vers; then
         cargo install clippy --vers=$clippy_vers --force;
       fi

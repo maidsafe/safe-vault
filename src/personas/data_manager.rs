@@ -108,7 +108,7 @@ impl Cache {
                 let _ = self.ongoing_gets.insert(src, (timestamp, expected_idv));
             }
         }
-        for (_, data_idvs) in &mut self.data_holders {
+        for data_idvs in &mut self.data_holders.values_mut() {
             let _ = data_idvs.remove(&(*data_id, version));
         }
     }

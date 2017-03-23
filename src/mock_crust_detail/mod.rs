@@ -74,11 +74,12 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
 
         expected_data_holders.truncate(GROUP_SIZE);
 
-        assert!(expected_data_holders == data_holders,
-                "Data: {:?}. expected = {:?}, actual = {:?}",
-                data_id,
-                expected_data_holders,
-                data_holders);
+        assert_eq!(expected_data_holders,
+                   data_holders,
+                   "Data: {:?}. expected = {:?}, actual = {:?}",
+                   data_id,
+                   expected_data_holders,
+                   data_holders);
     }
 }
 

@@ -15,8 +15,6 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
-#![cfg(test)]
-
 macro_rules! assert_err {
     ($cond : expr, $error : pat) => {
         match $cond {
@@ -167,7 +165,7 @@ fn put_and_get_value_should_be_same() {
     }
     for (index, &(ref data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let retrieved_value = unwrap!(chunk_store.get(&(index as u32)));
-        assert!(*data == retrieved_value);
+        assert_eq!(*data, retrieved_value);
     }
 }
 
@@ -180,7 +178,7 @@ fn overwrite_value() {
         unwrap!(chunk_store.put(&0, data));
         assert_eq!(chunk_store.used_space(), *size);
         let retrieved_value = unwrap!(chunk_store.get(&0));
-        assert!(*data == retrieved_value);
+        assert_eq!(*data, retrieved_value);
     }
 }
 

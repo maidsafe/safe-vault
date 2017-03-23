@@ -48,7 +48,7 @@ pub fn read_config_file() -> Result<Config, InternalError> {
 /// the config file should be created by the Vault's installer.
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn write_config_file(config: Config) -> Result<::std::path::PathBuf, InternalError> {
+pub fn write_config_file(config: &Config) -> Result<::std::path::PathBuf, InternalError> {
     use rustc_serialize::json;
     use std::fs::File;
     use std::io::Write;
