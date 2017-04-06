@@ -426,7 +426,8 @@ impl MaidManager {
                            self.account_creation_cache.get(&msg_id));
                 }
                 let invite_dst = Authority::NaeManager(*invite_data.name());
-                routing_node.send_post_request(dst, invite_dst, invite_data, msg_id)?;
+                routing_node
+                    .send_post_request(dst, invite_dst, invite_data, msg_id)?;
                 return Ok(());
             }
         } else if data.get_type_tag() == TYPE_TAG_INVITE {

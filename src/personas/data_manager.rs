@@ -444,7 +444,8 @@ impl DataManager {
         trace!("DM sending get_failure of {:?}", data_id);
         let error = GetError::NoSuchData;
         let external_error_indicator = serialisation::serialise(&error)?;
-        routing_node.send_get_failure(dst, src, data_id, external_error_indicator, message_id)?;
+        routing_node
+            .send_get_failure(dst, src, data_id, external_error_indicator, message_id)?;
         Ok(())
     }
 
@@ -481,7 +482,8 @@ impl DataManager {
                 DataIdentifier::Immutable(..) => {
                     trace!("DM sending PutSuccess for data {:?}, it already exists.",
                            data_id);
-                    routing_node.send_put_success(dst, src, data_id, message_id)?;
+                    routing_node
+                        .send_put_success(dst, src, data_id, message_id)?;
                     return Ok(());
                 }
             }
@@ -497,7 +499,8 @@ impl DataManager {
 
         if let Some(error) = error_opt {
             let external_error_indicator = serialisation::serialise(&error)?;
-            routing_node.send_put_failure(dst, src, data_id, external_error_indicator, message_id)?;
+            routing_node
+                .send_put_failure(dst, src, data_id, external_error_indicator, message_id)?;
             if is_full {
                 return Err(From::from(error));
             }
@@ -527,7 +530,8 @@ impl DataManager {
             let post_error = serialisation::serialise(&error)?;
             trace!("DM sending post_failure for data {:?}, data exceeds size limit.",
                    data_id);
-            return Ok(routing_node.send_post_failure(dst, src, data_id, post_error, message_id)?);
+            return Ok(routing_node
+                          .send_post_failure(dst, src, data_id, post_error, message_id)?);
         }
 
         let mut error_opt = None;
@@ -580,17 +584,15 @@ impl DataManager {
                        message_id,
                        error);
                 let post_error = serialisation::serialise(&error)?;
-                return Ok(routing_node.send_post_failure(dst,
-                                                         src,
-                                                         data_id,
-                                                         post_error,
-                                                         message_id)?);
+                return Ok(routing_node
+                              .send_post_failure(dst, src, data_id, post_error, message_id)?);
             }
         };
 
         if let Some(ref error) = error_opt {
             let post_error = serialisation::serialise(error)?;
-            routing_node.send_post_failure(dst, src, data_id, post_error, message_id)?;
+            routing_node
+                .send_post_failure(dst, src, data_id, post_error, message_id)?;
         }
         self.update_pending_writes(routing_node,
                                    data,
@@ -635,7 +637,8 @@ impl DataManager {
         if let Some(error) = error_opt {
             trace!("DM sending delete_failure for {:?}", new_data.identifier());
             let err_data = serialisation::serialise(&error)?;
-            routing_node.send_delete_failure(dst, src, data_id, err_data, message_id)?;
+            routing_node
+                .send_delete_failure(dst, src, data_id, err_data, message_id)?;
         }
         Ok(())
     }
@@ -675,7 +678,8 @@ impl DataManager {
                        message_id,
                        error);
                 let append_error = serialisation::serialise(&MutationError::NoSuchData)?;
-                return Ok(routing_node.send_append_failure(dst,
+                return Ok(routing_node
+                              .send_append_failure(dst,
                                                    src,
                                                    data_id,
                                                    append_error,
@@ -689,7 +693,8 @@ impl DataManager {
                 let append_error = serialisation::serialise(&error)?;
                 trace!("DM sending append_failure for data {:?}, data exceeds size limit.",
                        data_id);
-                return Ok(routing_node.send_append_failure(dst,
+                return Ok(routing_node
+                              .send_append_failure(dst,
                                                    src,
                                                    data_id,
                                                    append_error,
@@ -707,7 +712,8 @@ impl DataManager {
                    data_id,
                    message_id);
             let append_error = serialisation::serialise(&MutationError::InvalidSuccessor)?;
-            Ok(routing_node.send_append_failure(dst, src, data_id, append_error, message_id)?)
+            Ok(routing_node
+                   .send_append_failure(dst, src, data_id, append_error, message_id)?)
         }
     }
 

@@ -1,5 +1,11 @@
 # Safe Vault - Change Log
 
+## [0.14.0]
+- Upgrade to routing 0.28.5.
+- Migrate from rust-serialize to serde.
+- Migrate from docopt to clap.
+- Implement invidation-based account creation.
+
 ## [0.13.2]
 - Upgrade to routing 0.28.4.
 
