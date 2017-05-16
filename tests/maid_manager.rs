@@ -327,7 +327,7 @@ fn account_mutation_count_increase_with_churn() {
             }
         }
 
-        event_count += poll::nodes_and_client(&mut nodes, &mut client);
+        event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
         let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
@@ -350,10 +350,13 @@ fn account_mutation_count_increase_with_churn() {
 
 #[test]
 fn account_mutation_count_decrease_with_churn() {
-    let network = Network::new(GROUP_SIZE, None);
+    let seed = None;
+    let node_count = 15;
+    let chunks_per_iter = 4;
+
+    let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
 
-    let node_count = 15;
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
     let client_config = mock_crust::Config::with_contacts(&[nodes[0].endpoint()]);
     let mut client = TestClient::new(&network, Some(client_config));
@@ -363,7 +366,6 @@ fn account_mutation_count_decrease_with_churn() {
     client.create_account(&mut nodes);
 
     let mut event_count = 0;
-    let chunks_per_iter = 4;
     let mut data_list = Vec::new();
 
     for i in 0..test_utils::iterations() as u64 {
@@ -397,8 +399,7 @@ fn account_mutation_count_decrease_with_churn() {
             }
         }
 
-        event_count += poll::nodes_and_client(&mut nodes, &mut client);
-
+        event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
         let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);

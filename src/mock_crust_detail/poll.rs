@@ -17,6 +17,12 @@
 
 use super::test_client::TestClient;
 use super::test_node::TestNode;
+use fake_clock::FakeClock;
+use routing::test_consts::{ACK_TIMEOUT_SECS, NODE_CONNECT_TIMEOUT_SECS};
+
+// Maximum number of times to try and poll in a loop.  This is several orders higher than the
+// anticipated upper limit for any test, and if hit is likely to indicate an infinite loop.
+const MAX_POLL_CALLS: usize = 1000;
 
 /// Empty event queue of nodes provided
 pub fn nodes(nodes: &mut [TestNode]) -> usize {
@@ -49,6 +55,35 @@ pub fn nodes_and_clients(nodes: &mut [TestNode], clients: &mut [TestClient]) -> 
     }
 
     count
+}
+
+/// Empty event queue of nodes and client, until there are no unacknowledged messages
+/// left.
+pub fn nodes_and_client_with_resend(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
+    nodes_and_clients_with_resend(nodes, ref_slice_mut(client))
+}
+
+/// Empty event queue of nodes and clients, until there are no unacknowledged messages
+/// left.
+pub fn nodes_and_clients_with_resend(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
+    let clock_advance_duration_ms = ACK_TIMEOUT_SECS * 1000 + 1;
+    let mut clock_advanced_by_ms = 0;
+    let mut count = 0;
+
+    for _ in 0..MAX_POLL_CALLS {
+        let prev_count = count;
+        count += nodes_and_clients(nodes, clients);
+        if count > prev_count {
+            clock_advanced_by_ms = 0;
+        } else if clock_advanced_by_ms > (NODE_CONNECT_TIMEOUT_SECS * 1000) {
+            return count;
+        }
+
+        FakeClock::advance_time(clock_advance_duration_ms);
+        clock_advanced_by_ms += clock_advance_duration_ms;
+    }
+
+    panic!("Polling has been called {} times.", MAX_POLL_CALLS);
 }
 
 /// Empty event queue of nodes and clients.

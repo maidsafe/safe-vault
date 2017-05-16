@@ -131,7 +131,7 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
             }
         }
 
-        event_count += poll::nodes_and_client(&mut nodes, &mut client);
+        event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
         mock_crust_detail::check_data(all_data.clone(), &nodes);

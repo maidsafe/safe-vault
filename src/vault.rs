@@ -104,17 +104,20 @@ impl Vault {
 
     /// Run the event loop, processing events received from Routing.
     pub fn run(&mut self) -> Result<bool, InternalError> {
-        while let Ok(ev) = self.routing_node.next_ev() {
-            if let Some(terminate) = self.process_event(ev) {
-                return Ok(terminate);
+        while let Ok(event) = self.routing_node.next_ev() {
+            match self.process_event(event) {
+                EventResult::Terminate => return Ok(true),
+                EventResult::Restart => return Ok(false),
+                _ => (),
             }
         }
+
         // FIXME: decide if we want to restart here (in which case return `Ok(false)`).
         Ok(true)
     }
 
-    fn process_event(&mut self, event: Event) -> Option<bool> {
-        let mut ret = None;
+    fn process_event(&mut self, event: Event) -> EventResult {
+        let mut res = EventResult::Processed;
         let event_res = match event {
             Event::Request { request, src, dst } => self.on_request(request, src, dst),
             Event::Response { response, src, dst } => self.on_response(response, src, dst),
@@ -126,16 +129,20 @@ impl Vault {
             }
             Event::RestartRequired => {
                 warn!("Restarting Vault");
-                ret = Some(false);
+                res = EventResult::Restart;
                 Ok(())
             }
             Event::Terminate => {
-                ret = Some(true);
+                res = EventResult::Terminate;
                 Ok(())
             }
-            Event::SectionSplit(_prefix) |
-            Event::SectionMerge(_prefix) => Ok(()),
-            Event::Connected | Event::Tick => Ok(()),
+            Event::SectionSplit(_) |
+            Event::SectionMerge(_) |
+            Event::Connected |
+            Event::Tick => {
+                res = EventResult::Ignored;
+                Ok(())
+            }
         };
 
         if let Err(error) = event_res {
@@ -143,7 +150,7 @@ impl Vault {
         }
 
         self.data_manager.check_timeouts(&mut self.routing_node);
-        ret
+        res
     }
 
     fn on_request(&mut self,
@@ -700,14 +707,15 @@ impl Vault {
     /// Non-blocking call to process any events in the event queue, returning true if
     /// any received, otherwise returns false.
     pub fn poll(&mut self) -> bool {
-        let mut ev_processed = self.routing_node.poll();
+        let mut processed = self.routing_node.poll();
 
-        while let Ok(ev) = self.routing_node.try_next_ev() {
-            let _ = self.process_event(ev);
-            ev_processed = true;
+        while let Ok(event) = self.routing_node.try_next_ev() {
+            if let EventResult::Processed = self.process_event(event) {
+                processed = true;
+            }
         }
 
-        ev_processed
+        processed
     }
 
     /// Get the IDs and versions of all the data chunks stored in a personas' chunk store.
@@ -729,4 +737,16 @@ impl Vault {
     pub fn routing_table(&self) -> &RoutingTable<XorName> {
         unwrap!(self.routing_node.routing_table())
     }
+}
+
+// Result of processing an event.
+enum EventResult {
+    // Event was processed.
+    Processed,
+    // Event was ignored.
+    Ignored,
+    // `Terminate` event received.
+    Terminate,
+    // `RestartRequired` event received.
+    Restart,
 }
