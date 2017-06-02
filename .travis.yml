@@ -38,7 +38,7 @@ matrix:
 
     - os: linux
     # TODO: Remove this once the musl build works again.
-      rust: stable
+      rust: 1.17.0
       env: >
         PLATFORM=linux-x64
       sudo: required
@@ -49,7 +49,7 @@ matrix:
             - sshpass
 
     - os: linux
-      rust: stable
+      rust: 1.17.0
       env: >
         PLATFORM=linux-x86
         TARGET=i686-unknown-linux-gnu
@@ -62,7 +62,7 @@ matrix:
             - sshpass
 
     - os: linux
-      rust: stable
+      rust: 1.17.0
       env: >
         PLATFORM=armv7
         TARGET=armv7-unknown-linux-gnueabihf
@@ -77,14 +77,14 @@ matrix:
             - libc6-dev-armhf-cross
 
     - os: osx
-      rust: stable
+      rust: 1.17.0
       env: >
         PLATFORM=osx-x64
         SKIP_SIGN_PACKAGE=1
 
     # For running `cargo clippy`
     - os: linux
-      rust: nightly-2017-03-16
+      rust: nightly-2017-04-28
 
 cache:
   cargo: true
@@ -99,15 +99,12 @@ install:
   - ./ci/travis/install.sh
 
 before_script:
-  - (which cargo-install-update && cargo install-update cargo-update) || cargo install cargo-update
-  - (which cargo-prune && cargo install-update cargo-prune) || cargo install cargo-prune
-  - if [ "${TRAVIS_RUST_VERSION}" = stable ]; then
-      (which rustfmt && cargo install-update rustfmt) || cargo install rustfmt;
-    elif [ -z "${TARGET}" ] && [ "${TRAVIS_OS_NAME}" = linux ]; then
-      clippy_vers=0.0.120;
-      if ! cargo clippy --version | grep -q $clippy_vers; then
-        cargo install clippy --vers=$clippy_vers --force;
-      fi
+  - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
+  - bash cargo_install.sh cargo-prune;
+  - if [ "${TRAVIS_RUST_VERSION}" = 1.17.0 ]; then
+      bash cargo_install.sh rustfmt 0.8.3;
+    elif [ "${TRAVIS_OS_NAME}" = linux ]; then
+      bash cargo_install.sh clippy 0.0.128;
     fi
 
 script:
@@ -130,7 +127,7 @@ deploy:
     draft: true
     tag_name: ${PROJECT_VERSION}
     on:
-      rust: stable
+      rust: 1.17.0
       condition: -n "$PROJECT_VERSION"
 
 # TODO - verify and renable following block

@@ -20,8 +20,8 @@ use super::test_node::TestNode;
 use GROUP_SIZE;
 use maidsafe_utilities::{SeededRng, serialisation};
 use rand::Rng;
-use routing::{self, AppendWrapper, Authority, Data, DataIdentifier, Event, FullId, MessageId,
-              PublicId, Response, StructuredData, XorName};
+use routing::{self, AccountPacket, AppendWrapper, Authority, Data, DataIdentifier, Event, FullId,
+              MessageId, PublicId, Response, StructuredData, XorName};
 use routing::client_errors::{GetError, MutationError};
 use routing::mock_crust::{self, Config, Network, ServiceHandle};
 use std::iter;
@@ -29,7 +29,7 @@ use std::sync::mpsc::TryRecvError;
 
 /// Client for use in tests only
 pub struct TestClient {
-    _handle: ServiceHandle,
+    _handle: ServiceHandle<PublicId>,
     routing_client: routing::Client,
     full_id: FullId,
     public_id: PublicId,
@@ -39,12 +39,15 @@ pub struct TestClient {
 
 impl TestClient {
     /// Creates a test client for the mock network.
-    pub fn new(network: &Network, config: Option<Config>) -> Self {
+    pub fn new(network: &Network<PublicId>, config: Option<Config>) -> Self {
         Self::new_with_id(network, config, FullId::new())
     }
 
     /// Creates a test client for the mock network with the given ID.
-    pub fn new_with_id(network: &Network, config: Option<Config>, full_id: FullId) -> Self {
+    pub fn new_with_id(network: &Network<PublicId>,
+                       config: Option<Config>,
+                       full_id: FullId)
+                       -> Self {
         let public_id = *full_id.public_id();
 
         let handle = network.new_service_handle(config, None);
@@ -83,11 +86,6 @@ impl TestClient {
         self.routing_client.poll()
     }
 
-    /// Resend all unacknowledged messages.
-    pub fn resend_unacknowledged(&self) -> bool {
-        self.routing_client.resend_unacknowledged()
-    }
-
     /// check client successfully connected to mock network
     pub fn ensure_connected(&mut self, nodes: &mut [TestNode]) {
         let _ = poll::nodes_and_client(nodes, self);
@@ -115,7 +113,11 @@ impl TestClient {
                                           -> Result<(), Option<MutationError>> {
         let owner_pubkey = *self.full_id.public_id().signing_public_key();
         let owner = iter::once(owner_pubkey).collect();
-        let payload = unwrap!(serialisation::serialise(&(invitation, Vec::<u8>::new())));
+        let payload = unwrap!(serialisation::serialise(&AccountPacket::WithInvitation {
+                                                            invitation_string: invitation
+                                                                .to_owned(),
+                                                            acc_pkt: Vec::<u8>::new(),
+                                                        }));
         let mut account = unwrap!(StructuredData::new(0, self.rng.gen(), 0, payload, owner));
         let _ = account.add_signature(&(owner_pubkey, self.full_id.signing_private_key().clone()));
         self.put_and_verify(Data::Structured(account), nodes)
@@ -171,7 +173,7 @@ impl TestClient {
         let request_message_id = MessageId::new();
         self.flush();
         unwrap!(self.routing_client
-                    .send_get_request(dst.clone(), request, request_message_id));
+                    .send_get_request(dst, request, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the get_response",
                events_count);
@@ -212,7 +214,7 @@ impl TestClient {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
         unwrap!(self.routing_client
-                    .send_post_request(dst.clone(), data, request_message_id));
+                    .send_post_request(dst, data, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the post_response",
                events_count);
@@ -253,7 +255,7 @@ impl TestClient {
         let dst = Authority::NaeManager(*data.name());
         let request_message_id = MessageId::new();
         unwrap!(self.routing_client
-                    .send_delete_request(dst.clone(), data, request_message_id));
+                    .send_delete_request(dst, data, request_message_id));
         let events_count = poll::nodes_and_client(nodes, self);
         trace!("totally {} events got processed during the delete_response",
                events_count);
@@ -362,7 +364,7 @@ impl TestClient {
         let request_message_id = MessageId::new();
         unwrap!(self.routing_client
                     .send_put_request(dst, data.clone(), request_message_id));
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+        let _ = poll::nodes_and_client_with_resend(nodes, self);
 
         match self.try_recv() {
             Ok(Event::Response {
@@ -409,7 +411,7 @@ impl TestClient {
         let request_message_id = MessageId::new();
         unwrap!(self.routing_client
                     .send_append_request(dst, wrapper, request_message_id));
-        let _ = poll::poll_and_resend_unacknowledged(nodes, self);
+        let _ = poll::nodes_and_client_with_resend(nodes, self);
 
         match self.try_recv() {
             Ok(Event::Response {

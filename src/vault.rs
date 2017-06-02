@@ -108,8 +108,10 @@ impl Vault {
     /// Run the event loop, processing events received from Routing.
     pub fn run(&mut self) -> Result<bool, InternalError> {
         while let Ok(ev) = self.routing_node.next_ev() {
-            if let Some(terminate) = self.process_event(ev) {
-                return Ok(terminate);
+            match self.process_event(ev) {
+                EventResult::Terminate => return Ok(true),
+                EventResult::Restart => return Ok(false),
+                _ => {}
             }
         }
         // FIXME: decide if we want to restart here (in which case return `Ok(false)`).
@@ -123,8 +125,9 @@ impl Vault {
         let mut ev_processed = self.routing_node.poll();
 
         while let Ok(ev) = self.routing_node.try_next_ev() {
-            let _ = self.process_event(ev);
-            ev_processed = true;
+            if let EventResult::Processed = self.process_event(ev) {
+                ev_processed = true;
+            }
         }
 
         ev_processed
@@ -142,32 +145,20 @@ impl Vault {
         self.maid_manager.get_put_count(client_name)
     }
 
-    /// Resend all unacknowledged messages.
-    #[cfg(feature = "use-mock-crust")]
-    pub fn resend_unacknowledged(&mut self) -> bool {
-        self.routing_node.resend_unacknowledged()
-    }
-
-    /// Clear routing node state.
-    #[cfg(feature = "use-mock-crust")]
-    pub fn clear_state(&mut self) {
-        self.routing_node.clear_state()
-    }
-
     /// Vault node name
     #[cfg(feature = "use-mock-crust")]
     pub fn name(&self) -> XorName {
-        unwrap!(self.routing_node.name())
+        *unwrap!(self.routing_node.id()).name()
     }
 
     /// Vault routing_table
     #[cfg(feature = "use-mock-crust")]
-    pub fn routing_table(&self) -> RoutingTable<XorName> {
+    pub fn routing_table(&self) -> &RoutingTable<XorName> {
         unwrap!(self.routing_node.routing_table())
     }
 
-    fn process_event(&mut self, event: Event) -> Option<bool> {
-        let mut ret = None;
+    fn process_event(&mut self, event: Event) -> EventResult {
+        let mut ret = EventResult::Processed;
 
         if let Err(error) = match event {
                Event::Request { request, src, dst } => self.on_request(request, src, dst),
@@ -180,16 +171,20 @@ impl Vault {
                }
                Event::RestartRequired => {
             warn!("Restarting Vault");
-            ret = Some(false);
+            ret = EventResult::Restart;
             Ok(())
         }
                Event::Terminate => {
-            ret = Some(true);
+            ret = EventResult::Terminate;
             Ok(())
         }
-               Event::SectionSplit(_prefix) |
-               Event::SectionMerge(_prefix) => Ok(()),
-               Event::Connected | Event::Tick => Ok(()),
+               Event::SectionSplit(_) |
+               Event::SectionMerge(_) |
+               Event::Connected |
+               Event::Tick => {
+            ret = EventResult::Ignored;
+            Ok(())
+        }
            } {
             debug!("Failed to handle event: {:?}", error);
         }
@@ -370,4 +365,16 @@ impl Vault {
             .handle_node_lost(&mut self.routing_node, &node_lost, &routing_table);
         Ok(())
     }
+}
+
+// Result of processing an event.
+enum EventResult {
+    // Event was processed.
+    Processed,
+    // Event was ignored.
+    Ignored,
+    // `Terminate` event received.
+    Terminate,
+    // `RestartRequired` event received.
+    Restart,
 }

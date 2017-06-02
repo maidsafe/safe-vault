@@ -1015,7 +1015,7 @@ impl DataManager {
     fn send_gets_for_needed_data(&mut self,
                                  routing_node: &mut RoutingNode)
                                  -> Result<(), InternalError> {
-        let src = Authority::ManagedNode(routing_node.name()?);
+        let src = Authority::ManagedNode(*routing_node.id()?.name());
         let candidates = self.cache.needed_data();
         for (idle_holder, data_idv) in candidates {
             if let Some(group) = routing_node.close_group(*data_idv.0.name(), GROUP_SIZE) {
@@ -1215,7 +1215,7 @@ impl DataManager {
                     dst: Authority<XorName>,
                     data_list: Vec<IdAndVersion>)
                     -> Result<(), InternalError> {
-        let src = Authority::ManagedNode(routing_node.name()?);
+        let src = Authority::ManagedNode(*routing_node.id()?.name());
         // FIXME - We need to handle >2MB chunks
         match serialisation::serialise(&RefreshDataList(data_list)) {
             Ok(serialised_list) => {

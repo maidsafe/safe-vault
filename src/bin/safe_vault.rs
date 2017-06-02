@@ -71,7 +71,7 @@ pub fn main() {
 
     let mut message = String::from("Running ");
     message.push_str(&name_and_version);
-    let underline = unwrap!(String::from_utf8(vec!['=' as u8; message.len()]));
+    let underline = unwrap!(String::from_utf8(vec![b'='; message.len()]));
     info!("\n\n{}\n{}", message, underline);
 
     loop {

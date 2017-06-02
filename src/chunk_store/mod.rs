@@ -21,7 +21,8 @@
 use fs2::FileExt;
 use hex::{FromHex, ToHex};
 use maidsafe_utilities::serialisation::{self, SerialisationError};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::cmp;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
@@ -79,8 +80,8 @@ pub struct ChunkStore<Key, Value> {
 }
 
 impl<Key, Value> ChunkStore<Key, Value>
-    where Key: Serialize + Deserialize,
-          Value: Serialize + Deserialize
+    where Key: Serialize + DeserializeOwned,
+          Value: Serialize + DeserializeOwned
 {
     /// Creates a new `ChunkStore` with `max_space` allowed storage space.
     ///

@@ -20,8 +20,8 @@ use error::InternalError;
 use itertools::Itertools;
 use lru_time_cache::LruCache;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, Data, DataIdentifier, ImmutableData, MessageId, RoutingTable,
-              StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
+use routing::{AccountPacket, Authority, Data, DataIdentifier, ImmutableData, MessageId,
+              RoutingTable, StructuredData, TYPE_TAG_SESSION_PACKET, XorName};
 use routing::client_errors::{GetError, MutationError};
 use rust_sodium::crypto::sign::PublicKey;
 use std::collections::HashMap;
@@ -382,7 +382,9 @@ impl MaidManager {
         // exist.
         let client_name = utils::client_name(&src);
         let is_admin = match src {
-            Authority::Client { client_key, .. } => Some(client_key) == self.invite_key,
+            Authority::Client { client_id, .. } => {
+                Some(*client_id.signing_public_key()) == self.invite_key
+            }
             _ => false,
         };
         let mut error_opt = None;
@@ -406,9 +408,14 @@ impl MaidManager {
             } else if self.accounts.contains_key(&client_name) {
                 error_opt = Some(MutationError::AccountExists);
             } else {
-                let (invitation, _): (String, Vec<u8>) =
-                    serialisation::deserialise(data.get_data())?;
-                let invite_hash = sha3_256(invitation.as_bytes());
+                let account_packet: AccountPacket = serialisation::deserialise(data.get_data())?;
+                let invite_hash = if let AccountPacket::WithInvitation {
+                           invitation_string, ..
+                       } = account_packet {
+                    sha3_256(invitation_string.as_bytes())
+                } else {
+                    return Err(InternalError::InvalidMessage);
+                };
                 let invite_data = Data::Structured(StructuredData::new(TYPE_TAG_INVITE,
                                                                        XorName(invite_hash),
                                                                        1,

@@ -213,6 +213,8 @@
 #![cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
 
 extern crate accumulator;
+#[cfg(feature = "use-mock-crust")]
+extern crate fake_clock;
 extern crate fs2;
 extern crate hex;
 #[macro_use]

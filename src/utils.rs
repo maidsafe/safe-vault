@@ -16,11 +16,11 @@
 // relating to use of the SAFE Network Software.
 
 use routing::{Authority, XorName};
-use rust_sodium::crypto::hash::sha256;
+use tiny_keccak::sha3_256;
 
 pub fn client_name(authority: &Authority<XorName>) -> XorName {
-    if let Authority::Client { ref client_key, .. } = *authority {
-        XorName(sha256::hash(&client_key.0[..]).0)
+    if let Authority::Client { ref client_id, .. } = *authority {
+        XorName(sha3_256(&client_id.signing_public_key().0[..]))
     } else {
         unreachable!("Logic error")
     }

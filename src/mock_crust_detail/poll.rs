@@ -17,37 +17,29 @@
 
 use super::test_client::TestClient;
 use super::test_node::TestNode;
+use fake_clock::FakeClock;
+use routing::test_consts::ACK_TIMEOUT_SECS;
+
+const NODE_CONNECT_TIMEOUT_SECS: u64 = 60;
+
+// Maximum number of times to try and poll in a loop.  This is several orders higher than the
+// anticipated upper limit for any test, and if hit is likely to indicate an infinite loop.
+const MAX_POLL_CALLS: usize = 1000;
 
 /// Empty event queue of nodes provided
-pub fn nodes(nodes: &mut [TestNode]) {
-    loop {
-        let mut next = false;
-
-        for node in nodes.iter_mut() {
-            if node.poll() > 0 {
-                next = true;
-                break;
-            }
-        }
-
-        if !next {
-            break;
-        }
-    }
+pub fn nodes(nodes: &mut [TestNode]) -> usize {
+    nodes_and_clients(nodes, &mut [])
 }
 
-/// Resends all unacknowledged messages on all nodes.
-pub fn resend_unacknowledged(nodes: &mut [TestNode], client: &TestClient) -> bool {
-    let mut result = false;
-    for node in nodes {
-        result = result || node.resend_unacknowledged();
-    }
-    result || client.resend_unacknowledged()
+/// Empty event queue of nodes and the client provided
+pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
+    nodes_and_clients(nodes, ref_slice_mut(client))
 }
 
 /// Empty event queue of nodes and clients provided
-pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
+pub fn nodes_and_clients(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
     let mut count: usize = 0;
+
     loop {
         let prev_count = count;
 
@@ -55,7 +47,49 @@ pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usiz
             count += node.poll();
         }
 
-        count += client.poll();
+        for client in clients.iter_mut() {
+            count += client.poll();
+        }
+
+        if prev_count == count {
+            break;
+        }
+    }
+
+    count
+}
+
+/// Empty event queue of nodes and client, until there are no unacknowledged messages
+/// left.
+pub fn nodes_and_client_with_resend(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
+    with_resend(|| nodes_and_client(nodes, client))
+}
+
+/// Empty event queue of nodes and clients, until there are no unacknowledged messages
+/// left.
+pub fn nodes_and_clients_with_resend(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
+    with_resend(|| nodes_and_clients(nodes, clients))
+}
+
+/// Empty event queue of nodes and clients.
+/// Handles more than one client and handles only one event per round for each node and client,
+/// to better simulate simultaneous requests.
+pub fn nodes_and_clients_parallel(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
+    let mut count = 0;
+    loop {
+        let prev_count = count;
+
+        for node in nodes.iter_mut() {
+            if node.poll_once() {
+                count += 1;
+            }
+        }
+
+        for client in clients.iter_mut() {
+            if client.poll_once() {
+                count += 1;
+            }
+        }
 
         if prev_count == count {
             break;
@@ -64,54 +98,41 @@ pub fn nodes_and_client(nodes: &mut [TestNode], client: &mut TestClient) -> usiz
     count
 }
 
-/// Empty event queue of nodes and clients and resend unacknowledged messages.
-pub fn poll_and_resend_unacknowledged(nodes: &mut [TestNode], client: &mut TestClient) -> usize {
-    let mut count = 0;
-    loop {
-        let new_count = nodes_and_client(nodes, client);
-        count += new_count;
-        if !resend_unacknowledged(nodes, client) && new_count == 0 {
-            return count;
-        }
-    }
+/// Empty event queue of nodes and clients, until there are no unacknowledged messages
+/// left. Handles only one event per round for each node and client to better simulate
+/// simultaneous requests.
+pub fn nodes_and_clients_parallel_with_resend(nodes: &mut [TestNode],
+                                              clients: &mut [TestClient])
+                                              -> usize {
+    with_resend(|| nodes_and_clients_parallel(nodes, clients))
 }
 
-/// Empty event queue of nodes and clients and resend unacknowledged messages.
-/// Handles more than one client and handles only one event per round for each node and client,
-/// to better simulate simultaneous requests.
-pub fn poll_and_resend_unacknowledged_parallel(nodes: &mut [TestNode],
-                                               clients: &mut [TestClient])
-                                               -> usize {
-    let mut event_count = 0;
-    loop {
-        let mut new_count = 0;
-        loop {
-            let prev_count = new_count;
-            for node in nodes.iter_mut() {
-                if node.poll_once() {
-                    new_count += 1;
-                }
-            }
-            for client in clients.iter_mut() {
-                if client.poll_once() {
-                    new_count += 1;
-                }
-            }
-            if prev_count == new_count {
-                break;
-            }
+fn with_resend<F>(mut f: F) -> usize
+    where F: FnMut() -> usize
+{
+    let clock_advance_duration_ms = ACK_TIMEOUT_SECS * 1000 + 1;
+    let mut clock_advanced_by_ms = 0;
+    let mut count = 0;
+
+    for _ in 0..MAX_POLL_CALLS {
+        let prev_count = count;
+        count += f();
+        if count > prev_count {
+            clock_advanced_by_ms = 0;
+        } else if clock_advanced_by_ms > (NODE_CONNECT_TIMEOUT_SECS * 1000) {
+            return count;
         }
-        event_count += new_count;
-        let mut result = false;
-        for node in nodes.iter_mut() {
-            result = result || node.resend_unacknowledged()
-        }
-        for client in clients.iter_mut() {
-            result = result || client.resend_unacknowledged();
-        }
-        if !result && new_count == 0 {
-            break;
-        }
+
+        FakeClock::advance_time(clock_advance_duration_ms);
+        clock_advanced_by_ms += clock_advance_duration_ms;
     }
-    event_count
+
+    panic!("Polling has been called {} times.", MAX_POLL_CALLS);
+}
+
+// Converts a reference to `A` into a slice of length 1 (without copying).
+#[allow(unsafe_code)]
+fn ref_slice_mut<A>(s: &mut A) -> &mut [A] {
+    use std::slice;
+    unsafe { slice::from_raw_parts_mut(s, 1) }
 }
