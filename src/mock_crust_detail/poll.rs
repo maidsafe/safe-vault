@@ -39,6 +39,7 @@ pub fn nodes_and_clients(nodes: &mut [TestNode], clients: &mut [TestClient]) -> 
     let mut count: usize = 0;
 
     loop {
+        nodes[0].handle.deliver_messages();
         let prev_count = count;
 
         for node in nodes.iter_mut() {
@@ -75,6 +76,7 @@ pub fn nodes_and_clients_with_resend(nodes: &mut [TestNode], clients: &mut [Test
 pub fn nodes_and_clients_parallel(nodes: &mut [TestNode], clients: &mut [TestClient]) -> usize {
     let mut count = 0;
     loop {
+        nodes[0].handle.deliver_messages();
         let prev_count = count;
 
         for node in nodes.iter_mut() {

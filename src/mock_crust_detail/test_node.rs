@@ -31,7 +31,8 @@ use vault::Vault;
 
 /// Test node for mock network
 pub struct TestNode {
-    handle: ServiceHandle<PublicId>,
+    /// A handle of this node's mock Crust service
+    pub handle: ServiceHandle<PublicId>,
     vault: Vault,
     chunk_store_root: PathBuf,
 }
