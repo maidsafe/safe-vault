@@ -28,7 +28,7 @@ use rust_sodium::crypto::sign;
 use safe_vault::{Config, DEFAULT_MAX_OPS_COUNT, GROUP_SIZE, TYPE_TAG_INVITE, test_utils};
 use safe_vault::mock_crust_detail::{self, Data, poll, test_node};
 use safe_vault::mock_crust_detail::test_client::TestClient;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use tiny_keccak;
 
 const TEST_NET_SIZE: usize = 20;
@@ -497,23 +497,20 @@ fn account_balance_with_failed_mutations_with_churn() {
     }
 }
 
-// Client trying to mutate an account concurrently: insert and delete a key at the same time.
-// The result could be:
-//  1, both succeeds, when all MMs accumulate deletion after insertion.
-//  2, insertion succeeds and deletion fails with `InvalidSuccessor`,
-//     when most of MMs receives deletion request after accumulate insertion.
-//  3, insertion succeeds and deletion fails with `ExpiredRequest`,
-//     when part of MMs receives deletion request after accumulate insertion.
+// Multiple clients try to concurrently mutate (insert and delete) the auth keys.
+// At most one mutation should succeed. Verify the keys are in consistent state
+// by senfing `ListAuthKeysAndVersion` request and asserting the response reflect
+// the mutations (if any).
 #[test]
-// FIXME: re-enabled this test
-#[ignore]
-fn account_concurrent_insert_delete_key() {
+fn account_concurrent_keys_mutation() {
     let seed = None;
     let node_count = TEST_NET_SIZE;
     let iterations = test_utils::iterations();
+    let max_mutations = 4;
 
     let network = Network::new(GROUP_SIZE, seed);
-    let mut event_count = 0;
+    let mut rng = network.new_rng();
+
     let mut nodes = test_node::create_nodes(&network, node_count, None, false);
 
     let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
@@ -521,115 +518,75 @@ fn account_concurrent_insert_delete_key() {
     client.ensure_connected(&mut nodes);
     client.create_account(&mut nodes);
 
-    let mut version = 0;
-    let mut auth_keys = BTreeSet::new();
-    for i in 0..iterations {
-        trace!("Iteration {}.", i + 1);
-        let (app_key, _) = sign::gen_keypair();
-        let _ = client.ins_auth_key(app_key, version + 1);
-        let _ = client.del_auth_key(app_key, version + 2);
-
-        event_count += poll::nodes_and_client(&mut nodes, &mut client);
-        trace!("Processed {} events.", event_count);
-
-        let mut ins_success = false;
-        let mut del_success = false;
-
-        while let Ok(event) = client.try_recv() {
-            if let Event::Response { response: Response::InsAuthKey { res, .. }, .. } =
-                event.clone() {
-                match res {
-                    Ok(()) => ins_success = true,
-                    Err(error) => {
-                        trace!("Received failed response of insertion. Reason: {:?}", error);
-                    }
-                }
-            }
-            if let Event::Response { response: Response::DelAuthKey { res, .. }, .. } = event {
-                match res {
-                    Ok(()) => del_success = true,
-                    Err(error) => {
-                        trace!("Received failed response of deletion. Reason: {:?}", error);
-                    }
-                }
-            }
-        }
-
-        match (ins_success, del_success) {
-            (true, true) => version += 2,
-            (true, false) => {
-                version += 1;
-                let _ = auth_keys.insert(app_key);
-            }
-            // TODO: advance clock and create another even to trigger expiration check.
-            (false, false) => panic!("Insertion is expected to always succeed"),
-            (false, true) => panic!("Deletion shall not be succeed when insertion is failed"),
-        }
-
-        match client.list_auth_keys_and_version_response(&mut nodes) {
-            Ok(result) => assert_eq!(result, (auth_keys.clone(), version)),
-            Err(err) => panic!("Unexpected error {:?} when list auth_keys and version", err),
-        }
-    }
-}
-
-// Client trying to concurrently insert keys into an account.
-// The result could be:
-//  1, one succeeds and the other fails with `InvalidSuccessor`.
-#[test]
-// FIXME: re-enabled this test
-#[ignore]
-fn account_concurrent_insert_keys() {
-    let seed = None;
-    let node_count = TEST_NET_SIZE;
-    let iterations = test_utils::iterations();
-
-    let network = Network::new(GROUP_SIZE, seed);
     let mut event_count = 0;
-    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
-
-    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
-    let mut client = TestClient::new(&network, Some(config));
-    client.ensure_connected(&mut nodes);
-    client.create_account(&mut nodes);
-
+    let mut stored_keys = Vec::new();
+    let mut inserted_keys = HashMap::new();
+    let mut deleted_keys = HashMap::new();
     let mut version = 0;
-    let mut auth_keys = BTreeSet::new();
+
     for i in 0..iterations {
         trace!("Iteration {}.", i + 1);
-        let (app_key_1, _) = sign::gen_keypair();
-        let (app_key_2, _) = sign::gen_keypair();
-        let msg_id_1 = client.ins_auth_key(app_key_1, version + 1);
-        let _ = client.ins_auth_key(app_key_2, version + 1);
+        let mutations = rng.gen_range(2, max_mutations);
+        for _ in 0..mutations {
+            if stored_keys.is_empty() || rng.gen() {
+                // Insert key
+                let (key, _) = sign::gen_keypair();
+                let msg_id = client.ins_auth_key(key, version + 1);
+                let _ = inserted_keys.insert(msg_id, key);
+            } else {
+                // Delete key
+                let key = *unwrap!(rng.choose(&stored_keys));
+                let msg_id = client.del_auth_key(key, version + 1);
+                let _ = deleted_keys.insert(msg_id, key);
+            }
+        }
 
         event_count += poll::nodes_and_client(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
-        // TODO: advance clock and create another even to trigger expiration check.
+        let mut ins_successes = Vec::new();
+        let mut del_successes = Vec::new();
+
         while let Ok(event) = client.try_recv() {
-            if let Event::Response { response: Response::InsAuthKey { res, msg_id }, .. } = event {
-                match res {
-                    Ok(()) => {
-                        version += 1;
-                        if msg_id == msg_id_1 {
-                            let _ = auth_keys.insert(app_key_1);
-                        } else {
-                            let _ = auth_keys.insert(app_key_2);
-                        }
-                    }
-                    Err(error) => {
-                        trace!("Received failed response of insertion {:?}. Reason: {:?}",
-                               msg_id,
-                               error);
-                    }
-                }
+            match event {
+                Event::Response {
+                    response: Response::InsAuthKey { res: Ok(()), msg_id, }, ..
+                } => ins_successes.push(msg_id),
+                Event::Response {
+                    response: Response::DelAuthKey { res: Ok(()), msg_id, }, ..
+                } => del_successes.push(msg_id),
+                _ => (),
             }
         }
 
-        match client.list_auth_keys_and_version_response(&mut nodes) {
-            Ok(result) => assert_eq!(result, (auth_keys.clone(), version)),
-            Err(err) => panic!("Unexpected error {:?} when list auth_keys and version", err),
+        let successes = ins_successes.len() + del_successes.len();
+        assert!(successes <= 1, "At most one mutation may succeed");
+
+        let (new_keys, new_version) =
+            unwrap!(client.list_auth_keys_and_version_response(&mut nodes));
+
+        if ins_successes.len() > 0 {
+            assert_eq!(new_keys.len(), stored_keys.len() + 1);
+
+            for msg_id in ins_successes {
+                let key = unwrap!(inserted_keys.remove(&msg_id));
+                assert!(new_keys.contains(&key));
+            }
         }
+
+        if del_successes.len() > 0 {
+            assert_eq!(new_keys.len(), stored_keys.len() - 1);
+
+            for msg_id in del_successes {
+                let key = unwrap!(deleted_keys.remove(&msg_id));
+                assert!(!new_keys.contains(&key));
+            }
+        }
+
+        assert_eq!(new_version, version + successes as u64);
+
+        stored_keys = new_keys.into_iter().collect();
+        version = new_version;
     }
 }
 
