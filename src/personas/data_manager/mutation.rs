@@ -124,6 +124,38 @@ impl Mutation {
             _ => false,
         }
     }
+
+    /// Apply the mutation to the mutable data, without performing any validations.
+    pub fn apply(&self, data: &mut MutableData) {
+        assert_eq!(DataId::Mutable(data.id()), self.data_id());
+
+        match *self {
+            Mutation::MutateMDataEntries { ref actions, .. } => {
+                data.mutate_entries_without_validation(actions.clone())
+            }
+            Mutation::SetMDataUserPermissions {
+                user,
+                permissions,
+                version,
+                ..
+            } => {
+                let _ = data.set_user_permissions_without_validation(user, permissions, version);
+            }
+            Mutation::DelMDataUserPermissions { ref user, version, .. } => {
+                let _ = data.del_user_permissions_without_validation(user, version);
+            }
+            Mutation::ChangeMDataOwner {
+                ref new_owners,
+                version,
+                ..
+            } => {
+                if let Some(owner) = new_owners.iter().next() {
+                    let _ = data.change_owner_without_validation(*owner, version);
+                }
+            }
+            _ => panic!("incompatible mutation ({:?})", self.mutation_type()),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

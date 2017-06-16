@@ -403,6 +403,8 @@ impl DataManager {
             }
         };
 
+        let mutation = Mutation::PutMData(data);
+        let res = res.and_then(|_| self.validate_concurrent_mutations(None, &mutation));
         let rejected = if let Err(error) = res {
             trace!("DM sending PutMData failure for data {:?}: {:?}",
                    data_id,
@@ -414,12 +416,7 @@ impl DataManager {
             false
         };
 
-        self.update_pending_writes(routing_node,
-                                   Mutation::PutMData(data),
-                                   src,
-                                   dst,
-                                   msg_id,
-                                   rejected)
+        self.update_pending_writes(routing_node, mutation, src, dst, msg_id, rejected)
     }
 
     pub fn handle_get_mdata_shell(&mut self,
@@ -682,7 +679,11 @@ impl DataManager {
             actions: actions.clone(),
         };
         let res = self.fetch_mdata(name, tag)
-            .and_then(|mut data| data.mutate_entries(actions.clone(), requester));
+            .and_then(|data| {
+                          data.clone().mutate_entries(actions.clone(), requester)?;
+                          self.validate_concurrent_mutations(Some(&data), &mutation)
+                      });
+
         self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
@@ -740,11 +741,12 @@ impl DataManager {
             permissions: permissions,
             version: version,
         };
-        let res =
-            self.fetch_mdata(name, tag)
-                .and_then(|mut data| {
-                              data.set_user_permissions(user, permissions, version, requester)
-                          });
+        let res = self.fetch_mdata(name, tag)
+            .and_then(|data| {
+                          data.clone()
+                              .set_user_permissions(user, permissions, version, requester)?;
+                          self.validate_concurrent_mutations(Some(&data), &mutation)
+                      });
         self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
@@ -767,7 +769,11 @@ impl DataManager {
             version: version,
         };
         let res = self.fetch_mdata(name, tag)
-            .and_then(|mut data| data.del_user_permissions(&user, version, requester));
+            .and_then(|data| {
+                          data.clone()
+                              .del_user_permissions(&user, version, requester)?;
+                          self.validate_concurrent_mutations(Some(&data), &mutation)
+                      });
         self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
@@ -790,12 +796,13 @@ impl DataManager {
         };
 
         let res = self.fetch_mdata(name, tag)
-            .and_then(|mut data| {
+            .and_then(|data| {
                 let client_name = utils::client_name(&src);
                 let new_owner = extract_owner(new_owners)?;
 
                 if utils::verify_mdata_owner(&data, client_name) {
-                    data.change_owner(new_owner, version)
+                    data.clone().change_owner(new_owner, version)?;
+                    self.validate_concurrent_mutations(Some(&data), &mutation)
                 } else {
                     Err(ClientError::AccessDenied)
                 }
@@ -956,21 +963,10 @@ impl DataManager {
                                         message_id)?;
         }
 
-        let mutation_type = mutation.mutation_type();
         let data_id = mutation.data_id();
-
         if let Some(refresh) = self.cache
                .insert_pending_write(mutation, src, dst, message_id, rejected) {
             self.send_group_refresh(routing_node, *data_id.name(), refresh, message_id)?;
-        } else if !rejected {
-            let error = ClientError::from("Conflicting concurrent mutation");
-            self.send_mutation_response(routing_node,
-                                        src,
-                                        dst,
-                                        mutation_type,
-                                        data_id,
-                                        Err(error),
-                                        message_id)?;
         }
 
         Ok(())
@@ -1360,6 +1356,19 @@ impl DataManager {
         let result = f(&mut data);
         put_into_chunk_store(&mut self.chunk_store, &data)?;
         Ok(result)
+    }
+
+    fn validate_concurrent_mutations(&self,
+                                     existing_data: Option<&MutableData>,
+                                     new_mutation: &Mutation)
+                                     -> Result<(), ClientError> {
+        if self.cache
+               .validate_concurrent_mutations(existing_data, new_mutation) {
+            Ok(())
+        } else {
+            // TODO: consider adding `Conflict` variant to `ClientError`.
+            Err(ClientError::from("Conflicting concurrent mutation"))
+        }
     }
 }
 

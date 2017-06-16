@@ -25,7 +25,7 @@ use std::env;
 use test_utils;
 use vault::Refresh as VaultRefresh;
 
-const CHUNK_STORE_CAPACITY: u64 = 1024;
+const CHUNK_STORE_CAPACITY: u64 = 1024 * 1024;
 const CHUNK_STORE_DIR: &'static str = "test_safe_vault_chunk_store";
 
 const TEST_TAG: u64 = 12345678;
@@ -685,6 +685,123 @@ fn mdata_conflicting_parallel_mutations() {
     // After receiving the group refresh, the first mutation succeeds and the second
     // one is rejected.
     unwrap!(dm.handle_group_refresh(&mut node, &payload));
+
+    let message = unwrap!(node.sent_responses.remove(&msg_id_0));
+    assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
+
+    let message = unwrap!(node.sent_responses.remove(&msg_id_1));
+    assert_match!(message.response, Response::MutateMDataEntries { res: Err(_), .. });
+}
+
+#[test]
+fn mdata_parallel_mutations_limits() {
+    let mut rng = rand::thread_rng();
+
+    let mut node = RoutingNode::new();
+    let mut dm = create_data_manager();
+
+    let (_, client_key_0) = test_utils::gen_client_authority();
+    let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
+
+    let (_, client_key_1) = test_utils::gen_client_authority();
+    let client_manager_1 = test_utils::gen_client_manager_authority(client_key_1);
+
+    let mut data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key_0, &mut rng);
+    unwrap!(data.set_user_permissions(User::Anyone,
+                                      PermissionSet::new()
+                                          .allow(Action::Insert)
+                                          .allow(Action::Update)
+                                          .allow(Action::Delete),
+                                      1,
+                                      client_key_0));
+
+
+    dm.put_into_chunk_store(data.clone());
+    let nae_manager = Authority::NaeManager(*data.name());
+
+    // Send two parallel, non-conflicting mutations, each inserting 25 entries.
+    // As the data is initially empty, both should succeed.
+    let mut actions = EntryActions::new();
+    for i in 0..25 {
+        actions = actions.ins(vec![0, i as u8], vec![], 0);
+    }
+    let msg_id_0 = MessageId::new();
+    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
+                                           client_manager_0,
+                                           nae_manager,
+                                           *data.name(),
+                                           data.tag(),
+                                           actions.into(),
+                                           msg_id_0,
+                                           client_key_0));
+
+    let mut actions = EntryActions::new();
+    for i in 0..25 {
+        actions = actions.ins(vec![1, i as u8], vec![], 0);
+    }
+    let msg_id_1 = MessageId::new();
+    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
+                                           client_manager_1,
+                                           nae_manager,
+                                           *data.name(),
+                                           data.tag(),
+                                           actions.into(),
+                                           msg_id_1,
+                                           client_key_1));
+
+    // Refresh both mutations.
+    let message = unwrap!(node.sent_requests.remove(&msg_id_0));
+    let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+
+    let message = unwrap!(node.sent_requests.remove(&msg_id_1));
+    let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+
+    // Both request should succeed.
+    let message = unwrap!(node.sent_responses.remove(&msg_id_0));
+    assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
+
+    let message = unwrap!(node.sent_responses.remove(&msg_id_1));
+    assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
+
+    // Now send two more non-conflicting mutations. This time each inserting 15
+    // entries. Because 2 * 15 = 30 is more than half the allowed remaining entries
+    // (50 / 2 = 25), the second request should be rejected.
+    let mut actions = EntryActions::new();
+    for i in 0..15 {
+        actions = actions.ins(vec![2, i as u8], vec![], 0);
+    }
+    let msg_id_0 = MessageId::new();
+    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
+                                           client_manager_0,
+                                           nae_manager,
+                                           *data.name(),
+                                           data.tag(),
+                                           actions.into(),
+                                           msg_id_0,
+                                           client_key_0));
+
+    let mut actions = EntryActions::new();
+    for i in 0..15 {
+        actions = actions.ins(vec![3, i as u8], vec![], 0);
+    }
+    let msg_id_1 = MessageId::new();
+    unwrap!(dm.handle_mutate_mdata_entries(&mut node,
+                                           client_manager_1,
+                                           nae_manager,
+                                           *data.name(),
+                                           data.tag(),
+                                           actions.into(),
+                                           msg_id_1,
+                                           client_key_1));
+
+    // Only the first mutation should result in refresh being sent.
+    let message = unwrap!(node.sent_requests.remove(&msg_id_0));
+    let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+    unwrap!(dm.handle_group_refresh(&mut node, &payload));
+
+    assert!(!node.sent_requests.contains_key(&msg_id_1));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id_0));
     assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
