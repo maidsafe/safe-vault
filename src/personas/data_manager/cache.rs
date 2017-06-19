@@ -17,7 +17,7 @@
 
 use super::STATUS_LOG_INTERVAL;
 use super::data::{DataId, ImmutableDataId, MutableDataId};
-use super::mutation::Mutation;
+use super::mutation::{self, Mutation};
 use GROUP_SIZE;
 use QUORUM;
 use maidsafe_utilities::serialisation::serialised_size;
@@ -25,6 +25,7 @@ use routing::{Authority, MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTE
               MutableData, RoutingTable, Value, XorName};
 use std::collections::VecDeque;
 use std::collections::hash_map::Entry;
+use std::iter;
 use std::time::Duration;
 use utils::{self, HashMap, HashSet, Instant, SecureHash};
 
@@ -482,8 +483,8 @@ impl Cache {
             }
         }
 
-        let mut data = if let Some(data) = existing_data {
-            data.clone()
+        let data = if let Some(data) = existing_data {
+            data
         } else {
             return true;
         };
@@ -493,28 +494,25 @@ impl Cache {
         // Only consider mutations that increase (as opposed to decrease) entry count
         // and/or size.
 
+        let mutations = || {
+            writes
+                .iter()
+                .filter(|w| !w.rejected)
+                .map(|w| &w.mutation)
+                .chain(iter::once(new_mutation))
+        };
+
         let size_before = serialised_size(&data);
-        let size_remaining = MAX_MUTABLE_DATA_SIZE_IN_BYTES.saturating_sub(size_before);
+        let size_after = mutation::compute_size_increase(&data, mutations());
 
-        let count_before = data.entries().len() as u64;
-        let count_remaining = MAX_MUTABLE_DATA_ENTRIES.saturating_sub(count_before);
-
-        for write in writes {
-            if !write.rejected {
-                write.mutation.apply(&mut data);
-            }
-        }
-        new_mutation.apply(&mut data);
-
-        let size_after = serialised_size(&data);
-        let size_diff = size_after.saturating_sub(size_before);
-        if size_diff > size_remaining / 2 {
+        if !check_limit(size_before, size_after, MAX_MUTABLE_DATA_SIZE_IN_BYTES) {
             return false;
         }
 
-        let count_after = data.entries().len() as u64;
-        let count_diff = count_after.saturating_sub(count_before);
-        if count_diff > count_remaining / 2 {
+        let count_before = data.entries().len() as u64;
+        let count_after = mutation::compute_entry_count_increase(&data, mutations());
+
+        if !check_limit(count_before, count_after, MAX_MUTABLE_DATA_ENTRIES) {
             return false;
         }
 
@@ -921,6 +919,13 @@ fn unindex_needed_fragment(index: &mut FragmentIndex, fragment: &FragmentInfo, h
     if remove {
         let _ = index.remove(fragment);
     }
+}
+
+fn check_limit(before: u64, after: u64, max: u64) -> bool {
+    let diff = after.saturating_sub(before);
+    let remaining = max.saturating_sub(before);
+
+    diff * 2 <= remaining + 1
 }
 
 #[cfg(test)]

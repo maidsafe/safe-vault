@@ -156,6 +156,8 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
 fn mutable_data_normal_flow() {
     let seed = None;
     let node_count = TEST_NET_SIZE;
+    let num_entries = 10;
+    let num_entry_actions = 10;
 
     let network = Network::new(GROUP_SIZE, seed);
     let mut rng = network.new_rng();
@@ -168,7 +170,8 @@ fn mutable_data_normal_flow() {
     client.create_account(&mut nodes);
 
     // Put mutable data
-    let mut data = test_utils::gen_mutable_data(10000, 10, *client.signing_public_key(), &mut rng);
+    let mut data =
+        test_utils::gen_mutable_data(10000, num_entries, *client.signing_public_key(), &mut rng);
     unwrap!(client.put_mdata_response(data.clone(), &mut nodes));
 
     // Get the shell and entries and verify they are what we put it.
@@ -189,7 +192,7 @@ fn mutable_data_normal_flow() {
     }
 
     // Mutate and verify the data.
-    let actions = test_utils::gen_mutable_data_entry_actions(&data, 10, &mut rng);
+    let actions = test_utils::gen_mutable_data_entry_actions(&data, num_entry_actions, &mut rng);
     unwrap!(data.mutate_entries(actions.clone(), *client.signing_public_key()));
     unwrap!(client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes));
     let received_entries =

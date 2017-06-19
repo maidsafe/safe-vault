@@ -17,6 +17,7 @@
 
 use super::*;
 use QUORUM;
+use maidsafe_utilities::SeededRng;
 use maidsafe_utilities::serialisation::{deserialise, serialise};
 use mock_routing::RequestWrapper;
 use rand::{self, Rng};
@@ -32,10 +33,12 @@ const TEST_TAG: u64 = 12345678;
 
 #[test]
 fn idata_basics() {
+    let mut rng = SeededRng::new();
+
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
-    let data = test_utils::gen_immutable_data(10, &mut rand::thread_rng());
+    let data = test_utils::gen_immutable_data(10, &mut rng);
     let nae_manager = Authority::NaeManager(*data.name());
 
     let mut node = RoutingNode::new();
@@ -75,7 +78,7 @@ fn idata_basics() {
 
 #[test]
 fn mdata_basics() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
@@ -137,7 +140,7 @@ fn mdata_basics() {
 
 #[test]
 fn mdata_mutations() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let (client, client_key) = test_utils::gen_client_authority();
     let client_manager = test_utils::gen_client_manager_authority(client_key);
@@ -223,7 +226,7 @@ fn mdata_mutations() {
 
 #[test]
 fn mdata_change_owner() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let (_, client_key_0) = test_utils::gen_client_authority();
     let client_manager_0 = test_utils::gen_client_manager_authority(client_key_0);
@@ -283,7 +286,7 @@ fn mdata_change_owner() {
 
 #[test]
 fn handle_node_added() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let mut node = RoutingNode::new();
     let mut dm = create_data_manager();
@@ -350,7 +353,7 @@ fn handle_node_added() {
 //    no more requests.
 #[test]
 fn idata_with_churn() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let (mut new_node, mut new_dm, old_node_names) = setup_churn(&mut rng);
 
@@ -425,7 +428,7 @@ fn idata_with_churn() {
 //    entries individually.
 #[test]
 fn mdata_with_churn() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let (_, client_key) = test_utils::gen_client_authority();
     let data = test_utils::gen_mutable_data(TEST_TAG, 2, client_key, &mut rng);
@@ -453,7 +456,7 @@ fn mdata_with_churn() {
 // Same as `mdata_with_churn` except only a subset of the data entries accumulate.
 #[test]
 fn mdata_with_churn_with_partial_accumulation() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let (_, client_key) = test_utils::gen_client_authority();
     let data = test_utils::gen_mutable_data(TEST_TAG, 3, client_key, &mut rng);
@@ -508,7 +511,7 @@ fn mdata_with_churn_with_partial_accumulation() {
 // Same as `mdata_with_churn`, except entries now accumulate before shell.
 #[test]
 fn mdata_with_churn_with_entries_accumulating_before_shell() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let (_, client_key) = test_utils::gen_client_authority();
     let data = test_utils::gen_mutable_data(TEST_TAG, 1, client_key, &mut rng);
@@ -547,7 +550,7 @@ fn mdata_with_churn_with_entries_accumulating_before_shell() {
 
 #[test]
 fn mdata_non_conflicting_parallel_mutations() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let mut node = RoutingNode::new();
     let mut dm = create_data_manager();
@@ -624,7 +627,7 @@ fn mdata_non_conflicting_parallel_mutations() {
 
 #[test]
 fn mdata_conflicting_parallel_mutations() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let mut node = RoutingNode::new();
     let mut dm = create_data_manager();
@@ -695,7 +698,7 @@ fn mdata_conflicting_parallel_mutations() {
 
 #[test]
 fn mdata_parallel_mutations_limits() {
-    let mut rng = rand::thread_rng();
+    let mut rng = SeededRng::new();
 
     let mut node = RoutingNode::new();
     let mut dm = create_data_manager();
@@ -758,7 +761,7 @@ fn mdata_parallel_mutations_limits() {
     let payload = assert_match!(message.request, Request::Refresh(payload, _) => payload);
     unwrap!(dm.handle_group_refresh(&mut node, &payload));
 
-    // Both request should succeed.
+    // Both requests should succeed.
     let message = unwrap!(node.sent_responses.remove(&msg_id_0));
     assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
 

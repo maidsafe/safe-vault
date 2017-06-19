@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use super::data::{Data, DataId};
+use maidsafe_utilities::serialisation::serialised_size;
 use routing::{EntryAction, ImmutableData, MutableData, PermissionSet, User, XorName};
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
@@ -166,6 +167,59 @@ pub enum MutationType {
     SetMDataUserPermissions,
     DelMDataUserPermissions,
     ChangeMDataOwner,
+}
+
+/// Compute the size of the data after applying only those mutations that
+/// increase the size.
+pub fn compute_size_increase<'a, T>(data: &MutableData, mutations: T) -> u64
+    where T: IntoIterator<Item = &'a Mutation>
+{
+    let mut size = serialised_size(data);
+    let mut data = data.clone();
+
+    for mutation in mutations.into_iter() {
+        let mut new_data = data.clone();
+        mutation.apply(&mut new_data);
+        let new_size = serialised_size(&new_data);
+
+        if new_size > size {
+            size = new_size;
+            data = new_data;
+        }
+    }
+
+    size
+}
+
+/// Compute the number of entries after applying only those mutations that
+/// increase the number of entries.
+pub fn compute_entry_count_increase<'a, T>(data: &MutableData, mutations: T) -> u64
+    where T: IntoIterator<Item = &'a Mutation>
+{
+    let prev = data.entries().len() as u64;
+    let diff: u64 = mutations
+        .into_iter()
+        .map(|mutation| if let Mutation::MutateMDataEntries { ref actions, .. } = *mutation {
+                 count_inserts(actions)
+             } else {
+                 0
+             })
+        .filter(|count| *count > 0)
+        .sum();
+
+    prev + diff
+}
+
+// Compute number of inserts in the actions.
+fn count_inserts(actions: &BTreeMap<Vec<u8>, EntryAction>) -> u64 {
+    actions
+        .iter()
+        .filter(|&(_, action)| if let EntryAction::Ins(_) = *action {
+                    true
+                } else {
+                    false
+                })
+        .count() as u64
 }
 
 // Returns true if some of the keys in `a` are also keys in `b`.
