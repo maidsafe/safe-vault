@@ -23,7 +23,8 @@ log = "~0.3.7"
 maidsafe_utilities = "~0.12.1"
 quick-error = "~1.1.0"
 rand = "~0.3.14"
-routing = { git = "https://github.com/maidsafe/routing" }
+# routing = { git = "https://github.com/maidsafe/routing" }
+routing = { git = "https://github.com/madadam/routing", branch = "entry-hard-delete" }
 rust_sodium = "~0.3.0"
 serde = "~1.0.6"
 serde_derive = "~1.0.6"

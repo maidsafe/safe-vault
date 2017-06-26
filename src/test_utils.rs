@@ -105,13 +105,8 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(data: &MutableData,
     let keys_to_modify = rand::sample(rng, data.keys().into_iter().cloned(), modify_count);
     for key in keys_to_modify {
         let version = unwrap!(data.get(&key)).entry_version + 1;
-
-        if rng.gen() {
-            actions = actions.del(key, version);
-        } else {
-            let content = gen_vec(10, rng);
-            actions = actions.update(key, content, version);
-        }
+        let content = gen_vec(10, rng);
+        actions = actions.update(key, content, version);
     }
 
     for _ in 0..insert_count {
@@ -121,7 +116,7 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(data: &MutableData,
         }
 
         let content = gen_vec(10, rng);
-        actions = actions.ins(key, content, 0);
+        actions = actions.insert(key, content, 0);
     }
 
     actions.into()

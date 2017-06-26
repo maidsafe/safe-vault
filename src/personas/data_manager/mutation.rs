@@ -30,6 +30,12 @@ pub enum Mutation {
         tag: u64,
         actions: BTreeMap<Vec<u8>, EntryAction>,
     },
+    DeleteMDataEntries {
+        name: XorName,
+        tag: u64,
+        keys: BTreeSet<Vec<u8>>,
+        version: u64,
+    },
     SetMDataUserPermissions {
         name: XorName,
         tag: u64,
@@ -57,6 +63,7 @@ impl Mutation {
             Mutation::PutIData(ref data) => DataId::Immutable(data.id()),
             Mutation::PutMData(ref data) => DataId::Mutable(data.id()),
             Mutation::MutateMDataEntries { name, tag, .. } |
+            Mutation::DeleteMDataEntries { name, tag, .. } |
             Mutation::SetMDataUserPermissions { name, tag, .. } |
             Mutation::DelMDataUserPermissions { name, tag, .. } |
             Mutation::ChangeMDataOwner { name, tag, .. } => DataId::mutable(name, tag),
@@ -68,6 +75,7 @@ impl Mutation {
             Mutation::PutIData(_) => MutationType::PutIData,
             Mutation::PutMData(_) => MutationType::PutMData,
             Mutation::MutateMDataEntries { .. } => MutationType::MutateMDataEntries,
+            Mutation::DeleteMDataEntries { .. } => MutationType::DeleteMDataEntries,
             Mutation::SetMDataUserPermissions { .. } => MutationType::SetMDataUserPermissions,
             Mutation::DelMDataUserPermissions { .. } => MutationType::DelMDataUserPermissions,
             Mutation::ChangeMDataOwner { .. } => MutationType::ChangeMDataOwner,
@@ -78,9 +86,6 @@ impl Mutation {
     /// mutations cannot be applied concurrently.
     pub fn conflicts_with(&self, other: &Self) -> bool {
         match (self, other) {
-            (&Mutation::PutMData(ref data0), &Mutation::PutMData(ref data1)) => {
-                data0.name() == data1.name() && data0.tag() == data1.tag()
-            }
             (&Mutation::MutateMDataEntries {
                   name: name0,
                   tag: tag0,
@@ -91,38 +96,14 @@ impl Mutation {
                   tag: tag1,
                   actions: ref actions1,
               }) => name0 == name1 && tag0 == tag1 && keys_intersect(actions0, actions1),
-            (&Mutation::SetMDataUserPermissions {
-                  name: name0,
-                  tag: tag0,
-                  ..
-              },
-             &Mutation::SetMDataUserPermissions {
-                  name: name1,
-                  tag: tag1,
-                  ..
-              }) |
-            (&Mutation::DelMDataUserPermissions {
-                  name: name0,
-                  tag: tag0,
-                  ..
-              },
-             &Mutation::DelMDataUserPermissions {
-                  name: name1,
-                  tag: tag1,
-                  ..
-              }) |
-            (&Mutation::ChangeMDataOwner {
-                  name: name0,
-                  tag: tag0,
-                  ..
-              },
-             &Mutation::ChangeMDataOwner {
-                  name: name1,
-                  tag: tag1,
-                  ..
-              }) => name0 == name1 && tag0 == tag1,
-
-            _ => false,
+            (_, _) => {
+                if let (DataId::Mutable(id0), DataId::Mutable(id1)) =
+                    (self.data_id(), other.data_id()) {
+                    id0 == id1
+                } else {
+                    false
+                }
+            }
         }
     }
 
@@ -133,6 +114,9 @@ impl Mutation {
         match *self {
             Mutation::MutateMDataEntries { ref actions, .. } => {
                 data.mutate_entries_without_validation(actions.clone())
+            }
+            Mutation::DeleteMDataEntries { ref keys, version, .. } => {
+                let _ = data.delete_entries_without_validation(keys.clone(), version);
             }
             Mutation::SetMDataUserPermissions {
                 user,
@@ -164,6 +148,7 @@ pub enum MutationType {
     PutIData,
     PutMData,
     MutateMDataEntries,
+    DeleteMDataEntries,
     SetMDataUserPermissions,
     DelMDataUserPermissions,
     ChangeMDataOwner,
@@ -210,11 +195,11 @@ pub fn compute_entry_count_after_increase<'a, T>(data: &MutableData, mutations: 
     prev + diff
 }
 
-// Compute number of inserts in the actions.
+// Compute number of inserts in the mutations.
 fn count_inserts(actions: &BTreeMap<Vec<u8>, EntryAction>) -> u64 {
     actions
         .iter()
-        .filter(|&(_, action)| if let EntryAction::Ins(_) = *action {
+        .filter(|&(_, a)| if let EntryAction::Insert(_) = *a {
                     true
                 } else {
                     false

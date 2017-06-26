@@ -27,7 +27,7 @@ use itertools::Itertools;
 use mock_crust_detail::test_node::TestNode;
 use personas::data_manager::DataId;
 use routing::{self, ImmutableData, MutableData, XorName, Xorable};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Type that can hold both immutable and mutable data.
 #[derive(Clone)]
@@ -47,29 +47,10 @@ impl Data {
     }
 }
 
-/// Checks that none of the given nodes has any copy of the given data left.
-pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
-    let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::id).collect();
-    let mut data_count = HashMap::new();
-
-    for data_idv in nodes
-            .iter()
-            .flat_map(|node| unwrap!(node.get_stored_ids_and_versions())) {
-        if deleted_data_ids.contains(&data_idv.0) {
-            *data_count.entry(data_idv).or_insert(0) += 1;
-        }
-    }
-
-    for (data_id, count) in data_count {
-        assert!(count < 5,
-                "Found deleted data: {:?}. count: {}",
-                data_id,
-                count);
-    }
-}
-
 /// Checks that the given `nodes` store the expected number of copies of the given data.
-pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
+pub fn check_data<T>(all_data: T, nodes: &[TestNode])
+    where T: IntoIterator<Item = Data>
+{
     let mut data_holders_map: HashMap<(DataId, u64), Vec<XorName>> = HashMap::new();
     for node in nodes {
         for data_idv in unwrap!(node.get_stored_ids_and_versions()) {

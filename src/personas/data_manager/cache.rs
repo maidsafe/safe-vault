@@ -23,7 +23,7 @@ use QUORUM;
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{Authority, MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, MessageId,
               MutableData, RoutingTable, Value, XorName};
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 use std::collections::hash_map::Entry;
 use std::iter;
 use std::time::Duration;
@@ -242,13 +242,13 @@ impl Cache {
         }
     }
 
-    pub fn start_needed_fragment_request(&mut self, fragment: &FragmentInfo, holder: &XorName) {
+    pub fn start_needed_fragment_request(&mut self, fragment: FragmentInfo, holder: &XorName) {
         if let Some(holder) = self.fragment_holders.get_mut(holder) {
-            holder.start_request(fragment.clone());
-
-            if let Some(state) = self.fragment_index.get_mut(fragment) {
+            if let Some(state) = self.fragment_index.get_mut(&fragment) {
                 state.start_request();
             }
+
+            holder.start_request(fragment);
         }
     }
 
@@ -636,8 +636,14 @@ pub enum FragmentInfo {
         name: XorName,
         tag: u64,
         key: Vec<u8>,
-        version: u64,
+        entry_version: u64,
         hash: SecureHash,
+    },
+    MutableDataDeletedEntries {
+        name: XorName,
+        tag: u64,
+        keys: BTreeSet<Vec<u8>>,
+        version: u64,
     },
 }
 
@@ -662,8 +668,18 @@ impl FragmentInfo {
             name: *data.name(),
             tag: data.tag(),
             key: key,
-            version: value.entry_version,
+            entry_version: value.entry_version,
             hash: hash,
+        }
+    }
+
+    /// Create `FragmentInfo` for deleted mutable data entries.
+    pub fn mutable_data_deleted_entries(data: &MutableData, keys: BTreeSet<Vec<u8>>) -> Self {
+        FragmentInfo::MutableDataDeletedEntries {
+            name: *data.name(),
+            tag: data.tag(),
+            keys: keys,
+            version: data.version(),
         }
     }
 
@@ -684,7 +700,8 @@ impl FragmentInfo {
         match *self {
             FragmentInfo::ImmutableData(ref name) |
             FragmentInfo::MutableDataShell { ref name, .. } |
-            FragmentInfo::MutableDataEntry { ref name, .. } => name,
+            FragmentInfo::MutableDataEntry { ref name, .. } |
+            FragmentInfo::MutableDataDeletedEntries { ref name, .. } => name,
         }
     }
 
@@ -692,7 +709,8 @@ impl FragmentInfo {
         match *self {
             FragmentInfo::ImmutableData(name) => DataId::Immutable(ImmutableDataId(name)),
             FragmentInfo::MutableDataShell { name, tag, .. } |
-            FragmentInfo::MutableDataEntry { name, tag, .. } => {
+            FragmentInfo::MutableDataEntry { name, tag, .. } |
+            FragmentInfo::MutableDataDeletedEntries { name, tag, .. } => {
                 DataId::Mutable(MutableDataId(name, tag))
             }
         }
@@ -973,7 +991,7 @@ mod tests {
         // Start request against one holder. The fragment should not appear among
         // the unrequested fragments even though this fragment is still unrequested
         // in different holder.
-        cache.start_needed_fragment_request(&fragment0, &holder0);
+        cache.start_needed_fragment_request(fragment0.clone(), &holder0);
         assert!(cache.needed_fragments().is_empty());
 
         // Stop the request. The fragment should be present in the collection again,
@@ -1008,10 +1026,10 @@ mod tests {
         // Start multiple requests, then stop them. Assert that the needed fragment
         // data structure remains empty afterwards.
         cache.insert_needed_fragment(fragment.clone(), holder0);
-        cache.start_needed_fragment_request(&fragment, &holder0);
+        cache.start_needed_fragment_request(fragment.clone(), &holder0);
 
         cache.insert_needed_fragment(fragment.clone(), holder1);
-        cache.start_needed_fragment_request(&fragment, &holder1);
+        cache.start_needed_fragment_request(fragment.clone(), &holder1);
 
         assert_eq!(cache.fragment_holders.len(), 2);
         assert_eq!(cache.fragment_index.len(), 1);
@@ -1028,16 +1046,15 @@ mod tests {
 
         // Now do the same, but instead of stopping, let one of the request expire.
         cache.insert_needed_fragment(fragment.clone(), holder0);
-        cache.start_needed_fragment_request(&fragment, &holder0);
+        cache.start_needed_fragment_request(fragment.clone(), &holder0);
 
         cache.insert_needed_fragment(fragment.clone(), holder1);
-        cache.start_needed_fragment_request(&fragment, &holder1);
+        cache.start_needed_fragment_request(fragment.clone(), &holder1);
 
         assert_eq!(cache.fragment_holders.len(), 2);
         assert_eq!(cache.fragment_index.len(), 1);
 
-        assert_eq!(cache.stop_needed_fragment_request(&holder0),
-                   Some(fragment.clone()));
+        assert_eq!(cache.stop_needed_fragment_request(&holder0), Some(fragment));
         assert_eq!(cache.fragment_holders.len(), 1);
         assert_eq!(cache.fragment_index.len(), 1);
 

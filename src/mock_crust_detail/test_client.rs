@@ -362,6 +362,24 @@ impl TestClient {
         assert_recv_response!(self, ListMDataEntries, msg_id)
     }
 
+    /// Sends a `ListMDataKeys` request and waits for the response.
+    pub fn list_mdata_keys_response(&mut self,
+                                    name: XorName,
+                                    tag: u64,
+                                    nodes: &mut [TestNode])
+                                    -> Result<BTreeSet<Vec<u8>>, ClientError> {
+        self.flush();
+
+        let dst = Authority::NaeManager(name);
+        let msg_id = MessageId::new();
+
+        unwrap!(self.routing_client
+                    .list_mdata_keys(dst, name, tag, msg_id));
+        let _ = poll::nodes_and_client(nodes, self);
+
+        assert_recv_response!(self, ListMDataKeys, msg_id)
+    }
+
     /// Sends a `GetMDataValue` request and waits for the response.
     pub fn get_mdata_value_response(&mut self,
                                     name: XorName,
@@ -385,7 +403,8 @@ impl TestClient {
     pub fn mutate_mdata_entries(&mut self,
                                 name: XorName,
                                 tag: u64,
-                                actions: BTreeMap<Vec<u8>, EntryAction>)
+                                actions: BTreeMap<Vec<u8>, EntryAction>,
+                                version: u64)
                                 -> MessageId {
         let msg_id = MessageId::new();
         let requester = *self.signing_public_key();
@@ -394,6 +413,7 @@ impl TestClient {
                                           name,
                                           tag,
                                           actions,
+                                          version,
                                           msg_id,
                                           requester));
         msg_id
@@ -404,12 +424,47 @@ impl TestClient {
                                          name: XorName,
                                          tag: u64,
                                          actions: BTreeMap<Vec<u8>, EntryAction>,
+                                         version: u64,
                                          nodes: &mut [TestNode])
                                          -> Result<(), ClientError> {
         self.flush();
-        let msg_id = self.mutate_mdata_entries(name, tag, actions);
+        let msg_id = self.mutate_mdata_entries(name, tag, actions, version);
         let _ = poll::nodes_and_client(nodes, self);
         assert_recv_response!(self, MutateMDataEntries, msg_id)
+    }
+
+    /// Sends a `DeleteMDataEntries` request.
+    pub fn delete_mdata_entries(&mut self,
+                                name: XorName,
+                                tag: u64,
+                                keys: BTreeSet<Vec<u8>>,
+                                version: u64)
+                                -> MessageId {
+        let msg_id = MessageId::new();
+        let requester = *self.signing_public_key();
+        unwrap!(self.routing_client
+                    .delete_mdata_entries(self.client_manager,
+                                          name,
+                                          tag,
+                                          keys,
+                                          version,
+                                          msg_id,
+                                          requester));
+        msg_id
+    }
+
+    /// Sends a `DeleteMDataEntries` request and waits for the response.
+    pub fn delete_mdata_entries_response(&mut self,
+                                         name: XorName,
+                                         tag: u64,
+                                         keys: BTreeSet<Vec<u8>>,
+                                         version: u64,
+                                         nodes: &mut [TestNode])
+                                         -> Result<(), ClientError> {
+        self.flush();
+        let msg_id = self.delete_mdata_entries(name, tag, keys, version);
+        let _ = poll::nodes_and_client(nodes, self);
+        assert_recv_response!(self, DeleteMDataEntries, msg_id)
     }
 
     /// Sends a `ListMDataPermissions` request and waits for the response.

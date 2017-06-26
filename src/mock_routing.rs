@@ -133,6 +133,17 @@ impl Node {
                       name: XorName,
                       tag: u64,
                       actions: BTreeMap<Vec<u8>, EntryAction>,
+                      version: u64,
+                      msg_id: MessageId,
+                      requester: sign::PublicKey,
+                  });
+
+    impl_request!(send_delete_mdata_entries_request,
+                  DeleteMDataEntries {
+                      name: XorName,
+                      tag: u64,
+                      keys: BTreeSet<Vec<u8>>,
+                      version: u64,
                       msg_id: MessageId,
                       requester: sign::PublicKey,
                   });
@@ -207,6 +218,7 @@ impl Node {
     impl_response!(send_get_mdata_value_response,
                    GetMDataValue, Value);
     impl_response!(send_mutate_mdata_entries_response, MutateMDataEntries);
+    impl_response!(send_delete_mdata_entries_response, DeleteMDataEntries);
     impl_response!(send_list_mdata_permissions_response,
                    ListMDataPermissions, BTreeMap<User, PermissionSet>);
     impl_response!(send_list_mdata_user_permissions_response,
@@ -328,6 +340,7 @@ fn request_id(request: &Request) -> MessageId {
         Request::ListMDataValues { msg_id, .. } |
         Request::GetMDataValue { msg_id, .. } |
         Request::MutateMDataEntries { msg_id, .. } |
+        Request::DeleteMDataEntries { msg_id, .. } |
         Request::ListMDataPermissions { msg_id, .. } |
         Request::ListMDataUserPermissions { msg_id, .. } |
         Request::SetMDataUserPermissions { msg_id, .. } |
@@ -353,6 +366,7 @@ fn response_id(response: &Response) -> MessageId {
         Response::ListMDataValues { msg_id, .. } |
         Response::GetMDataValue { msg_id, .. } |
         Response::MutateMDataEntries { msg_id, .. } |
+        Response::DeleteMDataEntries { msg_id, .. } |
         Response::ListMDataPermissions { msg_id, .. } |
         Response::ListMDataUserPermissions { msg_id, .. } |
         Response::SetMDataUserPermissions { msg_id, .. } |

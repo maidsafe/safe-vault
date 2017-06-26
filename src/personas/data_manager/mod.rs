@@ -670,6 +670,7 @@ impl DataManager {
                                        name: XorName,
                                        tag: u64,
                                        actions: BTreeMap<Vec<u8>, EntryAction>,
+                                       version: u64,
                                        msg_id: MessageId,
                                        requester: sign::PublicKey)
                                        -> Result<(), InternalError> {
@@ -680,7 +681,35 @@ impl DataManager {
         };
         let res = self.fetch_mdata(name, tag)
             .and_then(|data| {
-                          data.clone().mutate_entries(actions.clone(), requester)?;
+                          data.clone()
+                              .mutate_entries(actions, version, requester)?;
+                          self.validate_concurrent_mutations(Some(&data), &mutation)
+                      });
+
+        self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
+    }
+
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
+    pub fn handle_delete_mdata_entries(&mut self,
+                                       routing_node: &mut RoutingNode,
+                                       src: Authority<XorName>,
+                                       dst: Authority<XorName>,
+                                       name: XorName,
+                                       tag: u64,
+                                       keys: BTreeSet<Vec<u8>>,
+                                       version: u64,
+                                       msg_id: MessageId,
+                                       requester: sign::PublicKey)
+                                       -> Result<(), InternalError> {
+        let mutation = Mutation::DeleteMDataEntries {
+            name: name,
+            tag: tag,
+            keys: keys.clone(),
+            version: version,
+        };
+        let res = self.fetch_mdata(name, tag)
+            .and_then(|data| {
+                          data.clone().delete_entries(keys, version, requester)?;
                           self.validate_concurrent_mutations(Some(&data), &mutation)
                       });
 
@@ -1033,6 +1062,24 @@ impl DataManager {
                         .collect()
                 })
             }
+            Mutation::DeleteMDataEntries {
+                name,
+                tag,
+                keys,
+                version,
+            } => {
+                self.with_mdata(name, tag, |data| {
+                    let keys: BTreeSet<_> = keys.into_iter()
+                        .filter(|key| data.get(key).is_some())
+                        .collect();
+
+                    if data.delete_entries_without_validation(keys.clone(), version) {
+                        vec![FragmentInfo::mutable_data_deleted_entries(data, keys)]
+                    } else {
+                        vec![]
+                    }
+                })
+            }
             Mutation::SetMDataUserPermissions {
                 name,
                 tag,
@@ -1040,9 +1087,11 @@ impl DataManager {
                 permissions,
                 version,
             } => {
-                self.with_mdata(name, tag, |data| {
-                    data.set_user_permissions_without_validation(user, permissions, version);
+                self.with_mdata(name, tag, |data| if
+                    data.set_user_permissions_without_validation(user, permissions, version) {
                     vec![FragmentInfo::mutable_data_shell(data)]
+                } else {
+                    vec![]
                 })
             }
             Mutation::DelMDataUserPermissions {
@@ -1051,9 +1100,11 @@ impl DataManager {
                 user,
                 version,
             } => {
-                self.with_mdata(name, tag, |data| {
-                    data.del_user_permissions_without_validation(&user, version);
+                self.with_mdata(name, tag, |data| if
+                    data.del_user_permissions_without_validation(&user, version) {
                     vec![FragmentInfo::mutable_data_shell(data)]
+                } else {
+                    vec![]
                 })
             }
             Mutation::ChangeMDataOwner {
@@ -1064,9 +1115,11 @@ impl DataManager {
             } => {
                 self.with_mdata(name, tag, |data| {
                     if let Some(new_owner) = new_owners.into_iter().next() {
-                        data.change_owner_without_validation(new_owner, version);
+                        if data.change_owner_without_validation(new_owner, version) {
+                            return vec![FragmentInfo::mutable_data_shell(data)];
+                        }
                     }
-                    vec![FragmentInfo::mutable_data_shell(data)]
+                    vec![]
                 })
             }
         };
@@ -1112,6 +1165,13 @@ impl DataManager {
                        data_id);
                 routing_node
                     .send_mutate_mdata_entries_response(dst, src, res, msg_id)?
+            }
+            MutationType::DeleteMDataEntries => {
+                trace!("DM sending DeleteMDataEntries {} for data {:?}",
+                       res_string,
+                       data_id);
+                routing_node
+                    .send_delete_mdata_entries_response(dst, src, res, msg_id)?
             }
             MutationType::SetMDataUserPermissions => {
                 trace!("DM sending SetMDataUserPermissions {} for data {:?}",
@@ -1192,17 +1252,34 @@ impl DataManager {
                 name,
                 tag,
                 ref key,
-                version,
+                entry_version,
                 ..
             } => {
                 if let Ok(data) = self.chunk_store.get(&MutableDataId(name, tag)) {
                     match data.get(key) {
                         None => true,
-                        Some(value) => value.entry_version < version,
+                        Some(value) => value.entry_version < entry_version,
                     }
                 } else {
                     true
                 }
+            }
+            FragmentInfo::MutableDataDeletedEntries {
+                name,
+                tag,
+                keys,
+                version,
+            } => {
+                // Note: we don't need to request anything at this point, because we
+                // have all the information needed to perform the mutation already.
+                let id = MutableDataId(name, tag);
+                if let Ok(mut data) = self.chunk_store.get(&id) {
+                    if data.delete_entries_without_validation(keys, version) {
+                        let _ = self.chunk_store.put(&id, &data);
+                    }
+                }
+
+                return Ok(());
             }
         };
 
@@ -1310,9 +1387,6 @@ impl DataManager {
                     continue;
                 }
 
-                self.cache
-                    .start_needed_fragment_request(&fragment, &holder);
-
                 let dst = Authority::ManagedNode(holder);
                 let msg_id = MessageId::new();
 
@@ -1320,19 +1394,25 @@ impl DataManager {
                     FragmentInfo::ImmutableData(name) => {
                         routing_node
                             .send_get_idata_request(src, dst, name, msg_id)?;
-                        break;
                     }
                     FragmentInfo::MutableDataShell { name, tag, .. } => {
                         routing_node
                             .send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
-                        break;
                     }
-                    FragmentInfo::MutableDataEntry { name, tag, key, .. } => {
-                        routing_node
-                            .send_get_mdata_value_request(src, dst, name, tag, key, msg_id)?;
-                        break;
+                    FragmentInfo::MutableDataEntry { name, tag, ref key, .. } => {
+                        routing_node.send_get_mdata_value_request(src,
+                                                                  dst,
+                                                                  name,
+                                                                  tag,
+                                                                  key.clone(),
+                                                                  msg_id)?;
                     }
+                    FragmentInfo::MutableDataDeletedEntries { .. } => (),
                 }
+
+                self.cache
+                    .start_needed_fragment_request(fragment, &holder);
+                break;
             }
         }
 

@@ -346,6 +346,7 @@ impl Vault {
                  name,
                  tag,
                  actions,
+                 version,
                  msg_id,
                  requester,
              }) => {
@@ -356,6 +357,7 @@ impl Vault {
                                                  name,
                                                  tag,
                                                  actions,
+                                                 version,
                                                  msg_id,
                                                  requester)
             }
@@ -365,6 +367,7 @@ impl Vault {
                  name,
                  tag,
                  actions,
+                 version,
                  msg_id,
                  requester,
              }) => {
@@ -375,6 +378,50 @@ impl Vault {
                                                  name,
                                                  tag,
                                                  actions,
+                                                 version,
+                                                 msg_id,
+                                                 requester)
+            }
+            // ========== DeleteMDataEntries ==========
+            (Authority::Client { .. },
+             Authority::ClientManager(_),
+             Request::DeleteMDataEntries {
+                 name,
+                 tag,
+                 keys,
+                 version,
+                 msg_id,
+                 requester,
+             }) => {
+                self.maid_manager
+                    .handle_delete_mdata_entries(&mut self.routing_node,
+                                                 src,
+                                                 dst,
+                                                 name,
+                                                 tag,
+                                                 keys,
+                                                 version,
+                                                 msg_id,
+                                                 requester)
+            }
+            (Authority::ClientManager(_),
+             Authority::NaeManager(_),
+             Request::DeleteMDataEntries {
+                 name,
+                 tag,
+                 keys,
+                 version,
+                 msg_id,
+                 requester,
+             }) => {
+                self.data_manager
+                    .handle_delete_mdata_entries(&mut self.routing_node,
+                                                 src,
+                                                 dst,
+                                                 name,
+                                                 tag,
+                                                 keys,
+                                                 version,
                                                  msg_id,
                                                  requester)
             }
@@ -671,6 +718,13 @@ impl Vault {
              Response::MutateMDataEntries { res, msg_id }) => {
                 self.maid_manager
                     .handle_mutate_mdata_entries_response(&mut self.routing_node, res, msg_id)
+            }
+            // ================== DeleteMDataEntries ==================
+            (Authority::NaeManager(_),
+             Authority::ClientManager(_),
+             Response::DeleteMDataEntries { res, msg_id }) => {
+                self.maid_manager
+                    .handle_delete_mdata_entries_response(&mut self.routing_node, res, msg_id)
             }
             // ================== SetMDataUserPermissions ==================
             (Authority::NaeManager(_),

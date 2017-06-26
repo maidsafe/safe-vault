@@ -189,17 +189,19 @@ impl MaidManager {
                 let invite_src = dst;
                 let invite_dst = Authority::NaeManager(invite_name);
                 let actions = EntryActions::new()
-                    .ins(INVITE_CLAIMED_KEY.to_vec(),
-                         INVITE_CLAIMED_VALUE.to_vec(),
-                         0)
+                    .insert(INVITE_CLAIMED_KEY.to_vec(),
+                            INVITE_CLAIMED_VALUE.to_vec(),
+                            0)
                     .into();
 
+                // TODO: use correct shell version
                 routing_node
                     .send_mutate_mdata_entries_request(invite_src,
                                                        invite_dst,
                                                        invite_name,
                                                        TYPE_TAG_INVITE,
                                                        actions,
+                                                       0,
                                                        msg_id,
                                                        requester)?;
             }
@@ -257,6 +259,7 @@ impl MaidManager {
                                        name: XorName,
                                        tag: u64,
                                        actions: BTreeMap<Vec<u8>, EntryAction>,
+                                       version: u64,
                                        msg_id: MessageId,
                                        requester: sign::PublicKey)
                                        -> Result<(), InternalError> {
@@ -281,6 +284,7 @@ impl MaidManager {
                                                    name,
                                                    tag,
                                                    actions,
+                                                   version,
                                                    msg_id,
                                                    requester)?;
             insert.commit();
@@ -335,6 +339,66 @@ impl MaidManager {
                 .send_mutate_mdata_entries_response(dst, src, res, msg_id)?;
         };
 
+        Ok(())
+    }
+
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
+    pub fn handle_delete_mdata_entries(&mut self,
+                                       routing_node: &mut RoutingNode,
+                                       src: Authority<XorName>,
+                                       dst: Authority<XorName>,
+                                       name: XorName,
+                                       tag: u64,
+                                       keys: BTreeSet<Vec<u8>>,
+                                       version: u64,
+                                       msg_id: MessageId,
+                                       requester: sign::PublicKey)
+                                       -> Result<(), InternalError> {
+        if let Err(err) = self.prepare_data_mutation(&src,
+                                                     &dst,
+                                                     AuthPolicy::Key,
+                                                     Some(msg_id),
+                                                     Some(requester)) {
+            routing_node
+                .send_delete_mdata_entries_response(dst, src, Err(err), msg_id)?;
+            return Ok(());
+        }
+
+        // Forwarding the request to NAE Manager.
+        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+            let fwd_src = dst;
+            let fwd_dst = Authority::NaeManager(name);
+            trace!("MM forwarding DeleteMDataEntries request to {:?}", fwd_dst);
+            routing_node
+                .send_delete_mdata_entries_request(fwd_src,
+                                                   fwd_dst,
+                                                   name,
+                                                   tag,
+                                                   keys,
+                                                   version,
+                                                   msg_id,
+                                                   requester)?;
+            insert.commit();
+        } else {
+            routing_node
+                .send_delete_mdata_entries_response(dst,
+                                                    src,
+                                                    Err(ClientError::InvalidOperation),
+                                                    msg_id)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn handle_delete_mdata_entries_response(&mut self,
+                                                routing_node: &mut RoutingNode,
+                                                res: Result<(), ClientError>,
+                                                msg_id: MessageId)
+                                                -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } =
+            self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
+        routing_node
+            .send_delete_mdata_entries_response(dst, src, res, msg_id)?;
         Ok(())
     }
 

@@ -151,6 +151,7 @@ fn mdata_basics() {
                                            *data.name(),
                                            data.tag(),
                                            Default::default(),
+                                           0,
                                            msg_id,
                                            client_key));
 
@@ -498,6 +499,7 @@ fn mutation_authorisation() {
                                            mdata_name,
                                            tag,
                                            Default::default(),
+                                           0,
                                            msg_id,
                                            app_key));
     assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
@@ -511,6 +513,7 @@ fn mutation_authorisation() {
                                            mdata_name,
                                            tag,
                                            Default::default(),
+                                           0,
                                            msg_id,
                                            owner_key));
 
@@ -599,6 +602,7 @@ fn mutation_authorisation() {
                                                mdata_name,
                                                tag,
                                                Default::default(),
+                                               0,
                                                msg_id,
                                                app_key));
 
@@ -629,6 +633,7 @@ fn mutation_authorisation() {
                                                mdata_name,
                                                tag,
                                                Default::default(),
+                                               0,
                                                msg_id,
                                                owner_key));
         let message = unwrap!(node.sent_responses.remove(&msg_id));

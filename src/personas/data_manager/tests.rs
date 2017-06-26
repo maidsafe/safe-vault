@@ -139,7 +139,7 @@ fn mdata_basics() {
 }
 
 #[test]
-fn mdata_mutations() {
+fn mdata_mutate_entries() {
     let mut rng = SeededRng::new();
 
     let (client, client_key) = test_utils::gen_client_authority();
@@ -178,8 +178,8 @@ fn mdata_mutations() {
     let content_1 = test_utils::gen_vec(10, &mut rng);
 
     let actions = EntryActions::new()
-        .ins(key_0.clone(), content_0.clone(), 0)
-        .ins(key_1.clone(), content_1.clone(), 0)
+        .insert(key_0.clone(), content_0.clone(), 0)
+        .insert(key_1.clone(), content_1.clone(), 0)
         .into();
     let msg_id = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -188,6 +188,7 @@ fn mdata_mutations() {
                                            data_name,
                                            TEST_TAG,
                                            actions,
+                                           0,
                                            msg_id,
                                            client_key));
 
@@ -222,6 +223,94 @@ fn mdata_mutations() {
     };
 
     assert_eq!(entries, vec![(key_0, value_0), (key_1, value_1)].into_iter().collect());
+}
+
+#[test]
+fn mdata_delete_entries() {
+    let mut rng = SeededRng::new();
+
+    let num_initial_entries = 10;
+    let num_deleted_entries = 4;
+
+    let (client, client_key) = test_utils::gen_client_authority();
+    let client_manager = test_utils::gen_client_manager_authority(client_key);
+
+    let data = test_utils::gen_mutable_data(TEST_TAG, num_initial_entries, client_key, &mut rng);
+    let data_name = *data.name();
+    let nae_manager = Authority::NaeManager(data_name);
+
+    let mut node = RoutingNode::new();
+    let mut dm = create_data_manager();
+
+    // Put the data.
+    dm.put_into_chunk_store(data.clone());
+
+    // Check initial entries and version.
+    let msg_id = MessageId::new();
+    unwrap!(dm.handle_list_mdata_entries(&mut node,
+                                         client,
+                                         nae_manager,
+                                         data_name,
+                                         TEST_TAG,
+                                         msg_id));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    let entries = assert_match!(
+            message.response,
+            Response::ListMDataEntries { res: Ok(entries), .. } => entries);
+    assert_eq!(entries, *data.entries());
+
+    let msg_id = MessageId::new();
+    unwrap!(dm.handle_get_mdata_version(&mut node,
+                                        client,
+                                        nae_manager,
+                                        data_name,
+                                        TEST_TAG,
+                                        msg_id));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response, Response::GetMDataVersion { res: Ok(0), .. });
+
+    // Delete some entries and simulate refresh.
+    let keys_to_delete = rand::sample(&mut rng,
+                                      data.keys().into_iter().cloned(),
+                                      num_deleted_entries);
+    let msg_id = MessageId::new();
+    unwrap!(dm.handle_delete_mdata_entries(&mut node,
+                                           client_manager,
+                                           nae_manager,
+                                           data_name,
+                                           TEST_TAG,
+                                           keys_to_delete.iter().cloned().collect(),
+                                           1,
+                                           msg_id,
+                                           client_key));
+
+    let message = unwrap!(node.sent_requests.remove(&msg_id));
+    let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
+    unwrap!(dm.handle_group_refresh(&mut node, &refresh));
+
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response, Response::DeleteMDataEntries { res: Ok(()), .. });
+
+    // The deleted entries are no longer present.
+    let msg_id = MessageId::new();
+    unwrap!(dm.handle_list_mdata_keys(&mut node, client, nae_manager, data_name, TEST_TAG, msg_id));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    let keys = assert_match!(message.response,
+                             Response::ListMDataKeys { res: Ok(keys), .. } => keys);
+    for key in keys_to_delete {
+        assert!(!keys.contains(&key));
+    }
+
+    // The version has been incremented.
+    let msg_id = MessageId::new();
+    unwrap!(dm.handle_get_mdata_version(&mut node,
+                                        client,
+                                        nae_manager,
+                                        data_name,
+                                        TEST_TAG,
+                                        msg_id));
+    let message = unwrap!(node.sent_responses.remove(&msg_id));
+    assert_match!(message.response, Response::GetMDataVersion { res: Ok(1), .. });
 }
 
 #[test]
@@ -576,7 +665,7 @@ fn mdata_non_conflicting_parallel_mutations() {
     // Issue two mutations in parallel, each touching different key. Both should be
     // accepted.
     let actions = EntryActions::new()
-        .ins(b"key0".to_vec(), b"value 0".to_vec(), 0)
+        .insert(b"key0".to_vec(), b"value 0".to_vec(), 0)
         .into();
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -585,11 +674,12 @@ fn mdata_non_conflicting_parallel_mutations() {
                                            *data.name(),
                                            data.tag(),
                                            actions,
+                                           1,
                                            msg_id_0,
                                            client_key_0));
 
     let actions = EntryActions::new()
-        .ins(b"key1".to_vec(), b"value 1".to_vec(), 0)
+        .insert(b"key1".to_vec(), b"value 1".to_vec(), 0)
         .into();
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -598,6 +688,7 @@ fn mdata_non_conflicting_parallel_mutations() {
                                            *data.name(),
                                            data.tag(),
                                            actions,
+                                           1,
                                            msg_id_1,
                                            client_key_1));
 
@@ -655,7 +746,7 @@ fn mdata_conflicting_parallel_mutations() {
     // one should result in group refresh being sent. The second one should be
     // rejected.
     let actions = EntryActions::new()
-        .ins(b"key".to_vec(), b"value 0".to_vec(), 0)
+        .insert(b"key".to_vec(), b"value 0".to_vec(), 0)
         .into();
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -664,11 +755,12 @@ fn mdata_conflicting_parallel_mutations() {
                                            *data.name(),
                                            data.tag(),
                                            actions,
+                                           1,
                                            msg_id_0,
                                            client_key_0));
 
     let actions = EntryActions::new()
-        .ins(b"key".to_vec(), b"value 1".to_vec(), 0)
+        .insert(b"key".to_vec(), b"value 1".to_vec(), 0)
         .into();
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -677,6 +769,7 @@ fn mdata_conflicting_parallel_mutations() {
                                            *data.name(),
                                            data.tag(),
                                            actions,
+                                           1,
                                            msg_id_1,
                                            client_key_1));
 
@@ -726,7 +819,7 @@ fn mdata_parallel_mutations_limits() {
     // As the data is initially empty, both should succeed.
     let mut actions = EntryActions::new();
     for i in 0..25 {
-        actions = actions.ins(vec![0, i as u8], vec![], 0);
+        actions = actions.insert(vec![0, i as u8], vec![], 0);
     }
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -735,12 +828,13 @@ fn mdata_parallel_mutations_limits() {
                                            *data.name(),
                                            data.tag(),
                                            actions.into(),
+                                           1,
                                            msg_id_0,
                                            client_key_0));
 
     let mut actions = EntryActions::new();
     for i in 0..25 {
-        actions = actions.ins(vec![1, i as u8], vec![], 0);
+        actions = actions.insert(vec![1, i as u8], vec![], 0);
     }
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -749,6 +843,7 @@ fn mdata_parallel_mutations_limits() {
                                            *data.name(),
                                            data.tag(),
                                            actions.into(),
+                                           1,
                                            msg_id_1,
                                            client_key_1));
 
@@ -773,7 +868,7 @@ fn mdata_parallel_mutations_limits() {
     // (50 / 2 = 25), the second request should be rejected.
     let mut actions = EntryActions::new();
     for i in 0..15 {
-        actions = actions.ins(vec![2, i as u8], vec![], 0);
+        actions = actions.insert(vec![2, i as u8], vec![], 0);
     }
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -782,12 +877,13 @@ fn mdata_parallel_mutations_limits() {
                                            *data.name(),
                                            data.tag(),
                                            actions.into(),
+                                           1,
                                            msg_id_0,
                                            client_key_0));
 
     let mut actions = EntryActions::new();
     for i in 0..15 {
-        actions = actions.ins(vec![3, i as u8], vec![], 0);
+        actions = actions.insert(vec![3, i as u8], vec![], 0);
     }
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
@@ -796,6 +892,7 @@ fn mdata_parallel_mutations_limits() {
                                            *data.name(),
                                            data.tag(),
                                            actions.into(),
+                                           1,
                                            msg_id_1,
                                            client_key_1));
 
