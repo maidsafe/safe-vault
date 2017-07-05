@@ -16,6 +16,7 @@
 // relating to use of the SAFE Network Software.
 
 use super::data::{Data, DataId};
+use log::LogLevel;
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{EntryAction, ImmutableData, MutableData, PermissionSet, User, XorName};
 use rust_sodium::crypto::sign;
@@ -78,9 +79,6 @@ impl Mutation {
     /// mutations cannot be applied concurrently.
     pub fn conflicts_with(&self, other: &Self) -> bool {
         match (self, other) {
-            (&Mutation::PutMData(ref data0), &Mutation::PutMData(ref data1)) => {
-                data0.name() == data1.name() && data0.tag() == data1.tag()
-            }
             (&Mutation::MutateMDataEntries {
                   name: name0,
                   tag: tag0,
@@ -91,44 +89,27 @@ impl Mutation {
                   tag: tag1,
                   actions: ref actions1,
               }) => name0 == name1 && tag0 == tag1 && keys_intersect(actions0, actions1),
-            (&Mutation::SetMDataUserPermissions {
-                  name: name0,
-                  tag: tag0,
-                  ..
-              },
-             &Mutation::SetMDataUserPermissions {
-                  name: name1,
-                  tag: tag1,
-                  ..
-              }) |
-            (&Mutation::DelMDataUserPermissions {
-                  name: name0,
-                  tag: tag0,
-                  ..
-              },
-             &Mutation::DelMDataUserPermissions {
-                  name: name1,
-                  tag: tag1,
-                  ..
-              }) |
-            (&Mutation::ChangeMDataOwner {
-                  name: name0,
-                  tag: tag0,
-                  ..
-              },
-             &Mutation::ChangeMDataOwner {
-                  name: name1,
-                  tag: tag1,
-                  ..
-              }) => name0 == name1 && tag0 == tag1,
-
-            _ => false,
+            (_, _) => {
+                if let (DataId::Mutable(id0), DataId::Mutable(id1)) =
+                    (self.data_id(), other.data_id()) {
+                    id0 == id1
+                } else {
+                    false
+                }
+            }
         }
     }
 
     /// Apply the mutation to the mutable data, without performing any validations.
     pub fn apply(&self, data: &mut MutableData) {
-        assert_eq!(DataId::Mutable(data.id()), self.data_id());
+        let data_id = DataId::Mutable(data.id());
+        if data_id != self.data_id() {
+            log_or_panic!(LogLevel::Error,
+                          "invalid data for mutation ({:?} instead of {:?})",
+                          data_id,
+                          self.data_id());
+            return;
+        }
 
         match *self {
             Mutation::MutateMDataEntries { ref actions, .. } => {
@@ -154,7 +135,11 @@ impl Mutation {
                     let _ = data.change_owner_without_validation(*owner, version);
                 }
             }
-            _ => panic!("incompatible mutation ({:?})", self.mutation_type()),
+            _ => {
+                log_or_panic!(LogLevel::Error,
+                              "incompatible mutation ({:?})",
+                              self.mutation_type())
+            }
         }
     }
 }

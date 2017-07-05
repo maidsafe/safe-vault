@@ -46,7 +46,7 @@ fn idata_basics() {
 
     // Get non-existent data fails.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_get_idata(&mut node, client, nae_manager, *data.name(), msg_id));
+    unwrap!(dm.handle_get_idata(&mut node, client.into(), nae_manager, *data.name(), msg_id));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(
@@ -55,7 +55,11 @@ fn idata_basics() {
 
     // Put immutable data sends refresh to the NAE manager.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_put_idata(&mut node, client_manager, nae_manager, data.clone(), msg_id));
+    unwrap!(dm.handle_put_idata(&mut node,
+                                client_manager.into(),
+                                nae_manager,
+                                data.clone(),
+                                msg_id));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
@@ -68,7 +72,7 @@ fn idata_basics() {
 
     // Get the data back and assert its the same data we put in originally.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_get_idata(&mut node, client, nae_manager, *data.name(), msg_id));
+    unwrap!(dm.handle_get_idata(&mut node, client.into(), nae_manager, *data.name(), msg_id));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     let retrieved_data =
@@ -93,11 +97,11 @@ fn mdata_basics() {
     // Attempt to list entries of non-existent data fails.
     let msg_id = MessageId::new();
     unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                             client,
-                                             nae_manager,
-                                             data_name,
-                                             TEST_TAG,
-                                             msg_id));
+                                         client.into(),
+                                         nae_manager,
+                                         data_name,
+                                         TEST_TAG,
+                                         msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(
             message.response,
@@ -106,11 +110,11 @@ fn mdata_basics() {
     // Put mutable data sends refresh to the NAE manager.
     let msg_id = MessageId::new();
     unwrap!(dm.handle_put_mdata(&mut node,
-                                    client_manager,
-                                    nae_manager,
-                                    data,
-                                    msg_id,
-                                    client_key));
+                                client_manager.into(),
+                                nae_manager,
+                                data,
+                                msg_id,
+                                client_key));
 
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, _) => payload);
@@ -125,11 +129,11 @@ fn mdata_basics() {
     // Now list the data entries - should successfuly respond with empty list.
     let msg_id = MessageId::new();
     unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                             client,
-                                             nae_manager,
-                                             data_name,
-                                             TEST_TAG,
-                                             msg_id));
+                                         client.into(),
+                                         nae_manager,
+                                         data_name,
+                                         TEST_TAG,
+                                         msg_id));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     let entries = assert_match!(
@@ -158,7 +162,7 @@ fn mdata_mutations() {
     // Initially, the entries should be empty.
     let msg_id = MessageId::new();
     unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                         client,
+                                         client.into(),
                                          nae_manager,
                                          data_name,
                                          TEST_TAG,
@@ -183,7 +187,7 @@ fn mdata_mutations() {
         .into();
     let msg_id = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager,
+                                           client_manager.into(),
                                            nae_manager,
                                            data_name,
                                            TEST_TAG,
@@ -201,7 +205,7 @@ fn mdata_mutations() {
     // The data should now contain the previously inserted two entries.
     let msg_id = MessageId::new();
     unwrap!(dm.handle_list_mdata_entries(&mut node,
-                                         client,
+                                         client.into(),
                                          nae_manager,
                                          data_name,
                                          TEST_TAG,
@@ -580,7 +584,7 @@ fn mdata_non_conflicting_parallel_mutations() {
         .into();
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_0,
+                                           client_manager_0.into(),
                                            nae_manager,
                                            *data.name(),
                                            data.tag(),
@@ -593,7 +597,7 @@ fn mdata_non_conflicting_parallel_mutations() {
         .into();
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_1,
+                                           client_manager_1.into(),
                                            nae_manager,
                                            *data.name(),
                                            data.tag(),
@@ -659,7 +663,7 @@ fn mdata_conflicting_parallel_mutations() {
         .into();
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_0,
+                                           client_manager_0.into(),
                                            nae_manager,
                                            *data.name(),
                                            data.tag(),
@@ -672,7 +676,7 @@ fn mdata_conflicting_parallel_mutations() {
         .into();
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_1,
+                                           client_manager_1.into(),
                                            nae_manager,
                                            *data.name(),
                                            data.tag(),
@@ -730,7 +734,7 @@ fn mdata_parallel_mutations_limits() {
     }
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_0,
+                                           client_manager_0.into(),
                                            nae_manager,
                                            *data.name(),
                                            data.tag(),
@@ -744,7 +748,7 @@ fn mdata_parallel_mutations_limits() {
     }
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_1,
+                                           client_manager_1.into(),
                                            nae_manager,
                                            *data.name(),
                                            data.tag(),
@@ -777,7 +781,7 @@ fn mdata_parallel_mutations_limits() {
     }
     let msg_id_0 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_0,
+                                           client_manager_0.into(),
                                            nae_manager,
                                            *data.name(),
                                            data.tag(),
@@ -791,7 +795,7 @@ fn mdata_parallel_mutations_limits() {
     }
     let msg_id_1 = MessageId::new();
     unwrap!(dm.handle_mutate_mdata_entries(&mut node,
-                                           client_manager_1,
+                                           client_manager_1.into(),
                                            nae_manager,
                                            *data.name(),
                                            data.tag(),

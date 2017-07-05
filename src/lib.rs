@@ -225,6 +225,7 @@ extern crate config_file_handler;
 extern crate quick_error;
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 extern crate rand;
+#[macro_use]
 extern crate routing;
 #[cfg(not(feature = "use-mock-crypto"))]
 extern crate rust_sodium;
@@ -247,6 +248,7 @@ pub mod test_utils;
 #[cfg(all(feature = "use-mock-crust", not(feature = "use-mock-routing")))]
 pub mod mock_crust_detail;
 
+mod authority;
 mod cache;
 mod chunk_store;
 mod config_handler;

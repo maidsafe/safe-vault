@@ -834,6 +834,100 @@ fn mutable_data_concurrent_mutations() {
     verify_data_is_stored(&mut nodes, &mut client, &all_data);
 }
 
+// Put a mutable data then immediately mutate it.
+// This test was used to expose an issue that a mutate request conflicts with a `PutMData` entry in
+// the pending_writes of DM's ache.
+#[test]
+fn mutable_data_put_and_mutate() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+    let iterations = test_utils::iterations();
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+    let mut event_count = 0;
+    let mut nodes = test_node::create_nodes(&network, node_count, None, false);
+
+    let mut clients: Vec<_> = (0..2)
+        .map(|_| {
+                 let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+                 let mut client = TestClient::new(&network, Some(config));
+                 client.ensure_connected(&mut nodes);
+                 client.create_account(&mut nodes);
+                 client
+             })
+        .collect();
+
+
+    let permissions = PermissionSet::new()
+        .allow(Action::Insert)
+        .allow(Action::Update)
+        .allow(Action::Delete);
+
+    let mut all_data = HashMap::new();
+
+    let client_key0 = *clients[0].signing_public_key();
+    let client_key1 = *clients[1].signing_public_key();
+
+    for i in 0..iterations {
+        trace!("Iteration {}. Network size: {}", i + 1, nodes.len());
+
+        let mut data = test_utils::gen_mutable_data(10_000, 1, client_key0, &mut rng);
+        let data_name = *data.name();
+        unwrap!(data.set_user_permissions(User::Anyone, permissions, 1, client_key0));
+        let _ = clients[0].put_mdata(data.clone());
+
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
+        trace!("Processed {} events.", event_count);
+
+        // Try to receive response for the PutMData request.
+        while let Ok(event) = clients[0].try_recv() {
+            if let Event::Response { response: Response::PutMData { res, .. }, .. } = event {
+                trace!("Client {:?} received PutMData response: {:?}",
+                       clients[0].name(),
+                       res);
+                if res.is_ok() {
+                    let _ = all_data.insert(data_name, data.clone());
+                }
+
+                break;
+            }
+        }
+
+        let actions = test_utils::gen_mutable_data_entry_actions(&data, 1, &mut rng);
+        let _ = clients[1].mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
+
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
+        trace!("Processed {} events.", event_count);
+
+        // Try to receive response for the MutateMDataEntries request.
+        while let Ok(event) = clients[1].try_recv() {
+            if let Event::Response {
+                       response: Response::MutateMDataEntries { res, .. }, ..
+                   } = event {
+                trace!("Client {:?} received MutateMDataResponse: {:?}",
+                       clients[1].name(),
+                       res);
+                if res.is_ok() {
+                    let mut data = unwrap!(all_data.get_mut(&data_name));
+                    unwrap!(data.mutate_entries(actions, client_key1));
+                }
+
+                break;
+            }
+        }
+    }
+
+    verify_data_is_stored(&mut nodes, &mut clients[0], all_data.values());
+
+    mock_crust_detail::check_data(all_data
+                                      .into_iter()
+                                      .map(|(_, data)| Data::Mutable(data))
+                                      .collect(),
+                                  &nodes);
+    mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
+}
+
 // Two clients concurrently mutating same data with same actions, one with permission,
 // the other not. Only the one with permission shall succeed.
 #[test]
@@ -1177,7 +1271,9 @@ fn owner_keys(key: sign::PublicKey) -> BTreeSet<sign::PublicKey> {
 }
 
 // Verify that every element of `data` is actually stored on the network.
-fn verify_data_is_stored(nodes: &mut [TestNode], client: &mut TestClient, data: &[MutableData]) {
+fn verify_data_is_stored<'a, T>(nodes: &mut [TestNode], client: &mut TestClient, data: T)
+    where T: IntoIterator<Item = &'a MutableData>
+{
     for sent_data in data {
         let recovered_shell =
             unwrap!(client.get_mdata_shell_response(*sent_data.name(), sent_data.tag(), nodes));

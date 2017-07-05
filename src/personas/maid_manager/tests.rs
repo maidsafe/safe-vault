@@ -67,7 +67,7 @@ fn idata_basics() {
 
     // Verify it gets forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
+    assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(*data.name()));
     assert_match!(message.request,
                   Request::PutIData { data: request_data, .. } => {
@@ -78,8 +78,8 @@ fn idata_basics() {
     // forwarded to the client.
     unwrap!(mm.handle_put_idata_response(&mut node, Ok(()), msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
-    assert_eq!(message.dst, client);
+    assert_eq!(message.src, Authority::from(client_manager));
+    assert_eq!(message.dst, Authority::from(client));
     assert_match!(message.response, Response::PutIData { res: Ok(()), .. });
 
     // Simulate refresh from at least QUORUM nodes.
@@ -119,7 +119,7 @@ fn mdata_basics() {
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
+    assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(*data.name()));
     assert_match!(message.request,
                   Request::PutMData { data: request_data, .. } => {
@@ -130,8 +130,8 @@ fn mdata_basics() {
     // forwarded to the client.
     unwrap!(mm.handle_put_mdata_response(&mut node, Ok(()), msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
-    assert_eq!(message.dst, client);
+    assert_eq!(message.src, Authority::from(client_manager));
+    assert_eq!(message.dst, Authority::from(client));
     assert_match!(message.response, Response::PutMData { res: Ok(()), .. });
 
     simulate_refresh(&mut node, &mut mm, msg_id, QUORUM);
@@ -156,7 +156,7 @@ fn mdata_basics() {
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
+    assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(*data.name()));
     assert_match!(message.request, Request::MutateMDataEntries { .. });
 
@@ -164,8 +164,8 @@ fn mdata_basics() {
     // forwarded to the client.
     unwrap!(mm.handle_mutate_mdata_entries_response(&mut node, Ok(()), msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
-    assert_eq!(message.dst, client);
+    assert_eq!(message.src, Authority::from(client_manager));
+    assert_eq!(message.dst, Authority::from(client));
     assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
 
     simulate_refresh(&mut node, &mut mm, msg_id, QUORUM);
@@ -222,7 +222,7 @@ fn mdata_permissions_and_owners() {
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
+    assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(data_name));
     assert_match!(message.request, Request::SetMDataUserPermissions { .. });
 
@@ -230,8 +230,8 @@ fn mdata_permissions_and_owners() {
     // forwarded to the client.
     unwrap!(mm.handle_set_mdata_user_permissions_response(&mut node, Ok(()), msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
-    assert_eq!(message.dst, client);
+    assert_eq!(message.src, Authority::from(client_manager));
+    assert_eq!(message.dst, Authority::from(client));
     assert_match!(message.response, Response::SetMDataUserPermissions { res: Ok(()), .. });
 
     simulate_refresh(&mut node, &mut mm, msg_id, QUORUM);
@@ -250,7 +250,7 @@ fn mdata_permissions_and_owners() {
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
+    assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(data_name));
     assert_match!(message.request, Request::DelMDataUserPermissions { .. });
 
@@ -258,8 +258,8 @@ fn mdata_permissions_and_owners() {
     // forwarded to the client.
     unwrap!(mm.handle_del_mdata_user_permissions_response(&mut node, Ok(()), msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
-    assert_eq!(message.dst, client);
+    assert_eq!(message.src, Authority::from(client_manager));
+    assert_eq!(message.dst, Authority::from(client));
     assert_match!(message.response, Response::DelMDataUserPermissions { res: Ok(()), .. });
 
     simulate_refresh(&mut node, &mut mm, msg_id, QUORUM);
@@ -315,7 +315,7 @@ fn mdata_permissions_and_owners() {
 
     // Verify it got forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
+    assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::NaeManager(data_name));
     assert_match!(message.request, Request::ChangeMDataOwner { .. });
 
@@ -323,8 +323,8 @@ fn mdata_permissions_and_owners() {
     // forwarded to the client.
     unwrap!(mm.handle_change_mdata_owner_response(&mut node, Ok(()), msg_id));
     let message = unwrap!(node.sent_responses.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
-    assert_eq!(message.dst, client);
+    assert_eq!(message.src, Authority::from(client_manager));
+    assert_eq!(message.dst, Authority::from(client));
     assert_match!(message.response, Response::ChangeMDataOwner { res: Ok(()), .. });
 
     simulate_refresh(&mut node, &mut mm, msg_id, QUORUM);
@@ -483,7 +483,7 @@ fn mutation_authorisation() {
     // Verify the request is forwarded to the NaeManager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     assert_match!(message.request, Request::PutMData { .. });
-    assert_eq!(message.src, owner_client_manager);
+    assert_eq!(message.src, Authority::from(owner_client_manager));
     assert_eq!(message.dst, mdata_nae_manager);
 
     // Simulate receiving the response from the NaeManager and refresh.
@@ -517,7 +517,7 @@ fn mutation_authorisation() {
     // Verify the request is forwarded to the NaeManager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     assert_match!(message.request, Request::MutateMDataEntries { .. });
-    assert_eq!(message.src, owner_client_manager);
+    assert_eq!(message.src, Authority::from(owner_client_manager));
     assert_eq!(message.dst, mdata_nae_manager);
 
     // Simulate receiving the response from the NaeManager and refresh.
@@ -546,7 +546,7 @@ fn mutation_authorisation() {
         // Verify the request is forwarded to the NaeManager.
         let message = unwrap!(node.sent_requests.remove(&msg_id));
         assert_match!(message.request, Request::PutIData { .. });
-        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.src, Authority::from(owner_client_manager));
         assert_eq!(message.dst, idata_nae_manager);
 
         // Simulate receiving the response from the NaeManager and verify it gets
@@ -554,8 +554,8 @@ fn mutation_authorisation() {
         unwrap!(mm.handle_put_idata_response(&mut node, Ok(()), msg_id));
         let message = unwrap!(node.sent_responses.remove(&msg_id));
         assert_match!(message.response, Response::PutIData { res: Ok(()), .. });
-        assert_eq!(message.src, owner_client_manager);
-        assert_eq!(message.dst, app_client);
+        assert_eq!(message.src, Authority::from(owner_client_manager));
+        assert_eq!(message.dst, Authority::from(app_client));
 
         simulate_refresh(&mut node, &mut mm, msg_id, QUORUM);
     }
@@ -576,7 +576,7 @@ fn mutation_authorisation() {
         // Verify the request is forwarded to the NaeManager.
         let message = unwrap!(node.sent_requests.remove(&msg_id));
         assert_match!(message.request, Request::PutMData { .. });
-        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.src, Authority::from(owner_client_manager));
         assert_eq!(message.dst, mdata_nae_manager);
 
         // Simulate receiving the response from the NaeManager and verify it gets
@@ -584,8 +584,8 @@ fn mutation_authorisation() {
         unwrap!(mm.handle_put_mdata_response(&mut node, Ok(()), msg_id));
         let message = unwrap!(node.sent_responses.remove(&msg_id));
         assert_match!(message.response, Response::PutMData { res: Ok(()), .. });
-        assert_eq!(message.src, owner_client_manager);
-        assert_eq!(message.dst, app_client);
+        assert_eq!(message.src, Authority::from(owner_client_manager));
+        assert_eq!(message.dst, Authority::from(app_client));
 
         simulate_refresh(&mut node, &mut mm, msg_id, QUORUM);
     }
@@ -605,7 +605,7 @@ fn mutation_authorisation() {
         // Verify the request is forwarded to the NaeManager.
         let message = unwrap!(node.sent_requests.remove(&msg_id));
         assert_match!(message.request, Request::MutateMDataEntries { .. });
-        assert_eq!(message.src, owner_client_manager);
+        assert_eq!(message.src, Authority::from(owner_client_manager));
         assert_eq!(message.dst, mdata_nae_manager);
 
         // Simulate receiving the response from the nae manager and verify it gets
@@ -613,8 +613,8 @@ fn mutation_authorisation() {
         unwrap!(mm.handle_mutate_mdata_entries_response(&mut node, Ok(()), msg_id));
         let message = unwrap!(node.sent_responses.remove(&msg_id));
         assert_match!(message.response, Response::MutateMDataEntries { res: Ok(()), .. });
-        assert_eq!(message.src, owner_client_manager);
-        assert_eq!(message.dst, app_client);
+        assert_eq!(message.src, Authority::from(owner_client_manager));
+        assert_eq!(message.dst, Authority::from(app_client));
 
         simulate_refresh(&mut node, &mut mm, msg_id, QUORUM);
     }
@@ -667,14 +667,14 @@ fn account_replication_during_churn() {
     // The first one is node to node, the second is group to node.
     let msg_id = MessageId::from_added_node(new_node_name);
     let message = unwrap!(old_node.sent_requests.remove(&msg_id));
-    assert_eq!(message.src, client_manager);
+    assert_eq!(message.src, Authority::from(client_manager));
     assert_eq!(message.dst, Authority::ManagedNode(new_node_name));
 
     // Simulate the node to node refresh of data part.
     let mut msg_id_list = BTreeSet::new();
     let _ = msg_id_list.insert(op_msg_id);
     let refresh_data_ops = Refresh::UpdateDataOps {
-        name: client_manager.name(),
+        name: *client_manager.name(),
         msg_ids: msg_id_list,
     };
     let serialised_refresh = unwrap!(serialise(&refresh_data_ops));
@@ -814,11 +814,10 @@ fn refresh_data_ops_count() {
 
 fn create_account(node: &mut RoutingNode,
                   mm: &mut MaidManager,
-                  src: Authority<XorName>,
-                  dst: Authority<XorName>)
+                  src: ClientAuthority,
+                  dst: ClientManagerAuthority)
                   -> MessageId {
-    let client_key =
-        assert_match!(src, Authority::Client { client_id, .. } => *client_id.signing_public_key());
+    let client_key = *src.client_key();
     let account_packet = test_utils::gen_mutable_data(TYPE_TAG_SESSION_PACKET,
                                                       0,
                                                       client_key,
@@ -838,8 +837,8 @@ fn create_account(node: &mut RoutingNode,
 
 fn get_account_info(node: &mut RoutingNode,
                     mm: &mut MaidManager,
-                    src: Authority<XorName>,
-                    dst: Authority<XorName>)
+                    src: ClientAuthority,
+                    dst: ClientManagerAuthority)
                     -> Result<AccountInfo, ClientError> {
     let msg_id = MessageId::new();
     unwrap!(mm.handle_get_account_info(node, src, dst, msg_id));

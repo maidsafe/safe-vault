@@ -15,8 +15,11 @@
 // Please review the Licences for the specific language governing permissions and limitations
 // relating to use of the SAFE Network Software.
 
+#[cfg(not(feature = "use-mock-crust"))]
+use authority::ClientAuthority;
+use authority::ClientManagerAuthority;
 use rand::{self, Rand, Rng};
-use routing::{Authority, EntryAction, EntryActions, ImmutableData, MutableData, Value, XorName};
+use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
 use rust_sodium::crypto::sign;
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
@@ -129,11 +132,11 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(data: &MutableData,
 
 /// Generate random `Client` authority and return it together with its client key.
 #[cfg(not(feature = "use-mock-crust"))]
-pub fn gen_client_authority() -> (Authority<XorName>, sign::PublicKey) {
+pub fn gen_client_authority() -> (ClientAuthority, sign::PublicKey) {
     use routing::FullId;
     let full_id = FullId::new();
 
-    let client = Authority::Client {
+    let client = ClientAuthority {
         client_id: *full_id.public_id(),
         proxy_node_name: rand::random(),
     };
@@ -142,6 +145,6 @@ pub fn gen_client_authority() -> (Authority<XorName>, sign::PublicKey) {
 }
 
 /// Generate `ClientManager` authority for the client with the given client key.
-pub fn gen_client_manager_authority(client_key: sign::PublicKey) -> Authority<XorName> {
-    Authority::ClientManager(utils::client_name_from_key(&client_key))
+pub fn gen_client_manager_authority(client_key: sign::PublicKey) -> ClientManagerAuthority {
+    ClientManagerAuthority(utils::client_name_from_key(&client_key))
 }

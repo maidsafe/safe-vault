@@ -26,6 +26,7 @@ use self::message_id_accumulator::MessageIdAccumulator;
 use GROUP_SIZE;
 use QUORUM;
 use TYPE_TAG_INVITE;
+use authority::{ClientAuthority, ClientManagerAuthority};
 use error::InternalError;
 use lru_time_cache::LruCache;
 use maidsafe_utilities::serialisation;
@@ -114,26 +115,29 @@ impl MaidManager {
 
     pub fn handle_get_account_info(&mut self,
                                    routing_node: &mut RoutingNode,
-                                   src: Authority<XorName>,
-                                   dst: Authority<XorName>,
+                                   src: ClientAuthority,
+                                   dst: ClientManagerAuthority,
                                    msg_id: MessageId)
                                    -> Result<(), InternalError> {
         let res = self.get_account(&src, &dst).map(Account::balance);
         routing_node
-            .send_get_account_info_response(dst, src, res, msg_id)?;
+            .send_get_account_info_response(dst.into(), src.into(), res, msg_id)?;
         Ok(())
     }
 
     pub fn handle_put_idata(&mut self,
                             routing_node: &mut RoutingNode,
-                            src: Authority<XorName>,
-                            dst: Authority<XorName>,
+                            src: ClientAuthority,
+                            dst: ClientManagerAuthority,
                             data: ImmutableData,
                             msg_id: MessageId)
                             -> Result<(), InternalError> {
         if !data.validate_size() {
             routing_node
-                .send_put_idata_response(dst, src, Err(ClientError::DataTooLarge), msg_id)?;
+                .send_put_idata_response(dst.into(),
+                                         src.into(),
+                                         Err(ClientError::DataTooLarge),
+                                         msg_id)?;
             return Ok(());
         }
 
@@ -143,13 +147,13 @@ impl MaidManager {
                                                      Some(msg_id),
                                                      None) {
             routing_node
-                .send_put_idata_response(dst, src, Err(err), msg_id)?;
+                .send_put_idata_response(dst.into(), src.into(), Err(err), msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
         if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, None) {
-            let fwd_src = dst;
+            let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(*data.name());
             trace!("MM forwarding PutIData request to {:?}", fwd_dst);
             routing_node
@@ -157,7 +161,10 @@ impl MaidManager {
             insert.commit();
         } else {
             routing_node
-                .send_put_idata_response(dst, src, Err(ClientError::InvalidOperation), msg_id)?;
+                .send_put_idata_response(dst.into(),
+                                         src.into(),
+                                         Err(ClientError::InvalidOperation),
+                                         msg_id)?;
         }
 
         Ok(())
@@ -172,21 +179,21 @@ impl MaidManager {
             self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
         // Send the response back to client
         routing_node
-            .send_put_idata_response(dst, src, res, msg_id)?;
+            .send_put_idata_response(dst.into(), src.into(), res, msg_id)?;
         Ok(())
     }
 
     pub fn handle_put_mdata(&mut self,
                             routing_node: &mut RoutingNode,
-                            src: Authority<XorName>,
-                            dst: Authority<XorName>,
+                            src: ClientAuthority,
+                            dst: ClientManagerAuthority,
                             data: MutableData,
                             msg_id: MessageId,
                             requester: sign::PublicKey)
                             -> Result<(), InternalError> {
         match self.prepare_put_mdata(src, dst, data, msg_id, requester) {
             Ok(PutMDataAction::Claim(invite_name)) => {
-                let invite_src = dst;
+                let invite_src = dst.into();
                 let invite_dst = Authority::NaeManager(invite_name);
                 let actions = EntryActions::new()
                     .ins(INVITE_CLAIMED_KEY.to_vec(),
@@ -204,11 +211,16 @@ impl MaidManager {
                                                        requester)?;
             }
             Ok(PutMDataAction::Forward(data)) => {
-                self.forward_put_mdata(routing_node, src, dst, data, msg_id, requester)?;
+                self.forward_put_mdata(routing_node,
+                                       src.into(),
+                                       dst.into(),
+                                       data,
+                                       msg_id,
+                                       requester)?;
             }
             Err(error) => {
                 routing_node
-                    .send_put_mdata_response(dst, src, Err(error), msg_id)?;
+                    .send_put_mdata_response(dst.into(), src.into(), Err(error), msg_id)?;
             }
         }
 
@@ -228,14 +240,13 @@ impl MaidManager {
             (Some(TYPE_TAG_SESSION_PACKET), Err(ClientError::DataExists)) => {
                 // We wouldn't have forwarded two `Put` requests for the same account, so
                 // it must have been created via another client manager.
-                let client_name = utils::client_name(&src);
-                let _ = self.accounts.remove(client_name);
+                let _ = self.accounts.remove(src.name());
 
-                trace!("MM sending delete refresh for account {}", client_name);
+                trace!("MM sending delete refresh for account {}", src.name());
                 self.send_refresh(routing_node,
-                                  dst,
-                                  dst,
-                                  Refresh::Delete(*client_name),
+                                  dst.into(),
+                                  dst.into(),
+                                  Refresh::Delete(*src.name()),
                                   msg_id)?;
 
                 Err(ClientError::AccountExists)
@@ -245,15 +256,15 @@ impl MaidManager {
 
         // Send response back to client
         routing_node
-            .send_put_mdata_response(dst, src, res, msg_id)?;
+            .send_put_mdata_response(dst.into(), src.into(), res, msg_id)?;
         Ok(())
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_mutate_mdata_entries(&mut self,
                                        routing_node: &mut RoutingNode,
-                                       src: Authority<XorName>,
-                                       dst: Authority<XorName>,
+                                       src: ClientAuthority,
+                                       dst: ClientManagerAuthority,
                                        name: XorName,
                                        tag: u64,
                                        actions: BTreeMap<Vec<u8>, EntryAction>,
@@ -266,13 +277,13 @@ impl MaidManager {
                                                      Some(msg_id),
                                                      Some(requester)) {
             routing_node
-                .send_mutate_mdata_entries_response(dst, src, Err(err), msg_id)?;
+                .send_mutate_mdata_entries_response(dst.into(), src.into(), Err(err), msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
         if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
-            let fwd_src = dst;
+            let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding MutateMDataEntries request to {:?}", fwd_dst);
             routing_node
@@ -286,8 +297,8 @@ impl MaidManager {
             insert.commit();
         } else {
             routing_node
-                .send_mutate_mdata_entries_response(dst,
-                                                    src,
+                .send_mutate_mdata_entries_response(dst.into(),
+                                                    src.into(),
                                                     Err(ClientError::InvalidOperation),
                                                     msg_id)?;
         }
@@ -307,14 +318,13 @@ impl MaidManager {
 
             match res {
                 Ok(()) => {
-                    let (client_name, client_key) = utils::client_name_and_key(&src);
-                    let _ = self.accounts.insert(*client_name, Account::default());
+                    let _ = self.accounts.insert(*src.name(), Account::default());
                     self.forward_put_mdata(routing_node,
-                                                  src,
-                                                  dst,
-                                                  data,
-                                                  msg_id,
-                                                  *client_key)?;
+                                           src,
+                                           dst,
+                                           data,
+                                           msg_id,
+                                           *src.client_key())?;
                 }
                 Err(error) => {
                     let error = match error {
@@ -324,7 +334,7 @@ impl MaidManager {
                     };
 
                     routing_node
-                        .send_put_mdata_response(dst, src, Err(error), msg_id)?;
+                        .send_put_mdata_response(dst.into(), src.into(), Err(error), msg_id)?;
                 }
             }
         } else {
@@ -332,7 +342,7 @@ impl MaidManager {
             let CachedRequest { src, dst, .. } =
                 self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
             routing_node
-                .send_mutate_mdata_entries_response(dst, src, res, msg_id)?;
+                .send_mutate_mdata_entries_response(dst.into(), src.into(), res, msg_id)?;
         };
 
         Ok(())
@@ -341,8 +351,8 @@ impl MaidManager {
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_set_mdata_user_permissions(&mut self,
                                              routing_node: &mut RoutingNode,
-                                             src: Authority<XorName>,
-                                             dst: Authority<XorName>,
+                                             src: ClientAuthority,
+                                             dst: ClientManagerAuthority,
                                              name: XorName,
                                              tag: u64,
                                              user: User,
@@ -357,13 +367,16 @@ impl MaidManager {
                                                      Some(msg_id),
                                                      Some(requester)) {
             routing_node
-                .send_set_mdata_user_permissions_response(dst, src, Err(err.clone()), msg_id)?;
+                .send_set_mdata_user_permissions_response(dst.into(),
+                                                          src.into(),
+                                                          Err(err.clone()),
+                                                          msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
         if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
-            let fwd_src = dst;
+            let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding SetMDataUserPermissions request to {:?}",
                    fwd_dst);
@@ -380,8 +393,8 @@ impl MaidManager {
             insert.commit();
         } else {
             routing_node
-                .send_set_mdata_user_permissions_response(dst,
-                                                          src,
+                .send_set_mdata_user_permissions_response(dst.into(),
+                                                          src.into(),
                                                           Err(ClientError::InvalidOperation),
                                                           msg_id)?;
         }
@@ -397,15 +410,15 @@ impl MaidManager {
         let CachedRequest { src, dst, .. } =
             self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
         routing_node
-            .send_set_mdata_user_permissions_response(dst, src, res, msg_id)?;
+            .send_set_mdata_user_permissions_response(dst.into(), src.into(), res, msg_id)?;
         Ok(())
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_del_mdata_user_permissions(&mut self,
                                              routing_node: &mut RoutingNode,
-                                             src: Authority<XorName>,
-                                             dst: Authority<XorName>,
+                                             src: ClientAuthority,
+                                             dst: ClientManagerAuthority,
                                              name: XorName,
                                              tag: u64,
                                              user: User,
@@ -419,13 +432,16 @@ impl MaidManager {
                                                      Some(msg_id),
                                                      Some(requester)) {
             routing_node
-                .send_del_mdata_user_permissions_response(dst, src, Err(err.clone()), msg_id)?;
+                .send_del_mdata_user_permissions_response(dst.into(),
+                                                          src.into(),
+                                                          Err(err.clone()),
+                                                          msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
         if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
-            let fwd_src = dst;
+            let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding DelMDataUserPermissions request to {:?}",
                    fwd_dst);
@@ -441,8 +457,8 @@ impl MaidManager {
             insert.commit();
         } else {
             routing_node
-                .send_del_mdata_user_permissions_response(dst,
-                                                          src,
+                .send_del_mdata_user_permissions_response(dst.into(),
+                                                          src.into(),
                                                           Err(ClientError::InvalidOperation),
                                                           msg_id)?;
         }
@@ -458,15 +474,15 @@ impl MaidManager {
         let CachedRequest { src, dst, .. } =
             self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
         routing_node
-            .send_del_mdata_user_permissions_response(dst, src, res, msg_id)?;
+            .send_del_mdata_user_permissions_response(dst.into(), src.into(), res, msg_id)?;
         Ok(())
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn handle_change_mdata_owner(&mut self,
                                      routing_node: &mut RoutingNode,
-                                     src: Authority<XorName>,
-                                     dst: Authority<XorName>,
+                                     src: ClientAuthority,
+                                     dst: ClientManagerAuthority,
                                      name: XorName,
                                      tag: u64,
                                      new_owners: BTreeSet<sign::PublicKey>,
@@ -478,14 +494,16 @@ impl MaidManager {
                                                      AuthPolicy::Owner,
                                                      Some(msg_id),
                                                      None) {
-            routing_node
-                .send_change_mdata_owner_response(dst, src, Err(err.clone()), msg_id)?;
+            routing_node.send_change_mdata_owner_response(dst.into(),
+                                                          src.into(),
+                                                          Err(err.clone()),
+                                                          msg_id)?;
             return Ok(());
         }
 
         // Forwarding the request to NAE Manager.
         if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
-            let fwd_src = dst;
+            let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding ChangeMDataOwner request to {:?}", fwd_dst);
             routing_node
@@ -499,8 +517,8 @@ impl MaidManager {
             insert.commit();
         } else {
             routing_node
-                .send_change_mdata_owner_response(dst,
-                                                  src,
+                .send_change_mdata_owner_response(dst.into(),
+                                                  src.into(),
                                                   Err(ClientError::InvalidOperation),
                                                   msg_id)?;
         }
@@ -516,27 +534,27 @@ impl MaidManager {
         let CachedRequest { src, dst, .. } =
             self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
         routing_node
-            .send_change_mdata_owner_response(dst, src, res, msg_id)?;
+            .send_change_mdata_owner_response(dst.into(), src.into(), res, msg_id)?;
         Ok(())
     }
 
     pub fn handle_list_auth_keys_and_version(&mut self,
                                              routing_node: &mut RoutingNode,
-                                             src: Authority<XorName>,
-                                             dst: Authority<XorName>,
+                                             src: ClientAuthority,
+                                             dst: ClientManagerAuthority,
                                              msg_id: MessageId)
                                              -> Result<(), InternalError> {
         let res = self.get_account(&src, &dst)
             .map(|account| (account.keys.clone(), account.keys_ops_count));
         routing_node
-            .send_list_auth_keys_and_version_response(dst, src, res, msg_id)?;
+            .send_list_auth_keys_and_version_response(dst.into(), src.into(), res, msg_id)?;
         Ok(())
     }
 
     pub fn handle_ins_auth_key(&mut self,
                                routing_node: &mut RoutingNode,
-                               src: Authority<XorName>,
-                               dst: Authority<XorName>,
+                               src: ClientAuthority,
+                               dst: ClientManagerAuthority,
                                key: sign::PublicKey,
                                version: u64,
                                msg_id: MessageId)
@@ -546,8 +564,8 @@ impl MaidManager {
 
     pub fn handle_del_auth_key(&mut self,
                                routing_node: &mut RoutingNode,
-                               src: Authority<XorName>,
-                               dst: Authority<XorName>,
+                               src: ClientAuthority,
+                               dst: ClientManagerAuthority,
                                key: sign::PublicKey,
                                version: u64,
                                msg_id: MessageId)
@@ -571,7 +589,7 @@ impl MaidManager {
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete: Vec<_> = self.request_cache
             .iter()
-            .filter_map(|(msg_id, entry)| if accounts_to_delete.contains(&entry.src.name()) {
+            .filter_map(|(msg_id, entry)| if accounts_to_delete.contains(entry.src.name()) {
                             Some(*msg_id)
                         } else {
                             None
@@ -648,8 +666,8 @@ impl MaidManager {
     }
 
     fn prepare_put_mdata(&mut self,
-                         src: Authority<XorName>,
-                         dst: Authority<XorName>,
+                         src: ClientAuthority,
+                         dst: ClientManagerAuthority,
                          data: MutableData,
                          msg_id: MessageId,
                          requester: sign::PublicKey)
@@ -657,10 +675,8 @@ impl MaidManager {
         data.validate()?;
 
         let tag = data.tag();
-        let src_name = utils::client_name(&src);
-        let dst_name = utils::client_name(&dst);
 
-        if !utils::verify_mdata_owner(&data, dst_name) {
+        if !utils::verify_mdata_owner(&data, dst.name()) {
             return Err(ClientError::InvalidOwners);
         }
 
@@ -680,7 +696,7 @@ impl MaidManager {
                     trace!("MM PutMData request failed: {:?}", error);
                     // Undo the account creation
                     if tag == TYPE_TAG_SESSION_PACKET {
-                        let _ = self.accounts.remove(src_name);
+                        let _ = self.accounts.remove(src.name());
                     }
 
                     error
@@ -691,22 +707,19 @@ impl MaidManager {
     }
 
     fn prepare_put_account(&mut self,
-                           src: Authority<XorName>,
-                           dst: Authority<XorName>,
+                           src: ClientAuthority,
+                           dst: ClientManagerAuthority,
                            data: MutableData,
                            msg_id: MessageId)
                            -> Result<PutMDataAction, ClientError> {
-        let src_name = utils::client_name(&src);
-        let dst_name = utils::client_name(&dst);
-
-        if dst_name != src_name {
+        if dst.name() != src.name() {
             trace!("MM Cannot create account for {:?} as {:?}.", src, dst);
             return Err(ClientError::InvalidOperation);
         }
 
         if self.is_admin(&src) || self.invite_key.is_none() {
             let len = self.accounts.len();
-            match self.accounts.entry(*src_name) {
+            match self.accounts.entry(*src.name()) {
                 Entry::Vacant(entry) => {
                     let _ = entry.insert(Account::default());
                     info!("Managing {} client accounts.", len + 1);
@@ -717,13 +730,13 @@ impl MaidManager {
                     Err(ClientError::AccountExists)
                 }
             }
-        } else if self.accounts.contains_key(src_name) {
+        } else if self.accounts.contains_key(src.name()) {
             trace!("MM Cannot create account for {:?} - it already exists", src);
             Err(ClientError::AccountExists)
         } else {
             let invite_name = get_invite_name(&data)?;
             trace!("Creating account for {:?} with invitation {:?}.",
-                   src_name,
+                   src.name(),
                    invite_name);
 
             let item = CachedAccountCreation {
@@ -744,8 +757,8 @@ impl MaidManager {
     }
 
     fn prepare_put_invite(&mut self,
-                          src: Authority<XorName>,
-                          dst: Authority<XorName>,
+                          src: ClientAuthority,
+                          dst: ClientManagerAuthority,
                           data: MutableData)
                           -> Result<PutMDataAction, ClientError> {
         // Only the authorised admin client can create invitations.
@@ -760,14 +773,14 @@ impl MaidManager {
 
     fn forward_put_mdata(&mut self,
                          routing_node: &mut RoutingNode,
-                         src: Authority<XorName>,
-                         dst: Authority<XorName>,
+                         src: ClientAuthority,
+                         dst: ClientManagerAuthority,
                          data: MutableData,
                          msg_id: MessageId,
                          requester: sign::PublicKey)
                          -> Result<(), InternalError> {
         if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(data.tag())) {
-            let fwd_src = dst;
+            let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(*data.name());
 
             trace!("MM forwarding PutMData request to {:?}", fwd_dst);
@@ -776,18 +789,21 @@ impl MaidManager {
             insert.commit();
         } else {
             routing_node
-                .send_put_mdata_response(dst, src, Err(ClientError::InvalidOperation), msg_id)?;
+                .send_put_mdata_response(dst.into(),
+                                         src.into(),
+                                         Err(ClientError::InvalidOperation),
+                                         msg_id)?;
         }
 
         Ok(())
     }
 
     fn get_account(&self,
-                   src: &Authority<XorName>,
-                   dst: &Authority<XorName>)
+                   src: &ClientAuthority,
+                   dst: &ClientManagerAuthority)
                    -> Result<&Account, ClientError> {
-        let requester_name = utils::client_name(src);
-        let client_name = utils::client_name(dst);
+        let requester_name = src.name();
+        let client_name = dst.name();
         if requester_name != client_name {
             trace!("MM Cannot allow requester {:?} accessing account {:?}.",
                    src,
@@ -804,8 +820,8 @@ impl MaidManager {
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     fn mutate_auth_keys(&mut self,
                         routing_node: &mut RoutingNode,
-                        src: Authority<XorName>,
-                        dst: Authority<XorName>,
+                        src: ClientAuthority,
+                        dst: ClientManagerAuthority,
                         op: KeysOp,
                         key: sign::PublicKey,
                         version: u64,
@@ -814,10 +830,10 @@ impl MaidManager {
         let res = match self.prepare_auth_keys_mutation(&src, &dst, op, key, version) {
             Ok(keys) => {
                 self.send_refresh(routing_node,
-                                  dst,
-                                  dst,
+                                  dst.into(),
+                                  dst.into(),
                                   Refresh::UpdateKeys {
-                                      name: *utils::client_name(&src),
+                                      name: *src.name(),
                                       keys: keys,
                                       ops_count: version,
                                   },
@@ -830,11 +846,11 @@ impl MaidManager {
         match op {
             KeysOp::Ins => {
                 routing_node
-                    .send_ins_auth_key_response(dst, src, res, msg_id)?;
+                    .send_ins_auth_key_response(dst.into(), src.into(), res, msg_id)?;
             }
             KeysOp::Del => {
                 routing_node
-                    .send_del_auth_key_response(dst, src, res, msg_id)?;
+                    .send_del_auth_key_response(dst.into(), src.into(), res, msg_id)?;
             }
         }
 
@@ -842,14 +858,14 @@ impl MaidManager {
     }
 
     fn prepare_auth_keys_mutation(&mut self,
-                                  src: &Authority<XorName>,
-                                  dst: &Authority<XorName>,
+                                  src: &ClientAuthority,
+                                  dst: &ClientManagerAuthority,
                                   op: KeysOp,
                                   key: sign::PublicKey,
                                   version: u64)
                                   -> Result<BTreeSet<sign::PublicKey>, ClientError> {
-        let client_name = utils::client_name(src);
-        let client_manager_name = utils::client_name(dst);
+        let client_name = src.name();
+        let client_manager_name = dst.name();
 
         if client_name != client_manager_name {
             return Err(ClientError::AccessDenied);
@@ -874,21 +890,18 @@ impl MaidManager {
     }
 
     fn prepare_data_mutation(&mut self,
-                             src: &Authority<XorName>,
-                             dst: &Authority<XorName>,
+                             src: &ClientAuthority,
+                             dst: &ClientManagerAuthority,
                              policy: AuthPolicy,
                              msg_id: Option<MessageId>,
                              requester: Option<sign::PublicKey>)
                              -> Result<(), ClientError> {
-        let client_manager_name = utils::client_name(dst);
-
         let account = self.accounts
-            .get(client_manager_name)
+            .get(dst.name())
             .ok_or(ClientError::NoSuchAccount)?;
-        let (client_name, client_key) = utils::client_name_and_key(src);
-        let allowed = client_name == client_manager_name ||
+        let allowed = src.name() == dst.name() ||
                       if AuthPolicy::Key == policy {
-                          account.keys.contains(client_key)
+                          account.keys.contains(src.client_key())
                       } else {
                           false
                       };
@@ -898,7 +911,7 @@ impl MaidManager {
         }
 
         if let Some(requester) = requester {
-            if requester != *client_key {
+            if requester != *src.client_key() {
                 return Err(ClientError::AccessDenied);
             }
         }
@@ -925,9 +938,9 @@ impl MaidManager {
         let req = self.remove_from_request_cache(&msg_id)?;
         if success {
             self.send_refresh(routing_node,
-                              req.dst,
-                              req.dst,
-                              Refresh::InsertDataOp(*utils::client_name(&req.dst)),
+                              req.dst.into(),
+                              req.dst.into(),
+                              Refresh::InsertDataOp(*req.dst.name()),
                               msg_id)?;
         }
         Ok(req)
@@ -1026,8 +1039,8 @@ impl MaidManager {
 
     fn insert_into_request_cache(&mut self,
                                  msg_id: MessageId,
-                                 src: Authority<XorName>,
-                                 dst: Authority<XorName>,
+                                 src: ClientAuthority,
+                                 dst: ClientManagerAuthority,
                                  tag: Option<u64>)
                                  -> Option<RequestCacheInsert> {
         match self.request_cache.entry(msg_id) {
@@ -1067,9 +1080,8 @@ impl MaidManager {
         Some(account)
     }
 
-    fn is_admin(&self, authority: &Authority<XorName>) -> bool {
-        let (_, src_key) = utils::client_name_and_key(authority);
-        Some(*src_key) == self.invite_key
+    fn is_admin(&self, authority: &ClientAuthority) -> bool {
+        Some(*authority.client_key()) == self.invite_key
     }
 }
 
@@ -1152,15 +1164,15 @@ enum AuthPolicy {
 }
 
 struct CachedRequest {
-    src: Authority<XorName>,
-    dst: Authority<XorName>,
+    src: ClientAuthority,
+    dst: ClientManagerAuthority,
     tag: Option<u64>,
 }
 
 #[derive(Debug)]
 struct CachedAccountCreation {
-    src: Authority<XorName>,
-    dst: Authority<XorName>,
+    src: ClientAuthority,
+    dst: ClientManagerAuthority,
     data: MutableData,
 }
 

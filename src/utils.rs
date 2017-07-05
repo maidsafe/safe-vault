@@ -18,7 +18,7 @@
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 pub use fake_clock::FakeClock as Instant;
 use maidsafe_utilities::serialisation;
-use routing::{Authority, MutableData, Value, XorName, sha3};
+use routing::{MutableData, Value, XorName, sha3};
 use rust_sodium::crypto::sign;
 use serde::Serialize;
 use std::collections;
@@ -54,33 +54,6 @@ pub type HashMap<K, V> = collections::HashMap<K, V>;
 pub type HashSet<T> = collections::HashSet<T, BuildHasherDefault<DefaultHasher>>;
 #[cfg(not(feature = "use-mock-crust"))]
 pub type HashSet<T> = collections::HashSet<T>;
-
-/// Extract client name (a `XorName`) from the authority.
-///
-/// # Panics
-///
-/// Panics when the authority is not `Client` or `ClientManager`.
-pub fn client_name(authority: &Authority<XorName>) -> &XorName {
-    match *authority {
-        Authority::Client { ref client_id, .. } => client_id.name(),
-        Authority::ClientManager(ref name) => name,
-        _ => unreachable!("Logic error"),
-    }
-}
-
-/// Extract client name and key from the authority.
-///
-/// # Panics
-///
-/// Panics when the authority is not `Client`.
-pub fn client_name_and_key(authority: &Authority<XorName>) -> (&XorName, &sign::PublicKey) {
-    match *authority {
-        Authority::Client { ref client_id, .. } => {
-            (client_id.name(), client_id.signing_public_key())
-        }
-        _ => unreachable!("Logic error"),
-    }
-}
 
 pub fn client_name_from_key(key: &sign::PublicKey) -> XorName {
     XorName(tiny_keccak::sha3_256(&key[..]))

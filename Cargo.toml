@@ -20,7 +20,7 @@ hex = "~0.2.0"
 itertools = "~0.5.9"
 lru_time_cache = "~0.6.0"
 log = "~0.3.7"
-maidsafe_utilities = "~0.12.1"
+maidsafe_utilities = "~0.13.0"
 quick-error = "~1.1.0"
 rand = "~0.3.14"
 routing = { git = "https://github.com/maidsafe/routing" }
