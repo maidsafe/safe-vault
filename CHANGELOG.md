@@ -5,7 +5,7 @@
 - Add support for MutableData instead.
 - MaidManagers only charge on put success now.
 - MaidManagers charge by directly storing the MsgIds and counting the number of them to determine the account balance.
-- MainManagers support insertion and deletion of auth-keys to support auth-app paradigm in which all mutations on behalf of the owner of the account has to go via the MaidManagers.
+- MaidManagers support insertion and deletion of auth-keys to support auth-app paradigm in which all mutations on behalf of the owner of the account has to go via the MaidManagers.
 
 ## [0.14.0]
 - Upgrade to routing 0.28.5.
