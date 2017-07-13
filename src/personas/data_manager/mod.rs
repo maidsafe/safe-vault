@@ -75,6 +75,10 @@ pub struct DataManager {
     chunk_refresh_accumulator: Accumulator<MutableDataId, XorName>,
     fragment_refresh_accumulator: Accumulator<FragmentInfo, XorName>,
     cache: Cache,
+    #[cfg(feature = "use-mock-crust")]
+    blocked_group_refresh_cache: BTreeMap<Vec<u8>, Vec<u8>>,
+    #[cfg(feature = "use-mock-crust")]
+    is_group_refresh_blocked: bool,
     mdata_cache: MutableDataCache,
     immutable_data_count: u64,
     mutable_data_count: u64,
@@ -83,6 +87,7 @@ pub struct DataManager {
 }
 
 impl DataManager {
+    #[cfg(not(feature = "use-mock-crust"))]
     pub fn new(chunk_store_root: PathBuf, capacity: u64) -> Result<DataManager, InternalError> {
         let chunk_store = ChunkStore::new(chunk_store_root, capacity)?;
         let accumulator_duration = Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS);
@@ -131,6 +136,27 @@ impl DataManager {
         self.request_needed_data(routing_node)
     }
 
+    fn push_group_refresh(&mut self, serialised_refresh: &[u8]) -> Option<Vec<u8>> {
+        #[cfg(feature = "use-mock-crust")]
+        {
+            use std::collections::btree_map::Entry;
+            if self.is_group_refresh_blocked {
+                let key = tiny_keccak::sha3_256(serialised_refresh).to_vec();
+
+                match self.blocked_group_refresh_cache.entry(key) {
+                    Entry::Vacant(entry) => {
+                        let _ = entry.insert(serialised_refresh.to_vec());
+                        return None;
+                    }
+                    Entry::Occupied(entry) => {
+                        let _ = entry.remove();
+                    }
+                }
+            }
+        }
+        Some(serialised_refresh.to_vec())
+    }
+
     // When a node in a group receives request to mutate some data it holds, it first sends
     // "group refresh" message to all the other members of the group. Only when the message
     // accumulates, the node applies the mutation to the data and updates it in the chunk
@@ -142,7 +168,12 @@ impl DataManager {
                                 routing_node: &mut RoutingNode,
                                 serialised_refresh: &[u8])
                                 -> Result<(), InternalError> {
-        let MutationVote { data_id, hash } = serialisation::deserialise(serialised_refresh)?;
+        let serialised_refresh = match self.push_group_refresh(serialised_refresh) {
+            Some(serialised_refresh) => serialised_refresh,
+            None => return Ok(()),
+        };
+
+        let MutationVote { data_id, hash } = serialisation::deserialise(&serialised_refresh)?;
         let write = match self.cache.take_pending_write(&data_id, &hash) {
             Some(write) => write,
             None => return Ok(()),
@@ -1374,6 +1405,27 @@ impl DataManager {
 
 #[cfg(feature = "use-mock-crust")]
 impl DataManager {
+    // Constructor for mock-crust tests.
+    pub fn new(chunk_store_root: PathBuf, capacity: u64) -> Result<DataManager, InternalError> {
+        let chunk_store = ChunkStore::new(chunk_store_root, capacity)?;
+        let accumulator_duration = Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS);
+
+        Ok(DataManager {
+               chunk_store: chunk_store,
+               chunk_refresh_accumulator: Accumulator::with_duration(QUORUM, accumulator_duration),
+               fragment_refresh_accumulator: Accumulator::with_duration(QUORUM,
+                                                                        accumulator_duration),
+               cache: Default::default(),
+               blocked_group_refresh_cache: BTreeMap::new(),
+               is_group_refresh_blocked: false,
+               mdata_cache: MutableDataCache::new(),
+               immutable_data_count: 0,
+               mutable_data_count: 0,
+               client_get_requests: 0,
+               logging_time: Instant::now(),
+           })
+    }
+
     pub fn get_stored_ids_and_versions(&self) -> Result<Vec<(DataId, u64)>, ChunkStoreError> {
         let data_ids = self.chunk_store.keys();
         let mut result = Vec::with_capacity(data_ids.len());
@@ -1390,6 +1442,28 @@ impl DataManager {
         }
 
         Ok(result)
+    }
+
+    pub fn set_block_group_refresh(&mut self, blocked: bool) {
+        self.is_group_refresh_blocked = blocked;
+    }
+
+    // In real network, the group_refresh is sent in the highest priority and shall not be dropped.
+    // However, it may get severly delayed for particular node, hence being processed out-of-order.
+    pub fn pop_group_refresh(&mut self, routing_node: &mut RoutingNode) {
+        use itertools::Itertools;
+        use maidsafe_utilities::SeededRng;
+        use rand::Rng;
+
+        if self.is_group_refresh_blocked {
+            let mut rng = SeededRng::thread_rng();
+            if !self.blocked_group_refresh_cache.is_empty() && rng.gen_weighted_bool(2) {
+                let serialised_refresh =
+                    unwrap!(rng.choose(&self.blocked_group_refresh_cache.values().collect_vec()))
+                        .to_vec();
+                let _ = self.handle_group_refresh(routing_node, &serialised_refresh);
+            }
+        }
     }
 
     fn get_version(&self, data_id: &DataId) -> Result<u64, ChunkStoreError> {

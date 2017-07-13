@@ -122,6 +122,11 @@ impl TestNode {
     pub fn routing_table(&self) -> &RoutingTable<XorName> {
         self.vault.routing_table()
     }
+
+    /// Toggle whether the group_refresh is blocked in `DataManager` on this node.
+    pub fn set_block_group_refresh(&mut self, blocked: bool) {
+        self.vault.set_block_group_refresh(blocked)
+    }
 }
 
 impl Drop for TestNode {

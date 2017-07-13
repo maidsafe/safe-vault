@@ -122,6 +122,10 @@ impl Vault {
     }
 
     fn process_event(&mut self, event: Event) -> EventResult {
+        #[cfg(feature = "use-mock-crust")]
+        self.data_manager
+            .pop_group_refresh(&mut self.routing_node);
+
         let mut res = EventResult::Processed;
         let event_res = match event {
             Event::Request { request, src, dst } => self.on_request(request, src, dst),
@@ -850,6 +854,11 @@ impl Vault {
     /// Vault routing_table
     pub fn routing_table(&self) -> &RoutingTable<XorName> {
         unwrap!(self.routing_node.routing_table())
+    }
+
+    /// Toggle whether the group_refresh is blocked in `DataManager` on this vault.
+    pub fn set_block_group_refresh(&mut self, blocked: bool) {
+        self.data_manager.set_block_group_refresh(blocked)
     }
 }
 

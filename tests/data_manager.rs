@@ -133,8 +133,12 @@ fn immutable_data_operations_with_churn(use_cache: bool) {
             }
         }
 
+        let node_index = rng.gen_range(0, nodes.len());
+        nodes[node_index].set_block_group_refresh(true);
+
         event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
+        nodes[node_index].set_block_group_refresh(false);
 
         mock_crust_detail::check_data(all_data.clone(), &nodes);
         mock_crust_detail::verify_network_invariant_for_all_nodes(&nodes);
@@ -647,8 +651,13 @@ fn mutable_data_parallel_mutations() {
             })
             .collect();
 
+        let node_index = rng.gen_range(0, nodes.len());
+        nodes[node_index].set_block_group_refresh(true);
+
         event_count += poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
         trace!("Processed {} events.", event_count);
+
+        nodes[node_index].set_block_group_refresh(false);
 
         // Collect the responses from the clients. For those that succeed,
         // apply their entry actions to the local copy of the data.
@@ -772,6 +781,9 @@ fn mutable_data_concurrent_mutations() {
             }
         }
 
+        let node_index = rng.gen_range(0, nodes.len());
+        nodes[node_index].set_block_group_refresh(true);
+
         event_count += poll::nodes_and_client(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
 
@@ -811,6 +823,7 @@ fn mutable_data_concurrent_mutations() {
         FakeClock::advance_time(PENDING_WRITE_TIMEOUT_SECS * 1000 + 1);
         event_count += poll::nodes_and_client(&mut nodes, &mut client);
         trace!(" Processed {} events.", event_count);
+        nodes[node_index].set_block_group_refresh(false);
 
         let sorted_nodes = test_node::closest_to(&nodes, client.name(), GROUP_SIZE);
         let node_count_stats: Vec<_> = sorted_nodes
@@ -834,13 +847,13 @@ fn mutable_data_concurrent_mutations() {
     verify_data_is_stored(&mut nodes, &mut client, &all_data);
 }
 
-// Concurrently put and mutate a mutable data.
-// Verify the data is consistently stored (it may or might not be mutated, depending
-// on the order in which the request are processed by the nodes).
+// Put a mutable data then immediately mutate it, meanwhile simulates out-of-order group_refresh.
+// This test was used to expose an issue that a mutate request conflicts with a `PutMData` entry in
+// the pending_writes of DM's ache.
 #[test]
-fn mutable_data_concurrent_put_and_mutate() {
+fn mutable_data_put_and_mutate() {
     let seed = None;
-    let node_count = TEST_NET_SIZE;
+    let node_count = GROUP_SIZE;
     let iterations = test_utils::iterations();
 
     let network = Network::new(GROUP_SIZE, seed);
@@ -877,8 +890,8 @@ fn mutable_data_concurrent_put_and_mutate() {
         unwrap!(data.set_user_permissions(User::Anyone, permissions, 1, client_key0));
         let _ = clients[0].put_mdata(data.clone());
 
-        let actions = test_utils::gen_mutable_data_entry_actions(&data, 1, &mut rng);
-        let _ = clients[1].mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
+        let node_index = rng.gen_range(0, nodes.len());
+        nodes[node_index].set_block_group_refresh(true);
 
         event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
         trace!("Processed {} events.", event_count);
@@ -890,12 +903,19 @@ fn mutable_data_concurrent_put_and_mutate() {
                        clients[0].name(),
                        res);
                 if res.is_ok() {
-                    let _ = all_data.insert(data_name, data);
+                    let _ = all_data.insert(data_name, data.clone());
                 }
 
                 break;
             }
         }
+
+        let actions = test_utils::gen_mutable_data_entry_actions(&data, 1, &mut rng);
+        let _ = clients[1].mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
+
+        event_count += poll::nodes_and_clients(&mut nodes, &mut clients);
+        trace!("Processed {} events.", event_count);
+        nodes[node_index].set_block_group_refresh(false);
 
         // Try to receive response for the MutateMDataEntries request.
         while let Ok(event) = clients[1].try_recv() {
@@ -996,8 +1016,12 @@ fn no_permission_mutable_data_concurrent_mutations() {
         let _ = clients[0].mutate_mdata_entries(data_name, data_tag, actions.clone());
         let _ = clients[1].mutate_mdata_entries(data_name, data_tag, actions.clone());
 
+        let node_index = rng.gen_range(0, nodes.len());
+        nodes[node_index].set_block_group_refresh(true);
+
         event_count += poll::nodes_and_clients_parallel(&mut nodes, &mut clients);
         trace!("Processed {} events.", event_count);
+        nodes[node_index].set_block_group_refresh(false);
 
         let mut network_responded = false;
         while let Ok(event) = clients[0].try_recv() {
@@ -1143,9 +1167,12 @@ fn mutable_data_operations_with_churn() {
 
             trace!("Removing {} node(s): {:?}", count, removed_nodes);
         }
+        let node_index = rng.gen_range(0, nodes.len());
+        nodes[node_index].set_block_group_refresh(true);
 
         event_count += poll::nodes_and_client_with_resend(&mut nodes, &mut client);
         trace!("Processed {} events.", event_count);
+        nodes[node_index].set_block_group_refresh(false);
 
         mock_crust_detail::check_data(all_data.iter().cloned().map(Data::Mutable).collect(),
                                       &nodes);
