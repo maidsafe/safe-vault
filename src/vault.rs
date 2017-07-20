@@ -39,8 +39,8 @@ use routing::NodeBuilder;
 #[cfg(not(feature = "use-mock-crust"))]
 use rust_sodium;
 use rust_sodium::crypto::sign;
-use std::env;
 use std::path::Path;
+use tempdir::TempDir;
 
 pub const CHUNK_STORE_DIR: &'static str = "safe_vault_chunk_store";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
@@ -50,6 +50,9 @@ pub struct Vault {
     maid_manager: MaidManager,
     data_manager: DataManager,
     routing_node: RoutingNode,
+    // We need to store this field for `TempDir` to remain valid
+    // for the time of the vault existence.
+    _chunk_root_tmp_dir: Option<TempDir>,
 }
 
 impl Vault {
@@ -63,9 +66,17 @@ impl Vault {
             }
             Err(e) => return Err(From::from(e)),
         };
-        let builder = RoutingNode::builder()
-            .first(first_vault)
-            .deny_other_local_nodes();
+        let mut builder = RoutingNode::builder().first(first_vault);
+
+        let deny_other_local_nodes =
+            config
+                .dev
+                .as_ref()
+                .map_or(true, |dev_config| !dev_config.allow_multiple_lan_nodes);
+        if deny_other_local_nodes {
+            builder = builder.deny_other_local_nodes();
+        }
+
         match Self::vault_with_config(builder, use_cache, config.clone()) {
             Ok(vault) => Ok(vault),
             Err(InternalError::ChunkStore(e)) => {
@@ -86,11 +97,14 @@ impl Vault {
         #[cfg(not(feature = "use-mock-crust"))]
         rust_sodium::init();
 
-        let mut chunk_store_root = match config.chunk_store_root {
-            Some(path_str) => Path::new(&path_str).to_path_buf(),
-            None => env::temp_dir(),
+        let (tmp_dir, chunk_store_root) = match config.chunk_store_root {
+            Some(path_str) => (None, Path::new(&path_str).to_path_buf()),
+            None => {
+                let tmp_dir = TempDir::new(CHUNK_STORE_DIR)?;
+                let path_buf = tmp_dir.path().to_path_buf();
+                (Some(tmp_dir), path_buf)
+            }
         };
-        chunk_store_root.push(CHUNK_STORE_DIR);
 
         let routing_node = if use_cache {
             builder.cache(Box::new(Cache::new())).create()
@@ -103,6 +117,7 @@ impl Vault {
                data_manager: DataManager::new(chunk_store_root,
                                               config.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY))?,
                routing_node: routing_node,
+               _chunk_root_tmp_dir: tmp_dir,
            })
 
     }
