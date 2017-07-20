@@ -22,7 +22,7 @@ use routing::{EntryAction, ImmutableData, MutableData, PermissionSet, User, XorN
 use rust_sodium::crypto::sign;
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Serialize)]
+#[derive(Serialize, Eq, PartialEq)]
 pub enum Mutation {
     PutIData(ImmutableData),
     PutMData(MutableData),
@@ -78,6 +78,11 @@ impl Mutation {
     /// Tests whether the two mutations conflict with each other. Conflicting
     /// mutations cannot be applied concurrently.
     pub fn conflicts_with(&self, other: &Self) -> bool {
+        // Allow identical mutations to support idempotence.
+        if self == other {
+            return false;
+        }
+
         match (self, other) {
             (&Mutation::MutateMDataEntries {
                   name: name0,

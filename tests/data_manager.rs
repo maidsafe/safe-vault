@@ -344,10 +344,11 @@ fn mutable_data_error_flow() {
 
     // Putting to the same data fails.
     let owners = owner_keys(*client.signing_public_key());
+    let entries = test_utils::gen_mutable_data_entries(1, &mut rng);
     let bad_data = unwrap!(MutableData::new(*data.name(),
                                             data.tag(),
                                             Default::default(),
-                                            Default::default(),
+                                            entries,
                                             owners));
 
     assert_match!(client.put_mdata_response(bad_data, &mut nodes),
@@ -472,7 +473,7 @@ fn mutable_data_error_flow() {
 
     // Inserting entry that already exists fails.
     let actions = EntryActions::new()
-        .ins(b"key".to_vec(), b"value-0".to_vec(), 0)
+        .ins(b"key".to_vec(), b"value-1".to_vec(), 0)
         .into();
     assert_match!(client.mutate_mdata_entries_response(*data.name(),
                                                        data.tag(),
@@ -1162,6 +1163,87 @@ fn mutable_data_operations_with_churn() {
     }
 
     verify_data_is_stored(&mut nodes, &mut client, &all_data);
+}
+
+#[test]
+fn mutable_data_idempotent_operations() {
+    let seed = None;
+    let node_count = TEST_NET_SIZE;
+
+    let network = Network::new(GROUP_SIZE, seed);
+    let mut rng = network.new_rng();
+    let mut nodes = test_node::create_nodes(&network, node_count, None, true);
+
+    let config = BootstrapConfig::with_contacts(&[nodes[0].endpoint()]);
+    let mut client = TestClient::new(&network, Some(config));
+
+    client.ensure_connected(&mut nodes);
+    client.create_account(&mut nodes);
+
+    // Sequentially putting the same mdata more than once.
+    let data = test_utils::gen_mutable_data(10000, 2, *client.signing_public_key(), &mut rng);
+    unwrap!(client.put_mdata_response(data.clone(), &mut nodes));
+    unwrap!(client.put_mdata_response(data, &mut nodes));
+
+    // Concurrently putting the same mdata more than once.
+    let data = test_utils::gen_mutable_data(10000, 2, *client.signing_public_key(), &mut rng);
+    let msg_id_0 = client.put_mdata(data.clone());
+    let msg_id_1 = client.put_mdata(data.clone());
+    let mut responded_0 = false;
+    let mut responded_1 = false;
+
+    let _ = poll::nodes_and_client(&mut nodes, &mut client);
+
+    while let Ok(event) = client.try_recv() {
+        if let Event::Response { response: Response::PutMData { res, msg_id }, .. } = event {
+            if res.is_ok() {
+                if msg_id == msg_id_0 {
+                    responded_0 = true
+                }
+                if msg_id == msg_id_1 {
+                    responded_1 = true
+                }
+            }
+        }
+    }
+
+    assert!(responded_0);
+    assert!(responded_1);
+
+    // Sequentially mutating the data with the same actions more than once.
+    let actions = test_utils::gen_mutable_data_entry_actions(&data, 2, &mut rng);
+    unwrap!(client.mutate_mdata_entries_response(*data.name(),
+                                                 data.tag(),
+                                                 actions.clone(),
+                                                 &mut nodes));
+    unwrap!(client.mutate_mdata_entries_response(*data.name(), data.tag(), actions, &mut nodes));
+
+    // Concurrently mutating the data with the same actions more than once.
+    let actions = test_utils::gen_mutable_data_entry_actions(&data, 2, &mut rng);
+    let msg_id_0 = client.mutate_mdata_entries(*data.name(), data.tag(), actions.clone());
+    let msg_id_1 = client.mutate_mdata_entries(*data.name(), data.tag(), actions);
+    responded_0 = false;
+    responded_1 = false;
+
+    let _ = poll::nodes_and_client(&mut nodes, &mut client);
+
+    while let Ok(event) = client.try_recv() {
+        if let Event::Response {
+                   response: Response::MutateMDataEntries { res, msg_id }, ..
+               } = event {
+            if res.is_ok() {
+                if msg_id == msg_id_0 {
+                    responded_0 = true
+                }
+                if msg_id == msg_id_1 {
+                    responded_1 = true
+                }
+            }
+        }
+    }
+
+    assert!(responded_0);
+    assert!(responded_1);
 }
 
 #[test]

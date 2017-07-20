@@ -407,8 +407,16 @@ impl DataManager {
                             -> Result<(), InternalError> {
         let data_id = data.id();
 
-        let res = if self.chunk_store.has(&data_id) {
-            Err(ClientError::DataExists)
+        let res = if let Ok(old_data) = self.chunk_store.get(&data_id) {
+            if old_data == data {
+                // Putting the same data more than once is allowed to support idempotence.
+                routing_node
+                    .send_put_mdata_response(dst, src, Ok(()), msg_id)?;
+                return Ok(());
+            } else {
+                // But putting different data with the same id is not.
+                Err(ClientError::DataExists)
+            }
         } else {
             self.clean_chunk_store();
 

@@ -51,7 +51,6 @@ const ACCOUNT_CREATION_TIMEOUT_SECS: u64 = 90;
 const ACCOUNT_CREATION_LIMIT: usize = 100;
 
 const INVITE_CLAIMED_KEY: &'static [u8] = b"claimed";
-const INVITE_CLAIMED_VALUE: &'static [u8] = &[1];
 
 pub struct MaidManager {
     accounts: HashMap<XorName, Account>,
@@ -195,10 +194,11 @@ impl MaidManager {
             Ok(PutMDataAction::Claim(invite_name)) => {
                 let invite_src = dst.into();
                 let invite_dst = Authority::NaeManager(invite_name);
+
+                // Use per-client unique value to prevent reusing claimed invites.
+                let value = src.client_key().0.to_vec();
                 let actions = EntryActions::new()
-                    .ins(INVITE_CLAIMED_KEY.to_vec(),
-                         INVITE_CLAIMED_VALUE.to_vec(),
-                         0)
+                    .ins(INVITE_CLAIMED_KEY.to_vec(), value, 0)
                     .into();
 
                 routing_node

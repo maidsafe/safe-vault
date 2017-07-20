@@ -371,7 +371,7 @@ impl Cache {
                                 msg_id: MessageId,
                                 rejected: bool)
                                 -> Option<MutationVote> {
-        let hash = utils::secure_hash(&mutation);
+        let hash = utils::secure_hash(&(&mutation, &msg_id));
         let data_id = mutation.data_id();
 
         self.pending_writes

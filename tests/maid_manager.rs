@@ -459,9 +459,17 @@ fn account_balance_with_failed_mutations_with_churn() {
             }
         } else {
             trace!("Putting {} chunks (expecting failure)", data_list.len());
-            for data in &data_list {
+            for existing_data in &data_list {
+                // Create data with the same id, but different content to cause failure.
+                let entries = test_utils::gen_mutable_data_entries(1, &mut rng);
+                let data = unwrap!(MutableData::new(*existing_data.name(),
+                                                    existing_data.tag(),
+                                                    existing_data.permissions().clone(),
+                                                    entries,
+                                                    existing_data.owners().clone()));
+
                 // Expect to be failed in DM. Account balance is not increased.
-                let _ = client.put_mdata(data.clone());
+                let _ = client.put_mdata(data);
             }
         }
 
