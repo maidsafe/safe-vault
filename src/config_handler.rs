@@ -28,10 +28,19 @@ pub struct Config {
     pub wallet_address: Option<XorName>,
     /// Upper limit for allowed network storage on this vault.
     pub max_capacity: Option<u64>, // measured by Bytes
-    /// root directory for chunk_store directories
+    /// Root directory for chunk_store directories
     pub chunk_store_root: Option<String>,
     /// Key that is allowed to put mutable data for account creation invitations.
     pub invite_key: Option<[u8; sign::PUBLICKEYBYTES]>,
+    /// Developer options
+    pub dev: Option<DevConfig>,
+}
+
+/// Extra configuration options intended for developers
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct DevConfig {
+    /// Allow to setup multiple nodes on a single local network
+    pub allow_multiple_lan_nodes: bool,
 }
 
 /// Reads the default vault config file.

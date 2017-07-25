@@ -69,6 +69,7 @@ impl TestNode {
                     max_capacity: None,
                     chunk_store_root: Some(format!("{}", chunk_store_root.display())),
                     invite_key: None,
+                    dev: None,
                 }
             }
         };
