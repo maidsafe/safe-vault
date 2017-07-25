@@ -751,10 +751,8 @@ impl FragmentHolder {
     // If there is an ongoing request for the given fragment, stops it and returns true,
     // otherwise does nothing and returns false.
     fn stop_request_for(&mut self, fragment: &FragmentInfo) -> bool {
-        if self.request.as_ref().map_or(false, |request| {
-            request.fragment == *fragment
-        })
-        {
+        let checker = |request: &FragmentRequest| request.fragment == *fragment;
+        if self.request.as_ref().map_or(false, checker) {
             let _ = self.fragments.remove(fragment);
             self.request = None;
             true

@@ -920,11 +920,7 @@ fn mutable_data_concurrent_mutations() {
                             |(key, _)| actions.contains_key(key),
                         )
                     };
-                    if !sent_actions.is_empty() &&
-                        sent_actions.iter().any(|(_, prev_actions)| {
-                            intersect_check(prev_actions)
-                        })
-                    {
+                    if !sent_actions.is_empty() && sent_actions.values().any(intersect_check) {
                         expect_successes = 1;
                     }
                 }

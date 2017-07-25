@@ -9,13 +9,11 @@ if [ -n "${TARGET}" ]; then
   ARG_TARGET=" --target ${TARGET}"
 fi
 
-if [ "${TRAVIS_RUST_VERSION}" = 1.17.0 ]; then
+if [ "${TRAVIS_RUST_VERSION}" = 1.19.0 ]; then
   cargo fmt -- --write-mode=diff
   # build without features
-  cargo rustc ${ARG_TARGET} --verbose --lib --profile test -- -Zno-trans
-  cargo rustc ${ARG_TARGET} --verbose --bin safe_vault --profile test -- -Zno-trans
-  cargo rustc ${ARG_TARGET} --verbose --lib -- -Zno-trans
-  cargo rustc ${ARG_TARGET} --verbose --bin safe_vault -- -Zno-trans
+  cargo check ${ARG_TARGET} --verbose --lib --tests
+  cargo check ${ARG_TARGET} --verbose --bin safe_vault --tests
 
   # unit tests with mock routing
   env RUSTFLAGS="-C opt-level=2 -C codegen-units=8" cargo test ${ARG_TARGET} --release --verbose --features use-mock-routing
