@@ -38,9 +38,9 @@ pub fn secure_hash<T: Serialize>(value: &T) -> SecureHash {
     serialisation::serialise(value)
         .map(|data| SecureHash(tiny_keccak::sha3_256(&data)))
         .unwrap_or_else(|_| {
-                            error!("Serialisation failure");
-                            Default::default()
-                        })
+            error!("Serialisation failure");
+            Default::default()
+        })
 }
 
 // Note: for testing with mock crust, use collections with deterministic hashing.
@@ -60,11 +60,13 @@ pub fn client_name_from_key(key: &sign::PublicKey) -> XorName {
 }
 
 pub fn mdata_shell_hash(data: &MutableData) -> SecureHash {
-    let shell = (*data.name(),
-                 data.tag(),
-                 data.version(),
-                 data.owners().clone(),
-                 data.permissions().clone());
+    let shell = (
+        *data.name(),
+        data.tag(),
+        data.version(),
+        data.owners().clone(),
+        data.permissions().clone(),
+    );
     secure_hash(&shell)
 }
 

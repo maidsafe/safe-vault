@@ -80,18 +80,19 @@ impl Mutation {
     pub fn conflicts_with(&self, other: &Self) -> bool {
         match (self, other) {
             (&Mutation::MutateMDataEntries {
-                  name: name0,
-                  tag: tag0,
-                  actions: ref actions0,
-              },
+                 name: name0,
+                 tag: tag0,
+                 actions: ref actions0,
+             },
              &Mutation::MutateMDataEntries {
-                  name: name1,
-                  tag: tag1,
-                  actions: ref actions1,
-              }) => name0 == name1 && tag0 == tag1 && keys_intersect(actions0, actions1),
+                 name: name1,
+                 tag: tag1,
+                 actions: ref actions1,
+             }) => name0 == name1 && tag0 == tag1 && keys_intersect(actions0, actions1),
             (_, _) => {
                 if let (DataId::Mutable(id0), DataId::Mutable(id1)) =
-                    (self.data_id(), other.data_id()) {
+                    (self.data_id(), other.data_id())
+                {
                     id0 == id1
                 } else {
                     false
@@ -104,10 +105,12 @@ impl Mutation {
     pub fn apply(&self, data: &mut MutableData) {
         let data_id = DataId::Mutable(data.id());
         if data_id != self.data_id() {
-            log_or_panic!(LogLevel::Error,
-                          "invalid data for mutation ({:?} instead of {:?})",
-                          data_id,
-                          self.data_id());
+            log_or_panic!(
+                LogLevel::Error,
+                "invalid data for mutation ({:?} instead of {:?})",
+                data_id,
+                self.data_id()
+            );
             return;
         }
 
@@ -136,9 +139,11 @@ impl Mutation {
                 }
             }
             _ => {
-                log_or_panic!(LogLevel::Error,
-                              "incompatible mutation ({:?})",
-                              self.mutation_type())
+                log_or_panic!(
+                    LogLevel::Error,
+                    "incompatible mutation ({:?})",
+                    self.mutation_type()
+                )
             }
         }
     }
@@ -157,7 +162,8 @@ pub enum MutationType {
 /// Compute the size of the data after applying only those mutations that
 /// increase the size.
 pub fn compute_size_after_increase<'a, T>(data: &MutableData, mutations: T) -> u64
-    where T: IntoIterator<Item = &'a Mutation>
+where
+    T: IntoIterator<Item = &'a Mutation>,
 {
     let mut size = serialised_size(data);
     let mut data = data.clone();
@@ -179,16 +185,20 @@ pub fn compute_size_after_increase<'a, T>(data: &MutableData, mutations: T) -> u
 /// Compute the number of entries after applying only those mutations that
 /// increase the number of entries.
 pub fn compute_entry_count_after_increase<'a, T>(data: &MutableData, mutations: T) -> u64
-    where T: IntoIterator<Item = &'a Mutation>
+where
+    T: IntoIterator<Item = &'a Mutation>,
 {
     let prev = data.entries().len() as u64;
     let diff: u64 = mutations
         .into_iter()
-        .map(|mutation| if let Mutation::MutateMDataEntries { ref actions, .. } = *mutation {
-                 count_inserts(actions)
-             } else {
-                 0
-             })
+        .map(|mutation| if let Mutation::MutateMDataEntries {
+            ref actions, ..
+        } = *mutation
+        {
+            count_inserts(actions)
+        } else {
+            0
+        })
         .filter(|count| *count > 0)
         .sum();
 
@@ -200,10 +210,10 @@ fn count_inserts(actions: &BTreeMap<Vec<u8>, EntryAction>) -> u64 {
     actions
         .iter()
         .filter(|&(_, action)| if let EntryAction::Ins(_) = *action {
-                    true
-                } else {
-                    false
-                })
+            true
+        } else {
+            false
+        })
         .count() as u64
 }
 

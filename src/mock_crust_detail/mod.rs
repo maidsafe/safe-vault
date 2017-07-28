@@ -52,19 +52,22 @@ pub fn check_deleted_data(deleted_data: &[Data], nodes: &[TestNode]) {
     let deleted_data_ids: HashSet<_> = deleted_data.iter().map(Data::id).collect();
     let mut data_count = HashMap::new();
 
-    for data_idv in nodes
-            .iter()
-            .flat_map(|node| unwrap!(node.get_stored_ids_and_versions())) {
+    for data_idv in nodes.iter().flat_map(|node| {
+        unwrap!(node.get_stored_ids_and_versions())
+    })
+    {
         if deleted_data_ids.contains(&data_idv.0) {
             *data_count.entry(data_idv).or_insert(0) += 1;
         }
     }
 
     for (data_id, count) in data_count {
-        assert!(count < 5,
-                "Found deleted data: {:?}. count: {}",
-                data_id,
-                count);
+        assert!(
+            count < 5,
+            "Found deleted data: {:?}. count: {}",
+            data_id,
+            count
+        );
     }
 }
 
@@ -94,18 +97,18 @@ pub fn check_data(all_data: Vec<Data>, nodes: &[TestNode]) {
             .into_iter()
             .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
 
-        let mut expected_data_holders =
-            nodes
-                .iter()
-                .map(TestNode::name)
-                .sorted_by(|left, right| data_id.name().cmp_distance(left, right));
+        let mut expected_data_holders = nodes.iter().map(TestNode::name).sorted_by(|left, right| {
+            data_id.name().cmp_distance(left, right)
+        });
         expected_data_holders.truncate(GROUP_SIZE);
 
         if expected_data_holders != data_holders {
-            panic!("Unexpected data holders for {:?}\n  expected: {:?}\n    actual: {:?}",
-                   data_id,
-                   expected_data_holders,
-                   data_holders);
+            panic!(
+                "Unexpected data holders for {:?}\n  expected: {:?}\n    actual: {:?}",
+                data_id,
+                expected_data_holders,
+                data_holders
+            );
         }
     }
 }

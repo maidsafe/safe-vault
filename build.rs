@@ -63,12 +63,18 @@ mod generate_diagrams {
 #[cfg(feature = "generate-diagrams")]
 fn main() {
     // List all diagram names and URLs to download them from.
-    generate_diagrams::download_image("personas",
-                                      "https://cacoo.com/diagrams/wl6of3FUFriB0FWO-0BD19.png");
-    generate_diagrams::download_image("immutable-data-put-flow",
-                                      "https://cacoo.com/diagrams/SCHrwEhLRB86EGe1-EF9A0.png");
-    generate_diagrams::download_image("immutable-data-get-flow",
-                                      "https://cacoo.com/diagrams/ndcPMKC3WapABSaA-EF9A0.png");
+    generate_diagrams::download_image(
+        "personas",
+        "https://cacoo.com/diagrams/wl6of3FUFriB0FWO-0BD19.png",
+    );
+    generate_diagrams::download_image(
+        "immutable-data-put-flow",
+        "https://cacoo.com/diagrams/SCHrwEhLRB86EGe1-EF9A0.png",
+    );
+    generate_diagrams::download_image(
+        "immutable-data-get-flow",
+        "https://cacoo.com/diagrams/ndcPMKC3WapABSaA-EF9A0.png",
+    );
 }
 
 #[cfg(not(feature = "generate-diagrams"))]

@@ -59,15 +59,22 @@ pub fn gen_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableData {
 }
 
 /// Generate mutable data with the given tag, number of entries and owner.
-pub fn gen_mutable_data<R: Rng>(tag: u64,
-                                num_entries: usize,
-                                owner: sign::PublicKey,
-                                rng: &mut R)
-                                -> MutableData {
+pub fn gen_mutable_data<R: Rng>(
+    tag: u64,
+    num_entries: usize,
+    owner: sign::PublicKey,
+    rng: &mut R,
+) -> MutableData {
     let entries = gen_mutable_data_entries(num_entries, rng);
     let mut owners = BTreeSet::new();
     let _ = owners.insert(owner);
-    unwrap!(MutableData::new(rng.gen(), tag, Default::default(), entries, owners))
+    unwrap!(MutableData::new(
+        rng.gen(),
+        tag,
+        Default::default(),
+        entries,
+        owners,
+    ))
 }
 
 /// Generate the given number of mutable data entries.
@@ -96,10 +103,11 @@ pub fn gen_mutable_data_entry<R: Rng>(rng: &mut R) -> (Vec<u8>, Value) {
 }
 
 /// Generate random entry actions to mutate the given mutable data.
-pub fn gen_mutable_data_entry_actions<R: Rng>(data: &MutableData,
-                                              count: usize,
-                                              rng: &mut R)
-                                              -> BTreeMap<Vec<u8>, EntryAction> {
+pub fn gen_mutable_data_entry_actions<R: Rng>(
+    data: &MutableData,
+    count: usize,
+    rng: &mut R,
+) -> BTreeMap<Vec<u8>, EntryAction> {
     let mut actions = EntryActions::new();
 
     let modify_count = cmp::min(rng.gen_range(0, count + 1), data.keys().len());

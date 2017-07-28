@@ -66,32 +66,37 @@ impl MaidManager {
     pub fn new(invite_key: Option<sign::PublicKey>) -> MaidManager {
         MaidManager {
             accounts: HashMap::default(),
-            data_ops_msg_id_accumulator:
-                MessageIdAccumulator::new(QUORUM, Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS)),
+            data_ops_msg_id_accumulator: MessageIdAccumulator::new(
+                QUORUM,
+                Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS),
+            ),
             request_cache: HashMap::default(),
             invite_key: invite_key,
             account_creation_cache: LruCache::with_expiry_duration_and_capacity(
                 Duration::from_secs(ACCOUNT_CREATION_TIMEOUT_SECS),
-                ACCOUNT_CREATION_LIMIT),
+                ACCOUNT_CREATION_LIMIT,
+            ),
         }
     }
 
-    pub fn handle_serialised_refresh(&mut self,
-                                     routing_node: &mut RoutingNode,
-                                     serialised_msg: &[u8],
-                                     msg_id: MessageId,
-                                     src_name: Option<XorName>)
-                                     -> Result<(), InternalError> {
+    pub fn handle_serialised_refresh(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        serialised_msg: &[u8],
+        msg_id: MessageId,
+        src_name: Option<XorName>,
+    ) -> Result<(), InternalError> {
         let refresh = serialisation::deserialise::<Refresh>(serialised_msg)?;
         self.handle_refresh(routing_node, refresh, msg_id, src_name)
     }
 
-    pub fn handle_refresh(&mut self,
-                          routing_node: &mut RoutingNode,
-                          refresh: Refresh,
-                          msg_id: MessageId,
-                          src_name: Option<XorName>)
-                          -> Result<(), InternalError> {
+    pub fn handle_refresh(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        refresh: Refresh,
+        msg_id: MessageId,
+        src_name: Option<XorName>,
+    ) -> Result<(), InternalError> {
         // `Refresh::Update` need to be accumulated using a custom algorithm, as `src` is a single
         // node. The other variants don't need custom accumulation, so `src` is a group.
 
@@ -113,41 +118,55 @@ impl MaidManager {
         Ok(())
     }
 
-    pub fn handle_get_account_info(&mut self,
-                                   routing_node: &mut RoutingNode,
-                                   src: ClientAuthority,
-                                   dst: ClientManagerAuthority,
-                                   msg_id: MessageId)
-                                   -> Result<(), InternalError> {
+    pub fn handle_get_account_info(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         let res = self.get_account(&src, &dst).map(Account::balance);
-        routing_node
-            .send_get_account_info_response(dst.into(), src.into(), res, msg_id)?;
+        routing_node.send_get_account_info_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
-    pub fn handle_put_idata(&mut self,
-                            routing_node: &mut RoutingNode,
-                            src: ClientAuthority,
-                            dst: ClientManagerAuthority,
-                            data: ImmutableData,
-                            msg_id: MessageId)
-                            -> Result<(), InternalError> {
+    pub fn handle_put_idata(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        data: ImmutableData,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         if !data.validate_size() {
-            routing_node
-                .send_put_idata_response(dst.into(),
-                                         src.into(),
-                                         Err(ClientError::DataTooLarge),
-                                         msg_id)?;
+            routing_node.send_put_idata_response(
+                dst.into(),
+                src.into(),
+                Err(ClientError::DataTooLarge),
+                msg_id,
+            )?;
             return Ok(());
         }
 
-        if let Err(err) = self.prepare_data_mutation(&src,
-                                                     &dst,
-                                                     AuthPolicy::Key,
-                                                     Some(msg_id),
-                                                     None) {
-            routing_node
-                .send_put_idata_response(dst.into(), src.into(), Err(err), msg_id)?;
+        if let Err(err) = self.prepare_data_mutation(
+            &src,
+            &dst,
+            AuthPolicy::Key,
+            Some(msg_id),
+            None,
+        )
+        {
+            routing_node.send_put_idata_response(
+                dst.into(),
+                src.into(),
+                Err(err),
+                msg_id,
+            )?;
             return Ok(());
         }
 
@@ -156,84 +175,111 @@ impl MaidManager {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(*data.name());
             trace!("MM forwarding PutIData request to {:?}", fwd_dst);
-            routing_node
-                .send_put_idata_request(fwd_src, fwd_dst, data, msg_id)?;
+            routing_node.send_put_idata_request(
+                fwd_src,
+                fwd_dst,
+                data,
+                msg_id,
+            )?;
             insert.commit();
         } else {
-            routing_node
-                .send_put_idata_response(dst.into(),
-                                         src.into(),
-                                         Err(ClientError::InvalidOperation),
-                                         msg_id)?;
+            routing_node.send_put_idata_response(
+                dst.into(),
+                src.into(),
+                Err(ClientError::InvalidOperation),
+                msg_id,
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn handle_put_idata_response(&mut self,
-                                     routing_node: &mut RoutingNode,
-                                     res: Result<(), ClientError>,
-                                     msg_id: MessageId)
-                                     -> Result<(), InternalError> {
-        let CachedRequest { src, dst, .. } =
-            self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
+    pub fn handle_put_idata_response(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        res: Result<(), ClientError>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } = self.handle_data_mutation_response(
+            routing_node,
+            msg_id,
+            res.is_ok(),
+        )?;
         // Send the response back to client
-        routing_node
-            .send_put_idata_response(dst.into(), src.into(), res, msg_id)?;
+        routing_node.send_put_idata_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
-    pub fn handle_put_mdata(&mut self,
-                            routing_node: &mut RoutingNode,
-                            src: ClientAuthority,
-                            dst: ClientManagerAuthority,
-                            data: MutableData,
-                            msg_id: MessageId,
-                            requester: sign::PublicKey)
-                            -> Result<(), InternalError> {
+    pub fn handle_put_mdata(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        data: MutableData,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InternalError> {
         match self.prepare_put_mdata(src, dst, data, msg_id, requester) {
             Ok(PutMDataAction::Claim(invite_name)) => {
                 let invite_src = dst.into();
                 let invite_dst = Authority::NaeManager(invite_name);
                 let actions = EntryActions::new()
-                    .ins(INVITE_CLAIMED_KEY.to_vec(),
-                         INVITE_CLAIMED_VALUE.to_vec(),
-                         0)
+                    .ins(
+                        INVITE_CLAIMED_KEY.to_vec(),
+                        INVITE_CLAIMED_VALUE.to_vec(),
+                        0,
+                    )
                     .into();
 
-                routing_node
-                    .send_mutate_mdata_entries_request(invite_src,
-                                                       invite_dst,
-                                                       invite_name,
-                                                       TYPE_TAG_INVITE,
-                                                       actions,
-                                                       msg_id,
-                                                       requester)?;
+                routing_node.send_mutate_mdata_entries_request(
+                    invite_src,
+                    invite_dst,
+                    invite_name,
+                    TYPE_TAG_INVITE,
+                    actions,
+                    msg_id,
+                    requester,
+                )?;
             }
             Ok(PutMDataAction::Forward(data)) => {
-                self.forward_put_mdata(routing_node,
-                                       src.into(),
-                                       dst.into(),
-                                       data,
-                                       msg_id,
-                                       requester)?;
+                self.forward_put_mdata(
+                    routing_node,
+                    src.into(),
+                    dst.into(),
+                    data,
+                    msg_id,
+                    requester,
+                )?;
             }
             Err(error) => {
-                routing_node
-                    .send_put_mdata_response(dst.into(), src.into(), Err(error), msg_id)?;
+                routing_node.send_put_mdata_response(
+                    dst.into(),
+                    src.into(),
+                    Err(error),
+                    msg_id,
+                )?;
             }
         }
 
         Ok(())
     }
 
-    pub fn handle_put_mdata_response(&mut self,
-                                     routing_node: &mut RoutingNode,
-                                     res: Result<(), ClientError>,
-                                     msg_id: MessageId)
-                                     -> Result<(), InternalError> {
-        let CachedRequest { src, dst, tag } =
-            self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
+    pub fn handle_put_mdata_response(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        res: Result<(), ClientError>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
+        let CachedRequest { src, dst, tag } = self.handle_data_mutation_response(
+            routing_node,
+            msg_id,
+            res.is_ok(),
+        )?;
 
         let res = match (tag, res) {
             (_, Ok(())) => Ok(()),
@@ -243,11 +289,13 @@ impl MaidManager {
                 let _ = self.accounts.remove(src.name());
 
                 trace!("MM sending delete refresh for account {}", src.name());
-                self.send_refresh(routing_node,
-                                  dst.into(),
-                                  dst.into(),
-                                  Refresh::Delete(*src.name()),
-                                  msg_id)?;
+                self.send_refresh(
+                    routing_node,
+                    dst.into(),
+                    dst.into(),
+                    Refresh::Delete(*src.name()),
+                    msg_id,
+                )?;
 
                 Err(ClientError::AccountExists)
             }
@@ -255,29 +303,41 @@ impl MaidManager {
         };
 
         // Send response back to client
-        routing_node
-            .send_put_mdata_response(dst.into(), src.into(), res, msg_id)?;
+        routing_node.send_put_mdata_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_mutate_mdata_entries(&mut self,
-                                       routing_node: &mut RoutingNode,
-                                       src: ClientAuthority,
-                                       dst: ClientManagerAuthority,
-                                       name: XorName,
-                                       tag: u64,
-                                       actions: BTreeMap<Vec<u8>, EntryAction>,
-                                       msg_id: MessageId,
-                                       requester: sign::PublicKey)
-                                       -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_data_mutation(&src,
-                                                     &dst,
-                                                     AuthPolicy::Key,
-                                                     Some(msg_id),
-                                                     Some(requester)) {
-            routing_node
-                .send_mutate_mdata_entries_response(dst.into(), src.into(), Err(err), msg_id)?;
+    pub fn handle_mutate_mdata_entries(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        name: XorName,
+        tag: u64,
+        actions: BTreeMap<Vec<u8>, EntryAction>,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InternalError> {
+        if let Err(err) = self.prepare_data_mutation(
+            &src,
+            &dst,
+            AuthPolicy::Key,
+            Some(msg_id),
+            Some(requester),
+        )
+        {
+            routing_node.send_mutate_mdata_entries_response(
+                dst.into(),
+                src.into(),
+                Err(err),
+                msg_id,
+            )?;
             return Ok(());
         }
 
@@ -286,32 +346,35 @@ impl MaidManager {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding MutateMDataEntries request to {:?}", fwd_dst);
-            routing_node
-                .send_mutate_mdata_entries_request(fwd_src,
-                                                   fwd_dst,
-                                                   name,
-                                                   tag,
-                                                   actions,
-                                                   msg_id,
-                                                   requester)?;
+            routing_node.send_mutate_mdata_entries_request(
+                fwd_src,
+                fwd_dst,
+                name,
+                tag,
+                actions,
+                msg_id,
+                requester,
+            )?;
             insert.commit();
         } else {
-            routing_node
-                .send_mutate_mdata_entries_response(dst.into(),
-                                                    src.into(),
-                                                    Err(ClientError::InvalidOperation),
-                                                    msg_id)?;
+            routing_node.send_mutate_mdata_entries_response(
+                dst.into(),
+                src.into(),
+                Err(ClientError::InvalidOperation),
+                msg_id,
+            )?;
         }
 
 
         Ok(())
     }
 
-    pub fn handle_mutate_mdata_entries_response(&mut self,
-                                                routing_node: &mut RoutingNode,
-                                                res: Result<(), ClientError>,
-                                                msg_id: MessageId)
-                                                -> Result<(), InternalError> {
+    pub fn handle_mutate_mdata_entries_response(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        res: Result<(), ClientError>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         if let Some(CachedAccountCreation { src, dst, data }) =
             // Invitation claim.
             self.account_creation_cache.remove(&msg_id) {
@@ -349,28 +412,33 @@ impl MaidManager {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_set_mdata_user_permissions(&mut self,
-                                             routing_node: &mut RoutingNode,
-                                             src: ClientAuthority,
-                                             dst: ClientManagerAuthority,
-                                             name: XorName,
-                                             tag: u64,
-                                             user: User,
-                                             permissions: PermissionSet,
-                                             version: u64,
-                                             msg_id: MessageId,
-                                             requester: sign::PublicKey)
-                                             -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_data_mutation(&src,
-                                                     &dst,
-                                                     AuthPolicy::Key,
-                                                     Some(msg_id),
-                                                     Some(requester)) {
-            routing_node
-                .send_set_mdata_user_permissions_response(dst.into(),
-                                                          src.into(),
-                                                          Err(err.clone()),
-                                                          msg_id)?;
+    pub fn handle_set_mdata_user_permissions(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        name: XorName,
+        tag: u64,
+        user: User,
+        permissions: PermissionSet,
+        version: u64,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InternalError> {
+        if let Err(err) = self.prepare_data_mutation(
+            &src,
+            &dst,
+            AuthPolicy::Key,
+            Some(msg_id),
+            Some(requester),
+        )
+        {
+            routing_node.send_set_mdata_user_permissions_response(
+                dst.into(),
+                src.into(),
+                Err(err.clone()),
+                msg_id,
+            )?;
             return Ok(());
         }
 
@@ -378,64 +446,81 @@ impl MaidManager {
         if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
-            trace!("MM forwarding SetMDataUserPermissions request to {:?}",
-                   fwd_dst);
-            routing_node
-                .send_set_mdata_user_permissions_request(fwd_src,
-                                                         fwd_dst,
-                                                         name,
-                                                         tag,
-                                                         user,
-                                                         permissions,
-                                                         version,
-                                                         msg_id,
-                                                         requester)?;
+            trace!(
+                "MM forwarding SetMDataUserPermissions request to {:?}",
+                fwd_dst
+            );
+            routing_node.send_set_mdata_user_permissions_request(
+                fwd_src,
+                fwd_dst,
+                name,
+                tag,
+                user,
+                permissions,
+                version,
+                msg_id,
+                requester,
+            )?;
             insert.commit();
         } else {
-            routing_node
-                .send_set_mdata_user_permissions_response(dst.into(),
-                                                          src.into(),
-                                                          Err(ClientError::InvalidOperation),
-                                                          msg_id)?;
+            routing_node.send_set_mdata_user_permissions_response(
+                dst.into(),
+                src.into(),
+                Err(ClientError::InvalidOperation),
+                msg_id,
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn handle_set_mdata_user_permissions_response(&mut self,
-                                                      routing_node: &mut RoutingNode,
-                                                      res: Result<(), ClientError>,
-                                                      msg_id: MessageId)
-                                                      -> Result<(), InternalError> {
-        let CachedRequest { src, dst, .. } =
-            self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
-        routing_node
-            .send_set_mdata_user_permissions_response(dst.into(), src.into(), res, msg_id)?;
+    pub fn handle_set_mdata_user_permissions_response(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        res: Result<(), ClientError>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } = self.handle_data_mutation_response(
+            routing_node,
+            msg_id,
+            res.is_ok(),
+        )?;
+        routing_node.send_set_mdata_user_permissions_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_del_mdata_user_permissions(&mut self,
-                                             routing_node: &mut RoutingNode,
-                                             src: ClientAuthority,
-                                             dst: ClientManagerAuthority,
-                                             name: XorName,
-                                             tag: u64,
-                                             user: User,
-                                             version: u64,
-                                             msg_id: MessageId,
-                                             requester: sign::PublicKey)
-                                             -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_data_mutation(&src,
-                                                     &dst,
-                                                     AuthPolicy::Key,
-                                                     Some(msg_id),
-                                                     Some(requester)) {
-            routing_node
-                .send_del_mdata_user_permissions_response(dst.into(),
-                                                          src.into(),
-                                                          Err(err.clone()),
-                                                          msg_id)?;
+    pub fn handle_del_mdata_user_permissions(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        name: XorName,
+        tag: u64,
+        user: User,
+        version: u64,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InternalError> {
+        if let Err(err) = self.prepare_data_mutation(
+            &src,
+            &dst,
+            AuthPolicy::Key,
+            Some(msg_id),
+            Some(requester),
+        )
+        {
+            routing_node.send_del_mdata_user_permissions_response(
+                dst.into(),
+                src.into(),
+                Err(err.clone()),
+                msg_id,
+            )?;
             return Ok(());
         }
 
@@ -443,61 +528,79 @@ impl MaidManager {
         if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
-            trace!("MM forwarding DelMDataUserPermissions request to {:?}",
-                   fwd_dst);
-            routing_node
-                .send_del_mdata_user_permissions_request(fwd_src,
-                                                         fwd_dst,
-                                                         name,
-                                                         tag,
-                                                         user,
-                                                         version,
-                                                         msg_id,
-                                                         requester)?;
+            trace!(
+                "MM forwarding DelMDataUserPermissions request to {:?}",
+                fwd_dst
+            );
+            routing_node.send_del_mdata_user_permissions_request(
+                fwd_src,
+                fwd_dst,
+                name,
+                tag,
+                user,
+                version,
+                msg_id,
+                requester,
+            )?;
             insert.commit();
         } else {
-            routing_node
-                .send_del_mdata_user_permissions_response(dst.into(),
-                                                          src.into(),
-                                                          Err(ClientError::InvalidOperation),
-                                                          msg_id)?;
+            routing_node.send_del_mdata_user_permissions_response(
+                dst.into(),
+                src.into(),
+                Err(ClientError::InvalidOperation),
+                msg_id,
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn handle_del_mdata_user_permissions_response(&mut self,
-                                                      routing_node: &mut RoutingNode,
-                                                      res: Result<(), ClientError>,
-                                                      msg_id: MessageId)
-                                                      -> Result<(), InternalError> {
-        let CachedRequest { src, dst, .. } =
-            self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
-        routing_node
-            .send_del_mdata_user_permissions_response(dst.into(), src.into(), res, msg_id)?;
+    pub fn handle_del_mdata_user_permissions_response(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        res: Result<(), ClientError>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } = self.handle_data_mutation_response(
+            routing_node,
+            msg_id,
+            res.is_ok(),
+        )?;
+        routing_node.send_del_mdata_user_permissions_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_change_mdata_owner(&mut self,
-                                     routing_node: &mut RoutingNode,
-                                     src: ClientAuthority,
-                                     dst: ClientManagerAuthority,
-                                     name: XorName,
-                                     tag: u64,
-                                     new_owners: BTreeSet<sign::PublicKey>,
-                                     version: u64,
-                                     msg_id: MessageId)
-                                     -> Result<(), InternalError> {
-        if let Err(err) = self.prepare_data_mutation(&src,
-                                                     &dst,
-                                                     AuthPolicy::Owner,
-                                                     Some(msg_id),
-                                                     None) {
-            routing_node.send_change_mdata_owner_response(dst.into(),
-                                                          src.into(),
-                                                          Err(err.clone()),
-                                                          msg_id)?;
+    pub fn handle_change_mdata_owner(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        name: XorName,
+        tag: u64,
+        new_owners: BTreeSet<sign::PublicKey>,
+        version: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
+        if let Err(err) = self.prepare_data_mutation(
+            &src,
+            &dst,
+            AuthPolicy::Owner,
+            Some(msg_id),
+            None,
+        )
+        {
+            routing_node.send_change_mdata_owner_response(
+                dst.into(),
+                src.into(),
+                Err(err.clone()),
+                msg_id,
+            )?;
             return Ok(());
         }
 
@@ -506,78 +609,97 @@ impl MaidManager {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding ChangeMDataOwner request to {:?}", fwd_dst);
-            routing_node
-                .send_change_mdata_owner_request(fwd_src,
-                                                 fwd_dst,
-                                                 name,
-                                                 tag,
-                                                 new_owners,
-                                                 version,
-                                                 msg_id)?;
+            routing_node.send_change_mdata_owner_request(
+                fwd_src,
+                fwd_dst,
+                name,
+                tag,
+                new_owners,
+                version,
+                msg_id,
+            )?;
             insert.commit();
         } else {
-            routing_node
-                .send_change_mdata_owner_response(dst.into(),
-                                                  src.into(),
-                                                  Err(ClientError::InvalidOperation),
-                                                  msg_id)?;
+            routing_node.send_change_mdata_owner_response(
+                dst.into(),
+                src.into(),
+                Err(ClientError::InvalidOperation),
+                msg_id,
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn handle_change_mdata_owner_response(&mut self,
-                                              routing_node: &mut RoutingNode,
-                                              res: Result<(), ClientError>,
-                                              msg_id: MessageId)
-                                              -> Result<(), InternalError> {
-        let CachedRequest { src, dst, .. } =
-            self.handle_data_mutation_response(routing_node, msg_id, res.is_ok())?;
-        routing_node
-            .send_change_mdata_owner_response(dst.into(), src.into(), res, msg_id)?;
+    pub fn handle_change_mdata_owner_response(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        res: Result<(), ClientError>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
+        let CachedRequest { src, dst, .. } = self.handle_data_mutation_response(
+            routing_node,
+            msg_id,
+            res.is_ok(),
+        )?;
+        routing_node.send_change_mdata_owner_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
-    pub fn handle_list_auth_keys_and_version(&mut self,
-                                             routing_node: &mut RoutingNode,
-                                             src: ClientAuthority,
-                                             dst: ClientManagerAuthority,
-                                             msg_id: MessageId)
-                                             -> Result<(), InternalError> {
-        let res = self.get_account(&src, &dst)
-            .map(|account| (account.keys.clone(), account.keys_ops_count));
-        routing_node
-            .send_list_auth_keys_and_version_response(dst.into(), src.into(), res, msg_id)?;
+    pub fn handle_list_auth_keys_and_version(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
+        let res = self.get_account(&src, &dst).map(|account| {
+            (account.keys.clone(), account.keys_ops_count)
+        });
+        routing_node.send_list_auth_keys_and_version_response(
+            dst.into(),
+            src.into(),
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
-    pub fn handle_ins_auth_key(&mut self,
-                               routing_node: &mut RoutingNode,
-                               src: ClientAuthority,
-                               dst: ClientManagerAuthority,
-                               key: sign::PublicKey,
-                               version: u64,
-                               msg_id: MessageId)
-                               -> Result<(), InternalError> {
+    pub fn handle_ins_auth_key(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        key: sign::PublicKey,
+        version: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.mutate_auth_keys(routing_node, src, dst, KeysOp::Ins, key, version, msg_id)
     }
 
-    pub fn handle_del_auth_key(&mut self,
-                               routing_node: &mut RoutingNode,
-                               src: ClientAuthority,
-                               dst: ClientManagerAuthority,
-                               key: sign::PublicKey,
-                               version: u64,
-                               msg_id: MessageId)
-                               -> Result<(), InternalError> {
+    pub fn handle_del_auth_key(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        key: sign::PublicKey,
+        version: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.mutate_auth_keys(routing_node, src, dst, KeysOp::Del, key, version, msg_id)
     }
 
-    pub fn handle_node_added(&mut self,
-                             routing_node: &mut RoutingNode,
-                             node_name: &XorName,
-                             routing_table: &RoutingTable<XorName>)
-                             -> Result<(), InternalError> {
+    pub fn handle_node_added(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        node_name: &XorName,
+        routing_table: &RoutingTable<XorName>,
+    ) -> Result<(), InternalError> {
 
         // Remove all accounts which we are no longer responsible for.
         let accounts_to_delete: Vec<_> = self.accounts
@@ -589,11 +711,14 @@ impl MaidManager {
         // Remove all requests from the cache that we are no longer responsible for.
         let msg_ids_to_delete: Vec<_> = self.request_cache
             .iter()
-            .filter_map(|(msg_id, entry)| if accounts_to_delete.contains(entry.src.name()) {
-                            Some(*msg_id)
-                        } else {
-                            None
-                        })
+            .filter_map(|(msg_id, entry)| if accounts_to_delete.contains(
+                entry.src.name(),
+            )
+            {
+                Some(*msg_id)
+            } else {
+                None
+            })
             .collect();
         for msg_id in msg_ids_to_delete {
             let _ = self.request_cache.remove(&msg_id);
@@ -612,8 +737,10 @@ impl MaidManager {
         for (name, account) in &self.accounts {
             match routing_table.other_closest_names(name, GROUP_SIZE) {
                 None => {
-                    error!("Moved out of close group of {:?} in a NodeAdded event after prune.",
-                           node_name);
+                    error!(
+                        "Moved out of close group of {:?} in a NodeAdded event after prune.",
+                        node_name
+                    );
                 }
                 Some(close_group) => {
                     if close_group.contains(&node_name) {
@@ -627,17 +754,20 @@ impl MaidManager {
         self.send_targeted_refresh_for_accounts(routing_node, *node_name, account_list, msg_id)
     }
 
-    pub fn handle_node_lost(&mut self,
-                            routing_node: &mut RoutingNode,
-                            node_name: &XorName,
-                            routing_table: &RoutingTable<XorName>)
-                            -> Result<(), InternalError> {
+    pub fn handle_node_lost(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        node_name: &XorName,
+        routing_table: &RoutingTable<XorName>,
+    ) -> Result<(), InternalError> {
         let mut refresh_list: HashMap<XorName, Vec<(XorName, Account)>> = HashMap::default();
         for (name, account) in &self.accounts {
             match routing_table.other_closest_names(name, GROUP_SIZE) {
                 None => {
-                    error!("Moved out of close group of {:?} in a NodeLost event.",
-                           node_name);
+                    error!(
+                        "Moved out of close group of {:?} in a NodeLost event.",
+                        node_name
+                    );
                 }
                 Some(close_group) => {
                     // If no new node joined the group due to this event, continue:
@@ -657,21 +787,24 @@ impl MaidManager {
         }
         let msg_id = MessageId::from_lost_node(*node_name);
         for (target_node_name, account_list) in refresh_list {
-            let _ = self.send_targeted_refresh_for_accounts(routing_node,
-                                                            target_node_name,
-                                                            account_list,
-                                                            msg_id);
+            let _ = self.send_targeted_refresh_for_accounts(
+                routing_node,
+                target_node_name,
+                account_list,
+                msg_id,
+            );
         }
         Ok(())
     }
 
-    fn prepare_put_mdata(&mut self,
-                         src: ClientAuthority,
-                         dst: ClientManagerAuthority,
-                         data: MutableData,
-                         msg_id: MessageId,
-                         requester: sign::PublicKey)
-                         -> Result<PutMDataAction, ClientError> {
+    fn prepare_put_mdata(
+        &mut self,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        data: MutableData,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<PutMDataAction, ClientError> {
         data.validate()?;
 
         let tag = data.tag();
@@ -706,12 +839,13 @@ impl MaidManager {
         res
     }
 
-    fn prepare_put_account(&mut self,
-                           src: ClientAuthority,
-                           dst: ClientManagerAuthority,
-                           data: MutableData,
-                           msg_id: MessageId)
-                           -> Result<PutMDataAction, ClientError> {
+    fn prepare_put_account(
+        &mut self,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        data: MutableData,
+        msg_id: MessageId,
+    ) -> Result<PutMDataAction, ClientError> {
         if dst.name() != src.name() {
             trace!("MM Cannot create account for {:?} as {:?}.", src, dst);
             return Err(ClientError::InvalidOperation);
@@ -735,9 +869,11 @@ impl MaidManager {
             Err(ClientError::AccountExists)
         } else {
             let invite_name = get_invite_name(&data)?;
-            trace!("Creating account for {:?} with invitation {:?}.",
-                   src.name(),
-                   invite_name);
+            trace!(
+                "Creating account for {:?} with invitation {:?}.",
+                src.name(),
+                invite_name
+            );
 
             let item = CachedAccountCreation {
                 src: src,
@@ -745,22 +881,25 @@ impl MaidManager {
                 data: data,
             };
             if let Some(old) = self.account_creation_cache.insert(msg_id, item) {
-                debug!("Received two account creation requests with message ID {:?}. {:?} \
+                debug!(
+                    "Received two account creation requests with message ID {:?}. {:?} \
                             and {:?}.",
-                       msg_id,
-                       old,
-                       self.account_creation_cache.get(&msg_id));
+                    msg_id,
+                    old,
+                    self.account_creation_cache.get(&msg_id)
+                );
             }
 
             Ok(PutMDataAction::Claim(invite_name))
         }
     }
 
-    fn prepare_put_invite(&mut self,
-                          src: ClientAuthority,
-                          dst: ClientManagerAuthority,
-                          data: MutableData)
-                          -> Result<PutMDataAction, ClientError> {
+    fn prepare_put_invite(
+        &mut self,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        data: MutableData,
+    ) -> Result<PutMDataAction, ClientError> {
         // Only the authorised admin client can create invitations.
         if !self.is_admin(&src) {
             trace!("Cannot put {:?} as {:?}.", data, dst);
@@ -771,43 +910,53 @@ impl MaidManager {
         }
     }
 
-    fn forward_put_mdata(&mut self,
-                         routing_node: &mut RoutingNode,
-                         src: ClientAuthority,
-                         dst: ClientManagerAuthority,
-                         data: MutableData,
-                         msg_id: MessageId,
-                         requester: sign::PublicKey)
-                         -> Result<(), InternalError> {
+    fn forward_put_mdata(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        data: MutableData,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InternalError> {
         if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(data.tag())) {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(*data.name());
 
             trace!("MM forwarding PutMData request to {:?}", fwd_dst);
-            routing_node
-                .send_put_mdata_request(fwd_src, fwd_dst, data, msg_id, requester)?;
+            routing_node.send_put_mdata_request(
+                fwd_src,
+                fwd_dst,
+                data,
+                msg_id,
+                requester,
+            )?;
             insert.commit();
         } else {
-            routing_node
-                .send_put_mdata_response(dst.into(),
-                                         src.into(),
-                                         Err(ClientError::InvalidOperation),
-                                         msg_id)?;
+            routing_node.send_put_mdata_response(
+                dst.into(),
+                src.into(),
+                Err(ClientError::InvalidOperation),
+                msg_id,
+            )?;
         }
 
         Ok(())
     }
 
-    fn get_account(&self,
-                   src: &ClientAuthority,
-                   dst: &ClientManagerAuthority)
-                   -> Result<&Account, ClientError> {
+    fn get_account(
+        &self,
+        src: &ClientAuthority,
+        dst: &ClientManagerAuthority,
+    ) -> Result<&Account, ClientError> {
         let requester_name = src.name();
         let client_name = dst.name();
         if requester_name != client_name {
-            trace!("MM Cannot allow requester {:?} accessing account {:?}.",
-                   src,
-                   dst);
+            trace!(
+                "MM Cannot allow requester {:?} accessing account {:?}.",
+                src,
+                dst
+            );
             return Err(ClientError::AccessDenied);
         }
         if let Some(account) = self.accounts.get(client_name) {
@@ -818,26 +967,29 @@ impl MaidManager {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    fn mutate_auth_keys(&mut self,
-                        routing_node: &mut RoutingNode,
-                        src: ClientAuthority,
-                        dst: ClientManagerAuthority,
-                        op: KeysOp,
-                        key: sign::PublicKey,
-                        version: u64,
-                        msg_id: MessageId)
-                        -> Result<(), InternalError> {
+    fn mutate_auth_keys(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        op: KeysOp,
+        key: sign::PublicKey,
+        version: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         let res = match self.prepare_auth_keys_mutation(&src, &dst, op, key, version) {
             Ok(keys) => {
-                self.send_refresh(routing_node,
-                                  dst.into(),
-                                  dst.into(),
-                                  Refresh::UpdateKeys {
-                                      name: *src.name(),
-                                      keys: keys,
-                                      ops_count: version,
-                                  },
-                                  msg_id)?;
+                self.send_refresh(
+                    routing_node,
+                    dst.into(),
+                    dst.into(),
+                    Refresh::UpdateKeys {
+                        name: *src.name(),
+                        keys: keys,
+                        ops_count: version,
+                    },
+                    msg_id,
+                )?;
                 Ok(())
             }
             Err(error) => Err(error),
@@ -845,25 +997,34 @@ impl MaidManager {
 
         match op {
             KeysOp::Ins => {
-                routing_node
-                    .send_ins_auth_key_response(dst.into(), src.into(), res, msg_id)?;
+                routing_node.send_ins_auth_key_response(
+                    dst.into(),
+                    src.into(),
+                    res,
+                    msg_id,
+                )?;
             }
             KeysOp::Del => {
-                routing_node
-                    .send_del_auth_key_response(dst.into(), src.into(), res, msg_id)?;
+                routing_node.send_del_auth_key_response(
+                    dst.into(),
+                    src.into(),
+                    res,
+                    msg_id,
+                )?;
             }
         }
 
         Ok(())
     }
 
-    fn prepare_auth_keys_mutation(&mut self,
-                                  src: &ClientAuthority,
-                                  dst: &ClientManagerAuthority,
-                                  op: KeysOp,
-                                  key: sign::PublicKey,
-                                  version: u64)
-                                  -> Result<BTreeSet<sign::PublicKey>, ClientError> {
+    fn prepare_auth_keys_mutation(
+        &mut self,
+        src: &ClientAuthority,
+        dst: &ClientManagerAuthority,
+        op: KeysOp,
+        key: sign::PublicKey,
+        version: u64,
+    ) -> Result<BTreeSet<sign::PublicKey>, ClientError> {
         let client_name = src.name();
         let client_manager_name = dst.name();
 
@@ -871,9 +1032,9 @@ impl MaidManager {
             return Err(ClientError::AccessDenied);
         }
 
-        let account = self.accounts
-            .get_mut(client_manager_name)
-            .ok_or(ClientError::NoSuchAccount)?;
+        let account = self.accounts.get_mut(client_manager_name).ok_or(
+            ClientError::NoSuchAccount,
+        )?;
 
         if version != account.keys_ops_count + 1 {
             return Err(ClientError::InvalidSuccessor);
@@ -889,22 +1050,23 @@ impl MaidManager {
         Ok(account.keys.clone())
     }
 
-    fn prepare_data_mutation(&mut self,
-                             src: &ClientAuthority,
-                             dst: &ClientManagerAuthority,
-                             policy: AuthPolicy,
-                             msg_id: Option<MessageId>,
-                             requester: Option<sign::PublicKey>)
-                             -> Result<(), ClientError> {
-        let account = self.accounts
-            .get(dst.name())
-            .ok_or(ClientError::NoSuchAccount)?;
+    fn prepare_data_mutation(
+        &mut self,
+        src: &ClientAuthority,
+        dst: &ClientManagerAuthority,
+        policy: AuthPolicy,
+        msg_id: Option<MessageId>,
+        requester: Option<sign::PublicKey>,
+    ) -> Result<(), ClientError> {
+        let account = self.accounts.get(dst.name()).ok_or(
+            ClientError::NoSuchAccount,
+        )?;
         let allowed = src.name() == dst.name() ||
-                      if AuthPolicy::Key == policy {
-                          account.keys.contains(src.client_key())
-                      } else {
-                          false
-                      };
+            if AuthPolicy::Key == policy {
+                account.keys.contains(src.client_key())
+            } else {
+                false
+            };
 
         if !allowed {
             return Err(ClientError::AccessDenied);
@@ -930,76 +1092,89 @@ impl MaidManager {
         Ok(())
     }
 
-    fn handle_data_mutation_response(&mut self,
-                                     routing_node: &mut RoutingNode,
-                                     msg_id: MessageId,
-                                     success: bool)
-                                     -> Result<CachedRequest, InternalError> {
+    fn handle_data_mutation_response(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        msg_id: MessageId,
+        success: bool,
+    ) -> Result<CachedRequest, InternalError> {
         let req = self.remove_from_request_cache(&msg_id)?;
         if success {
-            self.send_refresh(routing_node,
-                              req.dst.into(),
-                              req.dst.into(),
-                              Refresh::InsertDataOp(*req.dst.name()),
-                              msg_id)?;
+            self.send_refresh(
+                routing_node,
+                req.dst.into(),
+                req.dst.into(),
+                Refresh::InsertDataOp(*req.dst.name()),
+                msg_id,
+            )?;
         }
         Ok(req)
     }
 
-    fn send_refresh(&self,
-                    routing_node: &mut RoutingNode,
-                    src: Authority<XorName>,
-                    dst: Authority<XorName>,
-                    refresh: Refresh,
-                    msg_id: MessageId)
-                    -> Result<(), InternalError> {
+    fn send_refresh(
+        &self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        refresh: Refresh,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         let payload = if src.is_single() && dst.is_single() {
             serialisation::serialise(&VaultRefresh::MaidManager(refresh))?
         } else {
             serialisation::serialise(&refresh)?
         };
-        routing_node
-            .send_refresh_request(src, dst, payload, msg_id)?;
+        routing_node.send_refresh_request(src, dst, payload, msg_id)?;
         Ok(())
     }
 
-    fn send_targeted_refresh_for_accounts(&mut self,
-                                          routing_node: &mut RoutingNode,
-                                          targeted_node: XorName,
-                                          account_list: Vec<(XorName, Account)>,
-                                          msg_id: MessageId)
-                                          -> Result<(), InternalError> {
+    fn send_targeted_refresh_for_accounts(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        targeted_node: XorName,
+        account_list: Vec<(XorName, Account)>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         // The account's data part need to be sent in the refresh as a single node (not group) to
         // trigger the custom accumulation. And the key part will be sent in refresh as group.
         let node_src = Authority::ManagedNode(*routing_node.id()?.name());
         let dst = Authority::ManagedNode(targeted_node);
 
         for (account_name, account) in account_list {
-            self.send_refresh(routing_node,
-                              node_src,
-                              dst,
-                              Refresh::update_data_ops(&account_name, &account),
-                              MessageId::new())?;
-            self.send_refresh(routing_node,
-                              Authority::ClientManager(account_name),
-                              dst,
-                              Refresh::update_keys_ops(&account_name, &account),
-                              msg_id)?;
+            self.send_refresh(
+                routing_node,
+                node_src,
+                dst,
+                Refresh::update_data_ops(&account_name, &account),
+                MessageId::new(),
+            )?;
+            self.send_refresh(
+                routing_node,
+                Authority::ClientManager(account_name),
+                dst,
+                Refresh::update_keys_ops(&account_name, &account),
+                msg_id,
+            )?;
         }
 
         Ok(())
     }
 
     // `src` is a node - use custom accumulation.
-    fn handle_refresh_update_data_ops(&mut self,
-                                      routing_node: &mut RoutingNode,
-                                      sender: XorName,
-                                      account_name: XorName,
-                                      data_ops_msg_ids: BTreeSet<MessageId>) {
+    fn handle_refresh_update_data_ops(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        sender: XorName,
+        account_name: XorName,
+        data_ops_msg_ids: BTreeSet<MessageId>,
+    ) {
         for msg_id in data_ops_msg_ids {
             if let Some((_, msg_id)) =
-                self.data_ops_msg_id_accumulator
-                    .add((account_name, msg_id), sender) {
+                self.data_ops_msg_id_accumulator.add(
+                    (account_name, msg_id),
+                    sender,
+                )
+            {
                 if let Some(account) = self.fetch_account(routing_node, account_name) {
                     let _ = account.data_ops_msg_ids.insert(msg_id);
                 }
@@ -1008,21 +1183,25 @@ impl MaidManager {
     }
 
     // `src` is a group - already accumulated.
-    fn handle_refresh_insert_data_op(&mut self,
-                                     routing_node: &RoutingNode,
-                                     account_name: XorName,
-                                     msg_id: MessageId) {
+    fn handle_refresh_insert_data_op(
+        &mut self,
+        routing_node: &RoutingNode,
+        account_name: XorName,
+        msg_id: MessageId,
+    ) {
         if let Some(account) = self.fetch_account(routing_node, account_name) {
             let _ = account.data_ops_msg_ids.insert(msg_id);
         }
     }
 
     // `src` is a group - already accumulated.
-    fn handle_refresh_update_keys(&mut self,
-                                  routing_node: &RoutingNode,
-                                  account_name: XorName,
-                                  ops_count: u64,
-                                  keys: BTreeSet<sign::PublicKey>) {
+    fn handle_refresh_update_keys(
+        &mut self,
+        routing_node: &RoutingNode,
+        account_name: XorName,
+        ops_count: u64,
+        keys: BTreeSet<sign::PublicKey>,
+    ) {
         if let Some(account) = self.fetch_account(routing_node, account_name) {
             if account.keys_ops_count < ops_count {
                 account.keys = keys;
@@ -1037,12 +1216,13 @@ impl MaidManager {
         info!("Managing {} client accounts.", self.accounts.len());
     }
 
-    fn insert_into_request_cache(&mut self,
-                                 msg_id: MessageId,
-                                 src: ClientAuthority,
-                                 dst: ClientManagerAuthority,
-                                 tag: Option<u64>)
-                                 -> Option<RequestCacheInsert> {
+    fn insert_into_request_cache(
+        &mut self,
+        msg_id: MessageId,
+        src: ClientAuthority,
+        dst: ClientManagerAuthority,
+        tag: Option<u64>,
+    ) -> Option<RequestCacheInsert> {
         match self.request_cache.entry(msg_id) {
             Entry::Vacant(entry) => {
                 Some(RequestCacheInsert(entry, CachedRequest { src, dst, tag }))
@@ -1051,31 +1231,29 @@ impl MaidManager {
         }
     }
 
-    fn remove_from_request_cache(&mut self,
-                                 msg_id: &MessageId)
-                                 -> Result<CachedRequest, InternalError> {
-        self.request_cache
-            .remove(msg_id)
-            .ok_or_else(move || InternalError::FailedToFindCachedRequest(*msg_id))
+    fn remove_from_request_cache(
+        &mut self,
+        msg_id: &MessageId,
+    ) -> Result<CachedRequest, InternalError> {
+        self.request_cache.remove(msg_id).ok_or_else(move || {
+            InternalError::FailedToFindCachedRequest(*msg_id)
+        })
     }
 
-    fn fetch_account(&mut self,
-                     routing_node: &RoutingNode,
-                     account_name: XorName)
-                     -> Option<&mut Account> {
-        if routing_node
-               .close_group(account_name, GROUP_SIZE)
-               .is_none() {
+    fn fetch_account(
+        &mut self,
+        routing_node: &RoutingNode,
+        account_name: XorName,
+    ) -> Option<&mut Account> {
+        if routing_node.close_group(account_name, GROUP_SIZE).is_none() {
             return None;
         }
 
         let accounts_len = self.accounts.len();
-        let account = self.accounts
-            .entry(account_name)
-            .or_insert_with(|| {
-                                info!("Managing {} client accounts.", accounts_len + 1);
-                                Account::default()
-                            });
+        let account = self.accounts.entry(account_name).or_insert_with(|| {
+            info!("Managing {} client accounts.", accounts_len + 1);
+            Account::default()
+        });
 
         Some(account)
     }
@@ -1088,9 +1266,9 @@ impl MaidManager {
 #[cfg(feature = "use-mock-crust")]
 impl MaidManager {
     pub fn get_mutation_count(&self, client_name: &XorName) -> Option<u64> {
-        self.accounts
-            .get(client_name)
-            .map(|account| account.data_ops_msg_ids.len() as u64)
+        self.accounts.get(client_name).map(|account| {
+            account.data_ops_msg_ids.len() as u64
+        })
     }
 }
 
@@ -1133,10 +1311,11 @@ enum KeysOp {
 }
 
 impl KeysOp {
-    fn apply(self,
-             keys: &mut BTreeSet<sign::PublicKey>,
-             key: sign::PublicKey)
-             -> Result<(), ClientError> {
+    fn apply(
+        self,
+        keys: &mut BTreeSet<sign::PublicKey>,
+        key: sign::PublicKey,
+    ) -> Result<(), ClientError> {
         match self {
             KeysOp::Ins => {
                 // TODO: consider returning error when the key already exists.
@@ -1194,11 +1373,12 @@ impl<'a> RequestCacheInsert<'a> {
 
 fn get_invite_name(data: &MutableData) -> Result<XorName, ClientError> {
     let content = &data.get(ACC_LOGIN_ENTRY_KEY)
-                       .ok_or(ClientError::InvalidInvitation)?
-                       .content;
+        .ok_or(ClientError::InvalidInvitation)?
+        .content;
 
-    let account_packet = serialisation::deserialise(content)
-        .map_err(|_| ClientError::InvalidInvitation)?;
+    let account_packet = serialisation::deserialise(content).map_err(|_| {
+        ClientError::InvalidInvitation
+    })?;
 
     if let AccountPacket::WithInvitation { invitation_string, .. } = account_packet {
         Ok(XorName(tiny_keccak::sha3_256(invitation_string.as_bytes())))

@@ -5,7 +5,7 @@ environment:
     PROJECT_NAME: safe_vault
     RUST_BACKTRACE: 1
   matrix:
-    - RUST_VERSION: stable
+    - RUST_TOOLCHAIN: 1.19.0
 
 clone_depth: 1
 
@@ -36,10 +36,9 @@ configuration:
   - Release
 
 build_script:
-  - cargo rustc --verbose --release --lib -- -Zno-trans
-  - cargo rustc --verbose --release --profile test --lib -- -Zno-trans
-  - cargo rustc --verbose --release --profile test --features use-mock-routing --lib -- -Zno-trans
-  - cargo rustc --verbose --release --profile test --features use-mock-crust --lib -- -Zno-trans
+  - cargo check --verbose --lib --tests
+  - cargo check --verbose --features use-mock-routing --lib --tests
+  - cargo check --verbose --features use-mock-crust --lib --tests
 
 test_script:
   - cargo test --verbose --release --features use-mock-routing

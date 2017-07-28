@@ -87,7 +87,8 @@ pub struct ChunkStore<K> {
 }
 
 impl<K> ChunkStore<K>
-    where K: DeserializeOwned + Serialize
+where
+    K: DeserializeOwned + Serialize,
 {
     /// Creates a new `ChunkStore` with `max_space` allowed storage space.
     ///
@@ -95,12 +96,12 @@ impl<K> ChunkStore<K>
     pub fn new(root: PathBuf, max_space: u64) -> Result<Self, Error> {
         let lock_file = Self::lock_and_clear_dir(&root)?;
         Ok(ChunkStore {
-               rootdir: root,
-               lock_file: Some(lock_file),
-               max_space: max_space,
-               used_space: 0,
-               phantom: PhantomData,
-           })
+            rootdir: root,
+            lock_file: Some(lock_file),
+            max_space: max_space,
+            used_space: 0,
+            phantom: PhantomData,
+        })
     }
 
     /// Stores a new data chunk.
@@ -122,13 +123,13 @@ impl<K> ChunkStore<K>
         // Write the file.
         File::create(&file_path)
             .and_then(|mut file| {
-                          file.write_all(&serialised_value)
+                file.write_all(&serialised_value)
                     .and_then(|()| file.sync_all())
                     .and_then(|()| file.metadata())
                     .map(|metadata| {
                         self.used_space += metadata.len();
                     })
-                      })
+            })
             .map_err(From::from)
     }
 
@@ -180,9 +181,7 @@ impl<K> ChunkStore<K>
                         .and_then(|hex_name| Vec::from_hex(hex_name).ok())
                         .and_then(|bytes| serialisation::deserialise(&*bytes).ok())
                 };
-                Ok(dir_entries
-                       .filter_map(dir_entry_to_routing_name)
-                       .collect())
+                Ok(dir_entries.filter_map(dir_entry_to_routing_name).collect())
             })
             .unwrap_or_else(|_| Vec::new())
     }

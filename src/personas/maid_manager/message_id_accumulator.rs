@@ -26,7 +26,8 @@ pub struct MessageIdAccumulator<K> {
 }
 
 impl<K> MessageIdAccumulator<K>
-    where K: Clone + Ord
+where
+    K: Clone + Ord,
 {
     pub fn new(quorum: usize, duration: Duration) -> Self {
         MessageIdAccumulator {
@@ -37,9 +38,7 @@ impl<K> MessageIdAccumulator<K>
 
     pub fn add(&mut self, key: K, src_name: XorName) -> Option<K> {
         let done = {
-            let src_list = self.map
-                .entry(key.clone())
-                .or_insert_with(Default::default);
+            let src_list = self.map.entry(key.clone()).or_insert_with(Default::default);
             let _ = src_list.insert(src_name);
             src_list.len() >= self.quorum
         };
@@ -69,7 +68,9 @@ mod tests {
         assert_eq!(accumulator.add(msg_id, XorName(rand::random())), None);
         assert_eq!(accumulator.add(msg_id, XorName(rand::random())), None);
         assert_eq!(accumulator.add(msg_id, duplicate_sender), None);
-        assert_eq!(accumulator.add(msg_id, XorName(rand::random())),
-                   Some(msg_id));
+        assert_eq!(
+            accumulator.add(msg_id, XorName(rand::random())),
+            Some(msg_id)
+        );
     }
 }

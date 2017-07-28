@@ -91,21 +91,20 @@ impl DataManager {
         let accumulator_duration = Duration::from_secs(ACCUMULATOR_TIMEOUT_SECS);
 
         Ok(DataManager {
-               chunk_store: chunk_store,
-               chunk_refresh_accumulator: Accumulator::with_duration(QUORUM, accumulator_duration),
-               fragment_refresh_accumulator: Accumulator::with_duration(QUORUM,
-                                                                        accumulator_duration),
-               cache: Default::default(),
-               mdata_cache: MutableDataCache::new(),
-               immutable_data_count: 0,
-               mutable_data_count: 0,
-               client_get_requests: 0,
-               logging_time: Instant::now(),
-               // TODO: Once https://github.com/rust-lang/rust/issues/41681 is in stable we can
-               // initialise this field under #[cfg(feature = "use-mock-crust")] and exclude the
-               // member variable from the struct for production builds altogether.
-               _delayed_group_refresh_cache: None,
-           })
+            chunk_store: chunk_store,
+            chunk_refresh_accumulator: Accumulator::with_duration(QUORUM, accumulator_duration),
+            fragment_refresh_accumulator: Accumulator::with_duration(QUORUM, accumulator_duration),
+            cache: Default::default(),
+            mdata_cache: MutableDataCache::new(),
+            immutable_data_count: 0,
+            mutable_data_count: 0,
+            client_get_requests: 0,
+            logging_time: Instant::now(),
+            // TODO: Once https://github.com/rust-lang/rust/issues/41681 is in stable we can
+            // initialise this field under #[cfg(feature = "use-mock-crust")] and exclude the
+            // member variable from the struct for production builds altogether.
+            _delayed_group_refresh_cache: None,
+        })
     }
 
     // When a new node joins a group, the other members of the group send it "refresh"
@@ -114,20 +113,22 @@ impl DataManager {
     //
     // Note: refresh is a message whose source is individual node, so its accumulation
     // must be performed manually.
-    pub fn handle_serialised_refresh(&mut self,
-                                     routing_node: &mut RoutingNode,
-                                     src: XorName,
-                                     serialised_refresh: &[u8])
-                                     -> Result<(), InternalError> {
+    pub fn handle_serialised_refresh(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+        serialised_refresh: &[u8],
+    ) -> Result<(), InternalError> {
         let refreshes: Vec<Refresh> = serialisation::deserialise(serialised_refresh)?;
         self.handle_refreshes(routing_node, src, refreshes)
     }
 
-    pub fn handle_refreshes(&mut self,
-                            routing_node: &mut RoutingNode,
-                            src: XorName,
-                            refreshes: Vec<Refresh>)
-                            -> Result<(), InternalError> {
+    pub fn handle_refreshes(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+        refreshes: Vec<Refresh>,
+    ) -> Result<(), InternalError> {
         for refresh in refreshes {
             match refresh {
                 Refresh::Chunk(data_id) => self.handle_chunk_refresh(src, data_id),
@@ -145,10 +146,11 @@ impl DataManager {
     //
     // Note: group refresh is a message whose source is group, so the accumulation is
     // performed automatically by routing.
-    pub fn handle_group_refresh(&mut self,
-                                routing_node: &mut RoutingNode,
-                                serialised_refresh: Vec<u8>)
-                                -> Result<(), InternalError> {
+    pub fn handle_group_refresh(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        serialised_refresh: Vec<u8>,
+    ) -> Result<(), InternalError> {
         #[cfg(feature = "use-mock-crust")]
         // If this returns `None` then the message has been cached for handling later to simulate a
         // network delay.
@@ -172,7 +174,13 @@ impl DataManager {
         } = write;
 
         let mutation_type = mutation.mutation_type();
-        let fragments = self.commit_pending_mutation(routing_node, src, dst, mutation, message_id)?;
+        let fragments = self.commit_pending_mutation(
+            routing_node,
+            src,
+            dst,
+            mutation,
+            message_id,
+        )?;
 
         if fragments.is_empty() {
             // The commit wasn't successful.
@@ -188,14 +196,18 @@ impl DataManager {
         log_status!(self);
 
         let refreshes = fragments.into_iter().map(Refresh::Fragment).collect();
-        self.send_refresh(routing_node,
-                          Authority::NaeManager(*data_id.name()),
-                          refreshes)?;
+        self.send_refresh(
+            routing_node,
+            Authority::NaeManager(*data_id.name()),
+            refreshes,
+        )?;
 
         if let Some(group) = routing_node.close_group(*data_id.name(), GROUP_SIZE) {
             for node in &group {
-                self.cache
-                    .register_needed_data_with_another_holder(&data_id, *node);
+                self.cache.register_needed_data_with_another_holder(
+                    &data_id,
+                    *node,
+                );
             }
 
             self.request_needed_data(routing_node)?;
@@ -204,33 +216,43 @@ impl DataManager {
         Ok(())
     }
 
-    pub fn handle_get_idata(&mut self,
-                            routing_node: &mut RoutingNode,
-                            src: Authority<XorName>,
-                            dst: Authority<XorName>,
-                            name: XorName,
-                            msg_id: MessageId)
-                            -> Result<(), InternalError> {
+    pub fn handle_get_idata(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
 
         if let Ok(data) = self.chunk_store.get(&ImmutableDataId(name)) {
             trace!("As {:?} sending data {:?} to {:?}", dst, data, src);
-            routing_node
-                .send_get_idata_response(dst, src, Ok(data), msg_id)?;
+            routing_node.send_get_idata_response(
+                dst,
+                src,
+                Ok(data),
+                msg_id,
+            )?;
         } else {
             trace!("DM sending get_idata_failure of {:?}", name);
-            routing_node
-                .send_get_idata_response(dst, src, Err(ClientError::NoSuchData), msg_id)?;
+            routing_node.send_get_idata_response(
+                dst,
+                src,
+                Err(ClientError::NoSuchData),
+                msg_id,
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn handle_get_idata_success(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    src: XorName,
-                                    data: ImmutableData)
-                                    -> Result<(), InternalError> {
+    pub fn handle_get_idata_success(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+        data: ImmutableData,
+    ) -> Result<(), InternalError> {
         let mut valid = false;
         if let Some(fragment) = self.cache.stop_needed_fragment_request(&src) {
             if let FragmentInfo::ImmutableData(ref name) = fragment {
@@ -267,10 +289,11 @@ impl DataManager {
         Ok(())
     }
 
-    pub fn handle_get_idata_failure(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    src: XorName)
-                                    -> Result<(), InternalError> {
+    pub fn handle_get_idata_failure(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+    ) -> Result<(), InternalError> {
         if self.cache.stop_needed_fragment_request(&src).is_none() {
             return Err(InternalError::InvalidMessage);
         }
@@ -278,18 +301,25 @@ impl DataManager {
         self.request_needed_data(routing_node)
     }
 
-    pub fn handle_put_idata(&mut self,
-                            routing_node: &mut RoutingNode,
-                            src: Authority<XorName>,
-                            dst: Authority<XorName>,
-                            data: ImmutableData,
-                            msg_id: MessageId)
-                            -> Result<(), InternalError> {
+    pub fn handle_put_idata(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        data: ImmutableData,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         if self.chunk_store.has(&data.id()) {
-            trace!("DM sending PutIData success for data {:?}, it already exists.",
-                   data.name());
-            routing_node
-                .send_put_idata_response(dst, src, Ok(()), msg_id)?;
+            trace!(
+                "DM sending PutIData success for data {:?}, it already exists.",
+                data.name()
+            );
+            routing_node.send_put_idata_response(
+                dst,
+                src,
+                Ok(()),
+                msg_id,
+            )?;
             return Ok(());
         }
 
@@ -297,26 +327,33 @@ impl DataManager {
 
         if self.chunk_store_full() {
             let err = ClientError::NetworkFull;
-            routing_node
-                .send_put_idata_response(dst, src, Err(err.clone()), msg_id)?;
+            routing_node.send_put_idata_response(
+                dst,
+                src,
+                Err(err.clone()),
+                msg_id,
+            )?;
             return Err(From::from(err));
         }
 
-        self.update_pending_writes(routing_node,
-                                   Mutation::PutIData(data),
-                                   src,
-                                   dst,
-                                   msg_id,
-                                   false)
+        self.update_pending_writes(
+            routing_node,
+            Mutation::PutIData(data),
+            src,
+            dst,
+            msg_id,
+            false,
+        )
     }
 
-    pub fn handle_get_mdata(&mut self,
-                            routing_node: &mut RoutingNode,
-                            src: Authority<XorName>,
-                            name: XorName,
-                            tag: u64,
-                            msg_id: MessageId)
-                            -> Result<(), InternalError> {
+    pub fn handle_get_mdata(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
 
         /// Send the response as a node, to allow custom accumulation.
@@ -324,25 +361,35 @@ impl DataManager {
         let resp_dst = src;
 
         let res = self.fetch_mdata(name, tag);
-        trace!("As {:?} sending GetMData response {:?} of {:?} to {:?}",
-               resp_src,
-               res,
-               name,
-               resp_dst);
-        routing_node
-            .send_get_mdata_response(resp_src, resp_dst, res, msg_id)?;
+        trace!(
+            "As {:?} sending GetMData response {:?} of {:?} to {:?}",
+            resp_src,
+            res,
+            name,
+            resp_dst
+        );
+        routing_node.send_get_mdata_response(
+            resp_src,
+            resp_dst,
+            res,
+            msg_id,
+        )?;
 
         Ok(())
     }
 
-    pub fn handle_get_mdata_success(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    src: XorName,
-                                    data: MutableData,
-                                    msg_id: MessageId)
-                                    -> Result<(), InternalError> {
-        self.cache
-            .handle_needed_mutable_chunk_success(data.id(), src, msg_id);
+    pub fn handle_get_mdata_success(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+        data: MutableData,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
+        self.cache.handle_needed_mutable_chunk_success(
+            data.id(),
+            src,
+            msg_id,
+        );
         self.request_needed_data(routing_node)?;
 
         // If we're no longer in the close group, return.
@@ -387,24 +434,25 @@ impl DataManager {
         Ok(())
     }
 
-    pub fn handle_get_mdata_failure(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    src: XorName,
-                                    msg_id: MessageId)
-                                    -> Result<(), InternalError> {
-        self.cache
-            .handle_needed_mutable_chunk_failure(src, msg_id);
+    pub fn handle_get_mdata_failure(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
+        self.cache.handle_needed_mutable_chunk_failure(src, msg_id);
         self.request_needed_data(routing_node)
     }
 
-    pub fn handle_put_mdata(&mut self,
-                            routing_node: &mut RoutingNode,
-                            src: Authority<XorName>,
-                            dst: Authority<XorName>,
-                            data: MutableData,
-                            msg_id: MessageId,
-                            _requester: sign::PublicKey)
-                            -> Result<(), InternalError> {
+    pub fn handle_put_mdata(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        data: MutableData,
+        msg_id: MessageId,
+        _requester: sign::PublicKey,
+    ) -> Result<(), InternalError> {
         let data_id = data.id();
 
         let res = if self.chunk_store.has(&data_id) {
@@ -422,11 +470,17 @@ impl DataManager {
         let mutation = Mutation::PutMData(data);
         let res = res.and_then(|_| self.validate_concurrent_mutations(None, &mutation));
         let rejected = if let Err(error) = res {
-            trace!("DM sending PutMData failure for data {:?}: {:?}",
-                   data_id,
-                   error);
-            routing_node
-                .send_put_mdata_response(dst, src, Err(error), msg_id)?;
+            trace!(
+                "DM sending PutMData failure for data {:?}: {:?}",
+                data_id,
+                error
+            );
+            routing_node.send_put_mdata_response(
+                dst,
+                src,
+                Err(error),
+                msg_id,
+            )?;
             true
         } else {
             false
@@ -435,26 +489,32 @@ impl DataManager {
         self.update_pending_writes(routing_node, mutation, src, dst, msg_id, rejected)
     }
 
-    pub fn handle_get_mdata_shell(&mut self,
-                                  routing_node: &mut RoutingNode,
-                                  src: Authority<XorName>,
-                                  dst: Authority<XorName>,
-                                  name: XorName,
-                                  tag: u64,
-                                  msg_id: MessageId)
-                                  -> Result<(), InternalError> {
+    pub fn handle_get_mdata_shell(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
         let res = self.fetch_mdata(name, tag).map(|data| data.shell());
-        routing_node
-            .send_get_mdata_shell_response(dst, src, res, msg_id)?;
+        routing_node.send_get_mdata_shell_response(
+            dst,
+            src,
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
-    pub fn handle_get_mdata_shell_success(&mut self,
-                                          routing_node: &mut RoutingNode,
-                                          src: XorName,
-                                          mut shell: MutableData)
-                                          -> Result<(), InternalError> {
+    pub fn handle_get_mdata_shell_success(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+        mut shell: MutableData,
+    ) -> Result<(), InternalError> {
         let valid = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src) {
             let actual_hash = utils::mdata_shell_hash(&shell);
 
@@ -519,10 +579,11 @@ impl DataManager {
         Ok(())
     }
 
-    pub fn handle_get_mdata_shell_failure(&mut self,
-                                          routing_node: &mut RoutingNode,
-                                          src: XorName)
-                                          -> Result<(), InternalError> {
+    pub fn handle_get_mdata_shell_failure(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+    ) -> Result<(), InternalError> {
         if self.cache.stop_needed_fragment_request(&src).is_none() {
             return Err(InternalError::InvalidMessage);
         }
@@ -530,92 +591,122 @@ impl DataManager {
         self.request_needed_data(routing_node)
     }
 
-    pub fn handle_get_mdata_version(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    src: Authority<XorName>,
-                                    dst: Authority<XorName>,
-                                    name: XorName,
-                                    tag: u64,
-                                    msg_id: MessageId)
-                                    -> Result<(), InternalError> {
+    pub fn handle_get_mdata_version(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
         let res = self.fetch_mdata(name, tag).map(|data| data.version());
-        routing_node
-            .send_get_mdata_version_response(dst, src, res, msg_id)?;
+        routing_node.send_get_mdata_version_response(
+            dst,
+            src,
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
-    pub fn handle_list_mdata_entries(&mut self,
-                                     routing_node: &mut RoutingNode,
-                                     src: Authority<XorName>,
-                                     dst: Authority<XorName>,
-                                     name: XorName,
-                                     tag: u64,
-                                     msg_id: MessageId)
-                                     -> Result<(), InternalError> {
+    pub fn handle_list_mdata_entries(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag)
-            .map(|data| data.entries().clone());
-        routing_node
-            .send_list_mdata_entries_response(dst, src, res, msg_id)?;
+        let res = self.fetch_mdata(name, tag).map(
+            |data| data.entries().clone(),
+        );
+        routing_node.send_list_mdata_entries_response(
+            dst,
+            src,
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
-    pub fn handle_list_mdata_keys(&mut self,
-                                  routing_node: &mut RoutingNode,
-                                  src: Authority<XorName>,
-                                  dst: Authority<XorName>,
-                                  name: XorName,
-                                  tag: u64,
-                                  msg_id: MessageId)
-                                  -> Result<(), InternalError> {
+    pub fn handle_list_mdata_keys(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag)
-            .map(|data| data.entries().keys().cloned().collect());
-        routing_node
-            .send_list_mdata_keys_response(dst, src, res, msg_id)?;
+        let res = self.fetch_mdata(name, tag).map(|data| {
+            data.entries().keys().cloned().collect()
+        });
+        routing_node.send_list_mdata_keys_response(
+            dst,
+            src,
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
-    pub fn handle_list_mdata_values(&mut self,
-                                    routing_node: &mut RoutingNode,
-                                    src: Authority<XorName>,
-                                    dst: Authority<XorName>,
-                                    name: XorName,
-                                    tag: u64,
-                                    msg_id: MessageId)
-                                    -> Result<(), InternalError> {
+    pub fn handle_list_mdata_values(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag)
-            .map(|data| data.entries().values().cloned().collect());
-        routing_node
-            .send_list_mdata_values_response(dst, src, res, msg_id)?;
+        let res = self.fetch_mdata(name, tag).map(|data| {
+            data.entries().values().cloned().collect()
+        });
+        routing_node.send_list_mdata_values_response(
+            dst,
+            src,
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_get_mdata_value(&mut self,
-                                  routing_node: &mut RoutingNode,
-                                  src: Authority<XorName>,
-                                  dst: Authority<XorName>,
-                                  name: XorName,
-                                  tag: u64,
-                                  key: Vec<u8>,
-                                  msg_id: MessageId)
-                                  -> Result<(), InternalError> {
+    pub fn handle_get_mdata_value(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        key: Vec<u8>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag)
-            .and_then(|data| data.get(&key).cloned().ok_or(ClientError::NoSuchEntry));
-        routing_node
-            .send_get_mdata_value_response(dst, src, res, msg_id)?;
+        let res = self.fetch_mdata(name, tag).and_then(|data| {
+            data.get(&key).cloned().ok_or(ClientError::NoSuchEntry)
+        });
+        routing_node.send_get_mdata_value_response(
+            dst,
+            src,
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
-    pub fn handle_get_mdata_value_success(&mut self,
-                                          routing_node: &mut RoutingNode,
-                                          src: XorName,
-                                          value: Value)
-                                          -> Result<(), InternalError> {
+    pub fn handle_get_mdata_value_success(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+        value: Value,
+    ) -> Result<(), InternalError> {
         let info = if let Some(fragment) = self.cache.stop_needed_fragment_request(&src) {
             let actual_hash = utils::mdata_value_hash(&value);
 
@@ -667,10 +758,11 @@ impl DataManager {
         Ok(())
     }
 
-    pub fn handle_get_mdata_value_failure(&mut self,
-                                          routing_node: &mut RoutingNode,
-                                          src: XorName)
-                                          -> Result<(), InternalError> {
+    pub fn handle_get_mdata_value_failure(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: XorName,
+    ) -> Result<(), InternalError> {
         if self.cache.stop_needed_fragment_request(&src).is_none() {
             return Err(InternalError::InvalidMessage);
         }
@@ -679,77 +771,90 @@ impl DataManager {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_mutate_mdata_entries(&mut self,
-                                       routing_node: &mut RoutingNode,
-                                       src: Authority<XorName>,
-                                       dst: Authority<XorName>,
-                                       name: XorName,
-                                       tag: u64,
-                                       actions: BTreeMap<Vec<u8>, EntryAction>,
-                                       msg_id: MessageId,
-                                       requester: sign::PublicKey)
-                                       -> Result<(), InternalError> {
+    pub fn handle_mutate_mdata_entries(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        actions: BTreeMap<Vec<u8>, EntryAction>,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InternalError> {
         let mutation = Mutation::MutateMDataEntries {
             name: name,
             tag: tag,
             actions: actions.clone(),
         };
-        let res = self.fetch_mdata(name, tag)
-            .and_then(|data| {
-                          data.clone().mutate_entries(actions.clone(), requester)?;
-                          self.validate_concurrent_mutations(Some(&data), &mutation)
-                      });
+        let res = self.fetch_mdata(name, tag).and_then(|data| {
+            data.clone().mutate_entries(actions.clone(), requester)?;
+            self.validate_concurrent_mutations(Some(&data), &mutation)
+        });
 
         self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
-    pub fn handle_list_mdata_permissions(&mut self,
-                                         routing_node: &mut RoutingNode,
-                                         src: Authority<XorName>,
-                                         dst: Authority<XorName>,
-                                         name: XorName,
-                                         tag: u64,
-                                         msg_id: MessageId)
-                                         -> Result<(), InternalError> {
+    pub fn handle_list_mdata_permissions(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag)
-            .map(|data| data.permissions().clone());
-        routing_node
-            .send_list_mdata_permissions_response(dst, src, res, msg_id)?;
+        let res = self.fetch_mdata(name, tag).map(
+            |data| data.permissions().clone(),
+        );
+        routing_node.send_list_mdata_permissions_response(
+            dst,
+            src,
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_list_mdata_user_permissions(&mut self,
-                                              routing_node: &mut RoutingNode,
-                                              src: Authority<XorName>,
-                                              dst: Authority<XorName>,
-                                              name: XorName,
-                                              tag: u64,
-                                              user: User,
-                                              msg_id: MessageId)
-                                              -> Result<(), InternalError> {
+    pub fn handle_list_mdata_user_permissions(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        user: User,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         self.update_request_stats(&src);
-        let res = self.fetch_mdata(name, tag)
-            .and_then(|data| data.user_permissions(&user).map(|p| *p));
-        routing_node
-            .send_list_mdata_user_permissions_response(dst, src, res, msg_id)?;
+        let res = self.fetch_mdata(name, tag).and_then(|data| {
+            data.user_permissions(&user).map(|p| *p)
+        });
+        routing_node.send_list_mdata_user_permissions_response(
+            dst,
+            src,
+            res,
+            msg_id,
+        )?;
         Ok(())
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_set_mdata_user_permissions(&mut self,
-                                             routing_node: &mut RoutingNode,
-                                             src: Authority<XorName>,
-                                             dst: Authority<XorName>,
-                                             name: XorName,
-                                             tag: u64,
-                                             user: User,
-                                             permissions: PermissionSet,
-                                             version: u64,
-                                             msg_id: MessageId,
-                                             requester: sign::PublicKey)
-                                             -> Result<(), InternalError> {
+    pub fn handle_set_mdata_user_permissions(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        user: User,
+        permissions: PermissionSet,
+        version: u64,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InternalError> {
         let mutation = Mutation::SetMDataUserPermissions {
             name: name,
             tag: tag,
@@ -757,53 +862,56 @@ impl DataManager {
             permissions: permissions,
             version: version,
         };
-        let res = self.fetch_mdata(name, tag)
-            .and_then(|data| {
-                          data.clone()
-                              .set_user_permissions(user, permissions, version, requester)?;
-                          self.validate_concurrent_mutations(Some(&data), &mutation)
-                      });
+        let res = self.fetch_mdata(name, tag).and_then(|data| {
+            data.clone().set_user_permissions(
+                user,
+                permissions,
+                version,
+                requester,
+            )?;
+            self.validate_concurrent_mutations(Some(&data), &mutation)
+        });
         self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_del_mdata_user_permissions(&mut self,
-                                             routing_node: &mut RoutingNode,
-                                             src: Authority<XorName>,
-                                             dst: Authority<XorName>,
-                                             name: XorName,
-                                             tag: u64,
-                                             user: User,
-                                             version: u64,
-                                             msg_id: MessageId,
-                                             requester: sign::PublicKey)
-                                             -> Result<(), InternalError> {
+    pub fn handle_del_mdata_user_permissions(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        user: User,
+        version: u64,
+        msg_id: MessageId,
+        requester: sign::PublicKey,
+    ) -> Result<(), InternalError> {
         let mutation = Mutation::DelMDataUserPermissions {
             name: name,
             tag: tag,
             user: user,
             version: version,
         };
-        let res = self.fetch_mdata(name, tag)
-            .and_then(|data| {
-                          data.clone()
-                              .del_user_permissions(&user, version, requester)?;
-                          self.validate_concurrent_mutations(Some(&data), &mutation)
-                      });
+        let res = self.fetch_mdata(name, tag).and_then(|data| {
+            data.clone().del_user_permissions(&user, version, requester)?;
+            self.validate_concurrent_mutations(Some(&data), &mutation)
+        });
         self.start_pending_mutation(routing_node, src, dst, mutation, res, msg_id)
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    pub fn handle_change_mdata_owner(&mut self,
-                                     routing_node: &mut RoutingNode,
-                                     src: ClientManagerAuthority,
-                                     dst: Authority<XorName>,
-                                     name: XorName,
-                                     tag: u64,
-                                     new_owners: BTreeSet<sign::PublicKey>,
-                                     version: u64,
-                                     msg_id: MessageId)
-                                     -> Result<(), InternalError> {
+    pub fn handle_change_mdata_owner(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: ClientManagerAuthority,
+        dst: Authority<XorName>,
+        name: XorName,
+        tag: u64,
+        new_owners: BTreeSet<sign::PublicKey>,
+        version: u64,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         let mutation = Mutation::ChangeMDataOwner {
             name: name,
             tag: tag,
@@ -811,26 +919,26 @@ impl DataManager {
             version: version,
         };
 
-        let res = self.fetch_mdata(name, tag)
-            .and_then(|data| {
-                let new_owner = extract_owner(new_owners)?;
+        let res = self.fetch_mdata(name, tag).and_then(|data| {
+            let new_owner = extract_owner(new_owners)?;
 
-                if utils::verify_mdata_owner(&data, src.name()) {
-                    data.clone().change_owner(new_owner, version)?;
-                    self.validate_concurrent_mutations(Some(&data), &mutation)
-                } else {
-                    Err(ClientError::AccessDenied)
-                }
-            });
+            if utils::verify_mdata_owner(&data, src.name()) {
+                data.clone().change_owner(new_owner, version)?;
+                self.validate_concurrent_mutations(Some(&data), &mutation)
+            } else {
+                Err(ClientError::AccessDenied)
+            }
+        });
 
         self.start_pending_mutation(routing_node, src.into(), dst, mutation, res, msg_id)
     }
 
-    pub fn handle_node_added(&mut self,
-                             routing_node: &mut RoutingNode,
-                             node_name: &XorName,
-                             routing_table: &RoutingTable<XorName>)
-                             -> Result<(), InternalError> {
+    pub fn handle_node_added(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        node_name: &XorName,
+        routing_table: &RoutingTable<XorName>,
+    ) -> Result<(), InternalError> {
         if self.cache.prune_needed_fragments(routing_table) {
             let _ = self.request_needed_data(routing_node);
         }
@@ -847,7 +955,8 @@ impl DataManager {
                     match data_id {
                         DataId::Immutable(idata_id) => {
                             if self.chunk_store.has(&idata_id) &&
-                               !self.cache.is_in_unneeded(&idata_id) {
+                                !self.cache.is_in_unneeded(&idata_id)
+                            {
                                 self.immutable_data_count -= 1;
                                 has_pruned_data = true;
                                 self.cache.add_as_unneeded(idata_id);
@@ -883,11 +992,12 @@ impl DataManager {
 
     /// Get all names and hashes of all data. // [TODO]: Can be optimised - 2016-04-23 09:11pm
     /// Send to all members of group of data.
-    pub fn handle_node_lost(&mut self,
-                            routing_node: &mut RoutingNode,
-                            node_name: &XorName,
-                            routing_table: &RoutingTable<XorName>)
-                            -> Result<(), InternalError> {
+    pub fn handle_node_lost(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        node_name: &XorName,
+        routing_table: &RoutingTable<XorName>,
+    ) -> Result<(), InternalError> {
         let pruned_unneeded_chunks = self.cache.prune_unneeded_chunks(routing_table);
         if pruned_unneeded_chunks != 0 {
             self.immutable_data_count += pruned_unneeded_chunks;
@@ -902,8 +1012,10 @@ impl DataManager {
         for data_id in self.our_chunks() {
             match routing_table.other_closest_names(data_id.name(), GROUP_SIZE) {
                 None => {
-                    error!("Moved out of close group of {:?} in a NodeLost event.",
-                           node_name);
+                    error!(
+                        "Moved out of close group of {:?} in a NodeLost event.",
+                        node_name
+                    );
                 }
                 Some(close_group) => {
                     // If no new node joined the group due to this event, continue:
@@ -912,10 +1024,9 @@ impl DataManager {
                     // than the lost node, the lost node was not in the group in the first place.
                     if let Some(&outer_node) = close_group.get(GROUP_SIZE - 2) {
                         if data_id.name().closer(node_name, outer_node) {
-                            refreshes
-                                .entry(*outer_node)
-                                .or_insert_with(Vec::new)
-                                .push(Refresh::from_data_id(data_id))
+                            refreshes.entry(*outer_node).or_insert_with(Vec::new).push(
+                                Refresh::from_data_id(data_id),
+                            )
                         }
                     }
                 }
@@ -951,75 +1062,103 @@ impl DataManager {
         }
     }
 
-    fn update_pending_writes(&mut self,
-                             routing_node: &mut RoutingNode,
-                             mutation: Mutation,
-                             src: Authority<XorName>,
-                             dst: Authority<XorName>,
-                             message_id: MessageId,
-                             rejected: bool)
-                             -> Result<(), InternalError> {
+    fn update_pending_writes(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        mutation: Mutation,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        message_id: MessageId,
+        rejected: bool,
+    ) -> Result<(), InternalError> {
         for PendingWrite {
-                mutation,
+            mutation,
+            src,
+            dst,
+            message_id,
+            ..
+        } in self.cache.remove_expired_pending_writes()
+        {
+            let error = ClientError::from("Request expired.");
+            trace!(
+                "{:?} did not accumulate. Sending failure",
+                mutation.data_id()
+            );
+            self.send_mutation_response(
+                routing_node,
                 src,
                 dst,
+                mutation.mutation_type(),
+                mutation.data_id(),
+                Err(error),
                 message_id,
-                ..
-            } in self.cache.remove_expired_pending_writes() {
-            let error = ClientError::from("Request expired.");
-            trace!("{:?} did not accumulate. Sending failure",
-                   mutation.data_id());
-            self.send_mutation_response(routing_node,
-                                        src,
-                                        dst,
-                                        mutation.mutation_type(),
-                                        mutation.data_id(),
-                                        Err(error),
-                                        message_id)?;
+            )?;
         }
 
         let data_id = mutation.data_id();
-        if let Some(refresh) = self.cache
-               .insert_pending_write(mutation, src, dst, message_id, rejected) {
-            self.send_group_refresh(routing_node, *data_id.name(), refresh, message_id)?;
+        if let Some(refresh) = self.cache.insert_pending_write(
+            mutation,
+            src,
+            dst,
+            message_id,
+            rejected,
+        )
+        {
+            self.send_group_refresh(
+                routing_node,
+                *data_id.name(),
+                refresh,
+                message_id,
+            )?;
         }
 
         Ok(())
     }
 
-    fn start_pending_mutation(&mut self,
-                              routing_node: &mut RoutingNode,
-                              src: Authority<XorName>,
-                              dst: Authority<XorName>,
-                              mutation: Mutation,
-                              res: Result<(), ClientError>,
-                              msg_id: MessageId)
-                              -> Result<(), InternalError> {
+    fn start_pending_mutation(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        mutation: Mutation,
+        res: Result<(), ClientError>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         let mutation_type = mutation.mutation_type();
         let data_id = mutation.data_id();
 
-        self.update_pending_writes(routing_node, mutation, src, dst, msg_id, res.is_err())?;
+        self.update_pending_writes(
+            routing_node,
+            mutation,
+            src,
+            dst,
+            msg_id,
+            res.is_err(),
+        )?;
 
         if let Err(error) = res {
-            self.send_mutation_response(routing_node,
-                                        src,
-                                        dst,
-                                        mutation_type,
-                                        data_id,
-                                        Err(error),
-                                        msg_id)
+            self.send_mutation_response(
+                routing_node,
+                src,
+                dst,
+                mutation_type,
+                data_id,
+                Err(error),
+                msg_id,
+            )
         } else {
             Ok(())
         }
     }
 
-    fn commit_pending_mutation(&mut self,
-                               routing_node: &mut RoutingNode,
-                               src: Authority<XorName>,
-                               dst: Authority<XorName>,
-                               mutation: Mutation,
-                               msg_id: MessageId)
-                               -> Result<Vec<FragmentInfo>, InternalError> {
+    fn commit_pending_mutation(
+        &mut self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        mutation: Mutation,
+        msg_id: MessageId,
+    ) -> Result<Vec<FragmentInfo>, InternalError> {
         let mutation_type = mutation.mutation_type();
         let data_id = mutation.data_id();
 
@@ -1038,13 +1177,10 @@ impl DataManager {
                     data.mutate_entries_without_validation(actions);
                     keys.into_iter()
                         .filter_map(|key| {
-                                        data.get(&key)
-                                            .map(|value| {
-                                                     FragmentInfo::mutable_data_entry(data,
-                                                                                      key,
-                                                                                      value)
-                                                 })
-                                    })
+                            data.get(&key).map(|value| {
+                                FragmentInfo::mutable_data_entry(data, key, value)
+                            })
+                        })
                         .collect()
                 })
             }
@@ -1091,20 +1227,29 @@ impl DataManager {
             Err(error) => (Err(error), Vec::new()),
         };
 
-        self.send_mutation_response(routing_node, src, dst, mutation_type, data_id, res, msg_id)?;
+        self.send_mutation_response(
+            routing_node,
+            src,
+            dst,
+            mutation_type,
+            data_id,
+            res,
+            msg_id,
+        )?;
         Ok(fragments)
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
-    fn send_mutation_response(&self,
-                              routing_node: &mut RoutingNode,
-                              src: Authority<XorName>,
-                              dst: Authority<XorName>,
-                              mutation_type: MutationType,
-                              data_id: DataId,
-                              res: Result<(), ClientError>,
-                              msg_id: MessageId)
-                              -> Result<(), InternalError> {
+    fn send_mutation_response(
+        &self,
+        routing_node: &mut RoutingNode,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        mutation_type: MutationType,
+        data_id: DataId,
+        res: Result<(), ClientError>,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         let res_string = match res {
             Ok(_) => "success".to_string(),
             Err(ref error) => format!("failure ({:?})", error),
@@ -1113,41 +1258,63 @@ impl DataManager {
         match mutation_type {
             MutationType::PutIData => {
                 trace!("DM sending PutIData {} for data {:?}", res_string, data_id);
-                routing_node
-                    .send_put_idata_response(dst, src, res, msg_id)?
+                routing_node.send_put_idata_response(dst, src, res, msg_id)?
             }
             MutationType::PutMData => {
                 trace!("DM sending PutMData {} for data {:?}", res_string, data_id);
-                routing_node
-                    .send_put_mdata_response(dst, src, res, msg_id)?
+                routing_node.send_put_mdata_response(dst, src, res, msg_id)?
             }
             MutationType::MutateMDataEntries => {
-                trace!("DM sending MutateMDataEntries {} for data {:?}",
-                       res_string,
-                       data_id);
-                routing_node
-                    .send_mutate_mdata_entries_response(dst, src, res, msg_id)?
+                trace!(
+                    "DM sending MutateMDataEntries {} for data {:?}",
+                    res_string,
+                    data_id
+                );
+                routing_node.send_mutate_mdata_entries_response(
+                    dst,
+                    src,
+                    res,
+                    msg_id,
+                )?
             }
             MutationType::SetMDataUserPermissions => {
-                trace!("DM sending SetMDataUserPermissions {} for data {:?}",
-                       res_string,
-                       data_id);
-                routing_node
-                    .send_set_mdata_user_permissions_response(dst, src, res, msg_id)?
+                trace!(
+                    "DM sending SetMDataUserPermissions {} for data {:?}",
+                    res_string,
+                    data_id
+                );
+                routing_node.send_set_mdata_user_permissions_response(
+                    dst,
+                    src,
+                    res,
+                    msg_id,
+                )?
             }
             MutationType::DelMDataUserPermissions => {
-                trace!("DM sending DelMDataUserPermissions {} for data {:?}",
-                       res_string,
-                       data_id);
-                routing_node
-                    .send_del_mdata_user_permissions_response(dst, src, res, msg_id)?
+                trace!(
+                    "DM sending DelMDataUserPermissions {} for data {:?}",
+                    res_string,
+                    data_id
+                );
+                routing_node.send_del_mdata_user_permissions_response(
+                    dst,
+                    src,
+                    res,
+                    msg_id,
+                )?
             }
             MutationType::ChangeMDataOwner => {
-                trace!("DM sending ChangeMDataOwner {} for data {:?}",
-                       res_string,
-                       data_id);
-                routing_node
-                    .send_change_mdata_owner_response(dst, src, res, msg_id)?
+                trace!(
+                    "DM sending ChangeMDataOwner {} for data {:?}",
+                    res_string,
+                    data_id
+                );
+                routing_node.send_change_mdata_owner_response(
+                    dst,
+                    src,
+                    res,
+                    msg_id,
+                )?
             }
         }
 
@@ -1165,9 +1332,11 @@ impl DataManager {
         while self.chunk_store_full() {
             if let Some(data_id) = self.cache.pop_unneeded_chunk() {
                 if let Err(error) = self.chunk_store.delete(&data_id) {
-                    warn!("DM failed to delete unneeded chunk {:?}: {:?}",
-                          data_id,
-                          error);
+                    warn!(
+                        "DM failed to delete unneeded chunk {:?}: {:?}",
+                        data_id,
+                        error
+                    );
                     break;
                 }
             } else {
@@ -1176,18 +1345,22 @@ impl DataManager {
         }
     }
 
-    fn handle_fragment_refresh(&mut self,
-                               src: XorName,
-                               fragment: FragmentInfo)
-                               -> Result<(), InternalError> {
-        if self.cache
-               .register_needed_fragment_with_another_holder(fragment.clone(), src) {
+    fn handle_fragment_refresh(
+        &mut self,
+        src: XorName,
+        fragment: FragmentInfo,
+    ) -> Result<(), InternalError> {
+        if self.cache.register_needed_fragment_with_another_holder(
+            fragment.clone(),
+            src,
+        )
+        {
             return Ok(());
         }
 
         let holders = match self.fragment_refresh_accumulator
-                  .add(fragment.clone(), src)
-                  .cloned() {
+            .add(fragment.clone(), src)
+            .cloned() {
             Some(holders) => {
                 self.fragment_refresh_accumulator.delete(&fragment);
                 holders
@@ -1223,21 +1396,19 @@ impl DataManager {
 
         if needed {
             for holder in holders {
-                self.cache
-                    .insert_needed_fragment(fragment.clone(), holder);
+                self.cache.insert_needed_fragment(fragment.clone(), holder);
             }
         }
 
         Ok(())
     }
 
-    fn handle_chunk_refresh(&mut self,
-                            src: XorName,
-                            data_id: MutableDataId)
-                            -> Result<(), InternalError> {
-        if self.chunk_refresh_accumulator
-               .add(data_id, src)
-               .is_some() {
+    fn handle_chunk_refresh(
+        &mut self,
+        src: XorName,
+        data_id: MutableDataId,
+    ) -> Result<(), InternalError> {
+        if self.chunk_refresh_accumulator.add(data_id, src).is_some() {
             self.chunk_refresh_accumulator.delete(&data_id);
             self.cache.insert_needed_mutable_chunk(data_id);
         }
@@ -1245,11 +1416,12 @@ impl DataManager {
         Ok(())
     }
 
-    fn send_refresh(&self,
-                    routing_node: &mut RoutingNode,
-                    dst: Authority<XorName>,
-                    refreshes: Vec<Refresh>)
-                    -> Result<(), InternalError> {
+    fn send_refresh(
+        &self,
+        routing_node: &mut RoutingNode,
+        dst: Authority<XorName>,
+        refreshes: Vec<Refresh>,
+    ) -> Result<(), InternalError> {
         // FIXME - We need to handle >2MB chunks
         let src = Authority::ManagedNode(*routing_node.id()?.name());
         let payload = if dst.is_single() {
@@ -1258,24 +1430,30 @@ impl DataManager {
             serialisation::serialise(&refreshes)?
         };
         trace!("DM sending refresh to {:?}.", dst);
-        routing_node
-            .send_refresh_request(src, dst, payload, MessageId::new())?;
+        routing_node.send_refresh_request(
+            src,
+            dst,
+            payload,
+            MessageId::new(),
+        )?;
         Ok(())
     }
 
-    fn send_group_refresh(&self,
-                          routing_node: &mut RoutingNode,
-                          name: XorName,
-                          refresh: MutationVote,
-                          msg_id: MessageId)
-                          -> Result<(), InternalError> {
+    fn send_group_refresh(
+        &self,
+        routing_node: &mut RoutingNode,
+        name: XorName,
+        refresh: MutationVote,
+        msg_id: MessageId,
+    ) -> Result<(), InternalError> {
         let payload = serialisation::serialise(&refresh)?;
         trace!("DM sending refresh data to group {:?}.", name);
-        routing_node
-            .send_refresh_request(Authority::NaeManager(name),
-                                  Authority::NaeManager(name),
-                                  payload,
-                                  msg_id)?;
+        routing_node.send_refresh_request(
+            Authority::NaeManager(name),
+            Authority::NaeManager(name),
+            payload,
+            msg_id,
+        )?;
         Ok(())
     }
 
@@ -1285,27 +1463,36 @@ impl DataManager {
         Ok(())
     }
 
-    fn request_needed_chunks(&mut self,
-                             routing_node: &mut RoutingNode)
-                             -> Result<(), InternalError> {
+    fn request_needed_chunks(
+        &mut self,
+        routing_node: &mut RoutingNode,
+    ) -> Result<(), InternalError> {
         if let Some(data_id) = self.cache.needed_mutable_chunk() {
             let MutableDataId(name, tag) = data_id;
             let src = Authority::ManagedNode(*routing_node.id()?.name());
             let dst = Authority::NaeManager(name);
             let msg_id = MessageId::new();
 
-            routing_node
-                .send_get_mdata_request(src, dst, name, tag, msg_id)?;
-            self.cache
-                .start_needed_mutable_chunk_request(data_id, msg_id);
+            routing_node.send_get_mdata_request(
+                src,
+                dst,
+                name,
+                tag,
+                msg_id,
+            )?;
+            self.cache.start_needed_mutable_chunk_request(
+                data_id,
+                msg_id,
+            );
         }
 
         Ok(())
     }
 
-    fn request_needed_fragments(&mut self,
-                                routing_node: &mut RoutingNode)
-                                -> Result<(), InternalError> {
+    fn request_needed_fragments(
+        &mut self,
+        routing_node: &mut RoutingNode,
+    ) -> Result<(), InternalError> {
         let src = Authority::ManagedNode(*routing_node.id()?.name());
         let candidates = self.cache.needed_fragments();
 
@@ -1325,26 +1512,35 @@ impl DataManager {
                     continue;
                 }
 
-                self.cache
-                    .start_needed_fragment_request(&fragment, &holder);
+                self.cache.start_needed_fragment_request(&fragment, &holder);
 
                 let dst = Authority::ManagedNode(holder);
                 let msg_id = MessageId::new();
 
                 match fragment {
                     FragmentInfo::ImmutableData(name) => {
-                        routing_node
-                            .send_get_idata_request(src, dst, name, msg_id)?;
+                        routing_node.send_get_idata_request(src, dst, name, msg_id)?;
                         break;
                     }
                     FragmentInfo::MutableDataShell { name, tag, .. } => {
-                        routing_node
-                            .send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
+                        routing_node.send_get_mdata_shell_request(
+                            src,
+                            dst,
+                            name,
+                            tag,
+                            msg_id,
+                        )?;
                         break;
                     }
                     FragmentInfo::MutableDataEntry { name, tag, key, .. } => {
-                        routing_node
-                            .send_get_mdata_value_request(src, dst, name, tag, key, msg_id)?;
+                        routing_node.send_get_mdata_value_request(
+                            src,
+                            dst,
+                            name,
+                            tag,
+                            key,
+                            msg_id,
+                        )?;
                         break;
                     }
                 }
@@ -1365,7 +1561,8 @@ impl DataManager {
 
     // Load mutable data from the chunk store, apply the given function to it put it back.
     fn with_mdata<F, R>(&mut self, name: XorName, tag: u64, f: F) -> Result<R, ClientError>
-        where F: FnOnce(&mut MutableData) -> R
+    where
+        F: FnOnce(&mut MutableData) -> R,
     {
         let mut data = get_from_chunk_store(&self.chunk_store, &MutableDataId(name, tag))?;
         let result = f(&mut data);
@@ -1373,12 +1570,16 @@ impl DataManager {
         Ok(result)
     }
 
-    fn validate_concurrent_mutations(&self,
-                                     existing_data: Option<&MutableData>,
-                                     new_mutation: &Mutation)
-                                     -> Result<(), ClientError> {
-        if self.cache
-               .validate_concurrent_mutations(existing_data, new_mutation) {
+    fn validate_concurrent_mutations(
+        &self,
+        existing_data: Option<&MutableData>,
+        new_mutation: &Mutation,
+    ) -> Result<(), ClientError> {
+        if self.cache.validate_concurrent_mutations(
+            existing_data,
+            new_mutation,
+        )
+        {
             Ok(())
         } else {
             // TODO: consider adding `Conflict` variant to `ClientError`.
@@ -1436,19 +1637,20 @@ impl DataManager {
         use maidsafe_utilities::SeededRng;
         use rand::Rng;
 
-        let _ =
-            self._delayed_group_refresh_cache
-                .as_ref()
-                .and_then(|cache| {
-                    let mut rng = SeededRng::thread_rng();
-                    if rng.gen_weighted_bool(10) {
-                        let chosen = rng.choose(&cache.iter().collect_vec()).cloned();
-                        chosen.cloned()
-                    } else {
-                        None
-                    }
-                })
-                .map(|delayed_refresh| self.handle_group_refresh(routing_node, delayed_refresh));
+        let _ = self._delayed_group_refresh_cache
+            .as_ref()
+            .and_then(|cache| {
+                let mut rng = SeededRng::thread_rng();
+                if rng.gen_weighted_bool(10) {
+                    let chosen = rng.choose(&cache.iter().collect_vec()).cloned();
+                    chosen.cloned()
+                } else {
+                    None
+                }
+            })
+            .map(|delayed_refresh| {
+                self.handle_group_refresh(routing_node, delayed_refresh)
+            });
     }
 
     fn get_version(&self, data_id: &DataId) -> Result<u64, ChunkStoreError> {
@@ -1465,8 +1667,9 @@ impl DataManager {
 impl DataManager {
     /// For testing only - put the given data directly into the chunks store.
     pub fn put_into_chunk_store<T, I>(&mut self, data: T)
-        where T: Chunk<DataId, Id = I> + Data<Id = I>,
-              I: ChunkId<DataId>
+    where
+        T: Chunk<DataId, Id = I> + Data<Id = I>,
+        I: ChunkId<DataId>,
     {
         unwrap!(self.chunk_store.put(&data.id(), &data))
     }
@@ -1485,13 +1688,15 @@ impl DataManager {
 
 impl Debug for DataManager {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter,
-               "This vault has received {} Client Get requests. Chunks stored: Immutable: {}, \
+        write!(
+            formatter,
+            "This vault has received {} Client Get requests. Chunks stored: Immutable: {}, \
                 Mutable: {}. Total stored: {} bytes.",
-               self.client_get_requests,
-               self.immutable_data_count,
-               self.mutable_data_count,
-               self.chunk_store.used_space())
+            self.client_get_requests,
+            self.immutable_data_count,
+            self.mutable_data_count,
+            self.chunk_store.used_space()
+        )
     }
 }
 
@@ -1518,9 +1723,12 @@ fn close_to_address(routing_node: &mut RoutingNode, address: &XorName) -> bool {
 
 // Is `name` in the close group of `group_name`?
 fn is_in_close_group(routing_node: &mut RoutingNode, group_name: &XorName, name: &XorName) -> bool {
-    routing_node
-        .close_group(*group_name, GROUP_SIZE)
-        .map_or(false, |group| group.contains(name))
+    routing_node.close_group(*group_name, GROUP_SIZE).map_or(
+        false,
+        |group| {
+            group.contains(name)
+        },
+    )
 }
 
 fn recompute_idata_name(data: &ImmutableData) -> XorName {
@@ -1532,7 +1740,8 @@ fn recompute_idata_name(data: &ImmutableData) -> XorName {
 /// are overwritten if the new version is higher than the old version, otherwise
 /// ignored.
 fn merge_mdata_entries<I>(data: &mut MutableData, entries: I)
-    where I: IntoIterator<Item = (Vec<u8>, Value)>
+where
+    I: IntoIterator<Item = (Vec<u8>, Value)>,
 {
     for (key, value) in entries {
         data.mutate_entry_without_validation(key, value);
@@ -1548,31 +1757,34 @@ fn extract_owner(owners: BTreeSet<sign::PublicKey>) -> Result<sign::PublicKey, C
     }
 }
 
-fn get_from_chunk_store<T: ChunkId<DataId> + Debug>(chunk_store: &ChunkStore<DataId>,
-                                                    data_id: &T)
-                                                    -> Result<T::Chunk, ClientError> {
-    chunk_store
-        .get(data_id)
-        .map_err(|error| {
-                     trace!("DM failed to load {:?} from chunkstore: {:?}",
-                            data_id,
-                            error);
-                     ClientError::from(format!("Failed to load chunk: {:?}", error))
-                 })
+fn get_from_chunk_store<T: ChunkId<DataId> + Debug>(
+    chunk_store: &ChunkStore<DataId>,
+    data_id: &T,
+) -> Result<T::Chunk, ClientError> {
+    chunk_store.get(data_id).map_err(|error| {
+        trace!(
+            "DM failed to load {:?} from chunkstore: {:?}",
+            data_id,
+            error
+        );
+        ClientError::from(format!("Failed to load chunk: {:?}", error))
+    })
 }
 
-fn put_into_chunk_store<T, I>(chunk_store: &mut ChunkStore<DataId>,
-                              data: &T)
-                              -> Result<(), ClientError>
-    where T: Chunk<DataId, Id = I> + Data<Id = I>,
-          I: ChunkId<DataId> + Debug
+fn put_into_chunk_store<T, I>(
+    chunk_store: &mut ChunkStore<DataId>,
+    data: &T,
+) -> Result<(), ClientError>
+where
+    T: Chunk<DataId, Id = I> + Data<Id = I>,
+    I: ChunkId<DataId> + Debug,
 {
-    chunk_store
-        .put(&data.id(), data)
-        .map_err(|error| {
-                     trace!("DM failed to store {:?} in chunkstore: {:?}",
-                            data.id(),
-                            error);
-                     ClientError::from(format!("Failed to store chunk: {:?}", error))
-                 })
+    chunk_store.put(&data.id(), data).map_err(|error| {
+        trace!(
+            "DM failed to store {:?} in chunkstore: {:?}",
+            data.id(),
+            error
+        );
+        ClientError::from(format!("Failed to store chunk: {:?}", error))
+    })
 }

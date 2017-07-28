@@ -63,7 +63,13 @@ fn idata_basics() {
     // Put immutable data.
     let data = test_utils::gen_immutable_data(10, &mut rand::thread_rng());
     let msg_id = MessageId::new();
-    unwrap!(mm.handle_put_idata(&mut node, client, client_manager, data.clone(), msg_id));
+    unwrap!(mm.handle_put_idata(
+        &mut node,
+        client,
+        client_manager,
+        data.clone(),
+        msg_id,
+    ));
 
     // Verify it gets forwarded to the NAE manager.
     let message = unwrap!(node.sent_requests.remove(&msg_id));
@@ -361,8 +367,7 @@ fn auth_keys() {
                                                  owner_client,
                                                  owner_client_manager,
                                                  msg_id));
-    let (auth_keys, version) =
-        assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
+    let (auth_keys, version) = assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                       Response::ListAuthKeysAndVersion { res: Ok(ok), .. } => ok);
 
     assert!(auth_keys.is_empty());
@@ -415,8 +420,7 @@ fn auth_keys() {
                                                  owner_client,
                                                  owner_client_manager,
                                                  msg_id));
-    let (auth_keys, version) =
-        assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
+    let (auth_keys, version) = assert_match!(unwrap!(node.sent_responses.remove(&msg_id)).response,
                       Response::ListAuthKeysAndVersion { res: Ok(ok), .. } => ok);
 
     assert_eq!(auth_keys.len(), 1);
@@ -712,8 +716,8 @@ fn limits() {
     let client_manager = test_utils::gen_client_manager_authority(client_key);
 
     // Attempt to put oversized immutable data fails.
-    let bad_data = test_utils::gen_immutable_data(MAX_IMMUTABLE_DATA_SIZE_IN_BYTES as usize + 1,
-                                                  &mut rng);
+    let bad_data =
+        test_utils::gen_immutable_data(MAX_IMMUTABLE_DATA_SIZE_IN_BYTES as usize + 1, &mut rng);
     let msg_id = MessageId::new();
     unwrap!(mm.handle_put_idata(&mut node,
                                 client,
@@ -726,18 +730,22 @@ fn limits() {
 
 
     // Attempt to put mutable data with too many entries fails.
-    let mut bad_data = test_utils::gen_mutable_data(TEST_TAG,
-                                                    MAX_MUTABLE_DATA_ENTRIES as usize,
-                                                    client_key,
-                                                    &mut rng);
+    let mut bad_data = test_utils::gen_mutable_data(
+        TEST_TAG,
+        MAX_MUTABLE_DATA_ENTRIES as usize,
+        client_key,
+        &mut rng,
+    );
     while bad_data.keys().len() <= MAX_MUTABLE_DATA_ENTRIES as usize {
         let key = test_utils::gen_vec(10, &mut rng);
         let content = test_utils::gen_vec(10, &mut rng);
-        let _ = bad_data.mutate_entry_without_validation(key,
-                                                         Value {
-                                                             content: content,
-                                                             entry_version: 0,
-                                                         });
+        let _ = bad_data.mutate_entry_without_validation(
+            key,
+            Value {
+                content: content,
+                entry_version: 0,
+            },
+        );
     }
 
     let msg_id = MessageId::new();
@@ -755,11 +763,13 @@ fn limits() {
     let mut bad_data = test_utils::gen_mutable_data(TEST_TAG, 0, client_key, &mut rng);
     let key = test_utils::gen_vec(10, &mut rng);
     let content = test_utils::gen_vec(MAX_MUTABLE_DATA_SIZE_IN_BYTES as usize + 1, &mut rng);
-    let res = bad_data.mutate_entry_without_validation(key,
-                                                       Value {
-                                                           content: content,
-                                                           entry_version: 0,
-                                                       });
+    let res = bad_data.mutate_entry_without_validation(
+        key,
+        Value {
+            content: content,
+            entry_version: 0,
+        },
+    );
     assert!(res);
 
     let msg_id = MessageId::new();
@@ -812,16 +822,19 @@ fn refresh_data_ops_count() {
     assert_eq!(balance_1.mutations_done, balance_0.mutations_done + 1);
 }
 
-fn create_account(node: &mut RoutingNode,
-                  mm: &mut MaidManager,
-                  src: ClientAuthority,
-                  dst: ClientManagerAuthority)
-                  -> MessageId {
+fn create_account(
+    node: &mut RoutingNode,
+    mm: &mut MaidManager,
+    src: ClientAuthority,
+    dst: ClientManagerAuthority,
+) -> MessageId {
     let client_key = *src.client_key();
-    let account_packet = test_utils::gen_mutable_data(TYPE_TAG_SESSION_PACKET,
-                                                      0,
-                                                      client_key,
-                                                      &mut rand::thread_rng());
+    let account_packet = test_utils::gen_mutable_data(
+        TYPE_TAG_SESSION_PACKET,
+        0,
+        client_key,
+        &mut rand::thread_rng(),
+    );
     let msg_id = MessageId::new();
     unwrap!(mm.handle_put_mdata(node, src, dst, account_packet, msg_id, client_key));
 
@@ -835,11 +848,12 @@ fn create_account(node: &mut RoutingNode,
     msg_id
 }
 
-fn get_account_info(node: &mut RoutingNode,
-                    mm: &mut MaidManager,
-                    src: ClientAuthority,
-                    dst: ClientManagerAuthority)
-                    -> Result<AccountInfo, ClientError> {
+fn get_account_info(
+    node: &mut RoutingNode,
+    mm: &mut MaidManager,
+    src: ClientAuthority,
+    dst: ClientManagerAuthority,
+) -> Result<AccountInfo, ClientError> {
     let msg_id = MessageId::new();
     unwrap!(mm.handle_get_account_info(node, src, dst, msg_id));
 
@@ -849,10 +863,7 @@ fn get_account_info(node: &mut RoutingNode,
 
 // Simulate the node sending a refresh message with the given `msg_id` and then
 // receiving it back.
-fn simulate_refresh(node: &mut RoutingNode,
-                    mm: &mut MaidManager,
-                    msg_id: MessageId,
-                    count: usize) {
+fn simulate_refresh(node: &mut RoutingNode, mm: &mut MaidManager, msg_id: MessageId, count: usize) {
     let message = unwrap!(node.sent_requests.remove(&msg_id));
     let refresh = assert_match!(message.request, Request::Refresh(payload, ..) => payload);
     if message.src.is_single() && message.dst.is_single() {

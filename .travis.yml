@@ -38,7 +38,7 @@ matrix:
 
     - os: linux
     # TODO: Remove this once the musl build works again.
-      rust: 1.17.0
+      rust: 1.19.0
       env: >
         PLATFORM=linux-x64
       sudo: required
@@ -49,7 +49,7 @@ matrix:
             - sshpass
 
     - os: linux
-      rust: 1.17.0
+      rust: 1.19.0
       env: >
         PLATFORM=linux-x86
         TARGET=i686-unknown-linux-gnu
@@ -62,7 +62,7 @@ matrix:
             - sshpass
 
     - os: linux
-      rust: 1.17.0
+      rust: 1.19.0
       env: >
         PLATFORM=armv7
         TARGET=armv7-unknown-linux-gnueabihf
@@ -77,14 +77,14 @@ matrix:
             - libc6-dev-armhf-cross
 
     - os: osx
-      rust: 1.17.0
+      rust: 1.19.0
       env: >
         PLATFORM=osx-x64
         SKIP_SIGN_PACKAGE=1
 
     # For running `cargo clippy`
     - os: linux
-      rust: nightly-2017-04-28
+      rust: nightly-2017-07-20
 
 cache:
   cargo: true
@@ -101,10 +101,10 @@ install:
 before_script:
   - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
   - bash cargo_install.sh cargo-prune;
-  - if [ "${TRAVIS_RUST_VERSION}" = 1.17.0 ]; then
-      bash cargo_install.sh rustfmt 0.8.3;
+  - if [ "${TRAVIS_RUST_VERSION}" = 1.19.0 ]; then
+      bash cargo_install.sh rustfmt 0.9.0;
     elif [ -z "${TARGET}" ] && [ "${TRAVIS_OS_NAME}" = linux ]; then
-      bash cargo_install.sh clippy 0.0.128;
+      bash cargo_install.sh clippy 0.0.144;
     fi
 
 script:
@@ -127,7 +127,7 @@ deploy:
     draft: true
     tag_name: ${PROJECT_VERSION}
     on:
-      rust: 1.17.0
+      rust: 1.19.0
       condition: -n "$PROJECT_VERSION"
 
 # TODO - verify and renable following block

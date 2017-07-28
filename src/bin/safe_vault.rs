@@ -60,10 +60,9 @@ pub fn main() {
     let name_and_version = format!("{} v{}", name.to_string_lossy(), env!("CARGO_PKG_VERSION"));
 
     let matches = App::new(name.to_string_lossy())
-        .arg(Arg::with_name("first")
-                 .short("f")
-                 .long("first")
-                 .help("Run as the first Vault of a new network."))
+        .arg(Arg::with_name("first").short("f").long("first").help(
+            "Run as the first Vault of a new network.",
+        ))
         .version(env!("CARGO_PKG_VERSION"))
         .get_matches();
 

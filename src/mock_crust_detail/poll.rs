@@ -101,14 +101,16 @@ pub fn nodes_and_clients_parallel(nodes: &mut [TestNode], clients: &mut [TestCli
 /// Empty event queue of nodes and clients, until there are no unacknowledged messages
 /// left. Handles only one event per round for each node and client to better simulate
 /// simultaneous requests.
-pub fn nodes_and_clients_parallel_with_resend(nodes: &mut [TestNode],
-                                              clients: &mut [TestClient])
-                                              -> usize {
+pub fn nodes_and_clients_parallel_with_resend(
+    nodes: &mut [TestNode],
+    clients: &mut [TestClient],
+) -> usize {
     with_resend(|| nodes_and_clients_parallel(nodes, clients))
 }
 
 fn with_resend<F>(mut f: F) -> usize
-    where F: FnMut() -> usize
+where
+    F: FnMut() -> usize,
 {
     let clock_advance_duration_ms = ACK_TIMEOUT_SECS * 1000 + 1;
     let mut clock_advanced_by_ms = 0;

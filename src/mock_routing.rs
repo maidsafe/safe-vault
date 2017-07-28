@@ -88,9 +88,11 @@ impl Node {
     }
 
     pub fn close_group(&self, name: XorName, count: usize) -> Option<Vec<XorName>> {
-        self.routing_table
-            .closest_names(&name, count)
-            .map(|names| names.into_iter().cloned().collect())
+        self.routing_table.closest_names(&name, count).map(
+            |names| {
+                names.into_iter().cloned().collect()
+            },
+        )
     }
 
     pub fn routing_table(&self) -> Result<&RoutingTable<XorName>, RoutingError> {
@@ -102,31 +104,39 @@ impl Node {
         unwrap!(self.routing_table.add(name));
     }
 
-    impl_request!(send_get_idata_request,
-                  GetIData {
-                      name: XorName,
-                      msg_id: MessageId,
-                  });
+    impl_request!(
+        send_get_idata_request,
+        GetIData {
+            name: XorName,
+            msg_id: MessageId,
+        }
+    );
 
-    impl_request!(send_put_idata_request,
-                  PutIData {
-                      data: ImmutableData,
-                      msg_id: MessageId,
-                  });
+    impl_request!(
+        send_put_idata_request,
+        PutIData {
+            data: ImmutableData,
+            msg_id: MessageId,
+        }
+    );
 
-    impl_request!(send_get_mdata_request,
-                  GetMData {
-                      name: XorName,
-                      tag: u64,
-                      msg_id: MessageId,
-                  });
+    impl_request!(
+        send_get_mdata_request,
+        GetMData {
+            name: XorName,
+            tag: u64,
+            msg_id: MessageId,
+        }
+    );
 
-    impl_request!(send_put_mdata_request,
-                  PutMData {
-                      data: MutableData,
-                      msg_id: MessageId,
-                      requester: sign::PublicKey,
-                  });
+    impl_request!(
+        send_put_mdata_request,
+        PutMData {
+            data: MutableData,
+            msg_id: MessageId,
+            requester: sign::PublicKey,
+        }
+    );
 
     impl_request!(send_mutate_mdata_entries_request,
                   MutateMDataEntries {
@@ -182,12 +192,13 @@ impl Node {
                       msg_id: MessageId,
                   });
 
-    pub fn send_refresh_request(&mut self,
-                                src: Authority<XorName>,
-                                dst: Authority<XorName>,
-                                content: Vec<u8>,
-                                msg_id: MessageId)
-                                -> Result<(), InterfaceError> {
+    pub fn send_refresh_request(
+        &mut self,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        content: Vec<u8>,
+        msg_id: MessageId,
+    ) -> Result<(), InterfaceError> {
         self.send_request(src, dst, Request::Refresh(content, msg_id))
     }
 
@@ -221,34 +232,38 @@ impl Node {
     impl_response!(send_ins_auth_key_response, InsAuthKey);
     impl_response!(send_del_auth_key_response, DelAuthKey);
 
-    fn send_request(&mut self,
-                    src: Authority<XorName>,
-                    dst: Authority<XorName>,
-                    request: Request)
-                    -> Result<(), InterfaceError> {
-        let prev = self.sent_requests
-            .insert(request_id(&request),
-                    RequestWrapper {
-                        src: src,
-                        dst: dst,
-                        request: request,
-                    });
+    fn send_request(
+        &mut self,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        request: Request,
+    ) -> Result<(), InterfaceError> {
+        let prev = self.sent_requests.insert(
+            request_id(&request),
+            RequestWrapper {
+                src: src,
+                dst: dst,
+                request: request,
+            },
+        );
         assert!(prev.is_none());
         Ok(())
     }
 
-    fn send_response(&mut self,
-                     src: Authority<XorName>,
-                     dst: Authority<XorName>,
-                     response: Response)
-                     -> Result<(), InterfaceError> {
-        let prev = self.sent_responses
-            .insert(response_id(&response),
-                    ResponseWrapper {
-                        src: src,
-                        dst: dst,
-                        response: response,
-                    });
+    fn send_response(
+        &mut self,
+        src: Authority<XorName>,
+        dst: Authority<XorName>,
+        response: Response,
+    ) -> Result<(), InterfaceError> {
+        let prev = self.sent_responses.insert(
+            response_id(&response),
+            ResponseWrapper {
+                src: src,
+                dst: dst,
+                response: response,
+            },
+        );
         assert!(prev.is_none());
         Ok(())
     }
@@ -289,11 +304,11 @@ impl NodeBuilder {
         let id = *FullId::new().public_id();
 
         Ok(Node {
-               id: id,
-               routing_table: RoutingTable::new(*id.name(), GROUP_SIZE),
-               sent_requests: Default::default(),
-               sent_responses: Default::default(),
-           })
+            id: id,
+            routing_table: RoutingTable::new(*id.name(), GROUP_SIZE),
+            sent_requests: Default::default(),
+            sent_responses: Default::default(),
+        })
     }
 }
 

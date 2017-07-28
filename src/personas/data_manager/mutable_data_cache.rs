@@ -45,10 +45,11 @@ impl MutableDataCache {
 
     /// Accumulates mutable data. Returns the shell and entries that reached the
     /// accumulation quorum (if any).
-    pub fn accumulate(&mut self,
-                      mut data: MutableData,
-                      src: XorName)
-                      -> (Option<MutableData>, HashMap<Vec<u8>, Value>) {
+    pub fn accumulate(
+        &mut self,
+        mut data: MutableData,
+        src: XorName,
+    ) -> (Option<MutableData>, HashMap<Vec<u8>, Value>) {
         let data_id = data.id();
         let entries = data.take_entries();
 
@@ -57,9 +58,7 @@ impl MutableDataCache {
             hash: utils::secure_hash(&data),
         };
 
-        let result_shell = if self.shell_accumulator
-               .add(shell_key.clone(), src)
-               .is_some() {
+        let result_shell = if self.shell_accumulator.add(shell_key.clone(), src).is_some() {
             self.shell_accumulator.delete(&shell_key);
             Some(data)
         } else {
@@ -74,9 +73,7 @@ impl MutableDataCache {
                 hash: utils::secure_hash(&value),
             };
 
-            if self.entry_accumulator
-                   .add(entry_key.clone(), src)
-                   .is_some() {
+            if self.entry_accumulator.add(entry_key.clone(), src).is_some() {
                 self.entry_accumulator.delete(&entry_key);
                 let _ = result_entries.insert(entry_key.key, value);
             }
@@ -97,13 +94,12 @@ impl MutableDataCache {
 
     /// Inserts multiple entries into entry cache.
     pub fn insert_entries<I>(&mut self, id: MutableDataId, entries: I)
-        where I: IntoIterator<Item = (Vec<u8>, Value)>
+    where
+        I: IntoIterator<Item = (Vec<u8>, Value)>,
     {
         self.remove_expired_entries();
 
-        let mut map = self.entry_cache
-            .entry(id)
-            .or_insert_with(HashMap::default);
+        let mut map = self.entry_cache.entry(id).or_insert_with(HashMap::default);
 
         for (key, value) in entries {
             let _ = map.insert(key, (value, Instant::now()));
@@ -131,11 +127,12 @@ impl MutableDataCache {
             let expired_keys: Vec<_> = entries
                 .iter()
                 .filter_map(|(key, &(_, instant))| if instant.elapsed().as_secs() >
-                                                      ENTRY_CACHE_TIMEOUT_SECS {
-                                Some(key.clone())
-                            } else {
-                                None
-                            })
+                    ENTRY_CACHE_TIMEOUT_SECS
+                {
+                    Some(key.clone())
+                } else {
+                    None
+                })
                 .collect();
 
             for key in expired_keys {

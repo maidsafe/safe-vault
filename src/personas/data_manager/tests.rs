@@ -46,7 +46,13 @@ fn idata_basics() {
 
     // Get non-existent data fails.
     let msg_id = MessageId::new();
-    unwrap!(dm.handle_get_idata(&mut node, client.into(), nae_manager, *data.name(), msg_id));
+    unwrap!(dm.handle_get_idata(
+        &mut node,
+        client.into(),
+        nae_manager,
+        *data.name(),
+        msg_id,
+    ));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
     assert_match!(
@@ -75,8 +81,8 @@ fn idata_basics() {
     unwrap!(dm.handle_get_idata(&mut node, client.into(), nae_manager, *data.name(), msg_id));
 
     let message = unwrap!(node.sent_responses.remove(&msg_id));
-    let retrieved_data =
-        assert_match!(message.response, Response::GetIData { res: Ok(data), .. } => data);
+    let retrieved_data = assert_match!(message.response,
+                                       Response::GetIData { res: Ok(data), .. } => data);
     assert_eq!(retrieved_data, data);
 }
 
@@ -323,22 +329,17 @@ fn handle_node_added() {
 
     assert_eq!(refreshes.len(), 2);
 
-    let check = refreshes
-        .iter()
-        .any(|refresh| match *refresh {
-                 Refresh::Fragment(FragmentInfo::ImmutableData(ref name)) if name ==
-                                                                             data0.name() => true,
-                 _ => false,
-             });
+    let check = refreshes.iter().any(|refresh| match *refresh {
+        Refresh::Fragment(FragmentInfo::ImmutableData(ref name)) if name == data0.name() => true,
+        _ => false,
+    });
     assert!(check);
 
-    let check = refreshes
-        .iter()
-        .any(|refresh| match *refresh {
-                 Refresh::Chunk(MutableDataId(ref name, tag)) if name == data1.name() &&
-                                                                 tag == data1.tag() => true,
-                 _ => false,
-             });
+    let check = refreshes.iter().any(|refresh| match *refresh {
+        Refresh::Chunk(MutableDataId(ref name, tag))
+            if name == data1.name() && tag == data1.tag() => true,
+        _ => false,
+    });
     assert!(check);
 
     // TODO: test also that the refresh contains fragments that the node doesn't
@@ -474,9 +475,9 @@ fn mdata_with_churn_with_partial_accumulation() {
     // None of the groups reaches quorum for their data, but the nodes together do reach
     // quorum for the shell and some of the entries. Only the entries that reached
     // quorum are written to the chunk store.
-    let mut entries = data.entries()
-        .into_iter()
-        .map(|(key, value)| (key.clone(), value.clone()));
+    let mut entries = data.entries().into_iter().map(|(key, value)| {
+        (key.clone(), value.clone())
+    });
     let (key0, value0) = unwrap!(entries.next());
     let (key1, value1) = unwrap!(entries.next());
     let (key2, value2) = unwrap!(entries.next());
@@ -496,10 +497,7 @@ fn mdata_with_churn_with_partial_accumulation() {
                                                 msg_id));
     }
 
-    for node_name in other_node_names
-            .iter()
-            .skip(QUORUM - 1)
-            .take(QUORUM - 1) {
+    for node_name in other_node_names.iter().skip(QUORUM - 1).take(QUORUM - 1) {
         unwrap!(new_dm.handle_get_mdata_success(&mut new_node,
                                                 *node_name,
                                                 partial_data1.clone(),
@@ -847,9 +845,10 @@ fn setup_churn<R: Rng>(rng: &mut R) -> (RoutingNode, DataManager, Vec<XorName>) 
 //   - Simulate it receiving refresh messages and accumulate them.
 //   - Returns the new RoutingNode and DataManager and the names of the rest of
 //     the group.
-fn setup_mdata_refresh<R: Rng>(data: &MutableData,
-                               rng: &mut R)
-                               -> (RoutingNode, DataManager, Vec<XorName>) {
+fn setup_mdata_refresh<R: Rng>(
+    data: &MutableData,
+    rng: &mut R,
+) -> (RoutingNode, DataManager, Vec<XorName>) {
     let (mut new_node, mut new_dm, other_node_names) = setup_churn(rng);
 
     let refresh = vec![Refresh::Chunk(data.id())];
@@ -869,18 +868,23 @@ fn take_get_mdata_request(node: &mut RoutingNode) -> (MessageId, MutableDataId) 
         _ => false,
     });
 
-    let (name, tag) =
-        assert_match!(message.request, Request::GetMData { name, tag, .. } => (name, tag));
+    let (name, tag) = assert_match!(message.request,
+                                    Request::GetMData { name, tag, .. } => (name, tag));
     (msg_id, MutableDataId(name, tag))
 }
 
 // Removes and returns the sent request matching the given predicate.
 fn take_request<F>(node: &mut RoutingNode, mut f: F) -> (MessageId, RequestWrapper)
-    where F: FnMut(&RequestWrapper) -> bool
+where
+    F: FnMut(&RequestWrapper) -> bool,
 {
     let msg_id = node.sent_requests
         .iter()
-        .filter_map(|(msg_id, message)| if f(message) { Some(*msg_id) } else { None })
+        .filter_map(|(msg_id, message)| if f(message) {
+            Some(*msg_id)
+        } else {
+            None
+        })
         .next();
     let msg_id = unwrap!(msg_id);
     (msg_id, unwrap!(node.sent_requests.remove(&msg_id)))

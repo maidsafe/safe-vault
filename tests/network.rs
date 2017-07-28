@@ -45,6 +45,7 @@ fn fill_network() {
         max_capacity: Some(2000),
         chunk_store_root: None,
         invite_key: None,
+        dev: None,
     };
 
     let mut nodes = test_node::create_nodes(&network, 8, Some(config), true);
@@ -120,8 +121,10 @@ impl DebugId for ImmutableData {
 
 impl DebugId for MutableData {
     fn debug_id(&self) -> String {
-        format!("mutable chunk (name: {:?}, tag: {})",
-                self.name(),
-                self.tag())
+        format!(
+            "mutable chunk (name: {:?}, tag: {})",
+            self.name(),
+            self.tag()
+        )
     }
 }

@@ -32,8 +32,9 @@ impl Cache {
     pub fn new() -> Self {
         Cache {
             store: RefCell::new(LruCache::with_expiry_duration_and_capacity(
-                                    Duration::from_secs(CACHE_EXPIRY_DURATION_SECS),
-                                    CACHE_CAPACITY)),
+                Duration::from_secs(CACHE_EXPIRY_DURATION_SECS),
+                CACHE_CAPACITY,
+            )),
         }
     }
 }
@@ -41,15 +42,12 @@ impl Cache {
 impl RoutingCache for Cache {
     fn get(&self, request: &Request) -> Option<Response> {
         if let Request::GetIData { name, msg_id } = *request {
-            self.store
-                .borrow_mut()
-                .get(&name)
-                .map(|data| {
-                         Response::GetIData {
-                             res: Ok(data.clone()),
-                             msg_id: msg_id,
-                         }
-                     })
+            self.store.borrow_mut().get(&name).map(|data| {
+                Response::GetIData {
+                    res: Ok(data.clone()),
+                    msg_id: msg_id,
+                }
+            })
         } else {
             None
         }
