@@ -1,6 +1,6 @@
 [root]
 name = "safe_vault"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "accumulator 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.25.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -14,7 +14,7 @@ dependencies = [
  "maidsafe_utilities 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-error 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
- "routing 0.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "routing 0.32.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_sodium 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "routing"
-version = "0.32.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "config_file_handler 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1333,7 +1333,7 @@ dependencies = [
 "checksum regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1731164734096285ec2a5ec7fea5248ae2f5485b3feeb0115af4fda2183b2d1b"
 "checksum regex-syntax 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ad890a5eef7953f55427c50575c680c42841653abd2b028b68cd223d157f62db"
 "checksum resource_proof 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9eaa71a03a0cd0d41a32dfb3c5234c66658e6fa41d53785c5290d86465328215"
-"checksum routing 0.32.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f31e5be12038b860637923de006c6e22b9a6c44307d19acce9218b3de27c22c6"
+"checksum routing 0.32.1 (registry+https://github.com/rust-lang/crates.io-index)" = "eda3c92aca1ec7e7fa6ea28b5bcbaa55d2377928b0e988d3d220bf47a357a1b4"
 "checksum rust_sodium 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d9a38db456cdc9ecfd4dbe52b7eb0976f05414a5a7fe4e80300f90598bbf9597"
 "checksum rust_sodium-sys 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "209996fa5e69b106aad826f860047ad2aaa280ea01e1c9f43406a2979970601b"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
