@@ -1,5 +1,12 @@
 # Safe Vault - Change Log
 
+## [0.16.0]
+- Use Routing definitions for group size and quorum.
+- Add dev config options to allow running a local testnet.
+- Update to use Routing 0.32.0.
+- Update to use Rust Stable 1.19.0 / Nightly 2017-07-20, Clippy 0.0.144, and rustfmt 0.9.0.
+- Improve DataManager tests.
+
 ## [0.15.0]
 - Deprecate and remove support for Structured, PrivAppendable and PubAppendable Data.
 - Add support for MutableData instead.

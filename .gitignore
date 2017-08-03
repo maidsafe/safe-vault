@@ -1,5 +1,4 @@
 *.exe
-*.lock
 *.swp
 *.bk
 *.rsproj
@@ -18,4 +17,3 @@ packages/
 *.back.aip
 installer/docker/safe_vault
 installer/docker/safe_vault.*.config
-
