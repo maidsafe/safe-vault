@@ -1,7 +1,7 @@
 # Safe Vault - Change Log
 
-## [0.16.1]
-- Update to use Routing 0.32.1.
+## [0.16.1-2]
+- Update to use Routing 0.32.2.
 
 ## [0.16.0]
 - Use Routing definitions for group size and quorum.
