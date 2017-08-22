@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "safe_vault"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_vault"
-version = "0.16.2"
+version = "0.17.0"
 
 [dependencies]
 accumulator = "~0.6.0"
@@ -22,7 +22,7 @@ lru_time_cache = "~0.7.0"
 maidsafe_utilities = "~0.14.0"
 quick-error = "~1.2.0"
 rand = "~0.3.16"
-routing = { git="https://github.com/maidsafe/routing", branch="master" }
+routing = "~0.33.0"
 rust_sodium = "~0.5.0"
 serde = "~1.0.11"
 serde_derive = "~1.0.11"

@@ -40,6 +40,14 @@ build_script:
   - cargo check --verbose --features use-mock-routing --lib --tests
   - cargo check --verbose --features use-mock-crust --lib --tests
 
+after_build:
+  - ps: |
+        if (git diff --shortstat) {
+          Write-Error "Working tree is dirty after building.  Probably Cargo.lock should be updated."
+          git status
+          exit 1
+        }
+
 test_script:
   - cargo test --verbose --release --features use-mock-routing
   - cargo test --verbose --release --features use-mock-crust

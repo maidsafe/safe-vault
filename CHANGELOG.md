@@ -1,5 +1,8 @@
 # Safe Vault - Change Log
 
+## [0.17.0]
+- Remove proxy rate exceed event.
+
 ## [0.16.1-2]
 - Update to use Routing 0.32.2.
 

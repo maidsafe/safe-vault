@@ -112,6 +112,13 @@ script:
     export -f travis_jigger &&
     ./ci/travis/script.sh
 
+after_script:
+  - if [[ $TRAVIS_EVENT_TYPE = pull_request && -n $(git diff --shortstat 2> /dev/null | tail -n1) ]]; then
+      echo "Working tree is dirty after building.  Probably Cargo.lock should be updated.";
+      git status;
+      travis_terminate 1;
+    fi
+
 before_cache:
  - cargo prune
 
