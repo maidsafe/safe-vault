@@ -1,5 +1,8 @@
 # Safe Vault - Change Log
 
+## [0.17.2]
+- Update dependencies.
+
 ## [0.17.1]
 - Change test to use value of MAX_MUTABLE_DATA_ENTRIES rather than magic numbers.
 
