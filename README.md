@@ -1,6 +1,6 @@
 # safe_vault
 
-**Maintainer:** Andreas Fackler (andreas.fackler@maidsafe.net)
+**Maintainer:** Spandan Sharma (spandan.sharma@maidsafe.net)
 
 |Crate|Documentation|Linux/OS X|Windows|Issues|
 |:---:|:-----------:|:--------:|:-----:|:----:|
