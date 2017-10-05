@@ -1,4 +1,4 @@
-# safe_vault
+# SAFE Vault
 
 An autonomous network capable of data storage/publishing/sharing as well as computation, value transfer (cryptocurrency support), and more.
 See the documentation for a more detailed description of the operations involved in data storage.
@@ -27,7 +27,7 @@ See the documentation for a more detailed description of the operations involved
 
 3. Build the app for production (this may take several minutes):
 
-    ``` bash
+    ```bash
     cd safe_vault
     cargo build --release
     ```
