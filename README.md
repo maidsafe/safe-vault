@@ -35,7 +35,40 @@ See the documentation for a more detailed description of the operations involved
     This should produce the SAFE Vault binary in the folder `safe_vault/target/release`.
     It will be called either `safe_vault` or `safe_vault.exe` depending on your platform.
 
-4. In the same folder as above (`safe_vault/target/release`), add a few config files as described [here](https://forum.safedev.org/t/how-to-run-a-local-test-network/842).
+### Running a local network
+
+#### Configuring your vaults
+
+1. In the same folder as above (`safe_vault/target/release`), add a few config files as described [here](https://forum.safedev.org/t/how-to-run-a-local-test-network/842).
+
+    To use some default configs that should work out of the box:
+
+    ```bash
+    cp example-configs/*.config target/release/
+    ```
+
+2. Start your first vault:
+
+    ```bash
+    ./target/release/safe_vault --first
+    ```
+
+3. Start any additional vaults in separate terminals (you need to run at least `min_section_size` vaults based on your config):
+
+    ```bash
+    ./target/release/safe_vault
+    ```
+
+#### Configuring your browser
+
+1. You'll need to use similar configs for your SAFE Browser if you want to connect to your local vaults, e.g. if building on Linux:
+
+    ```bash
+    cp example-configs/safe_vault.crust.config ../safe_browser/dist/linux-unpacked/safe-browser.crust.config
+    cp example-configs/safe_vault.routing.config ../safe_browser/dist/linux-unpacked/safe-browser.routing.config
+    ```
+
+2. Open your SAFE Browser and create an account!
 
 ### Testing
 
