@@ -1,5 +1,8 @@
 # safe_vault
 
+An autonomous network capable of data storage/publishing/sharing as well as computation, value transfer (cryptocurrency support), and more.
+See the documentation for a more detailed description of the operations involved in data storage.
+
 **Maintainer:** Andreas Fackler (andreas.fackler@maidsafe.net)
 
 |Crate|Documentation|Linux/OS X|Windows|Issues|
@@ -9,9 +12,46 @@
 | [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
-## Overview
+## Development
 
-An autonomous network capable of data storage/publishing/sharing as well as computation, value transfer (crypto currency support) and more. See the documentation for a more detailed description of the operations involved in data storage.
+1. Prerequisites:
+
+    * [Git](https://git-scm.com/downloads) for version control
+    * [Cargo](https://www.rustup.rs/) for Rust
+
+2. Clone this GitHub repository:
+
+    ```bash
+    git clone https://github.com/maidsafe/safe_vault.git
+    ```
+
+3. Build the app for production (this may take several minutes):
+
+    ``` bash
+    cd safe_vault
+    cargo build --release
+    ```
+
+    This should produce the SAFE Vault binary in the folder `safe_vault/target/release`.
+    It will be called either `safe_vault` or `safe_vault.exe` depending on your platform.
+
+4. In the same folder as above (`safe_vault/target/release`), add a few config files as described [here](https://forum.safedev.org/t/how-to-run-a-local-test-network/842).
+
+### Testing
+
+To run tests locally:
+
+```bash
+cargo test
+```
+
+## Further Help
+
+You can discuss development-related questions on the [SAFE Dev Forum](https://forum.safedev.org/).
+Here are some good posts to get started:
+
+- [How to run a local test network](https://forum.safedev.org/t/how-to-run-a-local-test-network/842)
+- [How to develop for the SAFE Network](https://forum.safedev.org/t/how-to-develop-for-the-safe-network-draft/843)
 
 ## License
 
