@@ -12,7 +12,7 @@ use routing::{
     ImmutableData, InterfaceError, MessageId, MutableData, PermissionSet, PublicId, Request,
     Response, RoutingError, RoutingTable, User, Value, XorName,
 };
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::mpsc::{RecvError, TryRecvError};
 
@@ -104,7 +104,7 @@ impl Node {
         PutMData {
             data: MutableData,
             msg_id: MessageId,
-            requester: sign::PublicKey,
+            requester: PublicSignKey,
         }
     );
 
@@ -114,7 +114,7 @@ impl Node {
                       tag: u64,
                       actions: BTreeMap<Vec<u8>, EntryAction>,
                       msg_id: MessageId,
-                      requester: sign::PublicKey,
+                      requester: PublicSignKey,
                   });
 
     impl_request!(
@@ -143,7 +143,7 @@ impl Node {
             permissions: PermissionSet,
             version: u64,
             msg_id: MessageId,
-            requester: sign::PublicKey,
+            requester: PublicSignKey,
         }
     );
 
@@ -155,7 +155,7 @@ impl Node {
             user: User,
             version: u64,
             msg_id: MessageId,
-            requester: sign::PublicKey,
+            requester: PublicSignKey,
         }
     );
 
@@ -163,7 +163,7 @@ impl Node {
                   ChangeMDataOwner {
                       name: XorName,
                       tag: u64,
-                      new_owners: BTreeSet<sign::PublicKey>,
+                      new_owners: BTreeSet<PublicSignKey>,
                       version: u64,
                       msg_id: MessageId,
                   });
@@ -212,7 +212,7 @@ impl Node {
     impl_response!(
         send_list_auth_keys_and_version_response,
         ListAuthKeysAndVersion,
-        (BTreeSet<sign::PublicKey>, u64)
+        (BTreeSet<PublicSignKey>, u64)
     );
     impl_response!(send_ins_auth_key_response, InsAuthKey);
     impl_response!(send_del_auth_key_response, DelAuthKey);

@@ -6,23 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use routing::{Authority, PublicId, XorName};
-use rust_sodium::crypto::sign;
+use routing::{Authority, PublicKeysExt, XorName};
+use safe_crypto::{PublicKeys, PublicSignKey};
 
 /// Client.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ClientAuthority {
-    pub client_id: PublicId,
+    pub client_id: PublicKeys,
     pub proxy_node_name: XorName,
 }
 
 impl ClientAuthority {
-    pub fn name(&self) -> &XorName {
-        self.client_id.name()
+    pub fn name(&self) -> XorName {
+        self.client_id.xor_name()
     }
 
-    pub fn client_key(&self) -> &sign::PublicKey {
-        self.client_id.signing_public_key()
+    pub fn client_key(&self) -> PublicSignKey {
+        self.client_id.public_sign_key()
     }
 }
 
@@ -36,12 +36,12 @@ impl From<ClientAuthority> for Authority<XorName> {
 }
 
 /// Client manager
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ClientManagerAuthority(pub XorName);
 
 impl ClientManagerAuthority {
-    pub fn name(&self) -> &XorName {
-        &self.0
+    pub fn name(&self) -> XorName {
+        self.0
     }
 }
 

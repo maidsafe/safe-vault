@@ -21,8 +21,6 @@ use mock_routing::NodeBuilder;
 use personas::data_manager::DataId;
 use personas::data_manager::{self, DataManager};
 use personas::maid_manager::{self, MaidManager};
-#[cfg(feature = "use-mock-crypto")]
-use routing::mock_crypto::rust_sodium;
 #[cfg(feature = "use-mock-crust")]
 use routing::Config as RoutingConfig;
 pub use routing::Event;
@@ -31,9 +29,7 @@ pub use routing::Node as RoutingNode;
 #[cfg(not(all(test, feature = "use-mock-routing")))]
 use routing::NodeBuilder;
 use routing::{Authority, EventStream, Request, Response, RoutingTable, XorName};
-#[cfg(not(feature = "use-mock-crypto"))]
-use rust_sodium;
-use rust_sodium::crypto::sign;
+use safe_crypto;
 
 /// Main struct to hold all personas and Routing instance
 pub struct Vault {
@@ -58,7 +54,7 @@ impl Vault {
         use_cache: bool,
         config: Config,
     ) -> Result<Self, InternalError> {
-        let _ = rust_sodium::init();
+        let _ = safe_crypto::init();
         let disable_mutation_limit = config
             .dev
             .as_ref()
@@ -71,11 +67,7 @@ impl Vault {
         let group_size = routing_node.min_section_size();
 
         Ok(Vault {
-            maid_manager: MaidManager::new(
-                group_size,
-                config.invite_key.map(sign::PublicKey),
-                disable_mutation_limit,
-            ),
+            maid_manager: MaidManager::new(group_size, config.invite_key, disable_mutation_limit),
             data_manager: DataManager::new(
                 group_size,
                 config.chunk_store_root,
@@ -142,7 +134,7 @@ impl Vault {
         src: Authority<XorName>,
         dst: Authority<XorName>,
     ) -> Result<(), InternalError> {
-        match (src, dst, request) {
+        match (src.clone(), dst.clone(), request) {
             // ================== Refresh ==================
             (
                 Authority::ClientManager(_),

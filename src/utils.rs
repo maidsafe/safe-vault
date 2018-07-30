@@ -10,7 +10,7 @@
 pub use fake_clock::FakeClock as Instant;
 use maidsafe_utilities::serialisation;
 use routing::{sha3, MutableData, Value, XorName};
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use serde::Serialize;
 use std::collections;
 #[cfg(feature = "use-mock-crust")]
@@ -47,7 +47,7 @@ pub type HashSet<T> = collections::HashSet<T, BuildHasherDefault<DefaultHasher>>
 #[cfg(not(feature = "use-mock-crust"))]
 pub type HashSet<T> = collections::HashSet<T>;
 
-pub fn client_name_from_key(key: &sign::PublicKey) -> XorName {
+pub fn client_name_from_key(key: &PublicSignKey) -> XorName {
     XorName(tiny_keccak::sha3_256(&key[..]))
 }
 

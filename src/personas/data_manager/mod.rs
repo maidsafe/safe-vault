@@ -18,12 +18,13 @@ use chunk_store::Error as ChunkStoreError;
 use chunk_store::{Chunk, ChunkId, ChunkStore};
 use error::InternalError;
 use maidsafe_utilities::serialisation;
+use routing::PublicKeysExt;
 use routing::{
     Authority, ClientError, EntryAction, ImmutableData, MessageId, MutableData, PermissionSet,
     RoutingTable, User, Value, XorName, QUORUM_DENOMINATOR, QUORUM_NUMERATOR,
     TYPE_TAG_SESSION_PACKET,
 };
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::From;
 use std::fmt::{self, Debug, Formatter};
@@ -336,7 +337,7 @@ impl DataManager {
         self.update_request_stats(&src);
 
         // Send the response as a node, to allow custom accumulation.
-        let resp_src = Authority::ManagedNode(*routing_node.id()?.name());
+        let resp_src = Authority::ManagedNode(routing_node.id()?.xor_name());
         let resp_dst = src;
 
         let res = self.fetch_mdata(name, tag);
@@ -422,7 +423,7 @@ impl DataManager {
         dst: Authority<XorName>,
         data: MutableData,
         msg_id: MessageId,
-        _requester: sign::PublicKey,
+        _requester: PublicSignKey,
     ) -> Result<(), InternalError> {
         let data_id = data.id();
 
@@ -446,7 +447,7 @@ impl DataManager {
                 data_id,
                 error
             );
-            routing_node.send_put_mdata_response(dst, src, Err(error), msg_id)?;
+            routing_node.send_put_mdata_response(dst.clone(), src.clone(), Err(error), msg_id)?;
             true
         } else {
             false
@@ -717,7 +718,7 @@ impl DataManager {
         tag: u64,
         actions: BTreeMap<Vec<u8>, EntryAction>,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicSignKey,
     ) -> Result<(), InternalError> {
         let mutation = Mutation::MutateMDataEntries {
             name,
@@ -780,12 +781,12 @@ impl DataManager {
         permissions: PermissionSet,
         version: u64,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicSignKey,
     ) -> Result<(), InternalError> {
         let mutation = Mutation::SetMDataUserPermissions {
             name,
             tag,
-            user,
+            user: user.clone(),
             permissions,
             version,
         };
@@ -808,12 +809,12 @@ impl DataManager {
         user: User,
         version: u64,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicSignKey,
     ) -> Result<(), InternalError> {
         let mutation = Mutation::DelMDataUserPermissions {
             name,
             tag,
-            user,
+            user: user.clone(),
             version,
         };
         let res = self.fetch_mdata(name, tag).and_then(|data| {
@@ -832,7 +833,7 @@ impl DataManager {
         dst: Authority<XorName>,
         name: XorName,
         tag: u64,
-        new_owners: BTreeSet<sign::PublicKey>,
+        new_owners: BTreeSet<PublicSignKey>,
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
@@ -846,7 +847,7 @@ impl DataManager {
         let res = self.fetch_mdata(name, tag).and_then(|data| {
             let new_owner = extract_owner(new_owners)?;
 
-            if utils::verify_mdata_owner(&data, src.name()) {
+            if utils::verify_mdata_owner(&data, &src.name()) {
                 data.clone().change_owner(new_owner, version)?;
                 self.validate_concurrent_mutations(Some(&data), &mutation)
             } else {
@@ -1043,7 +1044,14 @@ impl DataManager {
         let mutation_type = mutation.mutation_type();
         let data_id = mutation.data_id();
 
-        self.update_pending_writes(routing_node, mutation, src, dst, msg_id, res.is_err())?;
+        self.update_pending_writes(
+            routing_node,
+            mutation,
+            src.clone(),
+            dst.clone(),
+            msg_id,
+            res.is_err(),
+        )?;
 
         if let Err(error) = res {
             self.send_mutation_response(
@@ -1297,7 +1305,7 @@ impl DataManager {
         refreshes: Vec<Refresh>,
     ) -> Result<(), InternalError> {
         // FIXME - We need to handle >2MB chunks
-        let src = Authority::ManagedNode(*routing_node.id()?.name());
+        let src = Authority::ManagedNode(routing_node.id()?.xor_name());
         let payload = if dst.is_single() {
             serialisation::serialise(&VaultRefresh::DataManager(refreshes))?
         } else {
@@ -1338,7 +1346,7 @@ impl DataManager {
     ) -> Result<(), InternalError> {
         if let Some(data_id) = self.cache.needed_mutable_chunk() {
             let MutableDataId(name, tag) = data_id;
-            let src = Authority::ManagedNode(*routing_node.id()?.name());
+            let src = Authority::ManagedNode(routing_node.id()?.xor_name());
             let dst = Authority::NaeManager(name);
             let msg_id = MessageId::new();
 
@@ -1354,7 +1362,7 @@ impl DataManager {
         &mut self,
         routing_node: &mut RoutingNode,
     ) -> Result<(), InternalError> {
-        let src = Authority::ManagedNode(*routing_node.id()?.name());
+        let src = Authority::ManagedNode(routing_node.id()?.xor_name());
         let candidates = self.cache.needed_fragments();
 
         // Set of holders we already sent a request to. Used to prevent sending
@@ -1380,16 +1388,28 @@ impl DataManager {
 
                 match fragment {
                     FragmentInfo::ImmutableData(name) => {
-                        routing_node.send_get_idata_request(src, dst, name, msg_id)?;
+                        routing_node.send_get_idata_request(src.clone(), dst, name, msg_id)?;
                         break;
                     }
                     FragmentInfo::MutableDataShell { name, tag, .. } => {
-                        routing_node.send_get_mdata_shell_request(src, dst, name, tag, msg_id)?;
+                        routing_node.send_get_mdata_shell_request(
+                            src.clone(),
+                            dst,
+                            name,
+                            tag,
+                            msg_id,
+                        )?;
                         break;
                     }
                     FragmentInfo::MutableDataEntry { name, tag, key, .. } => {
-                        routing_node
-                            .send_get_mdata_value_request(src, dst, name, tag, key, msg_id)?;
+                        routing_node.send_get_mdata_value_request(
+                            src.clone(),
+                            dst,
+                            name,
+                            tag,
+                            key,
+                            msg_id,
+                        )?;
                         break;
                     }
                 }
@@ -1595,7 +1615,7 @@ where
 }
 
 // `owners` must have exactly 1 element.
-fn extract_owner(owners: BTreeSet<sign::PublicKey>) -> Result<sign::PublicKey, ClientError> {
+fn extract_owner(owners: BTreeSet<PublicSignKey>) -> Result<PublicSignKey, ClientError> {
     let len = owners.len();
     match owners.into_iter().next() {
         Some(owner) if len == 1 => Ok(owner),

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use routing::{AccountInfo, MessageId};
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use std::collections::BTreeSet;
 
 /// Default available number of operations per account.
@@ -24,7 +24,7 @@ pub struct Account {
     /// Number of keys operations performed by this account.
     pub keys_ops_count: u64,
     /// App authentication keys.
-    pub keys: BTreeSet<sign::PublicKey>,
+    pub keys: BTreeSet<PublicSignKey>,
     /// Dev option to allow clients to make unlimited mutation requests.
     disable_mutation_limit: bool,
 }

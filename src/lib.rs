@@ -228,8 +228,7 @@ extern crate quick_error;
 extern crate rand;
 #[macro_use]
 extern crate routing;
-#[cfg(not(feature = "use-mock-crypto"))]
-extern crate rust_sodium;
+extern crate safe_crypto;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -264,8 +263,6 @@ pub use personas::data_manager::DataId;
 #[cfg(feature = "use-mock-crust")]
 pub use personas::data_manager::PENDING_WRITE_TIMEOUT_SECS;
 pub use personas::maid_manager::DEFAULT_MAX_OPS_COUNT;
-#[cfg(feature = "use-mock-crypto")]
-use routing::mock_crypto::rust_sodium;
 pub use vault::Vault;
 
 /// The type tag of invitations to create an account.

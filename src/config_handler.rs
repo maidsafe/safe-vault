@@ -9,7 +9,7 @@
 use config_file_handler::{self, FileHandler};
 use error::InternalError;
 use routing::XorName;
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use std::ffi::OsString;
 
 /// Lets a vault configure a wallet address and storage limit.
@@ -22,7 +22,7 @@ pub struct Config {
     /// Root directory for chunk_store directories.
     pub chunk_store_root: Option<String>,
     /// Key that is allowed to put mutable data for account creation invitations.
-    pub invite_key: Option<[u8; sign::PUBLICKEYBYTES]>,
+    pub invite_key: Option<PublicSignKey>,
     /// Developer options.
     pub dev: Option<DevConfig>,
 }

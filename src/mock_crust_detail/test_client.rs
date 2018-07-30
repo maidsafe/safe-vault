@@ -18,7 +18,7 @@ use routing::{
     Event, EventStream, FullId, ImmutableData, MessageId, MutableData, PermissionSet, PublicId,
     Response, User, Value, XorName, ACC_LOGIN_ENTRY_KEY, TYPE_TAG_SESSION_PACKET,
 };
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::sync::mpsc::TryRecvError;
@@ -551,7 +551,7 @@ impl TestClient {
         &mut self,
         name: XorName,
         tag: u64,
-        new_owners: BTreeSet<sign::PublicKey>,
+        new_owners: BTreeSet<PublicSignKey>,
         version: u64,
         nodes: &mut [TestNode],
     ) -> Result<(), ClientError> {
@@ -591,7 +591,7 @@ impl TestClient {
     pub fn list_auth_keys_and_version_response(
         &mut self,
         nodes: &mut [TestNode],
-    ) -> Result<(BTreeSet<sign::PublicKey>, u64), ClientError> {
+    ) -> Result<(BTreeSet<PublicSignKey>, u64), ClientError> {
         self.flush();
 
         let msg_id = MessageId::new();
@@ -604,7 +604,7 @@ impl TestClient {
     }
 
     /// Sends a `DelAuthKey` request.
-    pub fn del_auth_key(&mut self, key: sign::PublicKey, version: u64) -> MessageId {
+    pub fn del_auth_key(&mut self, key: PublicSignKey, version: u64) -> MessageId {
         let msg_id = MessageId::new();
         let _ = self
             .routing_client
@@ -613,7 +613,7 @@ impl TestClient {
     }
 
     /// Sends a `InsAuthKey` request.
-    pub fn ins_auth_key(&mut self, key: sign::PublicKey, version: u64) -> MessageId {
+    pub fn ins_auth_key(&mut self, key: PublicSignKey, version: u64) -> MessageId {
         let msg_id = MessageId::new();
         let _ = self
             .routing_client
@@ -624,7 +624,7 @@ impl TestClient {
     /// Sends a `InsAuthKey` request and waits for the response.
     pub fn ins_auth_key_response(
         &mut self,
-        key: sign::PublicKey,
+        key: PublicSignKey,
         version: u64,
         nodes: &mut [TestNode],
     ) -> Result<(), ClientError> {
@@ -645,7 +645,7 @@ impl TestClient {
     }
 
     /// Returns signing public key for this client
-    pub fn signing_public_key(&self) -> &sign::PublicKey {
+    pub fn signing_public_key(&self) -> &PublicSignKey {
         self.full_id.public_id().signing_public_key()
     }
 

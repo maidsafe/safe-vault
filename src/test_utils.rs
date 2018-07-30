@@ -15,7 +15,7 @@ use routing::Config as RoutingConfig;
 #[cfg(all(test, feature = "use-mock-routing"))]
 use routing::DevConfig as RoutingDevConfig;
 use routing::{EntryAction, EntryActions, ImmutableData, MutableData, Value};
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use std::cmp;
 use std::collections::{BTreeMap, BTreeSet};
 use utils;
@@ -59,7 +59,7 @@ pub fn gen_immutable_data<R: Rng>(size: usize, rng: &mut R) -> ImmutableData {
 pub fn gen_mutable_data<R: Rng>(
     tag: u64,
     num_entries: usize,
-    owner: sign::PublicKey,
+    owner: PublicSignKey,
     rng: &mut R,
 ) -> MutableData {
     let entries = gen_mutable_data_entries(num_entries, rng);
@@ -141,7 +141,7 @@ pub fn gen_mutable_data_entry_actions<R: Rng>(
 
 /// Generate random `Client` authority and return it together with its client key.
 #[cfg(not(feature = "use-mock-crust"))]
-pub fn gen_client_authority() -> (ClientAuthority, sign::PublicKey) {
+pub fn gen_client_authority() -> (ClientAuthority, PublicSignKey) {
     use rand;
     use routing::FullId;
 
@@ -156,7 +156,7 @@ pub fn gen_client_authority() -> (ClientAuthority, sign::PublicKey) {
 }
 
 /// Generate `ClientManager` authority for the client with the given client key.
-pub fn gen_client_manager_authority(client_key: sign::PublicKey) -> ClientManagerAuthority {
+pub fn gen_client_manager_authority(client_key: PublicSignKey) -> ClientManagerAuthority {
     ClientManagerAuthority(utils::client_name_from_key(&client_key))
 }
 

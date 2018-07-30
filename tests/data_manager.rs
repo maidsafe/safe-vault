@@ -16,7 +16,7 @@ use routing::{
     Action, Authority, BootstrapConfig, ClientError, EntryAction, EntryActions, EntryError, Event,
     ImmutableData, MessageId, MutableData, PermissionSet, Response, User, MAX_MUTABLE_DATA_ENTRIES,
 };
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::mock_crust_detail::test_node::{self, TestNode};
 use safe_vault::mock_crust_detail::{self, poll, Data};
@@ -1428,7 +1428,7 @@ fn gen_immutable_data_not_close_to<R: Rng>(
 }
 
 // Create set of owner keys.
-fn owner_keys(key: sign::PublicKey) -> BTreeSet<sign::PublicKey> {
+fn owner_keys(key: PublicSignKey) -> BTreeSet<PublicSignKey> {
     let mut result = BTreeSet::new();
     let _ = result.insert(key);
     result

@@ -18,7 +18,6 @@ use routing::{
     PermissionSet, Response, User, Value, XorName, MAX_IMMUTABLE_DATA_SIZE_IN_BYTES,
     MAX_MUTABLE_DATA_ENTRIES, MAX_MUTABLE_DATA_SIZE_IN_BYTES, TYPE_TAG_SESSION_PACKET,
 };
-use rust_sodium::crypto::sign;
 use safe_vault::mock_crust_detail::test_client::TestClient;
 use safe_vault::mock_crust_detail::{self, poll, test_node, Data};
 use safe_vault::{test_utils, Config, DEFAULT_MAX_OPS_COUNT, TYPE_TAG_INVITE};

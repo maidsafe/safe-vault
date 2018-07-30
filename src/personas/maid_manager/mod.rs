@@ -18,12 +18,13 @@ use authority::{ClientAuthority, ClientManagerAuthority};
 use error::InternalError;
 use lru_time_cache::LruCache;
 use maidsafe_utilities::serialisation;
+use routing::PublicKeysExt;
 use routing::{
     AccountPacket, Authority, ClientError, EntryAction, EntryActions, EntryError, ImmutableData,
     MessageId, MutableData, PermissionSet, RoutingTable, User, XorName, ACC_LOGIN_ENTRY_KEY,
     TYPE_TAG_SESSION_PACKET,
 };
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use std::collections::hash_map::{Entry, VacantEntry};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
@@ -49,7 +50,7 @@ pub struct MaidManager {
     accounts: HashMap<XorName, Account>,
     data_ops_msg_id_accumulator: MessageIdAccumulator<(XorName, MessageId)>,
     request_cache: HashMap<MessageId, CachedRequest>,
-    invite_key: Option<sign::PublicKey>,
+    invite_key: Option<PublicSignKey>,
     /// The ongoing requests from clients to create a new account.
     account_creation_cache: LruCache<MessageId, CachedAccountCreation>,
     /// Dev option to allow clients to make unlimited mutation requests.
@@ -59,7 +60,7 @@ pub struct MaidManager {
 impl MaidManager {
     pub fn new(
         group_size: usize,
-        invite_key: Option<sign::PublicKey>,
+        invite_key: Option<PublicSignKey>,
         disable_mutation_limit: bool,
     ) -> MaidManager {
         MaidManager {
@@ -156,7 +157,8 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, None) {
+        if let Some(insert) = self.insert_into_request_cache(msg_id, src.clone(), dst.clone(), None)
+        {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(*data.name());
             trace!("MM forwarding PutIData request to {:?}", fwd_dst);
@@ -194,9 +196,9 @@ impl MaidManager {
         dst: ClientManagerAuthority,
         data: MutableData,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicSignKey,
     ) -> Result<(), InternalError> {
-        match self.prepare_put_mdata(src, dst, data, msg_id, requester) {
+        match self.prepare_put_mdata(src.clone(), dst.clone(), data, msg_id, requester) {
             Ok(PutMDataAction::Claim(invite_name)) => {
                 let invite_src = dst.into();
                 let invite_dst = Authority::NaeManager(invite_name);
@@ -243,14 +245,14 @@ impl MaidManager {
             (Some(TYPE_TAG_SESSION_PACKET), Err(ClientError::DataExists)) => {
                 // We wouldn't have forwarded two `Put` requests for the same account, so
                 // it must have been created via another client manager.
-                let _ = self.accounts.remove(src.name());
+                let _ = self.accounts.remove(&src.name());
 
                 trace!("MM sending delete refresh for account {}", src.name());
                 self.send_refresh(
                     routing_node,
-                    dst.into(),
-                    dst.into(),
-                    Refresh::Delete(*src.name()),
+                    dst.clone().into(),
+                    dst.clone().into(),
+                    Refresh::Delete(src.name()),
                     msg_id,
                 )?;
 
@@ -274,7 +276,7 @@ impl MaidManager {
         tag: u64,
         actions: BTreeMap<Vec<u8>, EntryAction>,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicSignKey,
     ) -> Result<(), InternalError> {
         if let Err(err) =
             self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(msg_id), Some(requester))
@@ -289,7 +291,9 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+        if let Some(insert) =
+            self.insert_into_request_cache(msg_id, src.clone(), dst.clone(), Some(tag))
+        {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding MutateMDataEntries request to {:?}", fwd_dst);
@@ -321,14 +325,14 @@ impl MaidManager {
 
             match res {
                 Ok(()) => {
-                    let _ = self.accounts.insert(*src.name(),
+                    let _ = self.accounts.insert(src.name(),
                                                  Account::new(self.disable_mutation_limit));
                     self.forward_put_mdata(routing_node,
-                                           src,
+                                           src.clone(),
                                            dst,
                                            data,
                                            msg_id,
-                                           *src.client_key())?;
+                                           src.client_key())?;
                 }
                 Err(error) => {
                     let converted_error = match error {
@@ -379,14 +383,14 @@ impl MaidManager {
         permissions: PermissionSet,
         version: u64,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicSignKey,
     ) -> Result<(), InternalError> {
         if let Err(err) =
             self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(msg_id), Some(requester))
         {
             routing_node.send_set_mdata_user_permissions_response(
-                dst.into(),
-                src.into(),
+                dst.clone().into(),
+                src.clone().into(),
                 Err(err.clone()),
                 msg_id,
             )?;
@@ -394,7 +398,9 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+        if let Some(insert) =
+            self.insert_into_request_cache(msg_id, src.clone(), dst.clone(), Some(tag))
+        {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!(
@@ -448,14 +454,14 @@ impl MaidManager {
         user: User,
         version: u64,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicSignKey,
     ) -> Result<(), InternalError> {
         if let Err(err) =
             self.prepare_data_mutation(&src, &dst, AuthPolicy::Key, Some(msg_id), Some(requester))
         {
             routing_node.send_del_mdata_user_permissions_response(
-                dst.into(),
-                src.into(),
+                dst.clone().into(),
+                src.clone().into(),
                 Err(err.clone()),
                 msg_id,
             )?;
@@ -463,7 +469,9 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+        if let Some(insert) =
+            self.insert_into_request_cache(msg_id, src.clone(), dst.clone(), Some(tag))
+        {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!(
@@ -506,7 +514,7 @@ impl MaidManager {
         dst: ClientManagerAuthority,
         name: XorName,
         tag: u64,
-        new_owners: BTreeSet<sign::PublicKey>,
+        new_owners: BTreeSet<PublicSignKey>,
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
@@ -523,7 +531,9 @@ impl MaidManager {
         }
 
         // Forwarding the request to NAE Manager.
-        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(tag)) {
+        if let Some(insert) =
+            self.insert_into_request_cache(msg_id, src.clone(), dst.clone(), Some(tag))
+        {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(name);
             trace!("MM forwarding ChangeMDataOwner request to {:?}", fwd_dst);
@@ -574,7 +584,7 @@ impl MaidManager {
         routing_node: &mut RoutingNode,
         src: ClientAuthority,
         dst: ClientManagerAuthority,
-        key: sign::PublicKey,
+        key: PublicSignKey,
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
@@ -586,7 +596,7 @@ impl MaidManager {
         routing_node: &mut RoutingNode,
         src: ClientAuthority,
         dst: ClientManagerAuthority,
-        key: sign::PublicKey,
+        key: PublicSignKey,
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
@@ -612,7 +622,7 @@ impl MaidManager {
             .request_cache
             .iter()
             .filter_map(|(msg_id, entry)| {
-                if accounts_to_delete.contains(entry.src.name()) {
+                if accounts_to_delete.contains(&entry.src.name()) {
                     Some(*msg_id)
                 } else {
                     None
@@ -702,22 +712,24 @@ impl MaidManager {
         dst: ClientManagerAuthority,
         data: MutableData,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicSignKey,
     ) -> Result<PutMDataAction, ClientError> {
         data.validate()?;
 
         let tag = data.tag();
 
-        if !utils::verify_mdata_owner(&data, dst.name()) {
+        if !utils::verify_mdata_owner(&data, &dst.name()) {
             return Err(ClientError::InvalidOwners);
         }
 
         let mut check_msg_id = Some(msg_id);
         let res = match tag {
-            TYPE_TAG_SESSION_PACKET => self.prepare_put_account(src, dst, data, msg_id),
+            TYPE_TAG_SESSION_PACKET => {
+                self.prepare_put_account(src.clone(), dst.clone(), data, msg_id)
+            }
             TYPE_TAG_INVITE => {
                 check_msg_id = None;
-                self.prepare_put_invite(src, dst, data)
+                self.prepare_put_invite(src.clone(), dst.clone(), data)
             }
             _ => Ok(PutMDataAction::Forward(data)),
         };
@@ -728,7 +740,7 @@ impl MaidManager {
                     trace!("MM PutMData request failed: {:?}", error);
                     // Undo the account creation
                     if tag == TYPE_TAG_SESSION_PACKET {
-                        let _ = self.accounts.remove(src.name());
+                        let _ = self.accounts.remove(&src.name());
                     }
 
                     error
@@ -752,7 +764,7 @@ impl MaidManager {
 
         if self.is_admin(&src) || self.invite_key.is_none() {
             let len = self.accounts.len();
-            match self.accounts.entry(*src.name()) {
+            match self.accounts.entry(src.name()) {
                 Entry::Vacant(entry) => {
                     let _ = entry.insert(Account::new(self.disable_mutation_limit));
                     info!("Managing {} client accounts.", len + 1);
@@ -763,7 +775,7 @@ impl MaidManager {
                     Err(ClientError::AccountExists)
                 }
             }
-        } else if self.accounts.contains_key(src.name()) {
+        } else if self.accounts.contains_key(&src.name()) {
             trace!("MM Cannot create account for {:?} - it already exists", src);
             Err(ClientError::AccountExists)
         } else {
@@ -812,9 +824,11 @@ impl MaidManager {
         dst: ClientManagerAuthority,
         data: MutableData,
         msg_id: MessageId,
-        requester: sign::PublicKey,
+        requester: PublicSignKey,
     ) -> Result<(), InternalError> {
-        if let Some(insert) = self.insert_into_request_cache(msg_id, src, dst, Some(data.tag())) {
+        if let Some(insert) =
+            self.insert_into_request_cache(msg_id, src.clone(), dst.clone(), Some(data.tag()))
+        {
             let fwd_src = dst.into();
             let fwd_dst = Authority::NaeManager(*data.name());
 
@@ -848,7 +862,7 @@ impl MaidManager {
             );
             return Err(ClientError::AccessDenied);
         }
-        if let Some(account) = self.accounts.get(client_name) {
+        if let Some(account) = self.accounts.get(&client_name) {
             Ok(account)
         } else {
             Err(ClientError::NoSuchAccount)
@@ -862,7 +876,7 @@ impl MaidManager {
         src: ClientAuthority,
         dst: ClientManagerAuthority,
         op: KeysOp,
-        key: sign::PublicKey,
+        key: PublicSignKey,
         version: u64,
         msg_id: MessageId,
     ) -> Result<(), InternalError> {
@@ -870,10 +884,10 @@ impl MaidManager {
             Ok(keys) => {
                 self.send_refresh(
                     routing_node,
-                    dst.into(),
-                    dst.into(),
+                    dst.clone().into(),
+                    dst.clone().into(),
                     Refresh::UpdateKeys {
-                        name: *src.name(),
+                        name: src.name(),
                         keys,
                         ops_count: version,
                     },
@@ -901,9 +915,9 @@ impl MaidManager {
         src: &ClientAuthority,
         dst: &ClientManagerAuthority,
         op: KeysOp,
-        key: sign::PublicKey,
+        key: PublicSignKey,
         version: u64,
-    ) -> Result<BTreeSet<sign::PublicKey>, ClientError> {
+    ) -> Result<BTreeSet<PublicSignKey>, ClientError> {
         let client_name = src.name();
         let client_manager_name = dst.name();
 
@@ -913,7 +927,7 @@ impl MaidManager {
 
         let account = self
             .accounts
-            .get_mut(client_manager_name)
+            .get_mut(&client_manager_name)
             .ok_or(ClientError::NoSuchAccount)?;
 
         if version != account.keys_ops_count + 1 {
@@ -936,14 +950,14 @@ impl MaidManager {
         dst: &ClientManagerAuthority,
         policy: AuthPolicy,
         msg_id: Option<MessageId>,
-        requester: Option<sign::PublicKey>,
+        requester: Option<PublicSignKey>,
     ) -> Result<(), ClientError> {
         let account = self
             .accounts
-            .get(dst.name())
+            .get(&dst.name())
             .ok_or(ClientError::NoSuchAccount)?;
         let allowed = src.name() == dst.name() || if AuthPolicy::Key == policy {
-            account.keys.contains(src.client_key())
+            account.keys.contains(&src.client_key())
         } else {
             false
         };
@@ -953,7 +967,7 @@ impl MaidManager {
         }
 
         if let Some(requester) = requester {
-            if requester != *src.client_key() {
+            if requester != src.client_key() {
                 return Err(ClientError::AccessDenied);
             }
         }
@@ -982,9 +996,9 @@ impl MaidManager {
         if success {
             self.send_refresh(
                 routing_node,
-                req.dst.into(),
-                req.dst.into(),
-                Refresh::InsertDataOp(*req.dst.name()),
+                req.dst.clone().into(),
+                req.dst.clone().into(),
+                Refresh::InsertDataOp(req.dst.name()),
                 msg_id,
             )?;
         }
@@ -1017,21 +1031,21 @@ impl MaidManager {
     ) -> Result<(), InternalError> {
         // The account's data part need to be sent in the refresh as a single node (not group) to
         // trigger the custom accumulation. And the key part will be sent in refresh as group.
-        let node_src = Authority::ManagedNode(*routing_node.id()?.name());
+        let node_src = Authority::ManagedNode(routing_node.id()?.xor_name());
         let dst = Authority::ManagedNode(targeted_node);
 
         for (account_name, account) in account_list {
             self.send_refresh(
                 routing_node,
-                node_src,
-                dst,
+                node_src.clone(),
+                dst.clone(),
                 Refresh::update_data_ops(&account_name, &account),
                 MessageId::new(),
             )?;
             self.send_refresh(
                 routing_node,
                 Authority::ClientManager(account_name),
-                dst,
+                dst.clone(),
                 Refresh::update_keys_ops(&account_name, &account),
                 msg_id,
             )?;
@@ -1078,7 +1092,7 @@ impl MaidManager {
         routing_node: &RoutingNode,
         account_name: XorName,
         ops_count: u64,
-        keys: BTreeSet<sign::PublicKey>,
+        keys: BTreeSet<PublicSignKey>,
     ) {
         if let Some(account) = self.fetch_account(routing_node, account_name) {
             if account.keys_ops_count < ops_count {
@@ -1136,7 +1150,7 @@ impl MaidManager {
     }
 
     fn is_admin(&self, authority: &ClientAuthority) -> bool {
-        Some(*authority.client_key()) == self.invite_key
+        Some(authority.client_key()) == self.invite_key
     }
 }
 
@@ -1158,7 +1172,7 @@ pub enum Refresh {
     UpdateKeys {
         name: XorName,
         ops_count: u64,
-        keys: BTreeSet<sign::PublicKey>,
+        keys: BTreeSet<PublicSignKey>,
     },
     InsertDataOp(XorName),
     Delete(XorName),
@@ -1190,8 +1204,8 @@ enum KeysOp {
 impl KeysOp {
     fn apply(
         self,
-        keys: &mut BTreeSet<sign::PublicKey>,
-        key: sign::PublicKey,
+        keys: &mut BTreeSet<PublicSignKey>,
+        key: PublicSignKey,
     ) -> Result<(), ClientError> {
         match self {
             KeysOp::Ins => {

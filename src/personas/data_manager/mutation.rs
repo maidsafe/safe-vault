@@ -10,7 +10,7 @@ use super::data::{Data, DataId};
 use log::Level;
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{EntryAction, ImmutableData, MutableData, PermissionSet, User, XorName};
-use rust_sodium::crypto::sign;
+use safe_crypto::PublicSignKey;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Serialize)]
@@ -38,7 +38,7 @@ pub enum Mutation {
     ChangeMDataOwner {
         name: XorName,
         tag: u64,
-        new_owners: BTreeSet<sign::PublicKey>,
+        new_owners: BTreeSet<PublicSignKey>,
         version: u64,
     },
 }
@@ -112,12 +112,16 @@ impl Mutation {
                 data.mutate_entries_without_validation(actions.clone())
             }
             Mutation::SetMDataUserPermissions {
-                user,
+                ref user,
                 permissions,
                 version,
                 ..
             } => {
-                let _ = data.set_user_permissions_without_validation(user, permissions, version);
+                let _ = data.set_user_permissions_without_validation(
+                    user.clone(),
+                    permissions,
+                    version,
+                );
             }
             Mutation::DelMDataUserPermissions {
                 ref user, version, ..

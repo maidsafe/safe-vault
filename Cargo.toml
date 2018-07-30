@@ -10,9 +10,19 @@ readme = "README.md"
 repository = "https://github.com/maidsafe/safe_vault"
 version = "0.18.0"
 
+[[bin]]
+doc = false
+name = "safe_vault"
+
+[[test]]
+name = "tests"
+[build-dependencies.hyper]
+optional = true
+version = "~0.11.25"
+
 [dependencies]
 accumulator = "~0.7.0"
-clap = "~2.25.1"
+clap = "~2.29.4"
 config_file_handler = "~0.10.0"
 fake_clock = "~0.2.0"
 hex = "~0.3.1"
@@ -22,27 +32,26 @@ lru_time_cache = "~0.8.0"
 maidsafe_utilities = "~0.15.0"
 quick-error = "~1.2.1"
 rand = "~0.4.2"
-routing = "~0.36.0"
-rust_sodium = "~0.7.0"
 serde = "~1.0.37"
 serde_derive = "~1.0.37"
 serde_json = "~1.0.13"
 tempdir = "~0.3.7"
-tiny-keccak = "~1.3.1"
-unwrap = "~1.1.0"
+tiny-keccak = "~1.4.2"
+unwrap = "1.1.0"
 
-[build-dependencies]
-hyper = { version = "~0.11.25", optional = true }
+[dependencies.routing]
+git = "https://github.com/povilasb/routing"
+rev = "2ce0e580d"
+
+[dependencies.safe_crypto]
+git = "https://github.com/maidsafe/safe_crypto"
+rev = "f214410"
 
 [features]
 generate-diagrams = ["hyper"]
-use-mock-crust = ["routing/use-mock-crust", "lru_time_cache/fake_clock"]
-use-mock-routing = ["lru_time_cache/fake_clock"]
+use-mock-crust = [
+    "routing/use-mock-crust",
+    "lru_time_cache/fake_clock",
+]
 use-mock-crypto = ["routing/use-mock-crypto"]
-
-[[test]]
-name = "tests"
-
-[[bin]]
-name = "safe_vault"
-doc = false
+use-mock-routing = ["lru_time_cache/fake_clock"]
