@@ -43,6 +43,8 @@ script:
 before_cache:
   - cargo prune
 before_deploy:
+  - export PROJECT_VERSION=$(git log -1 | grep -i "version change to" | sed "s/.*[vV]ersion c
+hange to v\{0,1\}//")
   - ./ci/travis/before_deploy.sh
 deploy:
   # Deploy tarballs to GitHub releases
