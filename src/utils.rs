@@ -9,7 +9,7 @@
 use self::rust_sodium::crypto::sign;
 #[cfg(any(test, feature = "use-mock-crust", feature = "use-mock-routing"))]
 pub use fake_clock::FakeClock as Instant;
-use log::{error, log};
+use log::error;
 use maidsafe_utilities::serialisation;
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;

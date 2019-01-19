@@ -21,7 +21,7 @@ use crate::mock_routing::NodeBuilder;
 use crate::personas::data_manager::DataId;
 use crate::personas::data_manager::{self, DataManager};
 use crate::personas::maid_manager::{self, MaidManager};
-use log::{debug, log, warn};
+use log::{debug, warn};
 use maidsafe_utilities::serialisation;
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;

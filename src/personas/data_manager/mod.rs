@@ -21,7 +21,7 @@ use crate::utils::{self, HashMap, HashSet, Instant};
 use crate::vault::Refresh as VaultRefresh;
 use crate::vault::RoutingNode;
 use accumulator::Accumulator;
-use log::{error, info, log, trace, warn};
+use log::{error, info, trace, warn};
 use maidsafe_utilities::serialisation;
 #[cfg(feature = "use-mock-crypto")]
 use routing::mock_crypto::rust_sodium;

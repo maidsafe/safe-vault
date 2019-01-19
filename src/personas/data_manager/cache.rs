@@ -10,7 +10,7 @@ use super::data::{DataId, ImmutableDataId, MutableDataId};
 use super::mutation::{self, Mutation};
 use super::STATUS_LOG_INTERVAL;
 use crate::utils::{self, HashMap, HashSet, Instant, SecureHash};
-use log::{info, log};
+use log::info;
 use maidsafe_utilities::serialisation::serialised_size;
 use routing::{
     Authority, MessageId, MutableData, RoutingTable, Value, XorName, MAX_MUTABLE_DATA_ENTRIES,

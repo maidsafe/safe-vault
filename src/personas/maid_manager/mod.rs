@@ -21,7 +21,7 @@ use crate::utils::{self, HashMap};
 use crate::vault::Refresh as VaultRefresh;
 use crate::vault::RoutingNode;
 use crate::TYPE_TAG_INVITE;
-use log::{debug, error, info, log, trace};
+use log::{debug, error, info, trace};
 use lru_time_cache::LruCache;
 use maidsafe_utilities::serialisation;
 #[cfg(feature = "use-mock-crypto")]
