@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::error::{Error, Result};
+use crate::vault::Init;
 use bincode;
 use std::{
     cell::RefCell,
@@ -31,16 +32,25 @@ pub(super) struct UsedSpace {
 }
 
 impl UsedSpace {
-    pub fn new<T: AsRef<Path>>(dir: T, total_used_space: Rc<RefCell<u64>>) -> Result<Self> {
+    pub fn new<T: AsRef<Path>>(
+        dir: T,
+        total_used_space: Rc<RefCell<u64>>,
+        init_mode: Init,
+    ) -> Result<Self> {
         let mut local_record = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .open(dir.as_ref().join(USED_SPACE_FILENAME))?;
-        let mut buffer = vec![];
-        let _ = local_record.read_to_end(&mut buffer)?;
-        // TODO - if this can't be parsed, we should consider emptying `dir` of any chunks.
-        let local_value = bincode::deserialize::<u64>(&buffer).unwrap_or(0);
+        let local_value = if init_mode == Init::Load {
+            let mut buffer = vec![];
+            let _ = local_record.read_to_end(&mut buffer)?;
+            // TODO - if this can't be parsed, we should consider emptying `dir` of any chunks.
+            bincode::deserialize::<u64>(&buffer)?
+        } else {
+            bincode::serialize_into(&mut local_record, &0_u64)?;
+            0
+        };
         Ok(Self {
             total_value: total_used_space,
             local_value,
@@ -73,6 +83,7 @@ impl UsedSpace {
     }
 
     fn record_new_values(&mut self, total: u64, local: u64) -> Result<()> {
+        self.local_record.set_len(0)?;
         let _ = self.local_record.seek(SeekFrom::Start(0))?;
         bincode::serialize_into(&self.local_record, &local)?;
         *self.total_value.borrow_mut() = total;

@@ -60,57 +60,29 @@
 
 use env_logger;
 use log::info;
-use log4rs;
-use quic_p2p::Config as QuickP2pConfig;
-use safe_vault::{self, Vault};
-use std::{
-    env,
-    net::{IpAddr, Ipv4Addr},
-};
+use safe_vault::{self, Config, Vault};
 use structopt::StructOpt;
-
-/// Vault configuration
-#[derive(StructOpt)]
-pub struct Config {
-    #[allow(missing_docs)]
-    #[structopt(flatten)]
-    pub quic_p2p_config: QuickP2pConfig,
-}
 
 /// Runs a SAFE Network vault.
 pub fn main() {
-    if safe_vault::log_config_file_path()
-        .and_then(|path| log4rs::init_file(path, Default::default()).ok())
-        .is_none()
-    {
-        env_logger::init();
+    env_logger::init();
+
+    let mut config = Config::new();
+    if config.quic_p2p_config().ip.is_none() {
+        config.listen_on_loopback();
     }
 
-    let config = {
-        let mut config = Config::from_args();
-        // Override the existing default 0.0.0.0
-        let default_listening_ip = Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-        config.quic_p2p_config.ip = config.quic_p2p_config.ip.or(default_listening_ip);
-        config
-    };
-
-    let name = exe_name().unwrap_or_else(|| "vault".to_string());
-
-    let message = format!("Running {} v{}", name, env!("CARGO_PKG_VERSION"));
+    let message = format!(
+        "Running {} v{}",
+        Config::clap().get_name(),
+        env!("CARGO_PKG_VERSION")
+    );
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    match Vault::new(config.quic_p2p_config) {
+    match Vault::new(config) {
         Ok(mut vault) => vault.run(),
         Err(e) => {
             println!("Cannot start vault due to error: {:?}", e);
         }
     }
-}
-
-fn exe_name() -> Option<String> {
-    env::current_exe()
-        .ok()?
-        .file_stem()?
-        .to_str()
-        .map(|name| name.to_string())
 }

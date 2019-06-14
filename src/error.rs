@@ -39,6 +39,18 @@ quick_error! {
             display("JSON serialisation error: {}", error)
             from()
         }
+        /// Bincode error.
+        Bincode(error: bincode::Error) {
+            cause(error)
+            description(error.description())
+            display("Bincode error: {}", error)
+            from()
+        }
+        /// PickleDB error.
+        PickleDb(error: pickledb::error::Error) {
+            display("PickleDb error: {}", error)
+            from()
+        }
         /// Networking error.
         Networking(error: quic_p2p::Error) {
             cause(error)

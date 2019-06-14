@@ -6,11 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::{utils, vault::Init, Result};
 use pickledb::PickleDb;
+use std::path::Path;
 
-pub struct CoinsHandler {
+const COINS_DB_NAME: &str = "coins.db";
+
+pub(crate) struct CoinsHandler {
     // The total safecoin farmed from this section.
     farmed: PickleDb,
 }
 
-impl CoinsHandler {}
+impl CoinsHandler {
+    pub fn new<P: AsRef<Path>>(root_dir: P, init_mode: Init) -> Result<Self> {
+        let farmed = utils::new_db(root_dir, COINS_DB_NAME, init_mode)?;
+        Ok(Self { farmed })
+    }
+}

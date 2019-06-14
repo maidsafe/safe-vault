@@ -21,12 +21,13 @@ mod immutable;
 mod mutable;
 mod used_space;
 
+use crate::vault::Init;
 use append_only::AppendOnlyChunk;
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
 use hex::{self, FromHex};
 use immutable::ImmutableChunk;
-use log::info;
+use log::trace;
 use mutable::MutableChunk;
 use safe_nd::{ADataAddress, IDataAddress, MDataAddress};
 use serde::{Deserialize, Serialize};
@@ -42,7 +43,6 @@ use std::{
 use used_space::UsedSpace;
 
 const CHUNK_STORE_DIR: &str = "chunks";
-const DEFAULT_TOTAL_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
 
 /// The max name length for a chunk file.
 const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
@@ -56,47 +56,49 @@ pub(crate) type AppendOnlyChunkStore = ChunkStore<AppendOnlyChunk>;
 pub(crate) struct ChunkStore<T: Chunk> {
     dir: PathBuf,
     // Maximum space allowed for all `ChunkStore`s to consume.
-    total_capacity: u64,
+    max_capacity: u64,
     used_space: UsedSpace,
     _phantom: PhantomData<T>,
 }
 
-impl<T: Chunk> ChunkStore<T> {
-    /// Creates a new `ChunkStore` at location `root/CHUNK_STORE_DIR/subdir`, or if `root` is `None`
-    /// it is assumed to be [`env::temp_dir()`](https://doc.rust-lang.org/std/env/fn.temp_dir.html).
+impl<T> ChunkStore<T>
+where
+    T: Chunk,
+    ChunkStore<T>: Subdir,
+{
+    /// Creates a new `ChunkStore` at location `root/CHUNK_STORE_DIR/<chunk type>`.
     ///
     /// If the location specified already exists, the previous ChunkStore there is opened, otherwise
     /// the required folder structure is created.
     ///
-    /// The maximum storage space is defined by `capacity`, or `DEFAULT_MAX_CAPACITY` if this is
-    /// `None`.  This specifies the max usable by _all_ `ChunkStores`, not per `ChunkStore`.
-    pub fn new<R: AsRef<Path>, S: AsRef<Path>>(
-        root: Option<R>,
-        subdir: S,
-        total_capacity: Option<u64>,
+    /// The maximum storage space is defined by `max_capacity`.  This specifies the max usable by
+    /// _all_ `ChunkStores`, not per `ChunkStore`.
+    pub fn new<P: AsRef<Path>>(
+        root: P,
+        max_capacity: u64,
         total_used_space: Rc<RefCell<u64>>,
+        init_mode: Init,
     ) -> Result<Self> {
-        let dir = match root {
-            Some(path) => path.as_ref().into(),
-            None => env::temp_dir(),
-        }
-        .join(CHUNK_STORE_DIR)
-        .join(subdir);
+        let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 
-        if !dir.exists() {
-            Self::create_new_root(&dir)?;
+        match init_mode {
+            Init::New => Self::create_new_root(&dir)?,
+            Init::Load => trace!("Loading ChunkStore at {}", dir.display()),
         }
 
-        let used_space = UsedSpace::new(&dir, total_used_space)?;
+        let used_space = UsedSpace::new(&dir, total_used_space, init_mode)?;
         Ok(ChunkStore {
             dir,
-            total_capacity: total_capacity.unwrap_or(DEFAULT_TOTAL_CAPACITY),
+            max_capacity,
             used_space,
             _phantom: PhantomData,
         })
     }
+}
 
+impl<T: Chunk> ChunkStore<T> {
     fn create_new_root(root: &Path) -> Result<()> {
+        trace!("Creating ChunkStore at {}", root.display());
         fs::create_dir_all(root)?;
 
         // Verify that chunk files can be created.
@@ -104,7 +106,6 @@ impl<T: Chunk> ChunkStore<T> {
         let _ = File::create(&temp_file_path)?;
         fs::remove_file(temp_file_path)?;
 
-        info!("Created chunk store at {}", root.display());
         Ok(())
     }
 
@@ -117,7 +118,7 @@ impl<T: Chunk> ChunkStore<T> {
     pub fn put(&mut self, chunk: &T) -> Result<()> {
         let serialised_chunk = bincode::serialize(chunk)?;
         let consumed_space = serialised_chunk.len() as u64;
-        if self.used_space.total().saturating_add(consumed_space) > self.total_capacity {
+        if self.used_space.total().saturating_add(consumed_space) > self.max_capacity {
             return Err(Error::NotEnoughSpace);
         }
 
@@ -198,5 +199,27 @@ impl<T: Chunk> ChunkStore<T> {
         Ok(self
             .dir
             .join(&hex::encode(bincode::serialize(id.raw_name())?)))
+    }
+}
+
+pub(crate) trait Subdir {
+    fn subdir() -> &'static Path;
+}
+
+impl Subdir for ImmutableChunkStore {
+    fn subdir() -> &'static Path {
+        Path::new("immutable")
+    }
+}
+
+impl Subdir for MutableChunkStore {
+    fn subdir() -> &'static Path {
+        Path::new("mutable")
+    }
+}
+
+impl Subdir for AppendOnlyChunkStore {
+    fn subdir() -> &'static Path {
+        Path::new("append_only")
     }
 }

@@ -6,15 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    chunk_store::{AppendOnlyChunkStore, ImmutableChunkStore, MutableChunkStore},
-    error::Result,
-};
+use crate::{chunk_store::ImmutableChunkStore, vault::Init, Result};
+use std::{cell::RefCell, path::Path, rc::Rc};
 
 pub(crate) struct Adult {
     immutable_chunks: ImmutableChunkStore,
-    mutable_chunks: MutableChunkStore,
-    appendable_chunks: AppendOnlyChunkStore,
 }
 
-impl Adult {}
+impl Adult {
+    pub fn new<P: AsRef<Path>>(root_dir: P, max_capacity: u64, init_mode: Init) -> Result<Self> {
+        let total_used_space = Rc::new(RefCell::new(0));
+        let immutable_chunks = ImmutableChunkStore::new(
+            root_dir,
+            max_capacity,
+            Rc::clone(&total_used_space),
+            init_mode,
+        )?;
+        Ok(Self { immutable_chunks })
+    }
+}
