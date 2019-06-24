@@ -22,14 +22,12 @@ mod mutable;
 mod used_space;
 
 use crate::{utils, vault::Init};
-use append_only::AppendOnlyChunk;
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
 use hex::{self, FromHex};
-use immutable::ImmutableChunk;
 use log::trace;
 use mutable::MutableChunk;
-use safe_nd::{ADataAddress, IDataAddress, MDataAddress};
+use safe_nd::{AData, ADataAddress, IDataAddress, IDataKind, MDataAddress};
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -47,9 +45,9 @@ const CHUNK_STORE_DIR: &str = "chunks";
 /// The max name length for a chunk file.
 const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 
-pub(crate) type ImmutableChunkStore = ChunkStore<ImmutableChunk>;
+pub(crate) type ImmutableChunkStore = ChunkStore<IDataKind>;
 pub(crate) type MutableChunkStore = ChunkStore<MutableChunk>;
-pub(crate) type AppendOnlyChunkStore = ChunkStore<AppendOnlyChunk>;
+pub(crate) type AppendOnlyChunkStore = ChunkStore<AData>;
 
 /// `ChunkStore` is a store of data held as serialised files on disk, implementing a maximum disk
 /// usage to restrict storage.

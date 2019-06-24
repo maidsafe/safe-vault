@@ -59,7 +59,6 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
     use Request::*;
     match request {
         PutIData(ref data) => Some(data.name()),
-        PutPubIData(ref data) => Some(data.name()),
         GetIData(ref address) => Some(address.name()),
         DeleteUnpubIData(ref address) => Some(address.name()),
         PutUnseqMData(ref data) => Some(data.name()),

@@ -11,7 +11,7 @@ repository = "https://github.com/maidsafe/safe_vault"
 version = "0.18.0"
 
 [dependencies]
-# Ensure bincode version is identical to that in SAFE Client Libs.
+# Ensure bincode version is identical to that in SAFE Client Libs and SAFE Network Data.
 bincode = "=1.1.4"
 bytes = { version = "~0.4.12", features = ["serde"] }
 crossbeam-channel = "~0.3.8"
@@ -25,10 +25,10 @@ quic-p2p = { version = "~0.1.1", git = "https://github.com/maidsafe/quic-p2p" }
 quick-error = "~1.2.2"
 rand = "~0.6.5"
 safe-nd = { version = "~0.1.0", git = "https://github.com/maidsafe/safe-nd" }
-serde = { version = "~1.0.92", features = ["derive"] }
+serde = { version = "~1.0.93", features = ["derive"] }
 serde_json = "~1.0.39"
 structopt = "~0.2.16"
-tiny-keccak = "~1.4.3"
+tiny-keccak = "~1.4.4"
 unwrap = "~1.2.1"
 
 [[bin]]

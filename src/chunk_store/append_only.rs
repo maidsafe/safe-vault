@@ -8,28 +8,15 @@
 
 use super::chunk::{Chunk, ChunkId};
 use safe_nd::{
-    ADataAddress, AppendOnlyData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData,
-    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, XorName,
+    AData, ADataAddress, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, UnpubSeqAppendOnlyData,
+    UnpubUnseqAppendOnlyData, XorName,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[derive(Hash, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub(crate) enum AppendOnlyChunk {
-    PubSeq(PubSeqAppendOnlyData),
-    PubUnseq(PubUnseqAppendOnlyData),
-    UnpubSeq(UnpubSeqAppendOnlyData),
-    UnpubUnseq(UnpubUnseqAppendOnlyData),
-}
-
-impl Chunk for AppendOnlyChunk {
+impl Chunk for AData {
     type Id = ADataAddress;
     fn id(&self) -> &Self::Id {
-        match self {
-            AppendOnlyChunk::PubSeq(ref chunk) => chunk.address(),
-            AppendOnlyChunk::PubUnseq(ref chunk) => chunk.address(),
-            AppendOnlyChunk::UnpubSeq(ref chunk) => chunk.address(),
-            AppendOnlyChunk::UnpubUnseq(ref chunk) => chunk.address(),
-        }
+        self.address()
     }
 }
 

@@ -15,7 +15,7 @@ use pickledb::PickleDb;
 use quic_p2p::{Config as QuicP2pConfig, Event, Peer, QuicP2p};
 use safe_nd::{
     AppPermissions, Challenge, ClientPublicId, Coins, Message, MessageId, NodePublicId, PublicId,
-    PublicKey, Request, Signature,
+    PublicKey, Request, Response, Signature, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -202,15 +202,12 @@ impl SourceElder {
                 self.has_signature(client_id, &request, &message_id, &signature)?;
 
                 self.set_balance(owner, new_balance)?;
-                // No need to forward the signature for ImmutableData
                 Some(Action::ForwardClientRequest {
                     client_name: *client_id.name(),
                     request,
                     message_id,
-                    signature: None,
                 })
             }
-            PutPubIData(_) => unimplemented!(),
             GetIData(ref address) => unimplemented!(),
             DeleteUnpubIData(ref address) => unimplemented!(),
             //
@@ -283,7 +280,7 @@ impl SourceElder {
     ) -> bool {
         let pub_key = match client_id {
             PublicId::Node(_) => {
-                error!("Logic error.  This should be unreachable.");
+                error!("{}: Logic error.  This should be unreachable.", self);
                 return false;
             }
             PublicId::Client(pub_id) => pub_id.public_key(),
@@ -360,6 +357,96 @@ impl SourceElder {
                 self, public_id, peer_addr
             );
             self.quic_p2p.disconnect_from(peer_addr);
+        }
+    }
+
+    pub fn _handle_node_response(
+        &mut self,
+        dst_elders: XorName,
+        src_elders: XorName,
+        response: Response,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use Response::*;
+        trace!(
+            "{}: Received ({:?} {:?}) to {} from {}",
+            self,
+            response,
+            message_id,
+            src_elders,
+            dst_elders
+        );
+        // TODO - remove this
+        #[allow(unused)]
+        match response {
+            //
+            // ===== Immutable Data =====
+            //
+            PutIData(result) => unimplemented!(),
+            GetIData(result) => unimplemented!(),
+            DeleteUnpubIData(result) => unimplemented!(),
+            //
+            // ===== Mutable Data =====
+            //
+            GetUnseqMData(result) => unimplemented!(),
+            PutUnseqMData(result) => unimplemented!(),
+            GetSeqMData(result) => unimplemented!(),
+            PutSeqMData(result) => unimplemented!(),
+            GetSeqMDataShell(result) => unimplemented!(),
+            GetUnseqMDataShell(result) => unimplemented!(),
+            GetMDataVersion(result) => unimplemented!(),
+            ListUnseqMDataEntries(result) => unimplemented!(),
+            ListSeqMDataEntries(result) => unimplemented!(),
+            ListMDataKeys(result) => unimplemented!(),
+            ListSeqMDataValues(result) => unimplemented!(),
+            ListUnseqMDataValues(result) => unimplemented!(),
+            DeleteMData(result) => unimplemented!(),
+            SetMDataUserPermissions(result) => unimplemented!(),
+            DelMDataUserPermissions(result) => unimplemented!(),
+            ListMDataUserPermissions(result) => unimplemented!(),
+            ListMDataPermissions(result) => unimplemented!(),
+            MutateSeqMDataEntries(result) => unimplemented!(),
+            MutateUnseqMDataEntries(result) => unimplemented!(),
+            GetSeqMDataValue(result) => unimplemented!(),
+            GetUnseqMDataValue(result) => unimplemented!(),
+            //
+            // ===== Append Only Data =====
+            //
+            PutAData(result) => unimplemented!(),
+            GetAData(result) => unimplemented!(),
+            GetADataShell(result) => unimplemented!(),
+            GetADataOwners(result) => unimplemented!(),
+            GetADataRange(result) => unimplemented!(),
+            GetADataIndices(result) => unimplemented!(),
+            GetADataLastEntry(result) => unimplemented!(),
+            GetUnpubADataPermissionAtIndex(result) => unimplemented!(),
+            GetPubADataPermissionAtIndex(result) => unimplemented!(),
+            GetPubADataUserPermissions(result) => unimplemented!(),
+            GetUnpubADataUserPermissions(result) => unimplemented!(),
+            AddUnpubADataPermissions(result) => unimplemented!(),
+            AddPubADataPermissions(result) => unimplemented!(),
+            SetADataOwner(result) => unimplemented!(),
+            AppendSeq(result) => unimplemented!(),
+            AppendUnseq(result) => unimplemented!(),
+            DeleteAData(result) => unimplemented!(),
+            //
+            // ===== Coins =====
+            //
+            GetTransaction(result) => unimplemented!(),
+            //
+            // ===== Invalid =====
+            //
+            TransferCoins(_)
+            | GetBalance(_)
+            | ListAuthKeysAndVersion(_)
+            | InsAuthKey(_)
+            | DelAuthKey(_) => {
+                error!(
+                    "{}: Should not receive {:?} as a source elder.",
+                    self, response
+                );
+                None
+            }
         }
     }
 

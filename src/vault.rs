@@ -145,7 +145,6 @@ impl Vault {
                 client_name,
                 request,
                 message_id,
-                signature,
             } => {
                 let dst_elders_address = match utils::dst_elders_address(&request) {
                     Some(address) => address,
@@ -164,7 +163,6 @@ impl Vault {
                         client_name,
                         request,
                         message_id,
-                        signature,
                     );
                 }
                 None

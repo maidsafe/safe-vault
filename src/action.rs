@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use safe_nd::{MessageId, Request, Signature, XorName};
+use safe_nd::{MessageId, Request, XorName};
 
 #[derive(Debug)]
 pub(crate) enum Action {
@@ -16,6 +16,5 @@ pub(crate) enum Action {
         client_name: XorName,
         request: Request,
         message_id: MessageId,
-        signature: Option<Signature>,
     },
 }
