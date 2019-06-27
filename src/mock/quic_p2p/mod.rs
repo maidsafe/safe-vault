@@ -327,6 +327,7 @@ impl Peer {
         }
     }
 
+    /// Returns the socket address of this peer.
     pub fn peer_addr(&self) -> SocketAddr {
         match *self {
             Peer::Node { ref node_info } => node_info.peer_addr,
@@ -338,7 +339,9 @@ impl Peer {
 /// Information about a peer of type node.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct NodeInfo {
+    /// Endpoint of the node
     pub peer_addr: SocketAddr,
+    /// Certificate of the node
     pub peer_cert_der: Vec<u8>,
 }
 

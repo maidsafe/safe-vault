@@ -7,8 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    action::Action, adult::Adult, coins_handler::CoinsHandler, destination_elder::DestinationElder,
-    quic_p2p::Event, source_elder::SourceElder, utils, Config, Result,
+    action::Action,
+    adult::Adult,
+    coins_handler::CoinsHandler,
+    destination_elder::DestinationElder,
+    quic_p2p::{Event, NodeInfo},
+    source_elder::SourceElder,
+    utils, Config, Result,
 };
 use bincode;
 use crossbeam_channel::Receiver;
@@ -46,7 +51,7 @@ pub struct Vault {
     id: NodeFullId,
     root_dir: PathBuf,
     state: State,
-    event_receiver: Option<Receiver<Event>>,
+    event_receiver: Receiver<Event>,
 }
 
 // TODO - remove this
@@ -84,7 +89,7 @@ impl Vault {
                     dst,
                     coins_handler,
                 },
-                Some(event_receiver),
+                event_receiver,
             )
         } else {
             let _adult = Adult::new(
@@ -106,17 +111,38 @@ impl Vault {
         Ok(vault)
     }
 
-    /// Run the main event loop.  Blocks until the vault is terminated.
+    /// Returns our connection info.
+    pub fn our_connection_info(&mut self) -> Result<NodeInfo> {
+        match self.state {
+            State::Elder { ref mut src, .. } => src.our_connection_info(),
+            State::Adult { .. } => unimplemented!(),
+        }
+    }
+
+    /// Runs the main event loop. Blocks until the vault is terminated.
     pub fn run(&mut self) {
-        if let Some(event_receiver) = self.event_receiver.take() {
-            for event in event_receiver.iter() {
-                let mut some_action = self.handle_quic_p2p_event(event);
-                while let Some(action) = some_action {
-                    some_action = self.handle_action(action);
-                }
-            }
-        } else {
-            error!("{}: Event receiver not available!", self);
+        while let Ok(event) = self.event_receiver.recv() {
+            self.step(event)
+        }
+    }
+
+    /// Processes any outstanding network events and returns. Does not block.
+    /// Returns whether at least one event was processed.
+    pub fn poll(&mut self) -> bool {
+        let mut processed = false;
+
+        while let Ok(event) = self.event_receiver.try_recv() {
+            self.step(event);
+            processed = true;
+        }
+
+        processed
+    }
+
+    fn step(&mut self, event: Event) {
+        let mut maybe_action = self.handle_quic_p2p_event(event);
+        while let Some(action) = maybe_action {
+            maybe_action = self.handle_action(action);
         }
     }
 

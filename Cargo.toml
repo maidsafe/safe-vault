@@ -34,6 +34,9 @@ structopt = "~0.2.16"
 tiny-keccak = "~1.4.4"
 unwrap = "~1.2.1"
 
+[dev_dependencies]
+rand_chacha = "~0.1.1"
+
 [[bin]]
 name = "safe_vault"
 doc = false

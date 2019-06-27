@@ -107,6 +107,11 @@ impl Config {
         &self.quic_p2p_config
     }
 
+    /// Set Quic-P2P configuration options.
+    pub fn set_quic_p2p_config(&mut self, config: QuicP2pConfig) {
+        self.quic_p2p_config = config;
+    }
+
     /// Set the Quic-P2P `ip` configuration to 127.0.0.1.
     pub fn listen_on_loopback(&mut self) {
         self.quic_p2p_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
@@ -125,29 +130,25 @@ impl Config {
             self.quic_p2p_config.port = Some(unwrap!(value.parse()));
         } else if arg == ARGS[5] {
             self.quic_p2p_config.ip = Some(unwrap!(value.parse()));
-        } else if arg == ARGS[6] {
-            #[cfg(not(feature = "mock"))]
-            {
-                self.quic_p2p_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
-            }
-        } else if arg == ARGS[7] {
-            #[cfg(not(feature = "mock"))]
-            {
-                self.quic_p2p_config.idle_timeout_msec = Some(unwrap!(value.parse()));
-            }
-        } else if arg == ARGS[8] {
-            #[cfg(not(feature = "mock"))]
-            {
-                self.quic_p2p_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
-            }
-        } else if arg == ARGS[9] {
-            #[cfg(not(feature = "mock"))]
-            {
-                self.quic_p2p_config.our_complete_cert = Some(unwrap!(value.parse()));
-            }
         } else if arg == ARGS[10] {
             self.quic_p2p_config.our_type = unwrap!(value.parse());
         } else {
+            #[cfg(not(feature = "mock"))]
+            {
+                if arg == ARGS[6] {
+                    self.quic_p2p_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
+                } else if arg == ARGS[7] {
+                    self.quic_p2p_config.idle_timeout_msec = Some(unwrap!(value.parse()));
+                } else if arg == ARGS[8] {
+                    self.quic_p2p_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
+                } else if arg == ARGS[9] {
+                    self.quic_p2p_config.our_complete_cert = Some(unwrap!(value.parse()));
+                } else {
+                    println!("ERROR");
+                }
+            }
+
+            #[cfg(feature = "mock")]
             println!("ERROR");
         }
     }

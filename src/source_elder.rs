@@ -8,11 +8,10 @@
 
 use crate::{
     action::Action,
-    quic_p2p::{self, Config as QuicP2pConfig, Event, Peer, QuicP2p},
+    quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
     utils,
     vault::Init,
-    Result,
-    ToDbKey,
+    Result, ToDbKey,
 };
 use bytes::Bytes;
 use crossbeam_channel::{self, Receiver};
@@ -103,6 +102,10 @@ impl SourceElder {
             unwrap!(serde_json::to_string(&our_conn_info))
         );
         Ok((quic_p2p, event_receiver))
+    }
+
+    pub fn our_connection_info(&mut self) -> Result<NodeInfo> {
+        Ok(self.quic_p2p.our_connection_info()?)
     }
 
     pub fn handle_new_connection(&mut self, peer: Peer) {

@@ -6,13 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Implementation of the "Vault" node for the SAFE Network.
-
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
-    html_favicon_url = "https://maidsafe.net/img/favicon.ico",
-    test(attr(forbid(warnings)))
-)]
+// TODO: make these tests work without mock too.
+#![cfg(feature = "mock")]
 #![forbid(
     exceeding_bitshifts,
     mutable_transmutes,
@@ -55,33 +50,23 @@
     variant_size_differences
 )]
 
-mod action;
-mod adult;
-mod chunk_store;
-mod coins_handler;
-mod config_handler;
-mod destination_elder;
-mod error;
-mod source_elder;
-mod to_db_key;
-mod utils;
-mod vault;
+mod common;
 
-pub(crate) use to_db_key::ToDbKey;
+use self::common::{Environment, TestClient};
+use safe_vault::{Config, Vault};
+use unwrap::unwrap;
 
-/// Utilities for testing.
-#[cfg(feature = "mock")]
-pub mod mock;
+#[test]
+fn client_connects() {
+    let mut env = Environment::new();
+    let mut vault = unwrap!(Vault::new(Config::default()));
+    let vault_conn_info = unwrap!(vault.our_connection_info());
 
-// `crate::quic_p2p` refers to real or mock quic_p2p, depending on the "mock" feature flag.
-#[cfg(feature = "mock")]
-pub use self::mock::quic_p2p;
-#[cfg(not(feature = "mock"))]
-pub use quic_p2p;
+    let mut client = TestClient::new(env.rng());
+    client.connect_to(vault_conn_info.clone());
+    env.poll(&mut vault);
 
-pub use crate::{
-    chunk_store::error::Error as ChunkStoreError,
-    config_handler::Config,
-    error::{Error, Result},
-    vault::Vault,
-};
+    client.expect_connected_to(&vault_conn_info);
+    client.handle_challenge_from(&vault_conn_info);
+    env.poll(&mut vault);
+}
