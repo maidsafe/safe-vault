@@ -6,13 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{action::Action, utils, vault::Init, Result, ToDbKey};
+use crate::{
+    action::Action,
+    quic_p2p::{self, Config as QuicP2pConfig, Event, Peer, QuicP2p},
+    utils,
+    vault::Init,
+    Result,
+    ToDbKey,
+};
 use bytes::Bytes;
 use crossbeam_channel::{self, Receiver};
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
-use quic_p2p::{Config as QuicP2pConfig, Event, Peer, QuicP2p};
 use safe_nd::{
     AppPermissions, Challenge, ClientPublicId, Coins, Error as NdError, Message, MessageId,
     NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,

@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::Result;
+use crate::{quic_p2p::Config as QuicP2pConfig, Result};
 use directories::ProjectDirs;
 use log::trace;
-use quic_p2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::fs;
@@ -127,13 +126,25 @@ impl Config {
         } else if arg == ARGS[5] {
             self.quic_p2p_config.ip = Some(unwrap!(value.parse()));
         } else if arg == ARGS[6] {
-            self.quic_p2p_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
+            #[cfg(not(feature = "mock"))]
+            {
+                self.quic_p2p_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
+            }
         } else if arg == ARGS[7] {
-            self.quic_p2p_config.idle_timeout_msec = Some(unwrap!(value.parse()));
+            #[cfg(not(feature = "mock"))]
+            {
+                self.quic_p2p_config.idle_timeout_msec = Some(unwrap!(value.parse()));
+            }
         } else if arg == ARGS[8] {
-            self.quic_p2p_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
+            #[cfg(not(feature = "mock"))]
+            {
+                self.quic_p2p_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
+            }
         } else if arg == ARGS[9] {
-            self.quic_p2p_config.our_complete_cert = Some(unwrap!(value.parse()));
+            #[cfg(not(feature = "mock"))]
+            {
+                self.quic_p2p_config.our_complete_cert = Some(unwrap!(value.parse()));
+            }
         } else if arg == ARGS[10] {
             self.quic_p2p_config.our_type = unwrap!(value.parse());
         } else {
@@ -205,6 +216,7 @@ mod test {
     use unwrap::unwrap;
 
     #[test]
+    #[cfg_attr(feature = "mock", ignore)]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
             216

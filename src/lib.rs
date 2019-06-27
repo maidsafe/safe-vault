@@ -69,6 +69,16 @@ mod vault;
 
 pub(crate) use to_db_key::ToDbKey;
 
+/// Utilities for testing.
+#[cfg(any(test, feature = "mock"))]
+pub mod test_utils;
+
+// `crate::quic_p2p` refers to real or mock quic_p2p, depending on the "mock" feature flag.
+#[cfg(feature = "mock")]
+use self::test_utils::mock_quic_p2p as quic_p2p;
+#[cfg(not(feature = "mock"))]
+use quic_p2p;
+
 pub use crate::{
     chunk_store::error::Error as ChunkStoreError,
     config_handler::Config,

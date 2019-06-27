@@ -8,12 +8,11 @@
 
 use crate::{
     action::Action, adult::Adult, coins_handler::CoinsHandler, destination_elder::DestinationElder,
-    source_elder::SourceElder, utils, Config, Result,
+    quic_p2p::Event, source_elder::SourceElder, utils, Config, Result,
 };
 use bincode;
 use crossbeam_channel::Receiver;
 use log::{error, info};
-use quic_p2p::Event;
 use safe_nd::{NodeFullId, XorName};
 use std::{
     fmt::{self, Display, Formatter},
