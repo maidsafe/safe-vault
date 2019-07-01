@@ -183,7 +183,7 @@ impl Vault {
                 //        onwards, and then if we're also part of the dst elders, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
-                if self.self_is_dst_elder_for(&dst_elders_address) {
+                if self.self_is_elder_for(&dst_elders_address) {
                     return self.destination_elder_mut()?.handle_request(
                         client_name,
                         request,
@@ -209,25 +209,46 @@ impl Vault {
                 client_name,
                 response,
                 message_id,
+                ..
             } => {
-                self.source_elder_mut()?
-                    .handle_response(sender, client_name, response, message_id)
+                // TODO - once Routing is integrated, we'll construct the full message to send
+                //        onwards, and then if we're also part of the src elders, we'll call that
+                //        same handler which Routing will call after receiving a message.
+
+                if self.self_is_elder_for(&client_name) {
+                    return self.source_elder_mut()?.handle_response(
+                        sender,
+                        client_name,
+                        response,
+                        message_id,
+                    );
+                }
+                None
             }
             SendToPeers {
+                sender,
                 targets,
                 request,
                 message_id,
             } => {
-                // TODO - Phase 1 is only 1 target
-                targets.first().and_then(|target| {
-                    self.destination_elder_mut()?
-                        .handle_request(*target, request, message_id)
-                })
+                let mut next_action = None;
+                for target in targets {
+                    if target == *self.id.public_id().name() {
+                        next_action = self.destination_elder_mut()?.handle_request(
+                            sender,
+                            request.clone(),
+                            message_id,
+                        );
+                        // } else {
+                        //     Send to target
+                    }
+                }
+                next_action
             }
         }
     }
 
-    fn self_is_dst_elder_for(&self, _address: &XorName) -> bool {
+    fn self_is_elder_for(&self, _address: &XorName) -> bool {
         true
     }
 

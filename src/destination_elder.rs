@@ -18,7 +18,7 @@ use crate::{
     vault::Init,
     Result, ToDbKey,
 };
-use idata_op::IDataOp;
+use idata_op::{IDataOp, OpType};
 use log::{error, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
@@ -28,7 +28,7 @@ use safe_nd::{
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     iter,
     path::Path,
@@ -46,7 +46,7 @@ const IMMUTABLE_DATA_COPY_COUNT: usize = 3;
 
 #[derive(Default, Serialize, Deserialize)]
 struct ChunkMetadata {
-    holders: Vec<XorName>,
+    holders: BTreeSet<XorName>,
 }
 
 // TODO - remove this
@@ -274,7 +274,7 @@ impl DestinationElder {
             //
             // ===== Immutable Data =====
             //
-            GetIData(_) => self.handle_get_idata_resp(src, response, message_id),
+            GetIData(result) => self.handle_get_idata_resp(src, result, message_id),
             //
             // ===== Mutable Data =====
             //
@@ -408,22 +408,6 @@ impl DestinationElder {
         })
     }
 
-    fn handle_mutation_resp(
-        &mut self,
-        client_name: XorName,
-        result: NdResult<()>,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        // TODO - DeleteUnpubIData needs to be handled here but this function is being redone for
-        //        PutIData so wait for that branch to land first.
-        Some(Action::RespondToSrcElders {
-            sender: *self.id.name(),
-            client_name,
-            response: Response::Mutation(result),
-            message_id,
-        })
-    }
-
     fn handle_put_idata_req(
         &mut self,
         src: XorName,
@@ -436,51 +420,82 @@ impl DestinationElder {
             self.store_idata(kind, message_id)
         } else {
             // We're acting as dst elder, received request from src elders
-            // TODO - should we add the chunk to our store until we get 3 success responses, and
-            //        then remove if we're not a designated holder?
-            let mut metadata = ChunkMetadata::default();
-            for adult in self
+            let data_name = *kind.name();
+            let respond = |result: NdResult<()>| {
+                Some(Action::RespondToSrcElders {
+                    sender: data_name,
+                    client_name: src,
+                    response: Response::Mutation(result),
+                    message_id,
+                })
+            };
+
+            if self
+                .immutable_metadata
+                .exists(&(*utils::work_arounds::idata_address(&kind)).to_db_key())
+            {
+                trace!(
+                    "{}: Replying success for Put {:?}, it already exists.",
+                    self,
+                    kind
+                );
+                return respond(Ok(()));
+            }
+            let target_holders = self
                 .non_full_adults_sorted(kind.name())
+                .chain(self.elders_sorted(kind.name()))
                 .take(IMMUTABLE_DATA_COPY_COUNT)
-            {
-                // TODO - Send Put request to adult.
-                // For Routing msg, src = data.name() and dst = adult.
-                metadata.holders.push(*adult);
-            }
-            // TODO - should we just store it right now, or wait until we get the message from our
-            //        section elders?  For now, do both.
-            let mut self_should_store = false;
-            for elder in self
-                .elders_sorted(kind.name())
-                .take(IMMUTABLE_DATA_COPY_COUNT - metadata.holders.len())
-            {
-                metadata.holders.push(*elder);
-                if elder == self.id.name() {
-                    self_should_store = true;
-                } else {
-                    // TODO - Send Put request to elder
-                    // For Routing msg, src = data.name() and dst = elder.
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            let data_name = *kind.name();
+            // Can't fail
+            let idata_op = unwrap!(IDataOp::new(
+                src,
+                Request::PutIData(kind),
+                target_holders.clone()
+            ));
+            match self.idata_ops.entry(message_id) {
+                Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
+                Entry::Vacant(vacant_entry) => {
+                    let idata_op = vacant_entry.insert(idata_op);
+                    Some(Action::SendToPeers {
+                        sender: data_name,
+                        targets: target_holders,
+                        request: idata_op.request().clone(),
+                        message_id,
+                    })
                 }
-            }
-            let db_key = utils::work_arounds::idata_address(&kind).to_db_key();
-            if let Err(error) = self.immutable_metadata.set(&db_key, &metadata) {
-                warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-                // TODO - send failure back to src elders (hopefully won't accumulate), or
-                //        maybe self-terminate if we can't fix this error?
-            }
-            if self_should_store {
-                self.store_idata(kind, message_id)
-            } else {
-                None
             }
         }
     }
 
-    fn _handle_put_idata_resp(
+    fn handle_mutation_resp(
         &mut self,
-        _sender: XorName,
+        sender: XorName,
+        result: NdResult<()>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let own_id = format!("{}", self);
+        let (idata_address, op_type) = self.idata_op_mut(&message_id).and_then(|idata_op| {
+            let op_type = idata_op.op_type();
+            idata_op
+                .handle_mutation_resp(sender, own_id, message_id)
+                .map(|address| (address, op_type))
+        })?;
+
+        if op_type == OpType::Put {
+            self.handle_put_idata_resp(idata_address, sender, result, message_id)
+        } else {
+            unimplemented!();
+        }
+    }
+
+    fn handle_put_idata_resp(
+        &mut self,
+        idata_address: IDataAddress,
+        sender: XorName,
         _result: NdResult<()>,
-        _message_id: MessageId,
+        message_id: MessageId,
     ) -> Option<Action> {
         // TODO -
         // - if Ok, and this is the final of the three responses send success back to src elders and
@@ -492,7 +507,34 @@ impl DestinationElder {
         //   chunk.  Not known yet where we'll get the chunk from to do that.
         //
         // For phase 1, we can leave many of these unanswered.
-        unimplemented!()
+
+        // TODO - we'll assume `result` is success for phase 1.
+        let db_key = idata_address.to_db_key();
+        let mut metadata = self
+            .immutable_metadata
+            .get::<ChunkMetadata>(&db_key)
+            .unwrap_or_default();
+        if !metadata.holders.insert(sender) {
+            warn!(
+                "{}: {} already registered as a holder for {:?}",
+                self,
+                sender,
+                self.idata_op(&message_id)?
+            );
+        }
+        if let Err(error) = self.immutable_metadata.set(&db_key, &metadata) {
+            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+            // TODO - send failure back to src elders (hopefully won't accumulate), or
+            //        maybe self-terminate if we can't fix this error?
+        }
+
+        self.remove_idata_op_if_concluded(&message_id)
+            .map(|idata_op| Action::RespondToSrcElders {
+                sender: *idata_address.name(),
+                client_name: *idata_op.client(),
+                response: Response::Mutation(Ok(())),
+                message_id,
+            })
     }
 
     fn store_idata(&mut self, kind: IDataKind, message_id: MessageId) -> Option<Action> {
@@ -559,6 +601,7 @@ impl DestinationElder {
                 Entry::Vacant(vacant_entry) => {
                     let idata_op = vacant_entry.insert(idata_op);
                     Some(Action::SendToPeers {
+                        sender: *address.name(),
                         targets: metadata.holders,
                         request: idata_op.request().clone(),
                         message_id,
@@ -589,7 +632,7 @@ impl DestinationElder {
     }
 
     fn get_idata(&self, address: IDataAddress, message_id: MessageId) -> Option<Action> {
-        let client = self.get_client_name(message_id)?;
+        let client = self.client_name(&message_id)?;
         let result = self
             .immutable_chunks
             .get(&address)
@@ -609,19 +652,6 @@ impl DestinationElder {
             response: Response::GetIData(result),
             message_id,
         })
-    }
-
-    fn get_client_name(&self, message_id: MessageId) -> Option<&XorName> {
-        self.idata_ops
-            .get(&message_id)
-            .map(IDataOp::client)
-            .or_else(|| {
-                warn!(
-                    "{}: Client not found for message_id: {:?}",
-                    self, message_id
-                );
-                None
-            })
     }
 
     fn handle_delete_unpub_idata_req(
@@ -657,6 +687,7 @@ impl DestinationElder {
                 Entry::Vacant(vacant_entry) => {
                     let idata_op = vacant_entry.insert(idata_op);
                     Some(Action::SendToPeers {
+                        sender: *address.name(),
                         targets: metadata.holders,
                         request: idata_op.request().clone(),
                         message_id,
@@ -671,7 +702,7 @@ impl DestinationElder {
         address: IDataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let client = self.get_client_name(message_id)?;
+        let client = self.client_name(&message_id)?;
         // First we need to read the chunk to verify the permissions
         let result = self
             .immutable_chunks
@@ -709,20 +740,52 @@ impl DestinationElder {
     fn handle_get_idata_resp(
         &mut self,
         sender: XorName,
-        response: Response,
+        result: NdResult<IDataKind>,
         message_id: MessageId,
     ) -> Option<Action> {
         let own_id = format!("{}", self);
-        self.idata_ops
-            .get_mut(&message_id)
-            .or_else(|| {
-                warn!(
-                    "{}: Received response to non-existent message_id: {:?}",
-                    own_id, message_id
-                );
-                None
-            })
-            .and_then(|idata_ops| idata_ops.handle_response(sender, response, own_id, message_id))
+        let action = self.idata_op_mut(&message_id).and_then(|idata_op| {
+            idata_op.handle_get_idata_resp(sender, result, own_id, message_id)
+        });
+        let _ = self.remove_idata_op_if_concluded(&message_id);
+        action
+    }
+
+    fn client_name(&self, message_id: &MessageId) -> Option<&XorName> {
+        self.idata_op(message_id).map(IDataOp::client)
+    }
+
+    fn idata_op(&self, message_id: &MessageId) -> Option<&IDataOp> {
+        self.idata_ops.get(message_id).or_else(|| {
+            warn!(
+                "{}: No current ImmutableData operation for {:?}",
+                self, message_id
+            );
+            None
+        })
+    }
+
+    fn idata_op_mut(&mut self, message_id: &MessageId) -> Option<&mut IDataOp> {
+        let own_id = format!("{}", self);
+        self.idata_ops.get_mut(message_id).or_else(|| {
+            warn!(
+                "{}: No current ImmutableData operation for {:?}",
+                own_id, message_id
+            );
+            None
+        })
+    }
+
+    /// Removes and returns the op if it has concluded.
+    fn remove_idata_op_if_concluded(&mut self, message_id: &MessageId) -> Option<IDataOp> {
+        let is_concluded = self
+            .idata_op(message_id)
+            .map(IDataOp::concluded)
+            .unwrap_or(false);
+        if is_concluded {
+            return self.idata_ops.remove(message_id);
+        }
+        None
     }
 }
 

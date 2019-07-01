@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{action::Action, Error, Result};
+use crate::{action::Action, utils, Error, Result};
 use log::{error, warn};
-use safe_nd::{MessageId, Request, Response, XorName};
+use safe_nd::{IDataAddress, IDataKind, MessageId, Request, Response, Result as NdResult, XorName};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub(super) enum RpcState {
@@ -24,16 +24,22 @@ pub(super) enum RpcState {
     TimedOut,
 }
 
+#[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
+pub(super) enum OpType {
+    Put,
+    Get,
+    Delete,
+}
+
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub(super) struct IDataOp {
     client: XorName,
     request: Request,
-    rpc_states: BTreeMap<XorName, RpcState>,
+    pub rpc_states: BTreeMap<XorName, RpcState>,
 }
 
-#[allow(unused)]
 impl IDataOp {
-    pub(super) fn new(client: XorName, request: Request, holders: Vec<XorName>) -> Result<Self> {
+    pub fn new(client: XorName, request: Request, holders: BTreeSet<XorName>) -> Result<Self> {
         use Request::*;
         match request {
             PutIData(_) | GetIData(_) | DeleteUnpubIData(_) => (),
@@ -53,74 +59,105 @@ impl IDataOp {
         })
     }
 
-    pub(super) fn client(&self) -> &XorName {
+    pub fn client(&self) -> &XorName {
         &self.client
     }
 
-    pub(super) fn request(&self) -> &Request {
+    pub fn request(&self) -> &Request {
         &self.request
     }
 
-    pub(super) fn rpc_states(&self) -> &BTreeMap<XorName, RpcState> {
-        &self.rpc_states
-    }
-
-    pub(super) fn is_any_actioned(&self) -> bool {
+    pub fn is_any_actioned(&self) -> bool {
         self.rpc_states
             .values()
             .any(|rpc_state| rpc_state == &RpcState::Actioned)
     }
 
-    pub(super) fn handle_response(
+    pub fn op_type(&self) -> OpType {
+        match self.request {
+            Request::PutIData(_) => OpType::Put,
+            Request::GetIData(_) => OpType::Get,
+            Request::DeleteUnpubIData(_) => OpType::Delete,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Returns true if no `rpc_states` are still `RpcState::Sent`.
+    pub fn concluded(&self) -> bool {
+        !self
+            .rpc_states
+            .values()
+            .any(|state| *state == RpcState::Sent)
+    }
+
+    pub fn handle_mutation_resp(
         &mut self,
         sender: XorName,
-        response: Response,
+        own_id: String,
+        message_id: MessageId,
+    ) -> Option<IDataAddress> {
+        match &self.request {
+            &Request::PutIData(_) | &Request::DeleteUnpubIData(_) => (),
+            other => {
+                warn!(
+                    "{}: Expected PutIData or DeleteUnpubIData for {:?}, but found {:?}",
+                    own_id, message_id, other
+                );
+                return None;
+            }
+        };
+        self.set_to_actioned(&sender, own_id)?;
+
+        match self.request {
+            Request::PutIData(ref kind) => Some(*utils::work_arounds::idata_address(kind)),
+            Request::DeleteUnpubIData(address) => Some(address),
+            _ => None, // unreachable - we checked above
+        }
+    }
+
+    pub fn handle_get_idata_resp(
+        &mut self,
+        sender: XorName,
+        result: NdResult<IDataKind>,
         own_id: String,
         message_id: MessageId,
     ) -> Option<Action> {
         let is_already_actioned = self.is_any_actioned();
-        match response {
-            Response::GetIData(ref result) => {
-                let address = if let Request::GetIData(address) = self.request {
-                    address
-                } else {
-                    warn!(
-                        "{}: Expected Response::GetIData to correspond to \
-                         Request::GetIData from {}:",
-                        own_id, sender,
-                    );
-                    // TODO - Instead of returning None here, take action by treating the vault as
-                    //        failing.
-                    return None;
-                };
+        let address = if let Request::GetIData(address) = self.request {
+            address
+        } else {
+            warn!(
+                "{}: Expected Response::GetIData to correspond to Request::GetIData from {}:",
+                own_id, sender,
+            );
+            // TODO - Instead of returning None here, take action by treating the vault as
+            //        failing.
+            return None;
+        };
 
-                self.rpc_states
-                    .get_mut(&sender)
-                    .or_else(|| {
-                        warn!(
-                            "{}: Received response from sender {} that we didn't expect.",
-                            own_id, sender
-                        );
-                        None
-                    })
-                    .map(|rpc_state| *rpc_state = RpcState::Actioned)
-                    .and_then(|()| {
-                        if is_already_actioned {
-                            None
-                        } else {
-                            Some(Action::RespondToSrcElders {
-                                sender: *address.name(),
-                                client_name: *self.client(),
-                                response,
-                                message_id,
-                            })
-                        }
-                    })
-            }
-            _ => {
-                error!("{}: Logic error", own_id);
-                None
-            }
+        self.set_to_actioned(&sender, own_id)?;
+        if is_already_actioned {
+            None
+        } else {
+            Some(Action::RespondToSrcElders {
+                sender: *address.name(),
+                client_name: *self.client(),
+                response: Response::GetIData(result),
+                message_id,
+            })
         }
+    }
+
+    fn set_to_actioned(&mut self, sender: &XorName, own_id: String) -> Option<()> {
+        self.rpc_states
+            .get_mut(sender)
+            .or_else(|| {
+                warn!(
+                    "{}: Received response from {} that we didn't expect.",
+                    own_id, sender
+                );
+                None
+            })
+            .map(|rpc_state| *rpc_state = RpcState::Actioned)
     }
 }

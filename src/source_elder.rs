@@ -19,8 +19,8 @@ use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AppPermissions, Challenge, ClientPublicId, Coins, Error as NdError, Message, MessageId,
-    NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
+    AppPermissions, Challenge, ClientPublicId, Coins, Error as NdError, IDataKind, Message,
+    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -226,12 +226,42 @@ impl SourceElder {
             //
             // ===== Immutable Data =====
             //
-            PutIData(_) => {
+            PutIData(ref chunk) => {
                 let owner = utils::owner(client_id)?;
                 let balance = self.balance(owner)?;
-                let new_balance = balance.checked_sub(*COST_OF_PUT)?;
+                let new_balance = match balance.checked_sub(*COST_OF_PUT) {
+                    None => {
+                        // TODO - we only allow underfunded Put requests to proceed for phase 1.
+                        trace!(
+                            "{}: {} has no coins left, but allowing Put request anyway.",
+                            self,
+                            client_id
+                        );
+                        unwrap!(Coins::from_nano(0))
+                    }
+                    Some(new_balance) => new_balance,
+                };
 
                 self.has_signature(client_id, &request, &message_id, &signature)?;
+
+                // Assert that if the request was for UnpubIData, that the owner's public key has
+                // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
+                // by their Client owners.
+                if let IDataKind::Unpub(unpub_chunk) = chunk {
+                    if &PublicKey::from(*unpub_chunk.owners()) != owner.public_key() {
+                        trace!(
+                            "{}: {} attempted Put UnpubIData with invalid owners field.",
+                            self,
+                            client_id
+                        );
+                        self.send_response_to_client(
+                            client_id,
+                            message_id,
+                            Response::Mutation(Err(NdError::InvalidOwners)),
+                        );
+                        return None;
+                    }
+                }
 
                 self.set_balance(owner, new_balance)?;
                 Some(Action::ForwardClientRequest {

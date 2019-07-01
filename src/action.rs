@@ -7,18 +7,19 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use safe_nd::{MessageId, Request, Response, XorName};
+use std::collections::BTreeSet;
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Action {
-    // Send a validated client request from src elders to dst elders
+    // Send a validated client request from src elders to dst elders.
     ForwardClientRequest {
         // TODO - confirm this.  ATM, this represents the owner's name if the src is an app.
         client_name: XorName,
         request: Request,
         message_id: MessageId,
     },
-    // Send a response as an adult or elder to own section's elders
+    // Send a response as an adult or elder to own section's elders.
     RespondToOurDstElders {
         sender: XorName,
         response: Response,
@@ -32,7 +33,8 @@ pub(crate) enum Action {
     },
     // Send the same request to each individual peer (used to send IData requests to adults).
     SendToPeers {
-        targets: Vec<XorName>,
+        sender: XorName,
+        targets: BTreeSet<XorName>,
         request: Request,
         message_id: MessageId,
     },
