@@ -58,31 +58,46 @@
     variant_size_differences
 )]
 
-use env_logger;
-use log::info;
-use safe_vault::{self, Config, Vault};
-use structopt::StructOpt;
+fn main() {
+    self::detail::main()
+}
 
-/// Runs a SAFE Network vault.
-pub fn main() {
-    env_logger::init();
+#[cfg(not(feature = "mock"))]
+mod detail {
+    use env_logger;
+    use log::info;
+    use safe_vault::{self, Config, Vault};
+    use structopt::StructOpt;
 
-    let mut config = Config::new();
-    if config.quic_p2p_config().ip.is_none() {
-        config.listen_on_loopback();
-    }
+    /// Runs a SAFE Network vault.
+    pub fn main() {
+        env_logger::init();
 
-    let message = format!(
-        "Running {} v{}",
-        Config::clap().get_name(),
-        env!("CARGO_PKG_VERSION")
-    );
-    info!("\n\n{}\n{}", message, "=".repeat(message.len()));
+        let mut config = Config::new();
+        if config.quic_p2p_config().ip.is_none() {
+            config.listen_on_loopback();
+        }
 
-    match Vault::new(config) {
-        Ok(mut vault) => vault.run(),
-        Err(e) => {
-            println!("Cannot start vault due to error: {:?}", e);
+        let message = format!(
+            "Running {} v{}",
+            Config::clap().get_name(),
+            env!("CARGO_PKG_VERSION")
+        );
+        info!("\n\n{}\n{}", message, "=".repeat(message.len()));
+
+        match Vault::new(config) {
+            Ok(mut vault) => vault.run(),
+            Err(e) => {
+                println!("Cannot start vault due to error: {:?}", e);
+            }
         }
     }
+}
+
+#[cfg(feature = "mock")]
+mod detail {
+    pub fn main() {
+        println!("Cannot start vault with mock quic-p2p.");
+    }
+
 }

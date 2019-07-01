@@ -210,14 +210,19 @@ fn dirs() -> Result<ProjectDirs> {
 
 #[cfg(test)]
 mod test {
-    use super::{Config, ARGS};
+    use super::Config;
+    #[cfg(not(feature = "mock"))]
+    use super::ARGS;
     use serde_json;
-    use std::{fs::File, io::Read, mem, path::Path};
+    #[cfg(not(feature = "mock"))]
+    use std::mem;
+    use std::{fs::File, io::Read, path::Path};
+    #[cfg(not(feature = "mock"))]
     use structopt::StructOpt;
     use unwrap::unwrap;
 
+    #[cfg(not(feature = "mock"))]
     #[test]
-    #[cfg_attr(feature = "mock", ignore)]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
             216
