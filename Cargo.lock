@@ -1057,7 +1057,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "safe-nd"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/safe-nd#6077fab6ffc9b5e5d56f7ba63707275c9c0ae1ad"
+source = "git+https://github.com/maidsafe/safe-nd#d8615b265924e76ab97a6a3c727e129f9612afc5"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -199,7 +199,6 @@ impl DestinationElder {
             // ===== Coins =====
             //
             TransferCoins {
-                source,
                 destination,
                 amount,
                 transaction_id,
@@ -211,7 +210,13 @@ impl DestinationElder {
             //
             // ===== Invalid =====
             //
-            GetBalance(_) | ListAuthKeysAndVersion | InsAuthKey { .. } | DelAuthKey { .. } => {
+            GetBalance
+            | ListAuthKeysAndVersion
+            | InsAuthKey { .. }
+            | DelAuthKey { .. }
+            | CreateCoinBalance { .. }
+            | PutAccount { .. }
+            | GetAccount(..) => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, request
@@ -293,10 +298,13 @@ impl DestinationElder {
             //
             GetTransaction(_)
             | TransferCoins(_)
+            | CreateCoinBalance { .. }
             | GetBalance(_)
             | ListAuthKeysAndVersion(_)
             | InsAuthKey(_)
-            | DelAuthKey(_) => {
+            | DelAuthKey(_)
+            | PutAccount(_)
+            | GetAccount(_) => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, response

@@ -50,22 +50,36 @@
     variant_size_differences
 )]
 
+#[macro_use]
 mod common;
 
 use self::common::{Environment, TestClient, TestVault};
+use safe_nd::{Coins, Request, Response};
 use unwrap::unwrap;
 
 #[test]
 fn client_connects() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
-    let vault_conn_info = unwrap!(vault.our_connection_info());
+    let mut client = TestClient::new(env.rng());
+    let _ = client.establish_connection(&mut env, &mut vault);
+}
+
+#[test]
+fn get_balance() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
 
     let mut client = TestClient::new(env.rng());
-    client.connect_to(vault_conn_info.clone());
+    let conn_info = client.establish_connection(&mut env, &mut vault);
+
+    let message_id = client.send_request(conn_info, Request::GetBalance);
     env.poll(&mut vault);
 
-    client.expect_connected_to(&vault_conn_info);
-    client.handle_challenge_from(&vault_conn_info);
-    env.poll(&mut vault);
+    match client.expect_response(message_id) {
+        Response::GetBalance(Ok(coins)) if coins == unwrap!(Coins::from_nano(0)) => (),
+        x => unexpected!(x),
+    }
+
+    // TODO: expand this test to cover non-zero balance cases too.
 }

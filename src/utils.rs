@@ -99,8 +99,13 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
             ref coins_balance_id,
             ..
         } => Some(coins_balance_id),
-        GetBalance(ref name) => Some(name),
-        ListAuthKeysAndVersion | InsAuthKey { .. } | DelAuthKey { .. } => None,
+        GetBalance
+        | ListAuthKeysAndVersion
+        | InsAuthKey { .. }
+        | DelAuthKey { .. }
+        | CreateCoinBalance { .. }
+        | PutAccount { .. }
+        | GetAccount(_) => None,
     }
 }
 

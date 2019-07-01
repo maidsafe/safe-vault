@@ -129,8 +129,7 @@ impl SourceElder {
         };
 
         let challenge = utils::random_vec(8);
-        let msg = utils::serialise(&Challenge::Request(challenge.clone()));
-        self.quic_p2p.send(peer.clone(), Bytes::from(msg));
+        self.send(peer.clone(), &Challenge::Request(challenge.clone()));
         let _ = self.client_candidates.insert(peer.peer_addr(), challenge);
         info!("{}: Connected to new client on {}", self, peer_addr);
     }
@@ -298,13 +297,16 @@ impl SourceElder {
             //
             // ===== Coins =====
             //
-            TransferCoins {
-                ref source,
-                ref amount,
-                ..
-            } => unimplemented!(),
+            TransferCoins { ref amount, .. } => unimplemented!(),
             GetTransaction { .. } => unimplemented!(),
-            GetBalance(ref address) => unimplemented!(),
+            GetBalance => {
+                let owner = utils::owner(client_id)?;
+                let balance = self.balance(owner).or_else(|| Coins::from_nano(0).ok())?;
+                let response = Response::GetBalance(Ok(balance));
+                self.send_response_to_client(client_id, message_id, response);
+                None
+            }
+            CreateCoinBalance { .. } => unimplemented!(),
             //
             // ===== Client (Owner) to SrcElders =====
             //
@@ -315,6 +317,8 @@ impl SourceElder {
                 ref permissions,
             } => unimplemented!(),
             DelAuthKey { ref key, version } => unimplemented!(),
+            PutAccount { .. } => unimplemented!(),
+            GetAccount { .. } => unimplemented!(),
         }
     }
 
@@ -513,7 +517,10 @@ impl SourceElder {
             | GetBalance(_)
             | ListAuthKeysAndVersion(_)
             | InsAuthKey(_)
-            | DelAuthKey(_) => {
+            | DelAuthKey(_)
+            | CreateCoinBalance(_)
+            | PutAccount(_)
+            | GetAccount(_) => {
                 error!(
                     "{}: Should not receive {:?} as a source elder.",
                     self, response
@@ -521,6 +528,38 @@ impl SourceElder {
                 None
             }
         }
+    }
+
+    fn send<T: Serialize>(&mut self, recipient: Peer, msg: &T) {
+        let msg = utils::serialise(msg);
+        let msg = Bytes::from(msg);
+        self.quic_p2p.send(recipient, msg)
+    }
+
+    fn send_response_to_client(
+        &mut self,
+        client_id: &PublicId,
+        message_id: MessageId,
+        response: Response,
+    ) {
+        let peer_addr = if let Some((peer_addr, _)) = self
+            .clients
+            .iter()
+            .find(|(_, (pub_id, _))| pub_id == client_id)
+        {
+            *peer_addr
+        } else {
+            info!("{}: client {} not found", self, client_id);
+            return;
+        };
+
+        self.send(
+            Peer::Client { peer_addr },
+            &Message::Response {
+                response,
+                message_id,
+            },
+        )
     }
 
     fn balance(&self, client_id: &ClientPublicId) -> Option<Coins> {
@@ -546,6 +585,6 @@ impl SourceElder {
 
 impl Display for SourceElder {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id)
+        write!(formatter, "Node({})", self.id.name())
     }
 }

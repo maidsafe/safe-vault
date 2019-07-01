@@ -14,7 +14,7 @@ pub use self::rng::TestRng;
 
 use bytes::Bytes;
 use crossbeam_channel::Receiver;
-use safe_nd::{Challenge, ClientFullId, PublicId};
+use safe_nd::{Challenge, ClientFullId, Message, MessageId, PublicId, Request, Response};
 use safe_vault::{
     mock::Network,
     quic_p2p::{self, Builder, Event, NodeInfo, OurType, Peer, QuicP2p},
@@ -24,6 +24,7 @@ use serde::Serialize;
 use std::{
     net::SocketAddr,
     ops::{Deref, DerefMut},
+    slice,
 };
 use tempdir::TempDir;
 use unwrap::unwrap;
@@ -56,14 +57,23 @@ impl Environment {
 
     // Poll the mock network and the given vaults.
     // For convenience, this function can be called with `&mut Vault` or `&mut [Vault]`.
-    pub fn poll<V: Vaults>(&self, vaults: &mut V) {
-        loop {
+    pub fn poll<T: AsMutSlice<TestVault>>(&self, vaults: &mut T) {
+        let mut progress = true;
+        while progress {
             self.network.poll();
-            if !vaults.poll() {
-                break;
+
+            progress = false;
+            for vault in vaults.as_mut_slice().iter_mut() {
+                if vault.inner.poll() {
+                    progress = true;
+                }
             }
         }
     }
+}
+
+pub trait AsMutSlice<T> {
+    fn as_mut_slice(&mut self) -> &mut [T];
 }
 
 pub struct TestVault {
@@ -101,27 +111,15 @@ impl DerefMut for TestVault {
     }
 }
 
-pub trait Vaults {
-    fn poll(&mut self) -> bool;
-}
-
-impl Vaults for TestVault {
-    fn poll(&mut self) -> bool {
-        self.inner.poll()
+impl AsMutSlice<TestVault> for TestVault {
+    fn as_mut_slice(&mut self) -> &mut [TestVault] {
+        slice::from_mut(self)
     }
 }
 
-impl Vaults for [TestVault] {
-    fn poll(&mut self) -> bool {
-        let mut progress = false;
-
-        for vault in self.iter_mut() {
-            if vault.inner.poll() {
-                progress = true;
-            }
-        }
-
-        progress
+impl AsMutSlice<TestVault> for [TestVault] {
+    fn as_mut_slice(&mut self) -> &mut [TestVault] {
+        self
     }
 }
 
@@ -178,17 +176,70 @@ impl TestClient {
             signature,
         );
 
-        self.send(
-            Peer::Node {
-                node_info: conn_info.clone(),
-            },
-            &response,
-        );
+        self.send(conn_info.clone(), &response);
     }
 
-    pub fn send<T: Serialize>(&mut self, recipient: Peer, msg: &T) {
+    pub fn send<T: Serialize>(&mut self, recipient: NodeInfo, msg: &T) {
         let msg = unwrap!(bincode::serialize(msg));
-        self.quic_p2p.send(recipient, Bytes::from(msg))
+        self.quic_p2p.send(
+            Peer::Node {
+                node_info: recipient,
+            },
+            Bytes::from(msg),
+        )
+    }
+
+    pub fn send_request(&mut self, recipient: NodeInfo, request: Request) -> MessageId {
+        let message_id = MessageId::new();
+
+        let to_sign = (&request, &message_id);
+        let to_sign = unwrap!(bincode::serialize(&to_sign));
+        let signature = self.full_id.sign(&to_sign);
+
+        let msg = Message::Request {
+            request,
+            message_id,
+            signature: Some(signature),
+        };
+
+        self.send(recipient, &msg);
+
+        message_id
+    }
+
+    pub fn expect_response(&mut self, expected_message_id: MessageId) -> Response {
+        let bytes = self.expect_new_message().1;
+        let message: Message = unwrap!(bincode::deserialize(&bytes));
+
+        match message {
+            Message::Response {
+                message_id,
+                response,
+            } => {
+                assert_eq!(
+                    message_id, expected_message_id,
+                    "Received Response with unexpected MessageId."
+                );
+                response
+            }
+            Message::Request { request, .. } => unexpected!(request),
+        }
+    }
+
+    pub fn establish_connection(
+        &mut self,
+        env: &mut Environment,
+        vault: &mut TestVault,
+    ) -> NodeInfo {
+        let conn_info = unwrap!(vault.our_connection_info());
+        self.connect_to(conn_info.clone());
+        env.poll(vault);
+
+        self.expect_connected_to(&conn_info);
+        self.handle_challenge_from(&conn_info);
+        env.poll(vault);
+
+        conn_info
     }
 }
 
