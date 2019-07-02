@@ -43,7 +43,7 @@ const ARGS: [&str; 11] = [
 ];
 
 /// Vault configuration
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, StructOpt)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, StructOpt)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Config {
     /// The address to be credited when this vault farms SafeCoin.
@@ -169,12 +169,6 @@ impl Config {
         let reader = BufReader::new(file);
         let config = serde_json::from_reader(reader)?;
         Ok(config)
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
