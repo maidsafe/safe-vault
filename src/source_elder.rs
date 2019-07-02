@@ -251,12 +251,12 @@ impl SourceElder {
                         message_id,
                     })
                 } else {
-                    Some(Action::RespondToClient {
-                        sender: *self.id.name(),
-                        client_name: *client_id.name(),
-                        response: Response::GetIData(Err(NdError::AccessDenied)),
+                    self.send_response_to_client(
+                        client_id,
                         message_id,
-                    })
+                        Response::GetIData(Err(NdError::AccessDenied)),
+                    );
+                    None
                 }
             }
             DeleteUnpubIData(ref address) => unimplemented!(),
@@ -312,6 +312,39 @@ impl SourceElder {
             }
             CreateCoinBalance { .. } => unimplemented!(),
             //
+            // ===== Accounts =====
+            //
+            CreateAccount(..) => Some(Action::ForwardClientRequest {
+                client_name: *client_id.name(),
+                request,
+                message_id,
+            }),
+            CreateAccountFor { .. } => Some(Action::ForwardClientRequest {
+                client_name: *client_id.name(),
+                request,
+                message_id,
+            }),
+            UpdateAccount { .. } => unimplemented!(),
+            GetAccount(ref address) => {
+                // TODO: allow only registered clients to send this req
+                // once the coin balances are implemented.
+
+                // if registered_client == ClientState::Registered {
+                Some(Action::ForwardClientRequest {
+                    client_name: *client_id.name(),
+                    request,
+                    message_id,
+                })
+                // } else {
+                //     self.send_response_to_client(
+                //         client_id,
+                //         message_id,
+                //         Response::GetAccount(Err(NdError::AccessDenied)),
+                //     );
+                //     None
+                // }
+            }
+            //
             // ===== Client (Owner) to SrcElders =====
             //
             ListAuthKeysAndVersion => unimplemented!(),
@@ -321,8 +354,6 @@ impl SourceElder {
                 ref permissions,
             } => unimplemented!(),
             DelAuthKey { ref key, version } => unimplemented!(),
-            PutAccount { .. } => unimplemented!(),
-            GetAccount { .. } => unimplemented!(),
         }
     }
 
@@ -437,10 +468,11 @@ impl SourceElder {
         })
     }
 
-    pub fn handle_node_response(
+    /// Handle response from the destination elders.
+    pub fn handle_response(
         &mut self,
         dst_elders: XorName,
-        src_elders: XorName,
+        client_name: XorName,
         response: Response,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -450,18 +482,15 @@ impl SourceElder {
             self,
             response,
             message_id,
-            src_elders,
+            client_name,
             dst_elders
         );
         // TODO - remove this
         #[allow(unused)]
         match response {
-            //
-            // ===== Immutable Data =====
-            //
-            PutIData(result) => unimplemented!(),
-            GetIData(ref result) => {
-                if let Some(peer_addr) = self.lookup_client_peer_addr(src_elders) {
+            // Transfer the response from destination elders to clients
+            GetAccount(..) | CreateAccount(..) | GetIData(..) => {
+                if let Some(peer_addr) = self.lookup_client_peer_addr(client_name) {
                     let peer = Peer::Client {
                         peer_addr: *peer_addr,
                     };
@@ -473,10 +502,14 @@ impl SourceElder {
                         },
                     );
                 } else {
-                    info!("{}: client {} not found", self, src_elders);
+                    info!("{}: client {} not found", self, client_name);
                 }
                 None
             }
+            //
+            // ===== Immutable Data =====
+            //
+            PutIData(result) => unimplemented!(),
             DeleteUnpubIData(result) => unimplemented!(),
             //
             // ===== Mutable Data =====
@@ -527,16 +560,18 @@ impl SourceElder {
             //
             GetTransaction(result) => unimplemented!(),
             //
+            // ===== Accounts =====
+            //
+            CreateAccountFor(..) | UpdateAccount(..) => unimplemented!(),
+            //
             // ===== Invalid =====
             //
-            TransferCoins(_)
+            CreateCoinBalance(_)
+            | TransferCoins(_)
             | GetBalance(_)
             | ListAuthKeysAndVersion(_)
             | InsAuthKey(_)
-            | DelAuthKey(_)
-            | CreateCoinBalance(_)
-            | PutAccount(_)
-            | GetAccount(_) => {
+            | DelAuthKey(_) => {
                 error!(
                     "{}: Should not receive {:?} as a source elder.",
                     self, response

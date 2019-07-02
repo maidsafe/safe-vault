@@ -54,7 +54,7 @@
 mod common;
 
 use self::common::{Environment, TestClient, TestVault};
-use safe_nd::{Coins, Request, Response};
+use safe_nd::{AccountData, Coins, Error as NdError, Request, Response, XorName};
 use unwrap::unwrap;
 
 #[test]
@@ -82,4 +82,59 @@ fn get_balance() {
     }
 
     // TODO: expand this test to cover non-zero balance cases too.
+}
+
+#[test]
+fn accounts() {
+    env_logger::init();
+
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+
+    let mut client = TestClient::new(env.rng());
+    let conn_info = client.establish_connection(&mut env, &mut vault);
+
+    let account_data = vec![0; 32];
+    let account_locator: XorName = rand::random();
+
+    // Try to get an account that does not exist yet.
+    let message_id = client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::GetAccount(Err(NdError::NoSuchAccount)) => (),
+        x => unexpected!(x),
+    }
+
+    // Create a new account
+    let account = unwrap!(AccountData::new(
+        account_locator,
+        client.public_id().public_key().clone(),
+        account_data.clone(),
+        client.full_id().sign(&account_data),
+    ));
+
+    let message_id = client.send_request(conn_info.clone(), Request::CreateAccount(account));
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::CreateAccount(Ok(_)) => (),
+        x => unexpected!(x),
+    }
+
+    // Try to get the account data and signature.
+    let message_id = client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::GetAccount(Ok((data, sig))) => {
+            assert_eq!(data, account_data);
+
+            match client.public_id().public_key().verify(&sig, &data) {
+                Ok(()) => (),
+                x => unexpected!(x),
+            }
+        }
+        x => unexpected!(x),
+    }
 }

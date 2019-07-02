@@ -204,16 +204,14 @@ impl Vault {
                 self.destination_elder_mut()?
                     .handle_response(sender, response, message_id)
             }
-            RespondToClient {
+            RespondToSrcElders {
                 sender,
                 client_name,
                 response,
                 message_id,
             } => {
-                let dst_elders = sender;
-                let src_elders = client_name;
                 self.source_elder_mut()?
-                    .handle_node_response(dst_elders, src_elders, response, message_id)
+                    .handle_response(sender, client_name, response, message_id)
             }
             SendToPeers {
                 targets,

@@ -9,8 +9,12 @@
 mod idata_op;
 
 use crate::{
+    account::Account,
     action::Action,
-    chunk_store::{AppendOnlyChunkStore, ImmutableChunkStore, MutableChunkStore},
+    chunk_store::{
+        error::Error as ChunkStoreError, AccountChunkStore, AppendOnlyChunkStore,
+        ImmutableChunkStore, MutableChunkStore,
+    },
     utils,
     vault::Init,
     Result, ToDbKey,
@@ -19,8 +23,8 @@ use idata_op::IDataOp;
 use log::{error, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    Error as NdError, IDataAddress, IDataKind, MessageId, NodePublicId, Request, Response,
-    Result as NdResult, XorName,
+    AccountData, Error as NdError, IDataAddress, IDataKind, MessageId, NodePublicId, Request,
+    Response, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -36,6 +40,7 @@ use unwrap::unwrap;
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const MUTABLE_META_DB_NAME: &str = "mutable_data.db";
 const APPEND_ONLY_META_DB_NAME: &str = "append_only_data.db";
+const ACCOUNT_META_DB_NAME: &str = "accounts.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 // The number of separate copies of an ImmutableData chunk which should be maintained.
 const IMMUTABLE_DATA_COPY_COUNT: usize = 3;
@@ -53,10 +58,12 @@ pub(crate) struct DestinationElder {
     immutable_metadata: PickleDb,
     mutable_metadata: PickleDb,
     append_only_metadata: PickleDb,
+    account_metadata: PickleDb,
     full_adults: PickleDb,
     immutable_chunks: ImmutableChunkStore,
     mutable_chunks: MutableChunkStore,
     append_only_chunks: AppendOnlyChunkStore,
+    account_chunks: AccountChunkStore,
 }
 
 impl DestinationElder {
@@ -70,6 +77,7 @@ impl DestinationElder {
         let mutable_metadata = utils::new_db(root_dir, MUTABLE_META_DB_NAME, init_mode)?;
         let append_only_metadata = utils::new_db(root_dir, APPEND_ONLY_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
+        let account_metadata = utils::new_db(root_dir, ACCOUNT_META_DB_NAME, init_mode)?;
 
         let total_used_space = Rc::new(RefCell::new(0));
         let immutable_chunks = ImmutableChunkStore::new(
@@ -90,16 +98,24 @@ impl DestinationElder {
             Rc::clone(&total_used_space),
             init_mode,
         )?;
+        let account_chunks = AccountChunkStore::new(
+            root_dir,
+            max_capacity,
+            Rc::clone(&total_used_space),
+            init_mode,
+        )?;
         Ok(Self {
             id,
             idata_ops: Default::default(),
             immutable_metadata,
             mutable_metadata,
             append_only_metadata,
+            account_metadata,
             full_adults,
             immutable_chunks,
             mutable_chunks,
             append_only_chunks,
+            account_chunks,
         })
     }
 
@@ -209,15 +225,22 @@ impl DestinationElder {
                 transaction_id,
             } => unimplemented!(),
             //
+            // ===== Accounts =====
+            //
+            CreateAccount(ref new_account) => {
+                self.handle_create_account_req(src, new_account, message_id)
+            }
+            UpdateAccount { .. } => unimplemented!(),
+            CreateAccountFor { .. } => unimplemented!(),
+            GetAccount(ref address) => self.handle_get_account_req(src, address, message_id),
+            //
             // ===== Invalid =====
             //
             GetBalance
             | ListAuthKeysAndVersion
             | InsAuthKey { .. }
             | DelAuthKey { .. }
-            | CreateCoinBalance { .. }
-            | PutAccount { .. }
-            | GetAccount(..) => {
+            | CreateCoinBalance { .. } => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, request
@@ -295,6 +318,13 @@ impl DestinationElder {
             AppendUnseq(result) => unimplemented!(),
             DeleteAData(result) => unimplemented!(),
             //
+            // ===== Accounts ====
+            //
+            CreateAccount(result) => self.handle_create_account_resp(src, result, message_id),
+            CreateAccount(..) | CreateAccountFor(..) | UpdateAccount(..) | GetAccount(..) => {
+                unimplemented!()
+            }
+            //
             // ===== Invalid =====
             //
             GetTransaction(_)
@@ -303,9 +333,7 @@ impl DestinationElder {
             | GetBalance(_)
             | ListAuthKeysAndVersion(_)
             | InsAuthKey(_)
-            | DelAuthKey(_)
-            | PutAccount(_)
-            | GetAccount(_) => {
+            | DelAuthKey(_) => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, response
@@ -313,6 +341,75 @@ impl DestinationElder {
                 None
             }
         }
+    }
+
+    fn handle_create_account_req(
+        &mut self,
+        src: XorName,
+        new_account: &AccountData,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        // TODO: verify owner is the same as src?
+        let result = if self.account_chunks.has(&new_account.destination()) {
+            Err(NdError::AccountExists)
+        } else {
+            self.account_chunks
+                .put(&Account {
+                    address: *new_account.destination(),
+                    data: new_account.data().to_vec(), // FIXME: we probably don't need cloning here, try mem::replace
+                    authorised_getter: *new_account.authorised_getter(),
+                    signature: new_account.signature().clone(),
+                })
+                .map_err(|error| error.to_string().into())
+        };
+        Some(Action::RespondToOurDstElders {
+            sender: src,
+            response: Response::CreateAccount(result),
+            message_id,
+        })
+    }
+
+    fn handle_get_account_req(
+        &mut self,
+        src: XorName,
+        address: &XorName,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = self
+            .account_chunks
+            .get(address)
+            .map_err(|error| match error {
+                ChunkStoreError::NoSuchChunk => NdError::NoSuchAccount,
+                error => error.to_string().into(),
+            })
+            .and_then(|account| {
+                if XorName::from(account.authorised_getter) != src {
+                    // Request does not come from the sender
+                    Err(NdError::AccessDenied)
+                } else {
+                    Ok((account.data, account.signature))
+                }
+            });
+        Some(Action::RespondToSrcElders {
+            client_name: src,
+            sender: *self.id.name(),
+            response: Response::GetAccount(result),
+            message_id,
+        })
+    }
+
+    fn handle_create_account_resp(
+        &mut self,
+        client_name: XorName,
+        result: NdResult<()>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        Some(Action::RespondToSrcElders {
+            sender: *self.id.name(),
+            client_name,
+            response: Response::CreateAccount(result),
+            message_id,
+        })
     }
 
     fn handle_put_idata_req(

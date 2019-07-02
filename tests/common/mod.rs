@@ -14,7 +14,9 @@ pub use self::rng::TestRng;
 
 use bytes::Bytes;
 use crossbeam_channel::Receiver;
-use safe_nd::{Challenge, ClientFullId, Message, MessageId, PublicId, Request, Response};
+use safe_nd::{
+    Challenge, ClientFullId, ClientPublicId, Message, MessageId, PublicId, Request, Response,
+};
 use safe_vault::{
     mock::Network,
     quic_p2p::{self, Builder, Event, NodeInfo, OurType, Peer, QuicP2p},
@@ -240,6 +242,14 @@ impl TestClient {
         env.poll(vault);
 
         conn_info
+    }
+
+    pub fn public_id(&self) -> &ClientPublicId {
+        self.full_id.public_id()
+    }
+
+    pub fn full_id(&self) -> &ClientFullId {
+        &self.full_id
     }
 }
 

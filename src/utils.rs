@@ -95,6 +95,17 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
         TransferCoins {
             ref destination, ..
         } => Some(destination),
+        CreateCoinBalance {
+            // ref new_balance_owner,
+            ..
+        } => None, // Some(XorName::from(new_balance_owner)),
+        CreateAccount(account_data) => Some(account_data.destination()),
+        CreateAccountFor {
+            new_account,
+            ..
+        } => Some(new_account.destination()),
+        UpdateAccount(account_data) => Some(account_data.destination()),
+        GetAccount(ref name) => Some(name),
         GetTransaction {
             ref coins_balance_id,
             ..
@@ -102,10 +113,7 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
         GetBalance
         | ListAuthKeysAndVersion
         | InsAuthKey { .. }
-        | DelAuthKey { .. }
-        | CreateCoinBalance { .. }
-        | PutAccount { .. }
-        | GetAccount(_) => None,
+        | DelAuthKey { .. } => None,
     }
 }
 

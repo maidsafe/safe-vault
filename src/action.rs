@@ -23,7 +23,7 @@ pub(crate) enum Action {
         response: Response,
         message_id: MessageId,
     },
-    RespondToClient {
+    RespondToSrcElders {
         sender: XorName,
         client_name: XorName,
         response: Response,

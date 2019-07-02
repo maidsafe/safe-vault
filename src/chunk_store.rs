@@ -11,9 +11,9 @@
 // FIXME - remove
 #![allow(unused)]
 
-
 // #[cfg(test)]
 // mod tests;
+mod account;
 mod append_only;
 mod chunk;
 pub(super) mod error;
@@ -21,7 +21,7 @@ mod immutable;
 mod mutable;
 mod used_space;
 
-use crate::{utils, vault::Init};
+use crate::{account::Account, utils, vault::Init};
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
 use hex::{self, FromHex};
@@ -48,6 +48,7 @@ const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 pub(crate) type ImmutableChunkStore = ChunkStore<IDataKind>;
 pub(crate) type MutableChunkStore = ChunkStore<MutableChunk>;
 pub(crate) type AppendOnlyChunkStore = ChunkStore<AData>;
+pub(crate) type AccountChunkStore = ChunkStore<Account>;
 
 /// `ChunkStore` is a store of data held as serialised files on disk, implementing a maximum disk
 /// usage to restrict storage.
@@ -217,5 +218,11 @@ impl Subdir for MutableChunkStore {
 impl Subdir for AppendOnlyChunkStore {
     fn subdir() -> &'static Path {
         Path::new("append_only")
+    }
+}
+
+impl Subdir for AccountChunkStore {
+    fn subdir() -> &'static Path {
+        Path::new("accounts")
     }
 }
