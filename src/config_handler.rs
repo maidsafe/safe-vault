@@ -102,6 +102,11 @@ impl Config {
             .unwrap_or_else(|| env::temp_dir().join(DEFAULT_ROOT_DIR_NAME))
     }
 
+    /// Set the root directory for `ChunkStore`s and cached state.
+    pub fn set_root_dir<P: Into<PathBuf>>(&mut self, path: P) {
+        self.root_dir = Some(path.into())
+    }
+
     /// Quic-P2P configuration options.
     pub fn quic_p2p_config(&self) -> &QuicP2pConfig {
         &self.quic_p2p_config

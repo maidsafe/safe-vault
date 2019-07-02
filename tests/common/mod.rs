@@ -18,13 +18,14 @@ use safe_nd::{Challenge, ClientFullId, PublicId};
 use safe_vault::{
     mock::Network,
     quic_p2p::{self, Builder, Event, NodeInfo, OurType, Peer, QuicP2p},
-    Vault,
+    Config, Vault,
 };
 use serde::Serialize;
 use std::{
     net::SocketAddr,
     ops::{Deref, DerefMut},
 };
+use tempdir::TempDir;
 use unwrap::unwrap;
 
 macro_rules! unexpected {
@@ -65,22 +66,57 @@ impl Environment {
     }
 }
 
+pub struct TestVault {
+    inner: Vault,
+    _root_dir: TempDir,
+}
+
+impl TestVault {
+    pub fn new() -> Self {
+        let root_dir = unwrap!(TempDir::new("safe_vault"));
+
+        let mut config = Config::default();
+        config.set_root_dir(root_dir.path());
+
+        let inner = unwrap!(Vault::new(config));
+
+        Self {
+            inner,
+            _root_dir: root_dir,
+        }
+    }
+}
+
+impl Deref for TestVault {
+    type Target = Vault;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for TestVault {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 pub trait Vaults {
     fn poll(&mut self) -> bool;
 }
 
-impl Vaults for Vault {
+impl Vaults for TestVault {
     fn poll(&mut self) -> bool {
-        Vault::poll(self)
+        self.inner.poll()
     }
 }
 
-impl Vaults for [Vault] {
+impl Vaults for [TestVault] {
     fn poll(&mut self) -> bool {
         let mut progress = false;
 
         for vault in self.iter_mut() {
-            if vault.poll() {
+            if vault.inner.poll() {
                 progress = true;
             }
         }

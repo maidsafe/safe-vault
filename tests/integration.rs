@@ -52,14 +52,13 @@
 
 mod common;
 
-use self::common::{Environment, TestClient};
-use safe_vault::{Config, Vault};
+use self::common::{Environment, TestClient, TestVault};
 use unwrap::unwrap;
 
 #[test]
 fn client_connects() {
     let mut env = Environment::new();
-    let mut vault = unwrap!(Vault::new(Config::default()));
+    let mut vault = TestVault::new();
     let vault_conn_info = unwrap!(vault.our_connection_info());
 
     let mut client = TestClient::new(env.rng());

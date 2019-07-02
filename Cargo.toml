@@ -36,6 +36,7 @@ unwrap = "~1.2.1"
 
 [dev_dependencies]
 rand_chacha = "~0.1.1"
+tempdir = "~0.3.7"
 
 [[bin]]
 name = "safe_vault"
