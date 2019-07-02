@@ -39,4 +39,4 @@ after_build:
         }
 
 test_script:
-  - cargo test --verbose --release --features=mock --no-default-features
+  - cargo test --verbose --release --features=mock,disable-db-dump --no-default-features

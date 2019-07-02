@@ -2,4 +2,4 @@
 
 set -e -x
 
-cargo test $@ --release --features=mock --no-default-features
+cargo test $@ --release --features=mock,disable-db-dump --no-default-features
