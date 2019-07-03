@@ -86,8 +86,6 @@ fn get_balance() {
 
 #[test]
 fn accounts() {
-    env_logger::init();
-
     let mut env = Environment::new();
     let mut vault = TestVault::new();
 
@@ -118,7 +116,7 @@ fn accounts() {
     env.poll(&mut vault);
 
     match client.expect_response(message_id) {
-        Response::CreateAccount(Ok(_)) => (),
+        Response::Mutation(Ok(_)) => (),
         x => unexpected!(x),
     }
 

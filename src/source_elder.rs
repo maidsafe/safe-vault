@@ -489,7 +489,7 @@ impl SourceElder {
         #[allow(unused)]
         match response {
             // Transfer the response from destination elders to clients
-            GetAccount(..) | CreateAccount(..) | GetIData(..) => {
+            GetAccount(..) | Mutation(..) | GetIData(..) => {
                 if let Some(peer_addr) = self.lookup_client_peer_addr(client_name) {
                     let peer = Peer::Client {
                         peer_addr: *peer_addr,
@@ -507,17 +507,10 @@ impl SourceElder {
                 None
             }
             //
-            // ===== Immutable Data =====
-            //
-            PutIData(result) => unimplemented!(),
-            DeleteUnpubIData(result) => unimplemented!(),
-            //
             // ===== Mutable Data =====
             //
             GetUnseqMData(result) => unimplemented!(),
-            PutUnseqMData(result) => unimplemented!(),
             GetSeqMData(result) => unimplemented!(),
-            PutSeqMData(result) => unimplemented!(),
             GetSeqMDataShell(result) => unimplemented!(),
             GetUnseqMDataShell(result) => unimplemented!(),
             GetMDataVersion(result) => unimplemented!(),
@@ -526,19 +519,13 @@ impl SourceElder {
             ListMDataKeys(result) => unimplemented!(),
             ListSeqMDataValues(result) => unimplemented!(),
             ListUnseqMDataValues(result) => unimplemented!(),
-            DeleteMData(result) => unimplemented!(),
-            SetMDataUserPermissions(result) => unimplemented!(),
-            DelMDataUserPermissions(result) => unimplemented!(),
             ListMDataUserPermissions(result) => unimplemented!(),
             ListMDataPermissions(result) => unimplemented!(),
-            MutateSeqMDataEntries(result) => unimplemented!(),
-            MutateUnseqMDataEntries(result) => unimplemented!(),
             GetSeqMDataValue(result) => unimplemented!(),
             GetUnseqMDataValue(result) => unimplemented!(),
             //
             // ===== Append Only Data =====
             //
-            PutAData(result) => unimplemented!(),
             GetAData(result) => unimplemented!(),
             GetADataShell(result) => unimplemented!(),
             GetADataOwners(result) => unimplemented!(),
@@ -549,29 +536,14 @@ impl SourceElder {
             GetPubADataPermissionAtIndex(result) => unimplemented!(),
             GetPubADataUserPermissions(result) => unimplemented!(),
             GetUnpubADataUserPermissions(result) => unimplemented!(),
-            AddUnpubADataPermissions(result) => unimplemented!(),
-            AddPubADataPermissions(result) => unimplemented!(),
-            SetADataOwner(result) => unimplemented!(),
-            AppendSeq(result) => unimplemented!(),
-            AppendUnseq(result) => unimplemented!(),
-            DeleteAData(result) => unimplemented!(),
             //
             // ===== Coins =====
             //
             GetTransaction(result) => unimplemented!(),
             //
-            // ===== Accounts =====
-            //
-            CreateAccountFor(..) | UpdateAccount(..) => unimplemented!(),
-            //
             // ===== Invalid =====
             //
-            CreateCoinBalance(_)
-            | TransferCoins(_)
-            | GetBalance(_)
-            | ListAuthKeysAndVersion(_)
-            | InsAuthKey(_)
-            | DelAuthKey(_) => {
+            GetBalance(_) | ListAuthKeysAndVersion(_) => {
                 error!(
                     "{}: Should not receive {:?} as a source elder.",
                     self, response

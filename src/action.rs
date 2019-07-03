@@ -9,6 +9,7 @@
 use safe_nd::{MessageId, Request, Response, XorName};
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Action {
     // Send a validated client request from src elders to dst elders
     ForwardClientRequest {

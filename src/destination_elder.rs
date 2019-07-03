@@ -267,19 +267,16 @@ impl DestinationElder {
         // TODO - remove this
         #[allow(unused)]
         match response {
+            Mutation(result) => self.handle_mutation_resp(src, result, message_id),
             //
             // ===== Immutable Data =====
             //
-            PutIData(result) => self.handle_put_idata_resp(src, result, message_id),
             GetIData(_) => self.handle_get_idata_resp(src, response, message_id),
-            DeleteUnpubIData(result) => unimplemented!(),
             //
             // ===== Mutable Data =====
             //
             GetUnseqMData(result) => unimplemented!(),
-            PutUnseqMData(result) => unimplemented!(),
             GetSeqMData(result) => unimplemented!(),
-            PutSeqMData(result) => unimplemented!(),
             GetSeqMDataShell(result) => unimplemented!(),
             GetUnseqMDataShell(result) => unimplemented!(),
             GetMDataVersion(result) => unimplemented!(),
@@ -288,19 +285,13 @@ impl DestinationElder {
             ListMDataKeys(result) => unimplemented!(),
             ListSeqMDataValues(result) => unimplemented!(),
             ListUnseqMDataValues(result) => unimplemented!(),
-            DeleteMData(result) => unimplemented!(),
-            SetMDataUserPermissions(result) => unimplemented!(),
-            DelMDataUserPermissions(result) => unimplemented!(),
             ListMDataUserPermissions(result) => unimplemented!(),
             ListMDataPermissions(result) => unimplemented!(),
-            MutateSeqMDataEntries(result) => unimplemented!(),
-            MutateUnseqMDataEntries(result) => unimplemented!(),
             GetSeqMDataValue(result) => unimplemented!(),
             GetUnseqMDataValue(result) => unimplemented!(),
             //
             // ===== Append Only Data =====
             //
-            PutAData(result) => unimplemented!(),
             GetAData(result) => unimplemented!(),
             GetADataShell(result) => unimplemented!(),
             GetADataOwners(result) => unimplemented!(),
@@ -311,29 +302,14 @@ impl DestinationElder {
             GetPubADataPermissionAtIndex(result) => unimplemented!(),
             GetPubADataUserPermissions(result) => unimplemented!(),
             GetUnpubADataUserPermissions(result) => unimplemented!(),
-            AddUnpubADataPermissions(result) => unimplemented!(),
-            AddPubADataPermissions(result) => unimplemented!(),
-            SetADataOwner(result) => unimplemented!(),
-            AppendSeq(result) => unimplemented!(),
-            AppendUnseq(result) => unimplemented!(),
-            DeleteAData(result) => unimplemented!(),
             //
             // ===== Accounts ====
             //
-            CreateAccount(result) => self.handle_create_account_resp(src, result, message_id),
-            CreateAccount(..) | CreateAccountFor(..) | UpdateAccount(..) | GetAccount(..) => {
-                unimplemented!()
-            }
+            GetAccount(..) => unimplemented!(),
             //
             // ===== Invalid =====
             //
-            GetTransaction(_)
-            | TransferCoins(_)
-            | CreateCoinBalance { .. }
-            | GetBalance(_)
-            | ListAuthKeysAndVersion(_)
-            | InsAuthKey(_)
-            | DelAuthKey(_) => {
+            GetTransaction(_) | GetBalance(_) | ListAuthKeysAndVersion(_) => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, response
@@ -364,7 +340,7 @@ impl DestinationElder {
         };
         Some(Action::RespondToOurDstElders {
             sender: src,
-            response: Response::CreateAccount(result),
+            response: Response::Mutation(result),
             message_id,
         })
     }
@@ -398,7 +374,7 @@ impl DestinationElder {
         })
     }
 
-    fn handle_create_account_resp(
+    fn handle_mutation_resp(
         &mut self,
         client_name: XorName,
         result: NdResult<()>,
@@ -407,7 +383,7 @@ impl DestinationElder {
         Some(Action::RespondToSrcElders {
             sender: *self.id.name(),
             client_name,
-            response: Response::CreateAccount(result),
+            response: Response::Mutation(result),
             message_id,
         })
     }
@@ -464,7 +440,7 @@ impl DestinationElder {
         }
     }
 
-    fn handle_put_idata_resp(
+    fn _handle_put_idata_resp(
         &mut self,
         _sender: XorName,
         _result: NdResult<()>,
@@ -496,7 +472,7 @@ impl DestinationElder {
         };
         Some(Action::RespondToOurDstElders {
             sender: *self.id.name(),
-            response: Response::PutIData(result),
+            response: Response::Mutation(result),
             message_id,
         })
     }
@@ -523,7 +499,7 @@ impl DestinationElder {
             // chunk. See the sent Get request below.
             self.get_idata(address, message_id)
         } else {
-            let error_response = |error: NdError| Action::RespondToClient {
+            let error_response = |error: NdError| Action::RespondToSrcElders {
                 sender: *address.name(),
                 client_name: src,
                 response: Response::GetIData(Err(error)),
