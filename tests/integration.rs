@@ -158,7 +158,7 @@ fn update_account() {
     // Create a new account
     let account = unwrap!(AccountData::new(
         account_locator,
-        client.public_id().public_key().clone(),
+        *client.public_id().public_key(),
         account_data.clone(),
         client.full_id().sign(&account_data),
     ));
@@ -172,7 +172,7 @@ fn update_account() {
 
     // Update the account data.
     let new_account_data = vec![1; 32];
-    let client_public_key = client.public_id().public_key().clone();
+    let client_public_key = *client.public_id().public_key();
     let signature = client.full_id().sign(&new_account_data);
     common::perform_mutation(
         &mut env,
