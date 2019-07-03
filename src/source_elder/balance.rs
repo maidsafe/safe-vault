@@ -52,6 +52,13 @@ impl BalanceDb {
         self.db.get(&public_key.to_db_key())
     }
 
+    pub fn get_key_value<K: Key>(&self, key: &K) -> Option<(PublicKey, Balance)> {
+        let public_key = key.to_public_key(&self.index)?;
+        self.db
+            .get(&public_key.to_db_key())
+            .map(|balance| (*public_key, balance))
+    }
+
     pub fn put(&mut self, public_key: &PublicKey, balance: &Balance) -> Result<()> {
         let db_key = public_key.to_db_key();
         self.db.set(&db_key, &balance)?;

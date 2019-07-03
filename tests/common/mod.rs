@@ -15,7 +15,7 @@ pub use self::rng::TestRng;
 use bytes::Bytes;
 use crossbeam_channel::Receiver;
 use safe_nd::{
-    Challenge, ClientFullId, ClientPublicId, Message, MessageId, PublicId, Request, Response,
+    Challenge, ClientFullId, ClientPublicId, Coins, Message, MessageId, PublicId, Request, Response,
 };
 use safe_vault::{
     mock::Network,
@@ -97,6 +97,10 @@ impl TestVault {
             _root_dir: root_dir,
         }
     }
+
+    pub fn connection_info(&mut self) -> NodeInfo {
+        unwrap!(self.inner.our_connection_info())
+    }
 }
 
 impl Deref for TestVault {
@@ -144,6 +148,14 @@ impl TestClient {
             rx,
             full_id: ClientFullId::new_ed25519(rng),
         }
+    }
+
+    pub fn public_id(&self) -> &ClientPublicId {
+        self.full_id.public_id()
+    }
+
+    pub fn full_id(&self) -> &ClientFullId {
+        &self.full_id
     }
 
     pub fn expect_connected_to(&self, conn_info: &NodeInfo) {
@@ -227,30 +239,6 @@ impl TestClient {
             Message::Request { request, .. } => unexpected!(request),
         }
     }
-
-    pub fn establish_connection(
-        &mut self,
-        env: &mut Environment,
-        vault: &mut TestVault,
-    ) -> NodeInfo {
-        let conn_info = unwrap!(vault.our_connection_info());
-        self.connect_to(conn_info.clone());
-        env.poll(vault);
-
-        self.expect_connected_to(&conn_info);
-        self.handle_challenge_from(&conn_info);
-        env.poll(vault);
-
-        conn_info
-    }
-
-    pub fn public_id(&self) -> &ClientPublicId {
-        self.full_id.public_id()
-    }
-
-    pub fn full_id(&self) -> &ClientFullId {
-        &self.full_id
-    }
 }
 
 impl Deref for TestClient {
@@ -264,5 +252,43 @@ impl Deref for TestClient {
 impl DerefMut for TestClient {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.quic_p2p
+    }
+}
+
+pub fn establish_connection(env: &mut Environment, client: &mut TestClient, vault: &mut TestVault) {
+    let conn_info = vault.connection_info();
+    client.connect_to(conn_info.clone());
+    env.poll(vault);
+
+    client.expect_connected_to(&conn_info);
+    client.handle_challenge_from(&conn_info);
+    env.poll(vault);
+}
+
+pub fn perform_mutation(
+    env: &mut Environment,
+    client: &mut TestClient,
+    vault: &mut TestVault,
+    request: Request,
+) {
+    let conn_info = vault.connection_info();
+    let message_id = client.send_request(conn_info, request);
+    env.poll(vault);
+
+    match client.expect_response(message_id) {
+        Response::Mutation(Ok(())) => (),
+        x => unexpected!(x),
+    }
+}
+
+pub fn get_balance(env: &mut Environment, client: &mut TestClient, vault: &mut TestVault) -> Coins {
+    let conn_info = vault.connection_info();
+    let message_id = client.send_request(conn_info, Request::GetBalance);
+
+    env.poll(vault);
+
+    match client.expect_response(message_id) {
+        Response::GetBalance(Ok(coins)) => coins,
+        x => unexpected!(x),
     }
 }

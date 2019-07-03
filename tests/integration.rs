@@ -54,6 +54,7 @@
 mod common;
 
 use self::common::{Environment, TestClient, TestVault};
+use rand::Rng;
 use safe_nd::{AccountData, Coins, Error as NdError, IDataAddress, Request, Response, XorName};
 use unwrap::unwrap;
 
@@ -62,38 +63,20 @@ fn client_connects() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
     let mut client = TestClient::new(env.rng());
-    let _ = client.establish_connection(&mut env, &mut vault);
-}
-
-#[test]
-fn get_balance() {
-    let mut env = Environment::new();
-    let mut vault = TestVault::new();
-
-    let mut client = TestClient::new(env.rng());
-    let conn_info = client.establish_connection(&mut env, &mut vault);
-
-    let message_id = client.send_request(conn_info, Request::GetBalance);
-    env.poll(&mut vault);
-
-    match client.expect_response(message_id) {
-        Response::GetBalance(Ok(coins)) if coins == unwrap!(Coins::from_nano(0)) => (),
-        x => unexpected!(x),
-    }
-
-    // TODO: expand this test to cover non-zero balance cases too.
+    common::establish_connection(&mut env, &mut client, &mut vault);
 }
 
 #[test]
 fn accounts() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
+    let conn_info = vault.connection_info();
 
     let mut client = TestClient::new(env.rng());
-    let conn_info = client.establish_connection(&mut env, &mut vault);
+    common::establish_connection(&mut env, &mut client, &mut vault);
 
     let account_data = vec![0; 32];
-    let account_locator: XorName = rand::random();
+    let account_locator: XorName = env.rng().gen();
 
     // Try to get an account that does not exist yet.
     let message_id = client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
@@ -112,14 +95,12 @@ fn accounts() {
         client.full_id().sign(&account_data),
     ));
 
-    let message_id =
-        client.send_request(conn_info.clone(), Request::CreateAccount(account.clone()));
-    env.poll(&mut vault);
-
-    match client.expect_response(message_id) {
-        Response::Mutation(Ok(_)) => (),
-        x => unexpected!(x),
-    }
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        &mut vault,
+        Request::CreateAccount(account.clone()),
+    );
 
     // Try to get the account data and signature.
     let message_id = client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
@@ -149,7 +130,7 @@ fn accounts() {
     // Getting account from non-owning client should fail.
     {
         let mut client = TestClient::new(env.rng());
-        let conn_info = client.establish_connection(&mut env, &mut vault);
+        common::establish_connection(&mut env, &mut client, &mut vault);
 
         let message_id =
             client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
@@ -166,12 +147,13 @@ fn accounts() {
 fn update_account() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
+    let conn_info = vault.connection_info();
 
     let mut client = TestClient::new(env.rng());
-    let conn_info = client.establish_connection(&mut env, &mut vault);
+    common::establish_connection(&mut env, &mut client, &mut vault);
 
     let account_data = vec![0; 32];
-    let account_locator: XorName = rand::random();
+    let account_locator: XorName = env.rng().gen();
 
     // Create a new account
     let account = unwrap!(AccountData::new(
@@ -181,32 +163,28 @@ fn update_account() {
         client.full_id().sign(&account_data),
     ));
 
-    let message_id =
-        client.send_request(conn_info.clone(), Request::CreateAccount(account.clone()));
-    env.poll(&mut vault);
-
-    match client.expect_response(message_id) {
-        Response::Mutation(Ok(_)) => (),
-        x => unexpected!(x),
-    }
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        &mut vault,
+        Request::CreateAccount(account.clone()),
+    );
 
     // Update the account data.
     let new_account_data = vec![1; 32];
-    let message_id = client.send_request(
-        conn_info.clone(),
+    let client_public_key = *client.public_id().public_key();
+    let signature = client.full_id().sign(&new_account_data);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        &mut vault,
         Request::UpdateAccount(unwrap!(AccountData::new(
             account_locator,
-            *client.public_id().public_key(),
+            client_public_key,
             new_account_data.clone(),
-            client.full_id().sign(&new_account_data),
+            signature,
         ))),
     );
-    env.poll(&mut vault);
-
-    match client.expect_response(message_id) {
-        Response::Mutation(Ok(_)) => (),
-        x => unexpected!(x),
-    }
 
     // Try to get the account data and signature.
     let message_id = client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
@@ -223,7 +201,7 @@ fn update_account() {
     // Updating account from non-owning client should fail.
     {
         let mut client = TestClient::new(env.rng());
-        let conn_info = client.establish_connection(&mut env, &mut vault);
+        common::establish_connection(&mut env, &mut client, &mut vault);
 
         let message_id =
             client.send_request(conn_info.clone(), Request::UpdateAccount(account.clone()));
@@ -237,15 +215,79 @@ fn update_account() {
 }
 
 #[test]
+fn coin_operations() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+    let conn_info = vault.connection_info();
+
+    let mut client_a = TestClient::new(env.rng());
+    let mut client_b = TestClient::new(env.rng());
+
+    common::establish_connection(&mut env, &mut client_a, &mut vault);
+    common::establish_connection(&mut env, &mut client_b, &mut vault);
+
+    let balance = common::get_balance(&mut env, &mut client_a, &mut vault);
+    assert_eq!(balance, unwrap!(Coins::from_nano(0)));
+
+    // Create A's balance
+    let public_key = *client_a.public_id().public_key();
+    let _ = client_a.send_request(
+        conn_info.clone(),
+        Request::CreateCoinBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(10)),
+            transaction_id: 0,
+        },
+    );
+    env.poll(&mut vault);
+
+    let balance = common::get_balance(&mut env, &mut client_a, &mut vault);
+    assert_eq!(balance, unwrap!(Coins::from_nano(10)));
+
+    // Create B's balance
+    let _ = client_a.send_request(
+        conn_info.clone(),
+        Request::CreateCoinBalance {
+            new_balance_owner: *client_b.public_id().public_key(),
+            amount: unwrap!(Coins::from_nano(1)),
+            transaction_id: 0,
+        },
+    );
+    env.poll(&mut vault);
+
+    let balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
+    let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
+    assert_eq!(balance_a, unwrap!(Coins::from_nano(9)));
+    assert_eq!(balance_b, unwrap!(Coins::from_nano(1)));
+
+    // Transfer coins from A to B
+    let _ = client_a.send_request(
+        conn_info,
+        Request::TransferCoins {
+            destination: *client_b.public_id().name(),
+            amount: unwrap!(Coins::from_nano(2)),
+            transaction_id: 1,
+        },
+    );
+    env.poll(&mut vault);
+
+    let balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
+    let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
+    assert_eq!(balance_a, unwrap!(Coins::from_nano(7)));
+    assert_eq!(balance_b, unwrap!(Coins::from_nano(3)));
+}
+
+#[test]
 fn get_immutable_data() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
+    let conn_info = vault.connection_info();
 
     let mut client = TestClient::new(env.rng());
-    let conn_info = client.establish_connection(&mut env, &mut vault);
+    common::establish_connection(&mut env, &mut client, &mut vault);
 
     // Get idata that doesn't exist
-    let address: XorName = rand::random();
+    let address: XorName = env.rng().gen();
     let message_id = client.send_request(
         conn_info.clone(),
         Request::GetIData(IDataAddress::Pub(address)),
@@ -276,12 +318,13 @@ fn get_immutable_data() {
 fn delete_unpublished_immutable_data() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
+    let conn_info = vault.connection_info();
 
     let mut client = TestClient::new(env.rng());
-    let conn_info = client.establish_connection(&mut env, &mut vault);
+    common::establish_connection(&mut env, &mut client, &mut vault);
 
     // Try to delete published idata
-    let address: XorName = rand::random();
+    let address: XorName = env.rng().gen();
     let message_id = client.send_request(
         conn_info.clone(),
         Request::DeleteUnpubIData(IDataAddress::Pub(address)),

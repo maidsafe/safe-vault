@@ -306,13 +306,9 @@ impl DestinationElder {
             GetPubADataUserPermissions(result) => unimplemented!(),
             GetUnpubADataUserPermissions(result) => unimplemented!(),
             //
-            // ===== Accounts ====
-            //
-            GetAccount(..) => unimplemented!(),
-            //
             // ===== Invalid =====
             //
-            GetTransaction(_) | GetBalance(_) | ListAuthKeysAndVersion(_) => {
+            GetTransaction(_) | GetBalance(_) | ListAuthKeysAndVersion(_) | GetAccount(_) => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, response

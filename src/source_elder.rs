@@ -8,7 +8,7 @@
 
 mod balance;
 
-use self::balance::BalanceDb;
+use self::balance::{Balance, BalanceDb};
 use crate::{
     action::Action,
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
@@ -220,19 +220,6 @@ impl SourceElder {
             //
             PutIData(ref chunk) => {
                 let owner = utils::owner(&client.public_id)?;
-                let balance = self.balance(owner.public_key())?;
-                let new_balance = match balance.checked_sub(*COST_OF_PUT) {
-                    None => {
-                        // TODO - we only allow underfunded Put requests to proceed for phase 1.
-                        trace!(
-                            "{}: {} has no coins left, but allowing Put request anyway.",
-                            self,
-                            client.public_id
-                        );
-                        unwrap!(Coins::from_nano(0))
-                    }
-                    Some(new_balance) => new_balance,
-                };
 
                 self.has_signature(&client.public_id, &request, &message_id, &signature)?;
 
@@ -255,7 +242,15 @@ impl SourceElder {
                     }
                 }
 
-                self.set_balance(owner.public_key(), new_balance)?;
+                if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
+                    // Note: in phase 1, we proceed even if there are insufficient funds.
+                    trace!(
+                        "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
+                        self,
+                        *COST_OF_PUT,
+                        error
+                    );
+                }
 
                 Some(Action::ForwardClientRequest {
                     client_name: *client.public_id.name(),
@@ -348,7 +343,11 @@ impl SourceElder {
             //
             // ===== Coins =====
             //
-            TransferCoins { ref amount, .. } => unimplemented!(),
+            TransferCoins {
+                destination,
+                amount,
+                transaction_id,
+            } => self.handle_transfer_coins(&client.public_id, destination, amount, transaction_id),
             GetTransaction { .. } => unimplemented!(),
             GetBalance => {
                 let balance = self
@@ -358,8 +357,16 @@ impl SourceElder {
                 self.send_response_to_client(&client.public_id, message_id, response);
                 None
             }
-            CreateCoinBalance { .. } => unimplemented!(),
-            //
+            CreateCoinBalance {
+                new_balance_owner,
+                amount,
+                transaction_id,
+            } => self.handle_create_balance(
+                &client.public_id,
+                new_balance_owner,
+                amount,
+                transaction_id,
+            ), //
             // ===== Accounts =====
             //
             CreateAccount(..) => Some(Action::ForwardClientRequest {
@@ -601,6 +608,80 @@ impl SourceElder {
         }
     }
 
+    fn handle_create_balance(
+        &mut self,
+        public_id: &PublicId,
+        owner_key: PublicKey,
+        amount: Coins,
+        _transaction_id: u64,
+    ) -> Option<Action> {
+        let cost = self
+            .withdraw_coins_for_transfer(public_id.name(), amount)
+            .ok()?;
+
+        if self.create_balance(owner_key, amount).is_err() {
+            self.refund(public_id.name(), cost)
+        }
+
+        None
+    }
+
+    fn handle_transfer_coins(
+        &mut self,
+        public_id: &PublicId,
+        destination: XorName,
+        amount: Coins,
+        _transaction_id: u64,
+    ) -> Option<Action> {
+        let cost = self
+            .withdraw_coins_for_transfer(public_id.name(), amount)
+            .ok()?;
+
+        if self.deposit(&destination, amount).is_err() {
+            self.refund(public_id.name(), cost);
+        }
+
+        None
+    }
+
+    fn withdraw_coins_for_transfer(
+        &mut self,
+        balance_name: &XorName,
+        amount: Coins,
+    ) -> Result<Coins, NdError> {
+        match self.withdraw(balance_name, amount) {
+            Ok(()) => Ok(amount),
+            Err(error) => {
+                // Note: in phase 1, we proceed even if there are insufficient funds.
+                trace!("{}: Unable to withdraw {} coins: {}", self, amount, error);
+                Ok(unwrap!(Coins::from_nano(0)))
+            }
+        }
+    }
+
+    fn create_balance(&mut self, owner_key: PublicKey, amount: Coins) -> Result<(), NdError> {
+        if self.balances.exists(&owner_key) {
+            info!(
+                "{}: Failed to create balance for {:?}: already exists.",
+                self, owner_key
+            );
+
+            Err(NdError::AccountExists)
+        } else {
+            let balance = Balance { coins: amount };
+            self.put_balance(&owner_key, &balance)
+        }
+    }
+
+    fn refund(&mut self, balance_name: &XorName, amount: Coins) {
+        if let Err(error) = self.deposit(balance_name, amount) {
+            error!(
+                "{}: Failed to refund {} coins to balance of {:?}: {:?}.",
+                self, amount, balance_name, error
+            );
+        }
+    }
+
     fn send<T: Serialize>(&mut self, recipient: Peer, msg: &T) {
         let msg = utils::serialise(msg);
         let msg = Bytes::from(msg);
@@ -644,17 +725,40 @@ impl SourceElder {
         self.balances.get(key).map(|balance| balance.coins)
     }
 
-    fn set_balance(&mut self, public_key: &PublicKey, coins: Coins) -> Option<()> {
-        let mut balance = self.balances.get(public_key)?;
-        balance.coins = coins;
-        if let Err(error) = self.balances.put(public_key, &balance) {
+    fn withdraw<K: balance::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
+        let (public_key, mut balance) = self
+            .balances
+            .get_key_value(key)
+            .ok_or(NdError::InsufficientBalance)?;
+        balance.coins = balance
+            .coins
+            .checked_sub(amount)
+            .ok_or(NdError::InsufficientBalance)?;
+        self.put_balance(&public_key, &balance)
+    }
+
+    fn deposit<K: balance::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
+        let (public_key, mut balance) = self
+            .balances
+            .get_key_value(key)
+            .ok_or_else(|| NdError::from("No such balance"))?;
+        balance.coins = balance
+            .coins
+            .checked_add(amount)
+            .ok_or(NdError::ExcessiveValue)?;
+
+        self.put_balance(&public_key, &balance)
+    }
+
+    fn put_balance(&mut self, public_key: &PublicKey, balance: &Balance) -> Result<(), NdError> {
+        self.balances.put(public_key, balance).map_err(|error| {
             error!(
-                "{}: Failed to update balance for {}: {}",
+                "{}: Failed to update balance of {}: {}",
                 self, public_key, error
             );
-            return None;
-        }
-        Some(())
+
+            NdError::from("Failed to update balance")
+        })
     }
 }
 
