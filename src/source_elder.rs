@@ -8,7 +8,7 @@
 
 mod client_account;
 
-use self::client_account::ClientAccountDb;
+use self::client_account::{ClientAccount, ClientAccountDb};
 use crate::{
     action::Action,
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
@@ -22,7 +22,7 @@ use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use safe_nd::{
     Challenge, ClientPublicId, Coins, Error as NdError, Message, MessageId, NodePublicId, PublicId,
-    Request, Response, Signature, XorName,
+    PublicKey, Request, Response, Signature, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -222,13 +222,19 @@ impl SourceElder {
             // ===== Immutable Data =====
             //
             PutIData(_) => {
-                let owner = utils::owner(client_id)?;
-                let balance = self.balance(owner)?;
-                let new_balance = balance.checked_sub(*COST_OF_PUT)?;
-
                 self.has_signature(client_id, &request, &message_id, &signature)?;
+                let owner = utils::owner(client_id)?;
 
-                self.set_balance(owner, new_balance)?;
+                if let Err(error) = self.withdraw(owner, *COST_OF_PUT) {
+                    // Note: in phase 1, we proceed even if there are insufficient funds.
+                    trace!(
+                        "{}: Unable to withdraw {} coins: {}",
+                        self,
+                        *COST_OF_PUT,
+                        error
+                    );
+                }
+
                 Some(Action::ForwardClientRequest {
                     client_name: *client_id.name(),
                     request,
@@ -296,7 +302,17 @@ impl SourceElder {
             //
             // ===== Coins =====
             //
-            TransferCoins { ref amount, .. } => unimplemented!(),
+            TransferCoins {
+                destination,
+                amount,
+                transaction_id,
+            } => self.handle_transfer_coins(
+                client_id,
+                message_id,
+                destination,
+                amount,
+                transaction_id,
+            ),
             GetTransaction { .. } => unimplemented!(),
             GetBalance => {
                 let owner = utils::owner(client_id)?;
@@ -305,8 +321,17 @@ impl SourceElder {
                 self.send_response_to_client(client_id, message_id, response);
                 None
             }
-            CreateCoinBalance { .. } => unimplemented!(),
-            //
+            CreateCoinBalance {
+                new_balance_owner,
+                amount,
+                transaction_id,
+            } => self.handle_create_balance(
+                client_id,
+                message_id,
+                new_balance_owner,
+                amount,
+                transaction_id,
+            ), //
             // ===== Accounts =====
             //
             CreateAccount(..) => Some(Action::ForwardClientRequest {
@@ -389,6 +414,19 @@ impl SourceElder {
             return None;
         }
         Some(())
+    }
+
+    fn sender_client_id<'a>(&self, public_id: &'a PublicId) -> Option<&'a ClientPublicId> {
+        match public_id {
+            PublicId::Client(pub_id) => Some(pub_id),
+            _ => {
+                info!(
+                    "{}: Request must be sent from a client (was {:?})",
+                    self, public_id
+                );
+                None
+            }
+        }
     }
 
     /// Handles a received challenge response.
@@ -542,6 +580,95 @@ impl SourceElder {
         }
     }
 
+    fn handle_create_balance(
+        &mut self,
+        public_id: &PublicId,
+        message_id: MessageId,
+        owner_key: PublicKey,
+        amount: Coins,
+        _transaction_id: u64,
+    ) -> Option<Action> {
+        let client_id = self.sender_client_id(public_id)?;
+
+        let result = self
+            .withdraw_coins_for_transfer(client_id, amount)
+            .and_then(|cost| {
+                self.create_balance(owner_key, amount).map_err(|error| {
+                    self.refund(client_id, cost);
+                    error
+                })
+            });
+
+        self.send_response_to_client(public_id, message_id, Response::Mutation(result));
+        None
+    }
+
+    fn handle_transfer_coins(
+        &mut self,
+        public_id: &PublicId,
+        message_id: MessageId,
+        destination: XorName,
+        amount: Coins,
+        _transaction_id: u64,
+    ) -> Option<Action> {
+        let client_id = self.sender_client_id(public_id)?;
+
+        let result = self
+            .withdraw_coins_for_transfer(client_id, amount)
+            .and_then(|cost| {
+                self.deposit(&destination, amount).map_err(|error| {
+                    self.refund(client_id, cost);
+                    error
+                })
+            });
+
+        self.send_response_to_client(public_id, message_id, Response::Mutation(result));
+        None
+    }
+
+    fn withdraw_coins_for_transfer(
+        &mut self,
+        client_id: &ClientPublicId,
+        amount: Coins,
+    ) -> Result<Coins, NdError> {
+        match self.withdraw(client_id, amount) {
+            Ok(()) => Ok(amount),
+            Err(error) => {
+                // Note: in phase 1, we proceed even if there are insufficient funds.
+                trace!("{}: Unable to withdraw {} coins: {}", self, amount, error);
+                Ok(unwrap!(Coins::from_nano(0)))
+            }
+        }
+    }
+
+    fn create_balance(&mut self, owner_key: PublicKey, amount: Coins) -> Result<(), NdError> {
+        if self.client_accounts.exists(&owner_key) {
+            info!(
+                "{}: Failed to create balance for {:?}: already exists.",
+                self, owner_key
+            );
+
+            Err(NdError::AccountExists)
+        } else {
+            let owner_name = XorName::from(owner_key);
+            let owner_id = ClientPublicId::new(owner_name, owner_key);
+
+            let mut owner_account = ClientAccount::new();
+            owner_account.balance = amount;
+
+            self.put_client_account(&owner_id, &owner_account)
+        }
+    }
+
+    fn refund(&mut self, client_id: &ClientPublicId, amount: Coins) {
+        if let Err(error) = self.deposit(client_id, amount) {
+            error!(
+                "{}: Failed to refund {} coins to balance of {:?}: {:?}.",
+                self, amount, client_id, error
+            );
+        }
+    }
+
     fn send<T: Serialize>(&mut self, recipient: Peer, msg: &T) {
         let msg = utils::serialise(msg);
         let msg = Bytes::from(msg);
@@ -587,17 +714,46 @@ impl SourceElder {
             .map(|account| account.balance)
     }
 
-    fn set_balance(&mut self, client_id: &ClientPublicId, balance: Coins) -> Option<()> {
-        let mut account = self.client_accounts.get(client_id)?;
-        account.balance = balance;
-        if let Err(error) = self.client_accounts.put(client_id, account) {
-            error!(
-                "{}: Failed to update balance for {}: {}",
-                self, client_id, error
-            );
-            return None;
-        }
-        Some(())
+    fn withdraw<K: client_account::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
+        let (client_id, mut account) = self
+            .client_accounts
+            .get_key_value(key)
+            .ok_or(NdError::InsufficientBalance)?;
+        account.balance = account
+            .balance
+            .checked_sub(amount)
+            .ok_or(NdError::InsufficientBalance)?;
+        self.put_client_account(&client_id, &account)
+    }
+
+    fn deposit<K: client_account::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
+        let (client_id, mut account) = self
+            .client_accounts
+            .get_key_value(key)
+            .ok_or(NdError::NoSuchAccount)?;
+        account.balance = account
+            .balance
+            .checked_add(amount)
+            .ok_or(NdError::ExcessiveValue)?;
+
+        self.put_client_account(&client_id, &account)
+    }
+
+    fn put_client_account(
+        &mut self,
+        client_id: &ClientPublicId,
+        account: &ClientAccount,
+    ) -> Result<(), NdError> {
+        self.client_accounts
+            .put(client_id, account)
+            .map_err(|error| {
+                error!(
+                    "{}: Failed to update client account of {}: {}",
+                    self, client_id, error
+                );
+
+                NdError::from("Failed to update client account")
+            })
     }
 }
 

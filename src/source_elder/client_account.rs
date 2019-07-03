@@ -22,8 +22,6 @@ pub(super) struct ClientAccount {
 }
 
 impl ClientAccount {
-    // TODO: remove allow(unsued)
-    #[allow(unused)]
     pub fn new() -> Self {
         Self {
             apps: HashMap::new(),
@@ -68,7 +66,14 @@ impl ClientAccountDb {
         self.db.get(&public_id.to_db_key())
     }
 
-    pub fn put(&mut self, public_id: &ClientPublicId, account: ClientAccount) -> Result<()> {
+    pub fn get_key_value<K: Key>(&self, key: &K) -> Option<(ClientPublicId, ClientAccount)> {
+        let public_id = key.to_public_id(&self.index)?;
+        self.db
+            .get(&public_id.to_db_key())
+            .map(|account| (public_id.clone(), account))
+    }
+
+    pub fn put(&mut self, public_id: &ClientPublicId, account: &ClientAccount) -> Result<()> {
         let db_key = public_id.to_db_key();
         self.db.set(&db_key, &account)?;
         let _ = self

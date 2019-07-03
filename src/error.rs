@@ -87,4 +87,4 @@ quick_error! {
 }
 
 /// Specialisation of `std::Result` for Vault.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
