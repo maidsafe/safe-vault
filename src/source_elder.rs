@@ -6,6 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod balance;
+
+use self::balance::BalanceDb;
 use crate::{
     action::Action,
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
@@ -19,8 +22,8 @@ use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AppPermissions, Challenge, ClientPublicId, Coins, Error as NdError, IDataKind, Message,
-    MessageId, NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
+    AppPermissions, Challenge, Coins, Error as NdError, IDataKind, Message, MessageId,
+    NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -31,37 +34,28 @@ use std::{
 };
 use unwrap::unwrap;
 
-const CLIENT_ACCOUNTS_DB_NAME: &str = "client_accounts.db";
+const ACCOUNTS_DB_NAME: &str = "accounts.db";
+
 lazy_static! {
     static ref COST_OF_PUT: Coins = unwrap!(Coins::from_nano(1_000_000_000));
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct ClientAccount {
+struct Account {
     apps: HashMap<PublicKey, AppPermissions>,
-    balance: Coins,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum ClientState {
-    Registered,
-    Unregistered,
-}
-
-impl ClientState {
-    fn from_bool(is_registered: bool) -> Self {
-        if is_registered {
-            ClientState::Registered
-        } else {
-            ClientState::Unregistered
-        }
-    }
+#[derive(Clone, Debug)]
+struct ClientInfo {
+    public_id: PublicId,
+    has_balance: bool,
 }
 
 pub(crate) struct SourceElder {
     id: NodePublicId,
-    client_accounts: PickleDb,
-    clients: HashMap<SocketAddr, (PublicId, ClientState)>,
+    accounts: PickleDb,
+    balances: BalanceDb,
+    clients: HashMap<SocketAddr, ClientInfo>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
     quic_p2p: QuicP2p,
@@ -74,11 +68,13 @@ impl SourceElder {
         config: &QuicP2pConfig,
         init_mode: Init,
     ) -> Result<(Self, Receiver<Event>)> {
-        let client_accounts = utils::new_db(root_dir, CLIENT_ACCOUNTS_DB_NAME, init_mode)?;
+        let accounts = utils::new_db(&root_dir, ACCOUNTS_DB_NAME, init_mode)?;
+        let balances = BalanceDb::new(&root_dir, init_mode)?;
         let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config)?;
         let src_elder = Self {
             id,
-            client_accounts,
+            accounts,
+            balances,
             clients: Default::default(),
             client_candidates: Default::default(),
             quic_p2p,
@@ -136,10 +132,10 @@ impl SourceElder {
 
     pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr, error: Error) {
         info!("{}: {}", self, error);
-        if let Some((client_id, _)) = self.clients.remove(&peer_addr) {
+        if let Some(client) = self.clients.remove(&peer_addr) {
             info!(
                 "{}: Disconnected from {:?} on {}",
-                self, client_id, peer_addr
+                self, client.public_id, peer_addr
             );
         } else {
             let _ = self.client_candidates.remove(&peer_addr);
@@ -151,28 +147,25 @@ impl SourceElder {
     }
 
     pub fn handle_client_message(&mut self, peer_addr: SocketAddr, bytes: Bytes) -> Option<Action> {
-        if let Some((client_id, registered_client)) = self.clients.get(&peer_addr).cloned() {
+        if let Some(client) = self.clients.get(&peer_addr).cloned() {
             match bincode::deserialize(&bytes) {
                 Ok(Message::Request {
                     request,
                     message_id,
                     signature,
                 }) => {
-                    return self.handle_client_request(
-                        &client_id,
-                        request,
-                        message_id,
-                        signature,
-                        registered_client,
-                    );
+                    return self.handle_client_request(&client, request, message_id, signature);
                 }
                 Ok(Message::Response { response, .. }) => {
-                    info!("{}: {} invalidly sent {:?}", self, client_id, response);
+                    info!(
+                        "{}: {} invalidly sent {:?}",
+                        self, client.public_id, response
+                    );
                 }
                 Err(err) => {
                     info!(
                         "{}: Unable to deserialise message from {}: {}",
-                        self, client_id, err
+                        self, client.public_id, err
                     );
                 }
             }
@@ -201,11 +194,10 @@ impl SourceElder {
 
     fn handle_client_request(
         &mut self,
-        client_id: &PublicId,
+        client: &ClientInfo,
         request: Request,
         message_id: MessageId,
         signature: Option<Signature>,
-        registered_client: ClientState,
     ) -> Option<Action> {
         use Request::*;
         trace!(
@@ -213,10 +205,10 @@ impl SourceElder {
             self,
             request,
             message_id,
-            client_id
+            client.public_id
         );
         if let Some(sig) = signature.as_ref() {
-            if !self.is_valid_client_signature(client_id, &request, &message_id, sig) {
+            if !self.is_valid_client_signature(&client.public_id, &request, &message_id, sig) {
                 return None;
             }
         }
@@ -227,22 +219,22 @@ impl SourceElder {
             // ===== Immutable Data =====
             //
             PutIData(ref chunk) => {
-                let owner = utils::owner(client_id)?;
-                let balance = self.balance(owner)?;
+                let owner = utils::owner(&client.public_id)?;
+                let balance = self.balance(owner.public_key())?;
                 let new_balance = match balance.checked_sub(*COST_OF_PUT) {
                     None => {
                         // TODO - we only allow underfunded Put requests to proceed for phase 1.
                         trace!(
                             "{}: {} has no coins left, but allowing Put request anyway.",
                             self,
-                            client_id
+                            client.public_id
                         );
                         unwrap!(Coins::from_nano(0))
                     }
                     Some(new_balance) => new_balance,
                 };
 
-                self.has_signature(client_id, &request, &message_id, &signature)?;
+                self.has_signature(&client.public_id, &request, &message_id, &signature)?;
 
                 // Assert that if the request was for UnpubIData, that the owner's public key has
                 // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
@@ -252,10 +244,10 @@ impl SourceElder {
                         trace!(
                             "{}: {} attempted Put UnpubIData with invalid owners field.",
                             self,
-                            client_id
+                            client.public_id
                         );
                         self.send_response_to_client(
-                            client_id,
+                            &client.public_id,
                             message_id,
                             Response::Mutation(Err(NdError::InvalidOwners)),
                         );
@@ -263,26 +255,27 @@ impl SourceElder {
                     }
                 }
 
-                self.set_balance(owner, new_balance)?;
+                self.set_balance(owner.public_key(), new_balance)?;
+
                 Some(Action::ForwardClientRequest {
-                    client_name: *client_id.name(),
+                    client_name: *client.public_id.name(),
                     request,
                     message_id,
                 })
             }
             GetIData(ref address) => {
                 if !address.published() {
-                    self.has_signature(client_id, &request, &message_id, &signature)?;
+                    self.has_signature(&client.public_id, &request, &message_id, &signature)?;
                 }
-                if address.published() || registered_client == ClientState::Registered {
+                if address.published() || client.has_balance {
                     Some(Action::ForwardClientRequest {
-                        client_name: *client_id.name(),
+                        client_name: *client.public_id.name(),
                         request,
                         message_id,
                     })
                 } else {
                     self.send_response_to_client(
-                        client_id,
+                        &client.public_id,
                         message_id,
                         Response::GetIData(Err(NdError::AccessDenied)),
                     );
@@ -292,22 +285,22 @@ impl SourceElder {
             DeleteUnpubIData(ref address) => {
                 if address.published() {
                     self.send_response_to_client(
-                        client_id,
+                        &client.public_id,
                         message_id,
                         // TODO: consider changing this error
                         Response::GetIData(Err(NdError::InvalidOperation)),
                     );
                     return None;
                 }
-                if registered_client == ClientState::Registered {
+                if client.has_balance {
                     Some(Action::ForwardClientRequest {
-                        client_name: *client_id.name(),
+                        client_name: *client.public_id.name(),
                         request,
                         message_id,
                     })
                 } else {
                     self.send_response_to_client(
-                        client_id,
+                        &client.public_id,
                         message_id,
                         Response::Mutation(Err(NdError::AccessDenied)),
                     );
@@ -358,10 +351,11 @@ impl SourceElder {
             TransferCoins { ref amount, .. } => unimplemented!(),
             GetTransaction { .. } => unimplemented!(),
             GetBalance => {
-                let owner = utils::owner(client_id)?;
-                let balance = self.balance(owner).or_else(|| Coins::from_nano(0).ok())?;
+                let balance = self
+                    .balance(client.public_id.name())
+                    .or_else(|| Coins::from_nano(0).ok())?;
                 let response = Response::GetBalance(Ok(balance));
-                self.send_response_to_client(client_id, message_id, response);
+                self.send_response_to_client(&client.public_id, message_id, response);
                 None
             }
             CreateCoinBalance { .. } => unimplemented!(),
@@ -369,7 +363,7 @@ impl SourceElder {
             // ===== Accounts =====
             //
             CreateAccount(..) => Some(Action::ForwardClientRequest {
-                client_name: *client_id.name(),
+                client_name: *client.public_id.name(),
                 request,
                 message_id,
             }),
@@ -379,7 +373,7 @@ impl SourceElder {
 
                 // if registered_client == ClientState::Registered {
                 Some(Action::ForwardClientRequest {
-                    client_name: *client_id.name(),
+                    client_name: *client.public_id.name(),
                     request,
                     message_id,
                 })
@@ -474,12 +468,18 @@ impl SourceElder {
         if let Some(challenge) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
-                    let registered = self.determine_connecting_client_state(&public_id);
+                    let has_balance = self.has_balance(&public_id);
                     info!(
-                        "{}: Accepted {} on {} as {:?}",
-                        self, public_id, peer_addr, registered
+                        "{}: Accepted {} on {}. Has balance: {}",
+                        self, public_id, peer_addr, has_balance
                     );
-                    let _ = self.clients.insert(peer_addr, (public_id, registered));
+                    let _ = self.clients.insert(
+                        peer_addr,
+                        ClientInfo {
+                            public_id,
+                            has_balance,
+                        },
+                    );
                 }
                 Err(err) => {
                     info!(
@@ -498,22 +498,22 @@ impl SourceElder {
         }
     }
 
-    fn determine_connecting_client_state(&self, public_id: &PublicId) -> ClientState {
-        ClientState::from_bool(match public_id {
-            PublicId::Client(ref pub_id) => self.client_accounts.exists(&pub_id.to_db_key()),
-            PublicId::App(ref app_pub_id) => {
+    fn has_balance(&self, public_id: &PublicId) -> bool {
+        match public_id {
+            PublicId::Client(pub_id) => self.balances.exists(pub_id.name()),
+            PublicId::App(app_pub_id) => {
                 let owner = app_pub_id.owner();
                 let app_pub_key = app_pub_id.public_key();
-                self.client_accounts
+                self.accounts
                     .get(&owner.to_db_key())
-                    .and_then(|account: ClientAccount| account.apps.get(app_pub_key).cloned())
-                    .is_some()
+                    .map(|account: Account| account.apps.get(app_pub_key).is_some())
+                    .unwrap_or(false)
             }
             PublicId::Node(_) => {
-                error!("{}: Logic error.  This should be unreachable.", self);
+                error!("{}: Logic error. This should be unreachable.", self);
                 false
             }
-        })
+        }
     }
 
     /// Handle response from the destination elders.
@@ -538,7 +538,7 @@ impl SourceElder {
         match response {
             // Transfer the response from destination elders to clients
             GetAccount(..) | Mutation(..) | GetIData(..) => {
-                if let Some(peer_addr) = self.lookup_client_peer_addr(client_name) {
+                if let Some(peer_addr) = self.lookup_client_peer_addr(&client_name) {
                     let peer = Peer::Client {
                         peer_addr: *peer_addr,
                     };
@@ -616,7 +616,7 @@ impl SourceElder {
         let peer_addr = if let Some((peer_addr, _)) = self
             .clients
             .iter()
-            .find(|(_, (pub_id, _))| pub_id == client_id)
+            .find(|(_, client)| client.public_id == *client_id)
         {
             *peer_addr
         } else {
@@ -633,27 +633,24 @@ impl SourceElder {
         )
     }
 
-    fn lookup_client_peer_addr(&self, name: XorName) -> Option<&SocketAddr> {
+    fn lookup_client_peer_addr(&self, name: &XorName) -> Option<&SocketAddr> {
         self.clients
             .iter()
-            .find(|(_, (pub_id, _))| pub_id.name() == &name)
+            .find(|(_, client)| client.public_id.name() == name)
             .map(|(peer_addr, _)| peer_addr)
     }
 
-    fn balance(&self, client_id: &ClientPublicId) -> Option<Coins> {
-        self.client_accounts
-            .get(&client_id.to_db_key())
-            .map(|account: ClientAccount| account.balance)
+    fn balance<K: balance::Key>(&self, key: &K) -> Option<Coins> {
+        self.balances.get(key).map(|balance| balance.coins)
     }
 
-    fn set_balance(&mut self, client_id: &ClientPublicId, balance: Coins) -> Option<()> {
-        let db_key = client_id.to_db_key();
-        let mut account = self.client_accounts.get::<ClientAccount>(&db_key)?;
-        account.balance = balance;
-        if let Err(error) = self.client_accounts.set(&db_key, &account) {
+    fn set_balance(&mut self, public_key: &PublicKey, coins: Coins) -> Option<()> {
+        let mut balance = self.balances.get(public_key)?;
+        balance.coins = coins;
+        if let Err(error) = self.balances.put(public_key, &balance) {
             error!(
                 "{}: Failed to update balance for {}: {}",
-                self, client_id, error
+                self, public_key, error
             );
             return None;
         }
