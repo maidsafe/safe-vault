@@ -319,13 +319,7 @@ impl SourceElder {
                 request,
                 message_id,
             }),
-            CreateAccountFor { .. } => Some(Action::ForwardClientRequest {
-                client_name: *client_id.name(),
-                request,
-                message_id,
-            }),
-            UpdateAccount { .. } => unimplemented!(),
-            GetAccount(ref address) => {
+            CreateAccountFor { .. } | UpdateAccount { .. } | GetAccount(..) => {
                 // TODO: allow only registered clients to send this req
                 // once the coin balances are implemented.
 

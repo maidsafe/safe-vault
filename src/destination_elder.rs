@@ -230,7 +230,9 @@ impl DestinationElder {
             CreateAccount(ref new_account) => {
                 self.handle_create_account_req(src, new_account, message_id)
             }
-            UpdateAccount { .. } => unimplemented!(),
+            UpdateAccount(ref updated_account) => {
+                self.handle_update_account_req(src, updated_account, message_id)
+            }
             CreateAccountFor { .. } => unimplemented!(),
             GetAccount(ref address) => self.handle_get_account_req(src, address, message_id),
             //
@@ -319,6 +321,42 @@ impl DestinationElder {
         }
     }
 
+    fn handle_update_account_req(
+        &mut self,
+        src: XorName,
+        updated_account: &AccountData,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = self
+            .account_chunks
+            .get(&updated_account.destination())
+            .map_err(|e| match e {
+                ChunkStoreError::NoSuchChunk => NdError::NoSuchAccount,
+                error => error.to_string().into(),
+            })
+            .and_then(|existing_account| {
+                if XorName::from(existing_account.authorised_getter) != src {
+                    // Request does not come from the owner
+                    Err(NdError::AccessDenied)
+                } else {
+                    self.account_chunks
+                        .put(&Account {
+                            address: existing_account.address,
+                            data: updated_account.data().to_vec(), // FIXME: we probably don't need cloning here, try mem::replace
+                            authorised_getter: existing_account.authorised_getter,
+                            signature: updated_account.signature().clone(),
+                        })
+                        .map_err(|error| error.to_string().into())
+                }
+            });
+
+        Some(Action::RespondToOurDstElders {
+            sender: src,
+            response: Response::Mutation(result),
+            message_id,
+        })
+    }
+
     fn handle_create_account_req(
         &mut self,
         src: XorName,
@@ -360,7 +398,7 @@ impl DestinationElder {
             })
             .and_then(|account| {
                 if XorName::from(account.authorised_getter) != src {
-                    // Request does not come from the sender
+                    // Request does not come from the owner
                     Err(NdError::AccessDenied)
                 } else {
                     Ok((account.data, account.signature))

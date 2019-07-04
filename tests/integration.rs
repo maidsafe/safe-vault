@@ -112,7 +112,8 @@ fn accounts() {
         client.full_id().sign(&account_data),
     ));
 
-    let message_id = client.send_request(conn_info.clone(), Request::CreateAccount(account));
+    let message_id =
+        client.send_request(conn_info.clone(), Request::CreateAccount(account.clone()));
     env.poll(&mut vault);
 
     match client.expect_response(message_id) {
@@ -134,6 +135,108 @@ fn accounts() {
             }
         }
         x => unexpected!(x),
+    }
+
+    // Putting account to the same address should fail.
+    let message_id = client.send_request(conn_info.clone(), Request::CreateAccount(account));
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::Mutation(Err(NdError::AccountExists)) => (),
+        x => unexpected!(x),
+    }
+
+    // Getting account from non-owning client should fail.
+    {
+        let mut client = TestClient::new(env.rng());
+        let conn_info = client.establish_connection(&mut env, &mut vault);
+
+        let message_id =
+            client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
+        env.poll(&mut vault);
+
+        match client.expect_response(message_id) {
+            Response::GetAccount(Err(NdError::AccessDenied)) => (),
+            x => unexpected!(x),
+        }
+    }
+}
+
+#[test]
+fn update_account() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+
+    let mut client = TestClient::new(env.rng());
+    let conn_info = client.establish_connection(&mut env, &mut vault);
+
+    let account_data = vec![0; 32];
+    let account_locator: XorName = rand::random();
+
+    // Create a new account
+    let account = unwrap!(AccountData::new(
+        account_locator,
+        client.public_id().public_key().clone(),
+        account_data.clone(),
+        client.full_id().sign(&account_data),
+    ));
+
+    let message_id =
+        client.send_request(conn_info.clone(), Request::CreateAccount(account.clone()));
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::Mutation(Ok(_)) => (),
+        x => unexpected!(x),
+    }
+
+    // Update the account data.
+    let new_account_data = vec![1; 32];
+    let message_id = client.send_request(
+        conn_info.clone(),
+        Request::UpdateAccount(unwrap!(AccountData::new(
+            account_locator,
+            client.public_id().public_key().clone(),
+            new_account_data.clone(),
+            client.full_id().sign(&new_account_data),
+        ))),
+    );
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::Mutation(Ok(_)) => (),
+        x => unexpected!(x),
+    }
+
+    // Try to get the account data and signature.
+    let message_id = client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
+    env.poll(&mut vault);
+
+    match client.expect_response(message_id) {
+        Response::GetAccount(Ok((data, sig))) => {
+            assert_eq!(data, new_account_data);
+
+            match client.public_id().public_key().verify(&sig, &data) {
+                Ok(()) => (),
+                x => unexpected!(x),
+            }
+        }
+        x => unexpected!(x),
+    }
+
+    // Updating account from non-owning client should fail.
+    {
+        let mut client = TestClient::new(env.rng());
+        let conn_info = client.establish_connection(&mut env, &mut vault);
+
+        let message_id =
+            client.send_request(conn_info.clone(), Request::UpdateAccount(account.clone()));
+        env.poll(&mut vault);
+
+        match client.expect_response(message_id) {
+            Response::Mutation(Err(NdError::AccessDenied)) => (),
+            x => unexpected!(x),
+        }
     }
 }
 
