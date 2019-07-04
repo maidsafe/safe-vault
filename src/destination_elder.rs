@@ -9,7 +9,6 @@
 mod idata_op;
 
 use crate::{
-    account::Account,
     action::Action,
     chunk_store::{
         error::Error as ChunkStoreError, AccountChunkStore, AppendOnlyChunkStore,
@@ -335,18 +334,16 @@ impl DestinationElder {
                 error => error.to_string().into(),
             })
             .and_then(|existing_account| {
-                if XorName::from(existing_account.authorised_getter) != src {
+                if !updated_account.size_is_valid() {
+                    return Err(NdError::ExceededSize);
+                }
+                if XorName::from(*existing_account.authorised_getter()) != src {
                     // Request does not come from the owner
                     Err(NdError::AccessDenied)
                 } else {
                     self.account_chunks
-                        .put(&Account {
-                            address: existing_account.address,
-                            data: updated_account.data().to_vec(), // FIXME: we probably don't need cloning here, try mem::replace
-                            authorised_getter: existing_account.authorised_getter,
-                            signature: updated_account.signature().clone(),
-                        })
-                        .map_err(|error| error.to_string().into())
+                        .put(&updated_account)
+                        .map_err(|err| err.to_string().into())
                 }
             });
 
@@ -366,14 +363,11 @@ impl DestinationElder {
         // TODO: verify owner is the same as src?
         let result = if self.account_chunks.has(&new_account.destination()) {
             Err(NdError::AccountExists)
+        } else if !new_account.size_is_valid() {
+            Err(NdError::ExceededSize)
         } else {
             self.account_chunks
-                .put(&Account {
-                    address: *new_account.destination(),
-                    data: new_account.data().to_vec(), // FIXME: we probably don't need cloning here, try mem::replace
-                    authorised_getter: *new_account.authorised_getter(),
-                    signature: new_account.signature().clone(),
-                })
+                .put(new_account)
                 .map_err(|error| error.to_string().into())
         };
         Some(Action::RespondToOurDstElders {
@@ -397,11 +391,11 @@ impl DestinationElder {
                 error => error.to_string().into(),
             })
             .and_then(|account| {
-                if XorName::from(account.authorised_getter) != src {
+                if XorName::from(*account.authorised_getter()) != src {
                     // Request does not come from the owner
                     Err(NdError::AccessDenied)
                 } else {
-                    Ok((account.data, account.signature))
+                    Ok((account.data().to_vec(), account.signature().clone()))
                 }
             });
         Some(Action::RespondToSrcElders {

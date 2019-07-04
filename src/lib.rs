@@ -57,7 +57,6 @@
 // For quick error
 #![recursion_limit = "128"]
 
-mod account;
 mod action;
 mod adult;
 mod chunk_store;

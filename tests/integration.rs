@@ -215,11 +215,7 @@ fn update_account() {
     match client.expect_response(message_id) {
         Response::GetAccount(Ok((data, sig))) => {
             assert_eq!(data, new_account_data);
-
-            match client.public_id().public_key().verify(&sig, &data) {
-                Ok(()) => (),
-                x => unexpected!(x),
-            }
+            unwrap!(client.public_id().public_key().verify(&sig, &data));
         }
         x => unexpected!(x),
     }
