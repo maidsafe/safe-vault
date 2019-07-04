@@ -6,23 +6,25 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod client_account;
+
+use self::client_account::ClientAccountDb;
 use crate::{
     action::Action,
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
     utils,
     vault::Init,
-    Error, Result, ToDbKey,
+    Error, Result,
 };
 use bytes::Bytes;
 use crossbeam_channel::{self, Receiver};
 use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
-use pickledb::PickleDb;
 use safe_nd::{
-    AppPermissions, Challenge, ClientPublicId, Coins, Error as NdError, Message, MessageId,
-    NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
+    Challenge, ClientPublicId, Coins, Error as NdError, Message, MessageId, NodePublicId, PublicId,
+    Request, Response, Signature, XorName,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
@@ -31,15 +33,8 @@ use std::{
 };
 use unwrap::unwrap;
 
-const CLIENT_ACCOUNTS_DB_NAME: &str = "client_accounts.db";
 lazy_static! {
     static ref COST_OF_PUT: Coins = unwrap!(Coins::from_nano(1_000_000_000));
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct ClientAccount {
-    apps: HashMap<PublicKey, AppPermissions>,
-    balance: Coins,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,7 +55,7 @@ impl ClientState {
 
 pub(crate) struct SourceElder {
     id: NodePublicId,
-    client_accounts: PickleDb,
+    client_accounts: ClientAccountDb,
     clients: HashMap<SocketAddr, (PublicId, ClientState)>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, Vec<u8>>,
@@ -74,7 +69,7 @@ impl SourceElder {
         config: &QuicP2pConfig,
         init_mode: Init,
     ) -> Result<(Self, Receiver<Event>)> {
-        let client_accounts = utils::new_db(root_dir, CLIENT_ACCOUNTS_DB_NAME, init_mode)?;
+        let client_accounts = ClientAccountDb::new(root_dir, init_mode)?;
         let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config)?;
         let src_elder = Self {
             id,
@@ -446,13 +441,13 @@ impl SourceElder {
 
     fn determine_connecting_client_state(&self, public_id: &PublicId) -> ClientState {
         ClientState::from_bool(match public_id {
-            PublicId::Client(ref pub_id) => self.client_accounts.exists(&pub_id.to_db_key()),
+            PublicId::Client(ref pub_id) => self.client_accounts.exists(pub_id),
             PublicId::App(ref app_pub_id) => {
                 let owner = app_pub_id.owner();
                 let app_pub_key = app_pub_id.public_key();
                 self.client_accounts
-                    .get(&owner.to_db_key())
-                    .and_then(|account: ClientAccount| account.apps.get(app_pub_key).cloned())
+                    .get(owner)
+                    .and_then(|account| account.apps.get(app_pub_key).cloned())
                     .is_some()
             }
             PublicId::Node(_) => {
@@ -588,15 +583,14 @@ impl SourceElder {
 
     fn balance(&self, client_id: &ClientPublicId) -> Option<Coins> {
         self.client_accounts
-            .get(&client_id.to_db_key())
-            .map(|account: ClientAccount| account.balance)
+            .get(client_id)
+            .map(|account| account.balance)
     }
 
     fn set_balance(&mut self, client_id: &ClientPublicId, balance: Coins) -> Option<()> {
-        let db_key = client_id.to_db_key();
-        let mut account = self.client_accounts.get::<ClientAccount>(&db_key)?;
+        let mut account = self.client_accounts.get(client_id)?;
         account.balance = balance;
-        if let Err(error) = self.client_accounts.set(&db_key, &account) {
+        if let Err(error) = self.client_accounts.put(client_id, account) {
             error!(
                 "{}: Failed to update balance for {}: {}",
                 self, client_id, error
