@@ -44,6 +44,8 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         let mut rng = rng::new();
         let network_rng = rng::from_rng(&mut rng);
 
