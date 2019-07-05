@@ -6,9 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{action::Action, Error, Result};
+use crate::{action::Action, rpc::Rpc, Error, Result};
 use log::{error, warn};
-use safe_nd::{IData, IDataAddress, MessageId, Request, Response, Result as NdResult, XorName};
+use safe_nd::{
+    IData, IDataAddress, MessageId, PublicId, Request, Response, Result as NdResult, XorName,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -33,13 +35,13 @@ pub(super) enum OpType {
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub(super) struct IDataOp {
-    client: XorName,
+    client: PublicId,
     request: Request,
     pub rpc_states: BTreeMap<XorName, RpcState>,
 }
 
 impl IDataOp {
-    pub fn new(client: XorName, request: Request, holders: BTreeSet<XorName>) -> Result<Self> {
+    pub fn new(client: PublicId, request: Request, holders: BTreeSet<XorName>) -> Result<Self> {
         use Request::*;
         match request {
             PutIData(_) | GetIData(_) | DeleteUnpubIData(_) => (),
@@ -59,7 +61,7 @@ impl IDataOp {
         })
     }
 
-    pub fn client(&self) -> &XorName {
+    pub fn client(&self) -> &PublicId {
         &self.client
     }
 
@@ -141,9 +143,11 @@ impl IDataOp {
         } else {
             Some(Action::RespondToSrcElders {
                 sender: *address.name(),
-                client_name: *self.client(),
-                response: Response::GetIData(result),
-                message_id,
+                message: Rpc::Response {
+                    requester: self.client().clone(),
+                    response: Response::GetIData(result),
+                    message_id,
+                },
             })
         }
     }

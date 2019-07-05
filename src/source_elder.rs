@@ -12,6 +12,7 @@ use self::balance::{Balance, BalanceDb};
 use crate::{
     action::Action,
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
+    rpc::Rpc,
     utils,
     vault::Init,
     Error, Result, ToDbKey,
@@ -225,11 +226,11 @@ impl SourceElder {
                     self.has_signature(&client.public_id, &request, &message_id, &signature)?;
                 }
                 if address.kind() == IDataKind::Pub || client.has_balance {
-                    Some(Action::ForwardClientRequest {
-                        client_name: *client.public_id.name(),
+                    Some(Action::ForwardClientRequest(Rpc::Request {
+                        requester: client.public_id.clone(),
                         request,
                         message_id,
-                    })
+                    }))
                 } else {
                     self.send_response_to_client(
                         &client.public_id,
@@ -250,11 +251,11 @@ impl SourceElder {
                     return None;
                 }
                 if client.has_balance {
-                    Some(Action::ForwardClientRequest {
-                        client_name: *client.public_id.name(),
+                    Some(Action::ForwardClientRequest(Rpc::Request {
+                        requester: client.public_id.clone(),
                         request,
                         message_id,
-                    })
+                    }))
                 } else {
                     self.send_response_to_client(
                         &client.public_id,
@@ -331,21 +332,21 @@ impl SourceElder {
             //
             // ===== Login packets =====
             //
-            CreateLoginPacket(..) => Some(Action::ForwardClientRequest {
-                client_name: *client.public_id.name(),
+            CreateLoginPacket(..) => Some(Action::ForwardClientRequest(Rpc::Request {
+                requester: client.public_id.clone(),
                 request,
                 message_id,
-            }),
+            })),
             CreateLoginPacketFor { .. } | UpdateLoginPacket { .. } | GetLoginPacket(..) => {
                 // TODO: allow only registered clients to send this req
                 // once the coin balances are implemented.
 
                 // if registered_client == ClientState::Registered {
-                Some(Action::ForwardClientRequest {
-                    client_name: *client.public_id.name(),
+                Some(Action::ForwardClientRequest(Rpc::Request {
+                    requester: client.public_id.clone(),
                     request,
                     message_id,
-                })
+                }))
                 // } else {
                 //     self.send_response_to_client(
                 //         client_id,
@@ -375,13 +376,12 @@ impl SourceElder {
         message_id: &MessageId,
         signature: &Signature,
     ) -> bool {
-        let pub_key = match client_id {
-            PublicId::Node(_) => {
+        let pub_key = match utils::own_key(client_id) {
+            Some(pk) => pk,
+            None => {
                 error!("{}: Logic error.  This should be unreachable.", self);
                 return false;
             }
-            PublicId::Client(pub_id) => pub_id.public_key(),
-            PublicId::App(pub_id) => pub_id.public_key(),
         };
         match pub_key.verify(signature, utils::serialise(&(request, message_id))) {
             Ok(_) => true,
@@ -453,11 +453,11 @@ impl SourceElder {
             );
         }
 
-        Some(Action::ForwardClientRequest {
-            client_name: *client.public_id.name(),
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
             request,
             message_id,
-        })
+        }))
     }
 
     /// Handles a received challenge response.
@@ -469,10 +469,9 @@ impl SourceElder {
         public_id: PublicId,
         signature: Signature,
     ) {
-        let public_key = match public_id {
-            PublicId::Client(ref pub_id) => pub_id.public_key(),
-            PublicId::App(ref pub_id) => pub_id.public_key(),
-            PublicId::Node(_) => {
+        let public_key = match utils::own_key(&public_id) {
+            Some(pk) => pk,
+            None => {
                 info!(
                     "{}: Client on {} identifies as a node: {}",
                     self, peer_addr, public_id
@@ -534,11 +533,22 @@ impl SourceElder {
         }
     }
 
+    pub fn handle_vault_message(&mut self, src: XorName, message: Rpc) -> Option<Action> {
+        match message {
+            Rpc::Request { .. } => None, // None for now - might be required when we handle coin refunds
+            Rpc::Response {
+                response,
+                requester,
+                message_id,
+            } => self.handle_response(src, requester, response, message_id),
+        }
+    }
+
     /// Handle response from the destination elders.
-    pub fn handle_response(
+    fn handle_response(
         &mut self,
         dst_elders: XorName,
-        client_name: XorName,
+        requester: PublicId,
         response: Response,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -548,7 +558,7 @@ impl SourceElder {
             self,
             response,
             message_id,
-            client_name,
+            requester,
             dst_elders
         );
         // TODO - remove this
@@ -556,7 +566,7 @@ impl SourceElder {
         match response {
             // Transfer the response from destination elders to clients
             GetLoginPacket(..) | Mutation(..) | GetIData(..) => {
-                if let Some(peer_addr) = self.lookup_client_peer_addr(&client_name) {
+                if let Some(peer_addr) = self.lookup_client_peer_addr(&requester) {
                     let peer = Peer::Client {
                         peer_addr: *peer_addr,
                     };
@@ -568,7 +578,7 @@ impl SourceElder {
                         },
                     );
                 } else {
-                    info!("{}: client {} not found", self, client_name);
+                    info!("{}: client {} not found", self, requester);
                 }
                 None
             }
@@ -732,10 +742,10 @@ impl SourceElder {
         )
     }
 
-    fn lookup_client_peer_addr(&self, name: &XorName) -> Option<&SocketAddr> {
+    fn lookup_client_peer_addr(&self, id: &PublicId) -> Option<&SocketAddr> {
         self.clients
             .iter()
-            .find(|(_, client)| client.public_id.name() == name)
+            .find(|(_, client)| &client.public_id == id)
             .map(|(peer_addr, _)| peer_addr)
     }
 

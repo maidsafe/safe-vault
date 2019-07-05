@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{vault::Init, Result};
+use crate::{rpc::Rpc, vault::Init, Result};
 use bincode;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
-use safe_nd::{ClientPublicId, PublicId, Request, XorName};
+use safe_nd::{ClientPublicId, PublicId, PublicKey, Request, XorName};
 use serde::Serialize;
 use std::{fs, path::Path};
 use unwrap::unwrap;
@@ -52,6 +52,23 @@ pub(crate) fn owner(public_id: &PublicId) -> Option<&ClientPublicId> {
         PublicId::Node(_) => None,
         PublicId::Client(pub_id) => Some(pub_id),
         PublicId::App(pub_id) => Some(pub_id.owner()),
+    }
+}
+
+pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
+    match public_id {
+        PublicId::Node(_) => None,
+        PublicId::Client(ref client) => Some(client.public_key()),
+        PublicId::App(ref app) => Some(app.public_key()),
+    }
+}
+
+pub(crate) fn rpc_elder_address(rpc: &Rpc) -> Option<XorName> {
+    match rpc {
+        Rpc::Request { ref requester, .. } | Rpc::Response { ref requester, .. } => {
+            let client_pk = own_key(&requester)?;
+            Some(XorName::from(*client_pk))
+        }
     }
 }
 

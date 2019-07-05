@@ -12,6 +12,7 @@ use crate::{
     coins_handler::CoinsHandler,
     destination_elder::DestinationElder,
     quic_p2p::{Event, NodeInfo},
+    rpc::Rpc,
     source_elder::SourceElder,
     utils, Config, Error, Result,
 };
@@ -166,17 +167,19 @@ impl Vault {
     fn handle_action(&mut self, action: Action) -> Option<Action> {
         use Action::*;
         match action {
-            ForwardClientRequest {
-                client_name,
-                request,
-                message_id,
-            } => {
-                let dst_elders_address = match utils::dst_elders_address(&request) {
-                    Some(address) => address,
-                    None => {
-                        error!("{}: Logic error - no dst address available.", self);
-                        return None;
+            ForwardClientRequest(message) => {
+                let requester_name = utils::rpc_elder_address(&message)?;
+                let dst_elders_address = if let Rpc::Request { ref request, .. } = message {
+                    match utils::dst_elders_address(&request) {
+                        Some(address) => address,
+                        None => {
+                            error!("{}: Logic error - no dst address available.", self);
+                            return None;
+                        }
                     }
+                } else {
+                    error!("{}: Logic error - unexpcted RPC.", self);
+                    return None;
                 };
 
                 // TODO - once Routing is integrated, we'll construct the full message to send
@@ -184,66 +187,54 @@ impl Vault {
                 //        same handler which Routing will call after receiving a message.
 
                 if self.self_is_elder_for(&dst_elders_address) {
-                    return self.destination_elder_mut()?.handle_request(
-                        client_name,
-                        request,
-                        message_id,
-                    );
+                    return self
+                        .destination_elder_mut()?
+                        .handle_vault_message(requester_name, message);
                 }
                 None
             }
-            RespondToOurDstElders {
-                sender,
-                response,
-                message_id,
-            } => {
+            RespondToOurDstElders { sender, message } => {
                 // TODO - once Routing is integrated, we'll construct the full message to send
                 //        onwards, and then if we're also part of the dst elders, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
                 self.destination_elder_mut()?
-                    .handle_response(sender, response, message_id)
+                    .handle_vault_message(sender, message)
             }
-            RespondToSrcElders {
-                sender,
-                client_name,
-                response,
-                message_id,
-                ..
-            } => {
+            RespondToSrcElders { sender, message } => {
+                let client_name = utils::rpc_elder_address(&message)?;
+
                 // TODO - once Routing is integrated, we'll construct the full message to send
                 //        onwards, and then if we're also part of the src elders, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
                 if self.self_is_elder_for(&client_name) {
-                    return self.source_elder_mut()?.handle_response(
-                        sender,
-                        client_name,
-                        response,
-                        message_id,
-                    );
+                    return self
+                        .source_elder_mut()?
+                        .handle_vault_message(sender, message);
                 }
                 None
             }
             SendToPeers {
                 sender,
                 targets,
-                request,
-                message_id,
+                message,
             } => {
                 let mut next_action = None;
                 for target in targets {
                     if target == *self.id.public_id().name() {
-                        next_action = self.destination_elder_mut()?.handle_request(
-                            sender,
-                            request.clone(),
-                            message_id,
-                        );
+                        next_action = self
+                            .destination_elder_mut()?
+                            .handle_vault_message(sender, message.clone());
                         // } else {
                         //     Send to target
                     }
                 }
                 next_action
+            }
+            action => {
+                error!("Invalid action: {:?}", action);
+                None
             }
         }
     }
