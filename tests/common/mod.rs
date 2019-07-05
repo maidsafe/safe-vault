@@ -15,7 +15,8 @@ pub use self::rng::TestRng;
 use bytes::Bytes;
 use crossbeam_channel::Receiver;
 use safe_nd::{
-    Challenge, ClientFullId, ClientPublicId, Coins, Message, MessageId, PublicId, Request, Response,
+    Challenge, ClientFullId, ClientPublicId, Coins, Message, MessageId, PublicId, Request,
+    Response, Transaction, XorName,
 };
 use safe_vault::{
     mock::Network,
@@ -289,6 +290,29 @@ pub fn get_balance(env: &mut Environment, client: &mut TestClient, vault: &mut T
 
     match client.expect_response(message_id) {
         Response::GetBalance(Ok(coins)) => coins,
+        x => unexpected!(x),
+    }
+}
+
+pub fn get_transaction(
+    env: &mut Environment,
+    client: &mut TestClient,
+    vault: &mut TestVault,
+    account_name: XorName,
+    transaction_id: u64,
+) -> Transaction {
+    let conn_info = vault.connection_info();
+    let message_id = client.send_request(
+        conn_info,
+        Request::GetTransaction {
+            coins_balance_id: account_name,
+            transaction_id,
+        },
+    );
+    env.poll(vault);
+
+    match client.expect_response(message_id) {
+        Response::GetTransaction(Ok(transaction)) => transaction,
         x => unexpected!(x),
     }
 }

@@ -6,19 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, vault::Init, Result, ToDbKey};
+use crate::{fifo_map::FifoMap, utils, vault::Init, Result, ToDbKey};
 use pickledb::PickleDb;
-use safe_nd::{AppPermissions, ClientPublicId, Coins, PublicKey, XorName};
+use safe_nd::{AppPermissions, ClientPublicId, Coins, Error as NdError, PublicKey, XorName};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 use unwrap::unwrap;
 
 const CLIENT_ACCOUNTS_DB_NAME: &str = "client_accounts.db";
+const TRANSACTIONS_CAPACITY: usize = 1000;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub(super) struct ClientAccount {
     pub apps: HashMap<PublicKey, AppPermissions>,
     pub balance: Coins,
+    pub transactions: FifoMap<u64, Coins>,
 }
 
 impl ClientAccount {
@@ -26,7 +28,27 @@ impl ClientAccount {
         Self {
             apps: HashMap::new(),
             balance: unwrap!(Coins::from_nano(0)),
+            transactions: FifoMap::new(TRANSACTIONS_CAPACITY),
         }
+    }
+
+    pub fn deposit(&mut self, amount: Coins, transaction_id: Option<u64>) -> Result<(), NdError> {
+        if let Some(transaction_id) = transaction_id {
+            if self.transactions.contains_key(&transaction_id) {
+                return Err(NdError::TransactionIdExists);
+            }
+        }
+
+        self.balance = self
+            .balance
+            .checked_add(amount)
+            .ok_or(NdError::ExcessiveValue)?;
+
+        if let Some(transaction_id) = transaction_id {
+            let _ = self.transactions.insert(transaction_id, amount);
+        }
+
+        Ok(())
     }
 }
 

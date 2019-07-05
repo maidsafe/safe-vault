@@ -55,7 +55,9 @@ mod common;
 
 use self::common::{Environment, TestClient, TestVault};
 use rand::Rng;
-use safe_nd::{AccountData, Coins, Error as NdError, IDataAddress, Request, Response, XorName};
+use safe_nd::{
+    AccountData, Coins, Error as NdError, IDataAddress, Request, Response, Transaction, XorName,
+};
 use unwrap::unwrap;
 
 #[test]
@@ -244,7 +246,7 @@ fn coin_operations() {
     let balance = common::get_balance(&mut env, &mut client_a, &mut vault);
     assert_eq!(balance, unwrap!(Coins::from_nano(10)));
 
-    // Create B'a balance
+    // Create B's balance
     common::perform_mutation(
         &mut env,
         &mut client_a,
@@ -277,6 +279,179 @@ fn coin_operations() {
     let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
     assert_eq!(balance_a, unwrap!(Coins::from_nano(7)));
     assert_eq!(balance_b, unwrap!(Coins::from_nano(3)));
+}
+
+#[test]
+fn get_transaction_of_balance_creation() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+
+    let mut client = TestClient::new(env.rng());
+    let client_name = *client.public_id().name();
+
+    common::establish_connection(&mut env, &mut client, &mut vault);
+
+    // GetTransaction with nonexistent balance results in error.
+    let tid = 0;
+    assert_eq!(
+        common::get_transaction(&mut env, &mut client, &mut vault, client_name, tid),
+        Transaction::NoSuchCoinBalance
+    );
+
+    // Create the balance.
+    let public_key = *client.public_id().public_key();
+    let tid = 0;
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        &mut vault,
+        Request::CreateCoinBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(1)),
+            transaction_id: tid,
+        },
+    );
+
+    // GetTransaction with invalid transaction id results in error.
+    let tid_invalid = 1;
+    assert_eq!(
+        common::get_transaction(&mut env, &mut client, &mut vault, client_name, tid_invalid),
+        Transaction::NoSuchTransaction
+    );
+
+    // GetTransaction with existing transaction id succeeds.
+    assert_eq!(
+        common::get_transaction(&mut env, &mut client, &mut vault, client_name, tid),
+        Transaction::Success(unwrap!(Coins::from_nano(1)))
+    );
+}
+
+#[test]
+fn get_transaction_of_coin_transfer() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+
+    let mut client_a = TestClient::new(env.rng());
+    let mut client_b = TestClient::new(env.rng());
+
+    common::establish_connection(&mut env, &mut client_a, &mut vault);
+    common::establish_connection(&mut env, &mut client_b, &mut vault);
+
+    // Create A's balance
+    let public_key = *client_a.public_id().public_key();
+    let tid_a_0 = 0;
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        &mut vault,
+        Request::CreateCoinBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(3)),
+            transaction_id: tid_a_0,
+        },
+    );
+
+    // Create B's balance
+    let public_key = *client_b.public_id().public_key();
+    let tid_b_0 = 0;
+    common::perform_mutation(
+        &mut env,
+        &mut client_b,
+        &mut vault,
+        Request::CreateCoinBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(4)),
+            transaction_id: tid_b_0,
+        },
+    );
+
+    // Transfer coins from A to B
+    let tid_b_1 = 1;
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        &mut vault,
+        Request::TransferCoins {
+            destination: *client_b.public_id().name(),
+            amount: unwrap!(Coins::from_nano(2)),
+            transaction_id: tid_b_1,
+        },
+    );
+
+    // Both A and B can issue GetTransaction
+    let client_b_name = *client_b.public_id().name();
+
+    assert_eq!(
+        common::get_transaction(&mut env, &mut client_a, &mut vault, client_b_name, tid_b_1),
+        Transaction::Success(unwrap!(Coins::from_nano(2)))
+    );
+
+    assert_eq!(
+        common::get_transaction(&mut env, &mut client_b, &mut vault, client_b_name, tid_b_1),
+        Transaction::Success(unwrap!(Coins::from_nano(2)))
+    );
+}
+
+#[test]
+fn duplicate_transaction_id() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+
+    let mut client_a = TestClient::new(env.rng());
+    let mut client_b = TestClient::new(env.rng());
+
+    common::establish_connection(&mut env, &mut client_a, &mut vault);
+    common::establish_connection(&mut env, &mut client_b, &mut vault);
+
+    let conn_info = vault.connection_info();
+
+    // Create A's balance
+    let public_key = *client_a.public_id().public_key();
+    let tid_a_0 = 0;
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        &mut vault,
+        Request::CreateCoinBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(3)),
+            transaction_id: tid_a_0,
+        },
+    );
+
+    // Create B's balance
+    let public_key = *client_b.public_id().public_key();
+    let tid_b_0 = 0;
+    common::perform_mutation(
+        &mut env,
+        &mut client_b,
+        &mut vault,
+        Request::CreateCoinBalance {
+            new_balance_owner: public_key,
+            amount: unwrap!(Coins::from_nano(2)),
+            transaction_id: tid_b_0,
+        },
+    );
+
+    // Attempt to transfer coins using an already existing transaction id fails.
+    let message_id = client_a.send_request(
+        conn_info,
+        Request::TransferCoins {
+            destination: *client_b.public_id().name(),
+            amount: unwrap!(Coins::from_nano(1)),
+            transaction_id: tid_b_0,
+        },
+    );
+    env.poll(&mut vault);
+
+    match client_a.expect_response(message_id) {
+        Response::Mutation(Err(NdError::TransactionIdExists)) => (),
+        x => unexpected!(x),
+    }
+
+    // A's balance is refunded.
+    let balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
+    assert_eq!(balance_a, unwrap!(Coins::from_nano(3)));
 }
 
 #[test]
