@@ -107,7 +107,7 @@ fn accounts() {
     // Create a new account
     let account = unwrap!(AccountData::new(
         account_locator,
-        client.public_id().public_key().clone(),
+        *client.public_id().public_key(),
         account_data.clone(),
         client.full_id().sign(&account_data),
     ));
@@ -176,7 +176,7 @@ fn update_account() {
     // Create a new account
     let account = unwrap!(AccountData::new(
         account_locator,
-        client.public_id().public_key().clone(),
+        *client.public_id().public_key(),
         account_data.clone(),
         client.full_id().sign(&account_data),
     ));
@@ -196,7 +196,7 @@ fn update_account() {
         conn_info.clone(),
         Request::UpdateAccount(unwrap!(AccountData::new(
             account_locator,
-            client.public_id().public_key().clone(),
+            *client.public_id().public_key(),
             new_account_data.clone(),
             client.full_id().sign(&new_account_data),
         ))),

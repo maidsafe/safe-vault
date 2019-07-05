@@ -8,7 +8,7 @@
 
 use rand::{self, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-use std::env;
+use std::{env, thread};
 use unwrap::unwrap;
 
 pub type TestRng = ChaChaRng;
@@ -23,7 +23,11 @@ pub fn new() -> TestRng {
         rand::thread_rng().gen()
     };
 
-    println!("RNG seed: {}", seed);
+    println!(
+        "RNG seed for thread {:?}: {}",
+        unwrap!(thread::current().name()),
+        seed
+    );
 
     TestRng::seed_from_u64(seed)
 }

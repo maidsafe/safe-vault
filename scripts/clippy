@@ -4,3 +4,4 @@ set -e -x
 
 cargo fmt -- --check
 cargo clippy $@ --all-targets
+cargo clippy $@ --all-targets --features=mock --no-default-features

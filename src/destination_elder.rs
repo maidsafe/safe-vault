@@ -330,7 +330,7 @@ impl DestinationElder {
     ) -> Option<Action> {
         let result = self
             .account_chunks
-            .get(&updated_account.destination())
+            .get(updated_account.destination())
             .map_err(|e| match e {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchAccount,
                 error => error.to_string().into(),
@@ -344,13 +344,13 @@ impl DestinationElder {
                     Err(NdError::AccessDenied)
                 } else {
                     self.account_chunks
-                        .put(&updated_account)
+                        .put(updated_account)
                         .map_err(|err| err.to_string().into())
                 }
             });
-
-        Some(Action::RespondToOurDstElders {
-            sender: src,
+        Some(Action::RespondToSrcElders {
+            sender: *updated_account.destination(),
+            client_name: src,
             response: Response::Mutation(result),
             message_id,
         })
@@ -363,7 +363,7 @@ impl DestinationElder {
         message_id: MessageId,
     ) -> Option<Action> {
         // TODO: verify owner is the same as src?
-        let result = if self.account_chunks.has(&new_account.destination()) {
+        let result = if self.account_chunks.has(new_account.destination()) {
             Err(NdError::AccountExists)
         } else if !new_account.size_is_valid() {
             Err(NdError::ExceededSize)
@@ -372,8 +372,9 @@ impl DestinationElder {
                 .put(new_account)
                 .map_err(|error| error.to_string().into())
         };
-        Some(Action::RespondToOurDstElders {
-            sender: src,
+        Some(Action::RespondToSrcElders {
+            sender: *new_account.destination(),
+            client_name: src,
             response: Response::Mutation(result),
             message_id,
         })
@@ -402,7 +403,7 @@ impl DestinationElder {
             });
         Some(Action::RespondToSrcElders {
             client_name: src,
-            sender: *self.id.name(),
+            sender: *address,
             response: Response::GetAccount(result),
             message_id,
         })
