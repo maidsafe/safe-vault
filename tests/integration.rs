@@ -55,7 +55,11 @@ mod common;
 
 use self::common::{Environment, TestClient, TestVault};
 use rand::Rng;
-use safe_nd::{AccountData, Coins, Error as NdError, IDataAddress, Request, Response, XorName};
+use safe_nd::{
+    AccountData, Coins, Error as NdError, IData, IDataAddress, PubImmutableData, Request, Response,
+    UnpubImmutableData, XorName,
+};
+use safe_vault::COST_OF_PUT;
 use unwrap::unwrap;
 
 #[test]
@@ -275,6 +279,116 @@ fn coin_operations() {
     let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
     assert_eq!(balance_a, unwrap!(Coins::from_nano(7)));
     assert_eq!(balance_b, unwrap!(Coins::from_nano(3)));
+}
+
+#[test]
+fn put_immutable_data() {
+    let mut env = Environment::new();
+    let mut vault = TestVault::new();
+    let conn_info = vault.connection_info();
+
+    let mut client_a = TestClient::new(env.rng());
+    let mut client_b = TestClient::new(env.rng());
+    common::establish_connection(&mut env, &mut client_a, &mut vault);
+    common::establish_connection(&mut env, &mut client_b, &mut vault);
+
+    let mut raw_data = vec![0u8; 1024];
+    env.rng().fill(raw_data.as_mut_slice());
+    let pub_idata = IData::Pub(PubImmutableData::new(raw_data.clone()));
+    let unpub_idata = IData::Unpub(UnpubImmutableData::new(
+        raw_data,
+        *client_b.public_id().public_key(),
+    ));
+
+    // TODO - enable this once we're passed phase 1.
+    if false {
+        // Put should fail when the client has no associated balance.
+        let message_id_1 =
+            client_a.send_request(conn_info.clone(), Request::PutIData(pub_idata.clone()));
+        let message_id_2 =
+            client_b.send_request(conn_info.clone(), Request::PutIData(unpub_idata.clone()));
+        env.poll(&mut vault);
+
+        match client_a.expect_response(message_id_1) {
+            Response::Mutation(Err(NdError::InsufficientBalance)) => (),
+            x => unexpected!(x),
+        }
+        match client_b.expect_response(message_id_2) {
+            Response::Mutation(Err(NdError::InsufficientBalance)) => (),
+            x => unexpected!(x),
+        }
+    }
+
+    // Create balances.  Client A starts with 2000 safecoins and spends 1000 to initialise
+    // Client B's balance.
+    let start_nano = 1_000_000_000_000;
+    let _ = client_a.send_request(
+        conn_info.clone(),
+        Request::CreateBalance {
+            new_balance_owner: *client_a.public_id().public_key(),
+            amount: unwrap!(Coins::from_nano(2 * start_nano)),
+            transaction_id: 0,
+        },
+    );
+    let _ = client_a.send_request(
+        conn_info.clone(),
+        Request::CreateBalance {
+            new_balance_owner: *client_b.public_id().public_key(),
+            amount: unwrap!(Coins::from_nano(start_nano)),
+            transaction_id: 0,
+        },
+    );
+    env.poll(&mut vault);
+
+    // Check client A can't Put an UnpubIData where B is the owner.
+    let unpub_req = Request::PutIData(unpub_idata.clone());
+    let mut message_id_1 = client_a.send_request(conn_info.clone(), unpub_req.clone());
+    env.poll(&mut vault);
+    match client_a.expect_response(message_id_1) {
+        Response::Mutation(Err(NdError::InvalidOwners)) => (),
+        x => unexpected!(x),
+    }
+    let mut balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
+    let mut expected_balance = unwrap!(Coins::from_nano(start_nano));
+    assert_eq!(expected_balance, balance_a);
+
+    for _ in &[0, 1] {
+        // Check they can both Put valid data.
+        let pub_req = Request::PutIData(pub_idata.clone());
+        message_id_1 = client_a.send_request(conn_info.clone(), pub_req);
+        let mut message_id_2 = client_b.send_request(conn_info.clone(), unpub_req.clone());
+        env.poll(&mut vault);
+
+        match client_a.expect_response(message_id_1) {
+            Response::Mutation(Ok(())) => (),
+            x => unexpected!(x),
+        }
+        match client_b.expect_response(message_id_2) {
+            Response::Mutation(Ok(())) => (),
+            x => unexpected!(x),
+        }
+        balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
+        let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
+        expected_balance = unwrap!(expected_balance.checked_sub(*COST_OF_PUT));
+        assert_eq!(expected_balance, balance_a);
+        assert_eq!(expected_balance, balance_b);
+
+        // Check the data is retrievable.
+        message_id_1 =
+            client_a.send_request(conn_info.clone(), Request::GetIData(*pub_idata.address()));
+        message_id_2 =
+            client_b.send_request(conn_info.clone(), Request::GetIData(*unpub_idata.address()));
+        env.poll(&mut vault);
+
+        match client_a.expect_response(message_id_1) {
+            Response::GetIData(Ok(received)) => assert_eq!(pub_idata, received),
+            x => unexpected!(x),
+        }
+        match client_b.expect_response(message_id_2) {
+            Response::GetIData(Ok(received)) => assert_eq!(unpub_idata, received),
+            x => unexpected!(x),
+        }
+    }
 }
 
 #[test]

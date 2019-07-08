@@ -37,7 +37,8 @@ use unwrap::unwrap;
 const ACCOUNTS_DB_NAME: &str = "accounts.db";
 
 lazy_static! {
-    static ref COST_OF_PUT: Coins = unwrap!(Coins::from_nano(1_000_000_000));
+    /// The cost to Put a chunk to the network.
+    pub static ref COST_OF_PUT: Coins = unwrap!(Coins::from_nano(1_000_000_000));
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -218,46 +219,7 @@ impl SourceElder {
             //
             // ===== Immutable Data =====
             //
-            PutIData(ref chunk) => {
-                let owner = utils::owner(&client.public_id)?;
-
-                self.has_signature(&client.public_id, &request, &message_id, &signature)?;
-
-                // Assert that if the request was for UnpubIData, that the owner's public key has
-                // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
-                // by their Client owners.
-                if let IData::Unpub(unpub_chunk) = chunk {
-                    if unpub_chunk.owner() != owner.public_key() {
-                        trace!(
-                            "{}: {} attempted Put UnpubIData with invalid owners field.",
-                            self,
-                            client.public_id
-                        );
-                        self.send_response_to_client(
-                            &client.public_id,
-                            message_id,
-                            Response::Mutation(Err(NdError::InvalidOwners)),
-                        );
-                        return None;
-                    }
-                }
-
-                if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
-                    // Note: in phase 1, we proceed even if there are insufficient funds.
-                    trace!(
-                        "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
-                        self,
-                        *COST_OF_PUT,
-                        error
-                    );
-                }
-
-                Some(Action::ForwardClientRequest {
-                    client_name: *client.public_id.name(),
-                    request,
-                    message_id,
-                })
-            }
+            PutIData(chunk) => self.handle_put_idata(client, chunk, message_id, signature),
             GetIData(ref address) => {
                 if address.kind() != IDataKind::Pub {
                     self.has_signature(&client.public_id, &request, &message_id, &signature)?;
@@ -365,7 +327,8 @@ impl SourceElder {
                 new_balance_owner,
                 amount,
                 transaction_id,
-            ), //
+            ),
+            //
             // ===== Accounts =====
             //
             CreateAccount(..) => Some(Action::ForwardClientRequest {
@@ -432,7 +395,7 @@ impl SourceElder {
         }
     }
 
-    // This method only exists to avoid duplicating the log line in many places.
+    /// This method only exists to avoid duplicating the log line in many places.
     fn has_signature(
         &self,
         client_id: &PublicId,
@@ -448,6 +411,53 @@ impl SourceElder {
             return None;
         }
         Some(())
+    }
+
+    fn handle_put_idata(
+        &mut self,
+        client: &ClientInfo,
+        chunk: IData,
+        message_id: MessageId,
+        signature: Option<Signature>,
+    ) -> Option<Action> {
+        let owner = utils::owner(&client.public_id)?;
+
+        // Assert that if the request was for UnpubIData, that the owner's public key has
+        // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
+        // by their Client owners.
+        if let IData::Unpub(ref unpub_chunk) = &chunk {
+            if unpub_chunk.owner() != owner.public_key() {
+                trace!(
+                    "{}: {} attempted Put UnpubIData with invalid owners field.",
+                    self,
+                    client.public_id
+                );
+                self.send_response_to_client(
+                    &client.public_id,
+                    message_id,
+                    Response::Mutation(Err(NdError::InvalidOwners)),
+                );
+                return None;
+            }
+        }
+
+        let request = Request::PutIData(chunk);
+        self.has_signature(&client.public_id, &request, &message_id, &signature)?;
+        if let Err(error) = self.withdraw(owner.public_key(), *COST_OF_PUT) {
+            // Note: in phase 1, we proceed even if there are insufficient funds.
+            trace!(
+                "{}: Unable to withdraw {} coins (but allowing the request anyway): {}",
+                self,
+                *COST_OF_PUT,
+                error
+            );
+        }
+
+        Some(Action::ForwardClientRequest {
+            client_name: *client.public_id.name(),
+            request,
+            message_id,
+        })
     }
 
     /// Handles a received challenge response.
@@ -510,10 +520,12 @@ impl SourceElder {
             PublicId::App(app_pub_id) => {
                 let owner = app_pub_id.owner();
                 let app_pub_key = app_pub_id.public_key();
-                self.accounts
-                    .get(&owner.to_db_key())
-                    .map(|account: Account| account.apps.get(app_pub_key).is_some())
-                    .unwrap_or(false)
+                self.balances.exists(owner.name())
+                    && self
+                        .accounts
+                        .get(&owner.to_db_key())
+                        .map(|account: Account| account.apps.get(app_pub_key).is_some())
+                        .unwrap_or(false)
             }
             PublicId::Node(_) => {
                 error!("{}: Logic error. This should be unreachable.", self);
@@ -666,7 +678,15 @@ impl SourceElder {
             Err(NdError::AccountExists)
         } else {
             let balance = Balance { coins: amount };
-            self.put_balance(&owner_key, &balance)
+            self.put_balance(&owner_key, &balance)?;
+            for client in self
+                .clients
+                .values_mut()
+                .filter(|client| client.public_id.name() == &XorName::from(owner_key))
+            {
+                client.has_balance = true;
+            }
+            Ok(())
         }
     }
 

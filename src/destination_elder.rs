@@ -782,6 +782,6 @@ impl DestinationElder {
 
 impl Display for DestinationElder {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id)
+        write!(formatter, "{}", self.id.name())
     }
 }

@@ -85,5 +85,6 @@ pub use crate::{
     chunk_store::error::Error as ChunkStoreError,
     config_handler::Config,
     error::{Error, Result},
+    source_elder::COST_OF_PUT,
     vault::Vault,
 };
