@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{action::Action, utils, Error, Result};
+use crate::{action::Action, Error, Result};
 use log::{error, warn};
 use safe_nd::{IData, IDataAddress, MessageId, Request, Response, Result as NdResult, XorName};
 use serde::{Deserialize, Serialize};
@@ -109,7 +109,7 @@ impl IDataOp {
         self.set_to_actioned(&sender, own_id)?;
 
         match self.request {
-            Request::PutIData(ref kind) => Some(*utils::work_arounds::idata_address(kind)),
+            Request::PutIData(ref kind) => Some(*kind.address()),
             Request::DeleteUnpubIData(address) => Some(address),
             _ => None, // unreachable - we checked above
         }

@@ -115,15 +115,3 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
         | DelAuthKey { .. } => None,
     }
 }
-
-/// Temporary helpers to work around changes required in safe-nd.
-pub(crate) mod work_arounds {
-    use safe_nd::{IData, IDataAddress};
-
-    pub fn idata_address(idata: &IData) -> &IDataAddress {
-        match idata {
-            IData::Pub(ref chunk) => chunk.address(),
-            IData::Unpub(ref chunk) => chunk.address(),
-        }
-    }
-}

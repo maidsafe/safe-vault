@@ -426,7 +426,7 @@ impl DestinationElder {
 
             if self
                 .immutable_metadata
-                .exists(&(*utils::work_arounds::idata_address(&kind)).to_db_key())
+                .exists(&(*kind.address()).to_db_key())
             {
                 trace!(
                     "{}: Replying success for Put {:?}, it already exists.",
@@ -532,10 +532,7 @@ impl DestinationElder {
     }
 
     fn store_idata(&mut self, kind: IData, message_id: MessageId) -> Option<Action> {
-        let result = if self
-            .immutable_chunks
-            .has(utils::work_arounds::idata_address(&kind))
-        {
+        let result = if self.immutable_chunks.has(kind.address()) {
             Ok(())
         } else {
             self.immutable_chunks
