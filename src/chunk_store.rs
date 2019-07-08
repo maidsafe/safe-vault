@@ -27,7 +27,7 @@ use error::{Error, Result};
 use hex::{self, FromHex};
 use log::trace;
 use mutable::MutableChunk;
-use safe_nd::{AData, ADataAddress, AccountData, IDataAddress, IDataKind, MDataAddress};
+use safe_nd::{AData, ADataAddress, AccountData, IData, IDataAddress, MDataAddress};
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -45,7 +45,7 @@ const CHUNK_STORE_DIR: &str = "chunks";
 /// The max name length for a chunk file.
 const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 
-pub(crate) type ImmutableChunkStore = ChunkStore<IDataKind>;
+pub(crate) type ImmutableChunkStore = ChunkStore<IData>;
 pub(crate) type MutableChunkStore = ChunkStore<MutableChunk>;
 pub(crate) type AppendOnlyChunkStore = ChunkStore<AData>;
 pub(crate) type AccountChunkStore = ChunkStore<AccountData>;

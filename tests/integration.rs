@@ -233,7 +233,7 @@ fn coin_operations() {
     let public_key = *client_a.public_id().public_key();
     let _ = client_a.send_request(
         conn_info.clone(),
-        Request::CreateCoinBalance {
+        Request::CreateBalance {
             new_balance_owner: public_key,
             amount: unwrap!(Coins::from_nano(10)),
             transaction_id: 0,
@@ -247,7 +247,7 @@ fn coin_operations() {
     // Create B's balance
     let _ = client_a.send_request(
         conn_info.clone(),
-        Request::CreateCoinBalance {
+        Request::CreateBalance {
             new_balance_owner: *client_b.public_id().public_key(),
             amount: unwrap!(Coins::from_nano(1)),
             transaction_id: 0,

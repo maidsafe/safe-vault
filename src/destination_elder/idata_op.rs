@@ -8,7 +8,7 @@
 
 use crate::{action::Action, utils, Error, Result};
 use log::{error, warn};
-use safe_nd::{IDataAddress, IDataKind, MessageId, Request, Response, Result as NdResult, XorName};
+use safe_nd::{IData, IDataAddress, MessageId, Request, Response, Result as NdResult, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -118,7 +118,7 @@ impl IDataOp {
     pub fn handle_get_idata_resp(
         &mut self,
         sender: XorName,
-        result: NdResult<IDataKind>,
+        result: NdResult<IData>,
         own_id: String,
         message_id: MessageId,
     ) -> Option<Action> {

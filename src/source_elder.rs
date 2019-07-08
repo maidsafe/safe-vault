@@ -22,7 +22,7 @@ use lazy_static::lazy_static;
 use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AppPermissions, Challenge, Coins, Error as NdError, IDataKind, Message, MessageId,
+    AppPermissions, Challenge, Coins, Error as NdError, IData, IDataKind, Message, MessageId,
     NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
 };
 use serde::{Deserialize, Serialize};
@@ -226,8 +226,8 @@ impl SourceElder {
                 // Assert that if the request was for UnpubIData, that the owner's public key has
                 // been added to the chunk, to avoid Apps putting chunks which can't be retrieved
                 // by their Client owners.
-                if let IDataKind::Unpub(unpub_chunk) = chunk {
-                    if &PublicKey::from(*unpub_chunk.owners()) != owner.public_key() {
+                if let IData::Unpub(unpub_chunk) = chunk {
+                    if unpub_chunk.owner() != owner.public_key() {
                         trace!(
                             "{}: {} attempted Put UnpubIData with invalid owners field.",
                             self,
@@ -259,10 +259,10 @@ impl SourceElder {
                 })
             }
             GetIData(ref address) => {
-                if !address.published() {
+                if address.kind() != IDataKind::Pub {
                     self.has_signature(&client.public_id, &request, &message_id, &signature)?;
                 }
-                if address.published() || client.has_balance {
+                if address.kind() == IDataKind::Pub || client.has_balance {
                     Some(Action::ForwardClientRequest {
                         client_name: *client.public_id.name(),
                         request,
@@ -278,7 +278,7 @@ impl SourceElder {
                 }
             }
             DeleteUnpubIData(ref address) => {
-                if address.published() {
+                if address.kind() == IDataKind::Pub {
                     self.send_response_to_client(
                         &client.public_id,
                         message_id,
@@ -305,8 +305,7 @@ impl SourceElder {
             //
             // ===== Mutable Data =====
             //
-            PutUnseqMData(_) => unimplemented!(),
-            PutSeqMData(_) => unimplemented!(),
+            PutMData(_) => unimplemented!(),
             GetMData(ref address) => unimplemented!(),
             GetMDataValue { ref address, .. } => unimplemented!(),
             DeleteMData(ref address) => unimplemented!(),
@@ -357,7 +356,7 @@ impl SourceElder {
                 self.send_response_to_client(&client.public_id, message_id, response);
                 None
             }
-            CreateCoinBalance {
+            CreateBalance {
                 new_balance_owner,
                 amount,
                 transaction_id,
@@ -564,10 +563,8 @@ impl SourceElder {
             //
             // ===== Mutable Data =====
             //
-            GetUnseqMData(result) => unimplemented!(),
-            GetSeqMData(result) => unimplemented!(),
-            GetSeqMDataShell(result) => unimplemented!(),
-            GetUnseqMDataShell(result) => unimplemented!(),
+            GetMData(result) => unimplemented!(),
+            GetMDataShell(result) => unimplemented!(),
             GetMDataVersion(result) => unimplemented!(),
             ListUnseqMDataEntries(result) => unimplemented!(),
             ListSeqMDataEntries(result) => unimplemented!(),

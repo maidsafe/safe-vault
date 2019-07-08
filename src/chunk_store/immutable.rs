@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::{Chunk, ChunkId};
-use safe_nd::{IDataAddress, IDataKind, ImmutableData, UnpubImmutableData, XorName};
+use safe_nd::{IData, IDataAddress, PubImmutableData, UnpubImmutableData, XorName};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-impl Chunk for IDataKind {
+impl Chunk for IData {
     type Id = IDataAddress;
     fn id(&self) -> &Self::Id {
         match self {
-            IDataKind::Pub(ref chunk) => chunk.address(),
-            IDataKind::Unpub(ref chunk) => chunk.address(),
+            IData::Pub(ref chunk) => chunk.address(),
+            IData::Unpub(ref chunk) => chunk.address(),
         }
     }
 }

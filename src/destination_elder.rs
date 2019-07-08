@@ -22,8 +22,8 @@ use idata_op::{IDataOp, OpType};
 use log::{error, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AccountData, Error as NdError, IDataAddress, IDataKind, MessageId, NodePublicId, PublicKey,
-    Request, Response, Result as NdResult, XorName,
+    AccountData, Error as NdError, IData, IDataAddress, MessageId, NodePublicId, Request, Response,
+    Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -146,8 +146,7 @@ impl DestinationElder {
             //
             // ===== Mutable Data =====
             //
-            PutUnseqMData(data) => unimplemented!(),
-            PutSeqMData(data) => unimplemented!(),
+            PutMData(data) => unimplemented!(),
             GetMData(address) => unimplemented!(),
             GetMDataValue { address, key } => unimplemented!(),
             DeleteMData(address) => unimplemented!(),
@@ -243,7 +242,7 @@ impl DestinationElder {
             | ListAuthKeysAndVersion
             | InsAuthKey { .. }
             | DelAuthKey { .. }
-            | CreateCoinBalance { .. } => {
+            | CreateBalance { .. } => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, request
@@ -278,10 +277,8 @@ impl DestinationElder {
             //
             // ===== Mutable Data =====
             //
-            GetUnseqMData(result) => unimplemented!(),
-            GetSeqMData(result) => unimplemented!(),
-            GetSeqMDataShell(result) => unimplemented!(),
-            GetUnseqMDataShell(result) => unimplemented!(),
+            GetMData(result) => unimplemented!(),
+            GetMDataShell(result) => unimplemented!(),
             GetMDataVersion(result) => unimplemented!(),
             ListUnseqMDataEntries(result) => unimplemented!(),
             ListSeqMDataEntries(result) => unimplemented!(),
@@ -408,7 +405,7 @@ impl DestinationElder {
     fn handle_put_idata_req(
         &mut self,
         src: XorName,
-        kind: IDataKind,
+        kind: IData,
         message_id: MessageId,
     ) -> Option<Action> {
         if &src == kind.name() {
@@ -534,7 +531,7 @@ impl DestinationElder {
             })
     }
 
-    fn store_idata(&mut self, kind: IDataKind, message_id: MessageId) -> Option<Action> {
+    fn store_idata(&mut self, kind: IData, message_id: MessageId) -> Option<Action> {
         let result = if self
             .immutable_chunks
             .has(utils::work_arounds::idata_address(&kind))
@@ -635,8 +632,8 @@ impl DestinationElder {
             .get(&address)
             .map_err(|error| error.to_string().into())
             .and_then(|kind| match kind {
-                IDataKind::Unpub(ref data) => {
-                    if &XorName::from(PublicKey::from(*data.owners())) != client {
+                IData::Unpub(ref data) => {
+                    if &XorName::from(*data.owner()) != client {
                         Err(NdError::AccessDenied)
                     } else {
                         Ok(kind)
@@ -706,8 +703,8 @@ impl DestinationElder {
             .get(&address)
             .map_err(|error| error.to_string().into())
             .and_then(|kind| match kind {
-                IDataKind::Unpub(ref data) => {
-                    if &XorName::from(PublicKey::from(*data.owners())) != client {
+                IData::Unpub(ref data) => {
+                    if &XorName::from(*data.owner()) != client {
                         Err(NdError::AccessDenied)
                     } else {
                         Ok(())
@@ -715,7 +712,7 @@ impl DestinationElder {
                 }
                 _ => {
                     error!(
-                        "{}: Invalid DeleteUnpub(IDataKind::Pub) encountered: {:?}",
+                        "{}: Invalid DeleteUnpub(IData::Pub) encountered: {:?}",
                         self, message_id
                     );
                     Err(NdError::InvalidOperation)
@@ -737,7 +734,7 @@ impl DestinationElder {
     fn handle_get_idata_resp(
         &mut self,
         sender: XorName,
-        result: NdResult<IDataKind>,
+        result: NdResult<IData>,
         message_id: MessageId,
     ) -> Option<Action> {
         let own_id = format!("{}", self);

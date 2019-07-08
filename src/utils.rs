@@ -11,7 +11,7 @@ use bincode;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
-use safe_nd::{ClientPublicId, MutableData, PublicId, Request, XorName};
+use safe_nd::{ClientPublicId, PublicId, Request, XorName};
 use serde::Serialize;
 use std::{fs, path::Path};
 use unwrap::unwrap;
@@ -61,8 +61,7 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
         PutIData(ref data) => Some(data.name()),
         GetIData(ref address) => Some(address.name()),
         DeleteUnpubIData(ref address) => Some(address.name()),
-        PutUnseqMData(ref data) => Some(data.name()),
-        PutSeqMData(ref data) => Some(data.name()),
+        PutMData(ref data) => Some(data.name()),
         GetMData(ref address)
         | GetMDataValue { ref address, .. }
         | DeleteMData(ref address)
@@ -95,7 +94,7 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
         TransferCoins {
             ref destination, ..
         } => Some(destination),
-        CreateCoinBalance {
+        CreateBalance {
             // ref new_balance_owner,
             ..
         } => None, // Some(XorName::from(new_balance_owner)),
@@ -119,12 +118,12 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
 
 /// Temporary helpers to work around changes required in safe-nd.
 pub(crate) mod work_arounds {
-    use safe_nd::{IDataAddress, IDataKind};
+    use safe_nd::{IData, IDataAddress};
 
-    pub fn idata_address(idata: &IDataKind) -> &IDataAddress {
+    pub fn idata_address(idata: &IData) -> &IDataAddress {
         match idata {
-            IDataKind::Pub(ref chunk) => chunk.address(),
-            IDataKind::Unpub(ref chunk) => chunk.address(),
+            IData::Pub(ref chunk) => chunk.address(),
+            IData::Unpub(ref chunk) => chunk.address(),
         }
     }
 }
