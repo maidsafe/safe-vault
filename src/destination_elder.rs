@@ -238,10 +238,6 @@ impl DestinationElder {
                 amount,
                 transaction_id,
             } => unimplemented!(),
-            GetTransaction {
-                coins_balance_id,
-                transaction_id,
-            } => unimplemented!(),
             //
             // ===== Login packets =====
             //
@@ -325,7 +321,7 @@ impl DestinationElder {
             //
             // ===== Invalid =====
             //
-            GetTransaction(_) | GetBalance(_) | ListAuthKeysAndVersion(_) | GetLoginPacket(_) => {
+            GetBalance(_) | Transaction(_) | ListAuthKeysAndVersion(_) | GetLoginPacket(_) => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, response

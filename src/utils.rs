@@ -122,10 +122,6 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
         } => Some(new_login_packet.destination()),
         UpdateLoginPacket(account_data) => Some(account_data.destination()),
         GetLoginPacket(ref name) => Some(name),
-        GetTransaction {
-            ref coins_balance_id,
-            ..
-        } => Some(coins_balance_id),
         GetBalance
         | ListAuthKeysAndVersion
         | InsAuthKey { .. }

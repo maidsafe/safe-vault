@@ -24,7 +24,8 @@ use log::{error, info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
     AppPermissions, Challenge, Coins, Error as NdError, IData, IDataKind, Message, MessageId,
-    NodePublicId, PublicId, PublicKey, Request, Response, Signature, XorName,
+    NodePublicId, PublicId, PublicKey, Request, Response, Signature, Transaction, TransactionId,
+    XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -309,8 +310,13 @@ impl SourceElder {
                 destination,
                 amount,
                 transaction_id,
-            } => self.handle_transfer_coins(&client.public_id, destination, amount, transaction_id),
-            GetTransaction { .. } => unimplemented!(),
+            } => self.handle_transfer_coins(
+                &client.public_id,
+                message_id,
+                destination,
+                amount,
+                transaction_id,
+            ),
             GetBalance => {
                 let balance = self
                     .balance(client.public_id.name())
@@ -325,6 +331,7 @@ impl SourceElder {
                 transaction_id,
             } => self.handle_create_balance(
                 &client.public_id,
+                message_id,
                 new_balance_owner,
                 amount,
                 transaction_id,
@@ -565,7 +572,7 @@ impl SourceElder {
         #[allow(unused)]
         match response {
             // Transfer the response from destination elders to clients
-            GetLoginPacket(..) | Mutation(..) | GetIData(..) => {
+            GetLoginPacket(..) | Mutation(..) | GetIData(..) | Transaction(..) => {
                 if let Some(peer_addr) = self.lookup_client_peer_addr(&requester) {
                     let peer = Peer::Client {
                         peer_addr: *peer_addr,
@@ -611,10 +618,6 @@ impl SourceElder {
             GetPubADataUserPermissions(result) => unimplemented!(),
             GetUnpubADataUserPermissions(result) => unimplemented!(),
             //
-            // ===== Coins =====
-            //
-            GetTransaction(result) => unimplemented!(),
-            //
             // ===== Invalid =====
             //
             GetBalance(_) | ListAuthKeysAndVersion(_) => {
@@ -630,36 +633,50 @@ impl SourceElder {
     fn handle_create_balance(
         &mut self,
         public_id: &PublicId,
+        message_id: MessageId,
         owner_key: PublicKey,
         amount: Coins,
-        _transaction_id: u64,
+        transaction_id: TransactionId,
     ) -> Option<Action> {
-        let cost = self
+        let result = self
             .withdraw_coins_for_transfer(public_id.name(), amount)
-            .ok()?;
+            .and_then(|cost| {
+                self.create_balance(owner_key, amount).map_err(|error| {
+                    self.refund(public_id.name(), cost);
+                    error
+                })
+            })
+            .map(|_| Transaction {
+                id: transaction_id,
+                amount,
+            });
 
-        if self.create_balance(owner_key, amount).is_err() {
-            self.refund(public_id.name(), cost)
-        }
-
+        self.send_response_to_client(public_id, message_id, Response::Transaction(result));
         None
     }
 
     fn handle_transfer_coins(
         &mut self,
         public_id: &PublicId,
+        message_id: MessageId,
         destination: XorName,
         amount: Coins,
-        _transaction_id: u64,
+        transaction_id: TransactionId,
     ) -> Option<Action> {
-        let cost = self
+        let result = self
             .withdraw_coins_for_transfer(public_id.name(), amount)
-            .ok()?;
+            .and_then(|cost| {
+                self.deposit(&destination, amount).map_err(|error| {
+                    self.refund(public_id.name(), cost);
+                    error
+                })
+            })
+            .map(|_| Transaction {
+                id: transaction_id,
+                amount,
+            });
 
-        if self.deposit(&destination, amount).is_err() {
-            self.refund(public_id.name(), cost);
-        }
-
+        self.send_response_to_client(public_id, message_id, Response::Transaction(result));
         None
     }
 
@@ -685,8 +702,7 @@ impl SourceElder {
                 self, owner_key
             );
 
-            // FIXME: change to `BalanceExists` when this error variant is added to safe-nd
-            Err(NdError::DataExists)
+            Err(NdError::BalanceExists)
         } else {
             let balance = Balance { coins: amount };
             self.put_balance(&owner_key, &balance)?;

@@ -249,7 +249,7 @@ fn coin_operations() {
 
     // Create A's balance
     let public_key = *client_a.public_id().public_key();
-    let _ = client_a.send_request(
+    let message_id = client_a.send_request(
         conn_info.clone(),
         Request::CreateBalance {
             new_balance_owner: public_key,
@@ -259,11 +259,19 @@ fn coin_operations() {
     );
     env.poll(&mut vault);
 
+    match client_a.expect_response(message_id) {
+        Response::Transaction(Ok(transaction)) => {
+            assert_eq!(transaction.id, 0);
+            assert_eq!(transaction.amount, unwrap!(Coins::from_nano(10)))
+        }
+        x => unexpected!(x),
+    }
+
     let balance = common::get_balance(&mut env, &mut client_a, &mut vault);
     assert_eq!(balance, unwrap!(Coins::from_nano(10)));
 
     // Create B's balance
-    let _ = client_a.send_request(
+    let message_id = client_a.send_request(
         conn_info.clone(),
         Request::CreateBalance {
             new_balance_owner: *client_b.public_id().public_key(),
@@ -273,13 +281,21 @@ fn coin_operations() {
     );
     env.poll(&mut vault);
 
+    match client_a.expect_response(message_id) {
+        Response::Transaction(Ok(transaction)) => {
+            assert_eq!(transaction.id, 0);
+            assert_eq!(transaction.amount, unwrap!(Coins::from_nano(1)))
+        }
+        x => unexpected!(x),
+    }
+
     let balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
     let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
     assert_eq!(balance_a, unwrap!(Coins::from_nano(9)));
     assert_eq!(balance_b, unwrap!(Coins::from_nano(1)));
 
     // Transfer coins from A to B
-    let _ = client_a.send_request(
+    let message_id = client_a.send_request(
         conn_info,
         Request::TransferCoins {
             destination: *client_b.public_id().name(),
@@ -288,6 +304,14 @@ fn coin_operations() {
         },
     );
     env.poll(&mut vault);
+
+    match client_a.expect_response(message_id) {
+        Response::Transaction(Ok(transaction)) => {
+            assert_eq!(transaction.id, 1);
+            assert_eq!(transaction.amount, unwrap!(Coins::from_nano(2)))
+        }
+        x => unexpected!(x),
+    }
 
     let balance_a = common::get_balance(&mut env, &mut client_a, &mut vault);
     let balance_b = common::get_balance(&mut env, &mut client_b, &mut vault);
@@ -336,7 +360,7 @@ fn put_immutable_data() {
     // Create balances.  Client A starts with 2000 safecoins and spends 1000 to initialise
     // Client B's balance.
     let start_nano = 1_000_000_000_000;
-    let _ = client_a.send_request(
+    let message_id_1 = client_a.send_request(
         conn_info.clone(),
         Request::CreateBalance {
             new_balance_owner: *client_a.public_id().public_key(),
@@ -344,7 +368,7 @@ fn put_immutable_data() {
             transaction_id: 0,
         },
     );
-    let _ = client_a.send_request(
+    let message_id_2 = client_a.send_request(
         conn_info.clone(),
         Request::CreateBalance {
             new_balance_owner: *client_b.public_id().public_key(),
@@ -353,6 +377,13 @@ fn put_immutable_data() {
         },
     );
     env.poll(&mut vault);
+
+    for message_id in &[message_id_1, message_id_2] {
+        match client_a.expect_response(*message_id) {
+            Response::Transaction(Ok(_)) => (),
+            x => unexpected!(x),
+        }
+    }
 
     // Check client A can't Put an UnpubIData where B is the owner.
     let unpub_req = Request::PutIData(unpub_idata.clone());
