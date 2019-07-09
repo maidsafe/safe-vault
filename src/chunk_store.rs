@@ -13,11 +13,11 @@
 
 // #[cfg(test)]
 // mod tests;
-mod account;
 mod append_only;
 mod chunk;
 pub(super) mod error;
 mod immutable;
+mod login_packet;
 mod mutable;
 mod used_space;
 
@@ -27,7 +27,7 @@ use error::{Error, Result};
 use hex::{self, FromHex};
 use log::trace;
 use mutable::MutableChunk;
-use safe_nd::{AData, ADataAddress, AccountData, IData, IDataAddress, MDataAddress};
+use safe_nd::{AData, ADataAddress, IData, IDataAddress, LoginPacket, MDataAddress};
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
@@ -48,7 +48,7 @@ const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 pub(crate) type ImmutableChunkStore = ChunkStore<IData>;
 pub(crate) type MutableChunkStore = ChunkStore<MutableChunk>;
 pub(crate) type AppendOnlyChunkStore = ChunkStore<AData>;
-pub(crate) type AccountChunkStore = ChunkStore<AccountData>;
+pub(crate) type LoginPacketChunkStore = ChunkStore<LoginPacket>;
 
 /// `ChunkStore` is a store of data held as serialised files on disk, implementing a maximum disk
 /// usage to restrict storage.
@@ -221,8 +221,8 @@ impl Subdir for AppendOnlyChunkStore {
     }
 }
 
-impl Subdir for AccountChunkStore {
+impl Subdir for LoginPacketChunkStore {
     fn subdir() -> &'static Path {
-        Path::new("accounts")
+        Path::new("login_packets")
     }
 }

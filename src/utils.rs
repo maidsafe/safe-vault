@@ -98,13 +98,13 @@ pub(crate) fn dst_elders_address(request: &Request) -> Option<&XorName> {
             // ref new_balance_owner,
             ..
         } => None, // Some(XorName::from(new_balance_owner)),
-        CreateAccount(account_data) => Some(account_data.destination()),
-        CreateAccountFor {
-            new_account,
+        CreateLoginPacket(account_data) => Some(account_data.destination()),
+        CreateLoginPacketFor {
+            new_login_packet,
             ..
-        } => Some(new_account.destination()),
-        UpdateAccount(account_data) => Some(account_data.destination()),
-        GetAccount(ref name) => Some(name),
+        } => Some(new_login_packet.destination()),
+        UpdateLoginPacket(account_data) => Some(account_data.destination()),
+        GetLoginPacket(ref name) => Some(name),
         GetTransaction {
             ref coins_balance_id,
             ..

@@ -11,8 +11,8 @@ mod idata_op;
 use crate::{
     action::Action,
     chunk_store::{
-        error::Error as ChunkStoreError, AccountChunkStore, AppendOnlyChunkStore,
-        ImmutableChunkStore, MutableChunkStore,
+        error::Error as ChunkStoreError, AppendOnlyChunkStore, ImmutableChunkStore,
+        LoginPacketChunkStore, MutableChunkStore,
     },
     utils,
     vault::Init,
@@ -22,7 +22,7 @@ use idata_op::{IDataOp, OpType};
 use log::{error, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    AccountData, Error as NdError, IData, IDataAddress, MessageId, NodePublicId, Request, Response,
+    Error as NdError, IData, IDataAddress, LoginPacket, MessageId, NodePublicId, Request, Response,
     Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
@@ -39,7 +39,7 @@ use unwrap::unwrap;
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const MUTABLE_META_DB_NAME: &str = "mutable_data.db";
 const APPEND_ONLY_META_DB_NAME: &str = "append_only_data.db";
-const ACCOUNT_META_DB_NAME: &str = "accounts.db";
+const LOGIN_PACKET_META_DB_NAME: &str = "login_packet.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 // The number of separate copies of an ImmutableData chunk which should be maintained.
 const IMMUTABLE_DATA_COPY_COUNT: usize = 3;
@@ -57,12 +57,12 @@ pub(crate) struct DestinationElder {
     immutable_metadata: PickleDb,
     mutable_metadata: PickleDb,
     append_only_metadata: PickleDb,
-    account_metadata: PickleDb,
+    login_packet_metadata: PickleDb,
     full_adults: PickleDb,
     immutable_chunks: ImmutableChunkStore,
     mutable_chunks: MutableChunkStore,
     append_only_chunks: AppendOnlyChunkStore,
-    account_chunks: AccountChunkStore,
+    login_packet_chunks: LoginPacketChunkStore,
 }
 
 impl DestinationElder {
@@ -76,7 +76,7 @@ impl DestinationElder {
         let mutable_metadata = utils::new_db(root_dir, MUTABLE_META_DB_NAME, init_mode)?;
         let append_only_metadata = utils::new_db(root_dir, APPEND_ONLY_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
-        let account_metadata = utils::new_db(root_dir, ACCOUNT_META_DB_NAME, init_mode)?;
+        let login_packet_metadata = utils::new_db(root_dir, LOGIN_PACKET_META_DB_NAME, init_mode)?;
 
         let total_used_space = Rc::new(RefCell::new(0));
         let immutable_chunks = ImmutableChunkStore::new(
@@ -97,7 +97,7 @@ impl DestinationElder {
             Rc::clone(&total_used_space),
             init_mode,
         )?;
-        let account_chunks = AccountChunkStore::new(
+        let login_packet_chunks = LoginPacketChunkStore::new(
             root_dir,
             max_capacity,
             Rc::clone(&total_used_space),
@@ -109,12 +109,12 @@ impl DestinationElder {
             immutable_metadata,
             mutable_metadata,
             append_only_metadata,
-            account_metadata,
+            login_packet_metadata,
             full_adults,
             immutable_chunks,
             mutable_chunks,
             append_only_chunks,
-            account_chunks,
+            login_packet_chunks,
         })
     }
 
@@ -225,16 +225,18 @@ impl DestinationElder {
                 transaction_id,
             } => unimplemented!(),
             //
-            // ===== Accounts =====
+            // ===== Login packets =====
             //
-            CreateAccount(ref new_account) => {
-                self.handle_create_account_req(src, new_account, message_id)
+            CreateLoginPacket(ref new_login_packet) => {
+                self.handle_create_login_packet_req(src, new_login_packet, message_id)
             }
-            UpdateAccount(ref updated_account) => {
-                self.handle_update_account_req(src, updated_account, message_id)
+            UpdateLoginPacket(ref updated_login_packet) => {
+                self.handle_update_login_packet_req(src, updated_login_packet, message_id)
             }
-            CreateAccountFor { .. } => unimplemented!(),
-            GetAccount(ref address) => self.handle_get_account_req(src, address, message_id),
+            CreateLoginPacketFor { .. } => unimplemented!(),
+            GetLoginPacket(ref address) => {
+                self.handle_get_login_packet_req(src, address, message_id)
+            }
             //
             // ===== Invalid =====
             //
@@ -305,7 +307,7 @@ impl DestinationElder {
             //
             // ===== Invalid =====
             //
-            GetTransaction(_) | GetBalance(_) | ListAuthKeysAndVersion(_) | GetAccount(_) => {
+            GetTransaction(_) | GetBalance(_) | ListAuthKeysAndVersion(_) | GetLoginPacket(_) => {
                 error!(
                     "{}: Should not receive {:?} as a destination elder.",
                     self, response
@@ -315,89 +317,92 @@ impl DestinationElder {
         }
     }
 
-    fn handle_update_account_req(
+    fn handle_update_login_packet_req(
         &mut self,
         src: XorName,
-        updated_account: &AccountData,
+        updated_login_packet: &LoginPacket,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .account_chunks
-            .get(updated_account.destination())
+            .login_packet_chunks
+            .get(updated_login_packet.destination())
             .map_err(|e| match e {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchAccount,
+                ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,
                 error => error.to_string().into(),
             })
-            .and_then(|existing_account| {
-                if !updated_account.size_is_valid() {
+            .and_then(|existing_login_packet| {
+                if !updated_login_packet.size_is_valid() {
                     return Err(NdError::ExceededSize);
                 }
-                if XorName::from(*existing_account.authorised_getter()) != src {
+                if XorName::from(*existing_login_packet.authorised_getter()) != src {
                     // Request does not come from the owner
                     Err(NdError::AccessDenied)
                 } else {
-                    self.account_chunks
-                        .put(updated_account)
+                    self.login_packet_chunks
+                        .put(updated_login_packet)
                         .map_err(|err| err.to_string().into())
                 }
             });
         Some(Action::RespondToSrcElders {
-            sender: *updated_account.destination(),
+            sender: *updated_login_packet.destination(),
             client_name: src,
             response: Response::Mutation(result),
             message_id,
         })
     }
 
-    fn handle_create_account_req(
+    fn handle_create_login_packet_req(
         &mut self,
         src: XorName,
-        new_account: &AccountData,
+        new_login_packet: &LoginPacket,
         message_id: MessageId,
     ) -> Option<Action> {
         // TODO: verify owner is the same as src?
-        let result = if self.account_chunks.has(new_account.destination()) {
-            Err(NdError::AccountExists)
-        } else if !new_account.size_is_valid() {
+        let result = if self.login_packet_chunks.has(new_login_packet.destination()) {
+            Err(NdError::LoginPacketExists)
+        } else if !new_login_packet.size_is_valid() {
             Err(NdError::ExceededSize)
         } else {
-            self.account_chunks
-                .put(new_account)
+            self.login_packet_chunks
+                .put(new_login_packet)
                 .map_err(|error| error.to_string().into())
         };
         Some(Action::RespondToSrcElders {
-            sender: *new_account.destination(),
+            sender: *new_login_packet.destination(),
             client_name: src,
             response: Response::Mutation(result),
             message_id,
         })
     }
 
-    fn handle_get_account_req(
+    fn handle_get_login_packet_req(
         &mut self,
         src: XorName,
         address: &XorName,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
-            .account_chunks
+            .login_packet_chunks
             .get(address)
             .map_err(|error| match error {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchAccount,
+                ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,
                 error => error.to_string().into(),
             })
-            .and_then(|account| {
-                if XorName::from(*account.authorised_getter()) != src {
+            .and_then(|login_packet| {
+                if XorName::from(*login_packet.authorised_getter()) != src {
                     // Request does not come from the owner
                     Err(NdError::AccessDenied)
                 } else {
-                    Ok((account.data().to_vec(), account.signature().clone()))
+                    Ok((
+                        login_packet.data().to_vec(),
+                        login_packet.signature().clone(),
+                    ))
                 }
             });
         Some(Action::RespondToSrcElders {
             client_name: src,
             sender: *address,
-            response: Response::GetAccount(result),
+            response: Response::GetLoginPacket(result),
             message_id,
         })
     }

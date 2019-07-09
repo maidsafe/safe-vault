@@ -329,14 +329,14 @@ impl SourceElder {
                 transaction_id,
             ),
             //
-            // ===== Accounts =====
+            // ===== Login packets =====
             //
-            CreateAccount(..) => Some(Action::ForwardClientRequest {
+            CreateLoginPacket(..) => Some(Action::ForwardClientRequest {
                 client_name: *client.public_id.name(),
                 request,
                 message_id,
             }),
-            CreateAccountFor { .. } | UpdateAccount { .. } | GetAccount(..) => {
+            CreateLoginPacketFor { .. } | UpdateLoginPacket { .. } | GetLoginPacket(..) => {
                 // TODO: allow only registered clients to send this req
                 // once the coin balances are implemented.
 
@@ -555,7 +555,7 @@ impl SourceElder {
         #[allow(unused)]
         match response {
             // Transfer the response from destination elders to clients
-            GetAccount(..) | Mutation(..) | GetIData(..) => {
+            GetLoginPacket(..) | Mutation(..) | GetIData(..) => {
                 if let Some(peer_addr) = self.lookup_client_peer_addr(&client_name) {
                     let peer = Peer::Client {
                         peer_addr: *peer_addr,
@@ -675,7 +675,8 @@ impl SourceElder {
                 self, owner_key
             );
 
-            Err(NdError::AccountExists)
+            // FIXME: change to `BalanceExists` when this error variant is added to safe-nd
+            Err(NdError::DataExists)
         } else {
             let balance = Balance { coins: amount };
             self.put_balance(&owner_key, &balance)?;

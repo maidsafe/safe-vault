@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::Chunk;
-use safe_nd::{AccountData, XorName};
+use safe_nd::{LoginPacket, XorName};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-impl Chunk for AccountData {
+impl Chunk for LoginPacket {
     type Id = XorName;
     fn id(&self) -> &Self::Id {
         self.destination()

@@ -56,7 +56,7 @@ mod common;
 use self::common::{Environment, TestClient, TestVault};
 use rand::Rng;
 use safe_nd::{
-    AccountData, Coins, Error as NdError, IData, IDataAddress, PubImmutableData, Request, Response,
+    Coins, Error as NdError, IData, IDataAddress, LoginPacket, PubImmutableData, Request, Response,
     UnpubImmutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
@@ -71,7 +71,7 @@ fn client_connects() {
 }
 
 #[test]
-fn accounts() {
+fn login_packets() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
     let conn_info = vault.connection_info();
@@ -79,40 +79,46 @@ fn accounts() {
     let mut client = TestClient::new(env.rng());
     common::establish_connection(&mut env, &mut client, &mut vault);
 
-    let account_data = vec![0; 32];
-    let account_locator: XorName = env.rng().gen();
+    let login_packet_data = vec![0; 32];
+    let login_packet_locator: XorName = env.rng().gen();
 
-    // Try to get an account that does not exist yet.
-    let message_id = client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
+    // Try to get a login packet that does not exist yet.
+    let message_id = client.send_request(
+        conn_info.clone(),
+        Request::GetLoginPacket(login_packet_locator),
+    );
     env.poll(&mut vault);
 
     match client.expect_response(message_id) {
-        Response::GetAccount(Err(NdError::NoSuchAccount)) => (),
+        Response::GetLoginPacket(Err(NdError::NoSuchLoginPacket)) => (),
         x => unexpected!(x),
     }
 
-    // Create a new account
-    let account = unwrap!(AccountData::new(
-        account_locator,
+    // Create a new login packet.
+    let login_packet = unwrap!(LoginPacket::new(
+        login_packet_locator,
         *client.public_id().public_key(),
-        account_data.clone(),
-        client.full_id().sign(&account_data),
+        login_packet_data.clone(),
+        client.full_id().sign(&login_packet_data),
     ));
 
     common::perform_mutation(
         &mut env,
         &mut client,
         &mut vault,
-        Request::CreateAccount(account.clone()),
+        Request::CreateLoginPacket(login_packet.clone()),
     );
 
-    // Try to get the account data and signature.
-    let message_id = client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
+    // Try to get the login packet data and signature.
+    let message_id = client.send_request(
+        conn_info.clone(),
+        Request::GetLoginPacket(login_packet_locator),
+    );
     env.poll(&mut vault);
 
     match client.expect_response(message_id) {
-        Response::GetAccount(Ok((data, sig))) => {
-            assert_eq!(data, account_data);
+        Response::GetLoginPacket(Ok((data, sig))) => {
+            assert_eq!(data, login_packet_data);
 
             match client.public_id().public_key().verify(&sig, &data) {
                 Ok(()) => (),
@@ -122,33 +128,36 @@ fn accounts() {
         x => unexpected!(x),
     }
 
-    // Putting account to the same address should fail.
-    let message_id = client.send_request(conn_info.clone(), Request::CreateAccount(account));
+    // Putting login packet to the same address should fail.
+    let message_id =
+        client.send_request(conn_info.clone(), Request::CreateLoginPacket(login_packet));
     env.poll(&mut vault);
 
     match client.expect_response(message_id) {
-        Response::Mutation(Err(NdError::AccountExists)) => (),
+        Response::Mutation(Err(NdError::LoginPacketExists)) => (),
         x => unexpected!(x),
     }
 
-    // Getting account from non-owning client should fail.
+    // Getting login packet from non-owning client should fail.
     {
         let mut client = TestClient::new(env.rng());
         common::establish_connection(&mut env, &mut client, &mut vault);
 
-        let message_id =
-            client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
+        let message_id = client.send_request(
+            conn_info.clone(),
+            Request::GetLoginPacket(login_packet_locator),
+        );
         env.poll(&mut vault);
 
         match client.expect_response(message_id) {
-            Response::GetAccount(Err(NdError::AccessDenied)) => (),
+            Response::GetLoginPacket(Err(NdError::AccessDenied)) => (),
             x => unexpected!(x),
         }
     }
 }
 
 #[test]
-fn update_account() {
+fn update_login_packet() {
     let mut env = Environment::new();
     let mut vault = TestVault::new();
     let conn_info = vault.connection_info();
@@ -156,59 +165,64 @@ fn update_account() {
     let mut client = TestClient::new(env.rng());
     common::establish_connection(&mut env, &mut client, &mut vault);
 
-    let account_data = vec![0; 32];
-    let account_locator: XorName = env.rng().gen();
+    let login_packet_data = vec![0; 32];
+    let login_packet_locator: XorName = env.rng().gen();
 
-    // Create a new account
-    let account = unwrap!(AccountData::new(
-        account_locator,
+    // Create a new login packet.
+    let login_packet = unwrap!(LoginPacket::new(
+        login_packet_locator,
         *client.public_id().public_key(),
-        account_data.clone(),
-        client.full_id().sign(&account_data),
+        login_packet_data.clone(),
+        client.full_id().sign(&login_packet_data),
     ));
 
     common::perform_mutation(
         &mut env,
         &mut client,
         &mut vault,
-        Request::CreateAccount(account.clone()),
+        Request::CreateLoginPacket(login_packet.clone()),
     );
 
-    // Update the account data.
-    let new_account_data = vec![1; 32];
+    // Update the login packet data.
+    let new_login_packet_data = vec![1; 32];
     let client_public_key = *client.public_id().public_key();
-    let signature = client.full_id().sign(&new_account_data);
+    let signature = client.full_id().sign(&new_login_packet_data);
     common::perform_mutation(
         &mut env,
         &mut client,
         &mut vault,
-        Request::UpdateAccount(unwrap!(AccountData::new(
-            account_locator,
+        Request::UpdateLoginPacket(unwrap!(LoginPacket::new(
+            login_packet_locator,
             client_public_key,
-            new_account_data.clone(),
+            new_login_packet_data.clone(),
             signature,
         ))),
     );
 
-    // Try to get the account data and signature.
-    let message_id = client.send_request(conn_info.clone(), Request::GetAccount(account_locator));
+    // Try to get the login packet data and signature.
+    let message_id = client.send_request(
+        conn_info.clone(),
+        Request::GetLoginPacket(login_packet_locator),
+    );
     env.poll(&mut vault);
 
     match client.expect_response(message_id) {
-        Response::GetAccount(Ok((data, sig))) => {
-            assert_eq!(data, new_account_data);
+        Response::GetLoginPacket(Ok((data, sig))) => {
+            assert_eq!(data, new_login_packet_data);
             unwrap!(client.public_id().public_key().verify(&sig, &data));
         }
         x => unexpected!(x),
     }
 
-    // Updating account from non-owning client should fail.
+    // Updating login packet from non-owning client should fail.
     {
         let mut client = TestClient::new(env.rng());
         common::establish_connection(&mut env, &mut client, &mut vault);
 
-        let message_id =
-            client.send_request(conn_info.clone(), Request::UpdateAccount(account.clone()));
+        let message_id = client.send_request(
+            conn_info.clone(),
+            Request::UpdateLoginPacket(login_packet.clone()),
+        );
         env.poll(&mut vault);
 
         match client.expect_response(message_id) {
