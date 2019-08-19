@@ -530,34 +530,31 @@ fn put_append_only_data() {
     }]));
     let unpub_unseq_adata = AData::UnpubUnseq(unpub_unseq_adata);
 
-    // TODO - Enable this once we're passed phase 1
     // First try to put some data without any associated balance.
-    if false {
-        common::send_request_expect_err(
-            &mut env,
-            &mut client_a,
-            Request::PutAData(pub_seq_adata.clone()),
-            NdError::AccessDenied,
-        );
-        common::send_request_expect_err(
-            &mut env,
-            &mut client_a,
-            Request::PutAData(pub_unseq_adata.clone()),
-            NdError::AccessDenied,
-        );
-        common::send_request_expect_err(
-            &mut env,
-            &mut client_a,
-            Request::PutAData(unpub_seq_adata.clone()),
-            NdError::AccessDenied,
-        );
-        common::send_request_expect_err(
-            &mut env,
-            &mut client_a,
-            Request::PutAData(unpub_unseq_adata.clone()),
-            NdError::AccessDenied,
-        );
-    }
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(pub_seq_adata.clone()),
+        NdError::NoSuchBalance,
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(pub_unseq_adata.clone()),
+        NdError::NoSuchBalance,
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(unpub_seq_adata.clone()),
+        NdError::NoSuchBalance,
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::PutAData(unpub_unseq_adata.clone()),
+        NdError::NoSuchBalance,
+    );
 
     let start_nano = 1_000_000_000_000;
     common::create_balance(&mut env, &mut client_a, None, start_nano);
@@ -1779,22 +1776,19 @@ fn put_immutable_data() {
         *client_b.public_id().public_key(),
     ));
 
-    // TODO - enable this once we're passed phase 1.
-    if false {
-        // Put should fail when the client has no associated balance.
-        common::send_request_expect_err(
-            &mut env,
-            &mut client_a,
-            Request::PutIData(pub_idata.clone()),
-            NdError::InsufficientBalance,
-        );
-        common::send_request_expect_err(
-            &mut env,
-            &mut client_b,
-            Request::PutIData(unpub_idata.clone()),
-            NdError::InsufficientBalance,
-        );
-    }
+    // Put should fail when the client has no associated balance.
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::PutIData(pub_idata.clone()),
+        NdError::NoSuchBalance,
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        Request::PutIData(unpub_idata.clone()),
+        NdError::NoSuchBalance,
+    );
 
     // Create balances.  Client A starts with 2000 safecoins and spends 1000 to initialise
     // Client B's balance.
@@ -1860,16 +1854,13 @@ fn get_immutable_data_that_doesnt_exist() {
         NdError::NoSuchData,
     );
 
-    // TODO - enable this once we're passed phase 1.
-    if false {
-        // Try to get non-existing unpublished immutable data while having no balance
-        common::send_request_expect_err(
-            &mut env,
-            &mut client,
-            Request::GetIData(IDataAddress::Unpub(address)),
-            NdError::AccessDenied,
-        );
-    }
+    // Try to get non-existing unpublished immutable data while having no balance
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::GetIData(IDataAddress::Unpub(address)),
+        NdError::NoSuchData,
+    );
 
     // Try to get non-existing unpublished immutable data while having balance
     let start_nano = 1_000_000_000_000;
@@ -1998,16 +1989,13 @@ fn delete_immutable_data_that_doesnt_exist() {
         NdError::InvalidOperation,
     );
 
-    // TODO - enable this once we're passed phase 1.
-    if false {
-        // Try to delete non-existing unpublished data while not having a balance
-        common::send_request_expect_err(
-            &mut env,
-            &mut client,
-            Request::GetIData(IDataAddress::Unpub(address)),
-            NdError::AccessDenied,
-        );
-    }
+    // Try to delete non-existing unpublished data while not having a balance
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::GetIData(IDataAddress::Unpub(address)),
+        NdError::NoSuchData,
+    );
 
     // Try to delete non-existing unpublished data
     let start_nano = 1_000_000_000_000;
@@ -2057,6 +2045,7 @@ fn delete_immutable_data() {
     common::perform_mutation(&mut env, &mut client_a, Request::PutIData(unpub_idata));
 
     // TODO - enable this once we're passed phase 1.
+    // Currently Elders always assume mutation requests (put/delete) to Adults succeed.
     if false {
         // Delete unpublished data without being the owner
         common::send_request_expect_err(
