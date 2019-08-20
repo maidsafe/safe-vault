@@ -712,6 +712,13 @@ impl ClientHandler {
                 requester,
                 message_id,
             } => self.handle_response(src, requester, response, message_id),
+            Rpc::Refund {
+                requester,
+                amount,
+                transaction_id,
+                reason,
+                message_id,
+            } => self.handle_refund(src, requester, amount, transaction_id, reason, message_id),
         }
     }
 
@@ -878,6 +885,26 @@ impl ClientHandler {
         }
     }
 
+    fn handle_refund(
+        &mut self,
+        _src: XorName,
+        requester: PublicId,
+        amount: Coins,
+        _transaction_id: TransactionId,
+        reason: NdError,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        if let Err(error) = self.deposit(requester.name(), amount) {
+            error!(
+                "{}: Failed to refund {} coins for {:?}: {:?}",
+                self, amount, requester, error,
+            )
+        }
+
+        self.send_response_to_client(&requester, message_id, Response::Transaction(Err(reason)));
+        None
+    }
+
     fn handle_create_balance_client_req(
         &mut self,
         requester: &PublicId,
@@ -935,15 +962,13 @@ impl ClientHandler {
                     message_id,
                 }
             }
-            Err(_) => {
+            Err(error) => {
                 // Send refund.
-                Rpc::Request {
-                    request: Request::TransferCoins {
-                        destination: *requester.name(),
-                        amount,
-                        transaction_id,
-                    },
+                Rpc::Refund {
                     requester,
+                    amount,
+                    transaction_id,
+                    reason: error,
                     message_id,
                 }
             }
@@ -998,37 +1023,22 @@ impl ClientHandler {
                     id: transaction_id,
                     amount,
                 };
+
                 self.notify_destination_owners(&destination, transaction);
 
-                if *requester.name() == destination {
-                    // This is a successful refund.
-                    // TODO: we might want to send a response back to the client, but currently we
-                    // don't know the reason for the refund. We should maybe consider adding that
-                    // information to the `TransferCoins` request.
-                    return None;
-                } else {
-                    Rpc::Response {
-                        response: Response::Transaction(Ok(transaction)),
-                        requester,
-                        message_id,
-                    }
+                Rpc::Response {
+                    response: Response::Transaction(Ok(transaction)),
+                    requester,
+                    message_id,
                 }
             }
             Err(error) => {
-                if *requester.name() == destination {
-                    // This is a failed refund.
-                    error!("{} Failed to refund {} coins: {:?}", self, amount, error);
-                    return None;
-                }
-
                 // Send refund
-                Rpc::Request {
-                    request: Request::TransferCoins {
-                        destination: *requester.name(),
-                        amount,
-                        transaction_id,
-                    },
+                Rpc::Refund {
                     requester,
+                    amount,
+                    transaction_id,
+                    reason: error,
                     message_id,
                 }
             }
@@ -1166,7 +1176,7 @@ impl ClientHandler {
         let (public_key, mut balance) = self
             .balances
             .get_key_value(key)
-            .ok_or_else(|| NdError::from("No such balance"))?;
+            .ok_or_else(|| NdError::NoSuchBalance)?;
         balance.coins = balance
             .coins
             .checked_add(amount)

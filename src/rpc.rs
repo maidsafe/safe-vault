@@ -8,7 +8,7 @@
 
 //! RPC messages internal to Vaults.
 
-use safe_nd::{MessageId, PublicId, Request, Response};
+use safe_nd::{Coins, Error as NdError, MessageId, PublicId, Request, Response, TransactionId};
 use serde::{Deserialize, Serialize};
 
 /// RPC messages exchanged between nodes.
@@ -25,6 +25,14 @@ pub(crate) enum Rpc {
     Response {
         response: Response,
         requester: PublicId,
+        message_id: MessageId,
+    },
+    /// Refund for a failed coin transfer. Send between ClientHandlers.
+    Refund {
+        requester: PublicId,
+        amount: Coins,
+        transaction_id: TransactionId,
+        reason: NdError,
         message_id: MessageId,
     },
 }

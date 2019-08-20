@@ -62,10 +62,10 @@ use safe_nd::{
     ADataUnpubPermissions, ADataUser, AppPermissions, AppendOnlyData, ClientFullId, Coins,
     EntryError, Error as NdError, IData, IDataAddress, LoginPacket, MData, MDataAction,
     MDataAddress, MDataEntries, MDataKind, MDataPermissionSet, MDataSeqEntryActions, MDataSeqValue,
-    MDataUnseqEntryActions, MDataValue, MDataValues, Message, MessageId, Notification,
-    PubImmutableData, PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response,
-    Result as NdResult, SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData,
-    UnpubSeqAppendOnlyData, UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
+    MDataUnseqEntryActions, MDataValue, MDataValues, Message, MessageId, PubImmutableData,
+    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
+    SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData,
+    UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::{BTreeMap, BTreeSet};
@@ -377,23 +377,19 @@ fn create_balance_that_already_exists() {
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, balance_b);
 
-    // Attempt to create the balance for B again. The request fails and the coins are refunded.
+    // Attempt to create the balance for B again. The request fails and A receives an error back.
     let transaction_id = 2;
     let amount = unwrap!(Coins::from_nano(2));
-    let _ = client_a.send_request(Request::CreateBalance {
-        new_balance_owner: *client_b.public_id().public_key(),
-        amount,
-        transaction_id,
-    });
-    env.poll();
-
-    // A receives notification about the refund.
-    let Notification(transaction) = client_a.expect_notification();
-    assert_eq!(transaction.id, transaction_id);
-    assert_eq!(transaction.amount, amount);
-
-    // A does not receive any response (TODO: this might change)
-    client_a.expect_no_new_message();
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::CreateBalance {
+            new_balance_owner: *client_b.public_id().public_key(),
+            amount,
+            transaction_id,
+        },
+        NdError::BalanceExists,
+    );
 
     // A's balance is refunded.
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
@@ -418,24 +414,20 @@ fn transfer_coins_to_balance_that_doesnt_exist() {
     common::create_balance(&mut env, &mut client_a, None, balance_a);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 
-    // Attempt transfer coins to B's balance which doesn't exist.  The request fails and the coins
-    // are refunded.
+    // Attempt transfer coins to B's balance which doesn't exist. The request fails and A receives
+    // an error back.
     let transaction_id = 4;
     let amount = unwrap!(Coins::from_nano(4));
-    let _ = client_a.send_request(Request::TransferCoins {
-        destination: *client_b.public_id().name(),
-        amount,
-        transaction_id,
-    });
-    env.poll();
-
-    // A receives notification about the refund.
-    let Notification(transaction) = client_a.expect_notification();
-    assert_eq!(transaction.id, transaction_id);
-    assert_eq!(transaction.amount, amount);
-
-    // A does not receive any response (TODO: this might change)
-    client_a.expect_no_new_message();
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::TransferCoins {
+            destination: *client_b.public_id().name(),
+            amount,
+            transaction_id,
+        },
+        NdError::NoSuchBalance,
+    );
 
     // A's balance is refunded.
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
