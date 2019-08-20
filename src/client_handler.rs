@@ -1504,7 +1504,9 @@ impl ClientHandler {
         signature: Option<Signature>,
     ) -> Option<()> {
         let signature_required = match utils::authorisation_kind(request) {
-            AuthorisationKind::GetUnpub | AuthorisationKind::Mut => true,
+            AuthorisationKind::GetUnpub
+            | AuthorisationKind::Mut
+            | AuthorisationKind::GetBalance => true,
             AuthorisationKind::GetPub => false,
         };
 
@@ -1548,8 +1550,14 @@ impl ClientHandler {
 
         let result = match utils::authorisation_kind(request) {
             AuthorisationKind::GetPub => Ok(()),
-            AuthorisationKind::GetUnpub => self.authorise_app_for_unpublished_get(app_id),
-            AuthorisationKind::Mut => self.authorise_app_for_mutation(app_id),
+            AuthorisationKind::GetUnpub => self.check_app_permissions(app_id, |_| true),
+            AuthorisationKind::GetBalance => {
+                // TODO: Check `get_balance` instead of `transfer_coins` here, when it is implemented.
+                self.check_app_permissions(app_id, |perms| perms.transfer_coins)
+            }
+            AuthorisationKind::Mut => {
+                self.check_app_permissions(app_id, |perms| perms.transfer_coins)
+            }
         };
 
         if let Err(error) = result {
@@ -1560,24 +1568,21 @@ impl ClientHandler {
         }
     }
 
-    fn authorise_app_for_mutation(&self, app_id: &AppPublicId) -> Result<(), NdError> {
+    fn check_app_permissions(
+        &self,
+        app_id: &AppPublicId,
+        check: impl FnOnce(AppPermissions) -> bool,
+    ) -> Result<(), NdError> {
         if self
             .auth_keys
             .app_permissions(app_id)
-            .map(|perms| perms.transfer_coins)
+            .map(check)
             .unwrap_or(false)
         {
             Ok(())
         } else {
             Err(NdError::AccessDenied)
         }
-    }
-
-    fn authorise_app_for_unpublished_get(&self, app_id: &AppPublicId) -> Result<(), NdError> {
-        self.auth_keys
-            .app_permissions(app_id)
-            .map(|_| ())
-            .ok_or(NdError::AccessDenied)
     }
 
     fn verify_consistent_address(

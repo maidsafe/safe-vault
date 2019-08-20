@@ -147,13 +147,14 @@ pub(crate) enum AuthorisationKind {
     GetPub,
     // Get request against unpublished data.
     GetUnpub,
+    // Request to get balance.
+    GetBalance,
     // Mutation request.
     Mut,
 }
 
 // Returns the type of authorisation needed for the given request.
 pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
-    use AuthorisationKind::*;
     use Request::*;
 
     match request {
@@ -177,8 +178,8 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | CreateLoginPacketFor { .. }
         | UpdateLoginPacket(_)
         | InsAuthKey { .. }
-        | DelAuthKey { .. } => Mut,
-        GetIData(IDataAddress::Pub(_)) => GetPub,
+        | DelAuthKey { .. } => AuthorisationKind::Mut,
+        GetIData(IDataAddress::Pub(_)) => AuthorisationKind::GetPub,
         GetIData(IDataAddress::Unpub(_))
         | GetMData(_)
         | GetMDataValue { .. }
@@ -190,8 +191,7 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | ListMDataPermissions(_)
         | ListMDataUserPermissions { .. }
         | GetLoginPacket(_)
-        | GetBalance
-        | ListAuthKeysAndVersion => GetUnpub,
+        | ListAuthKeysAndVersion => AuthorisationKind::GetUnpub,
         GetAData(address)
         | GetADataValue { address, .. }
         | GetADataShell { address, .. }
@@ -203,10 +203,11 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | GetUnpubADataUserPermissions { address, .. }
         | GetADataOwners { address, .. } => {
             if address.is_pub() {
-                GetPub
+                AuthorisationKind::GetPub
             } else {
-                GetUnpub
+                AuthorisationKind::GetUnpub
             }
         }
+        GetBalance => AuthorisationKind::GetBalance,
     }
 }

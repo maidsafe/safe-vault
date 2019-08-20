@@ -514,8 +514,6 @@ fn coin_operations_by_app_with_insufficient_permissions() {
     );
     env.establish_connection(&mut app);
 
-    // FIXME: this currently fails.
-    /*
     // The attempt to get balance by the app fails.
     common::send_request_expect_err(
         &mut env,
@@ -523,7 +521,6 @@ fn coin_operations_by_app_with_insufficient_permissions() {
         Request::GetBalance,
         NdError::AccessDenied,
     );
-    */
 
     // The attempt to transfer some coins by the app fails.
     let destination: XorName = env.rng().gen();
