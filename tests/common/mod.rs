@@ -531,7 +531,7 @@ pub fn create_balance(
 
 pub fn transfer_coins(
     env: &mut Environment,
-    src_client: &mut TestClient,
+    src_client: &mut impl TestClientTrait,
     dst_client: &mut TestClient,
     amount: impl IntoCoins,
     transaction_id: TransactionId,

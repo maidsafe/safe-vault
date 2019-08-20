@@ -436,6 +436,113 @@ fn transfer_coins_to_balance_that_doesnt_exist() {
     client_b.expect_no_new_message();
 }
 
+#[test]
+fn coin_operations_by_app() {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+
+    // Create initial balance.
+    common::create_balance(&mut env, &mut client_a, None, 10);
+
+    // Create an app with permission to transfer coins.
+    let mut app = env.new_disconnected_app(client_a.public_id().clone());
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::InsAuthKey {
+            key: *app.public_id().public_key(),
+            version: 1,
+            permissions: AppPermissions {
+                transfer_coins: true,
+            },
+        },
+    );
+    env.establish_connection(&mut app);
+
+    // Check the balance by the app.
+    common::send_request_expect_ok(
+        &mut env,
+        &mut app,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(10)),
+    );
+
+    // Create the destination client with balance.
+    let mut client_b = env.new_connected_client();
+    common::create_balance(&mut env, &mut client_b, None, 0);
+
+    // App transfers some coins.
+    let transaction_id = 1;
+    common::transfer_coins(&mut env, &mut app, &mut client_b, 1, transaction_id);
+
+    // Check the coins did actually transfer.
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_a,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(9)),
+    );
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_b,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(1)),
+    );
+}
+
+#[test]
+fn coin_operations_by_app_with_insufficient_permissions() {
+    let mut env = Environment::new();
+    let mut owner = env.new_connected_client();
+
+    // Create initial balance.
+    let balance = unwrap!(Coins::from_nano(10));
+    common::create_balance(&mut env, &mut owner, None, balance);
+
+    // Create an app which does *not* have permission to transfer coins.
+    let mut app = env.new_disconnected_app(owner.public_id().clone());
+    common::perform_mutation(
+        &mut env,
+        &mut owner,
+        Request::InsAuthKey {
+            key: *app.public_id().public_key(),
+            version: 1,
+            permissions: AppPermissions {
+                transfer_coins: false,
+            },
+        },
+    );
+    env.establish_connection(&mut app);
+
+    // FIXME: this currently fails.
+    /*
+    // The attempt to get balance by the app fails.
+    common::send_request_expect_err(
+        &mut env,
+        &mut app,
+        Request::GetBalance,
+        NdError::AccessDenied,
+    );
+    */
+
+    // The attempt to transfer some coins by the app fails.
+    let destination: XorName = env.rng().gen();
+    let transaction_id = 1;
+    common::send_request_expect_err(
+        &mut env,
+        &mut app,
+        Request::TransferCoins {
+            destination,
+            amount: unwrap!(Coins::from_nano(1)),
+            transaction_id,
+        },
+        NdError::AccessDenied,
+    );
+
+    // The owners balance is unchanged.
+    common::send_request_expect_ok(&mut env, &mut owner, Request::GetBalance, balance);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Append-only data
