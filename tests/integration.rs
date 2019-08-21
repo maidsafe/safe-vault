@@ -929,7 +929,7 @@ fn get_unpub_append_only_data() {
         &mut env,
         &mut other_client,
         Request::GetAData(address),
-        NdError::InvalidPermissions,
+        NdError::AccessDenied,
     );
 }
 
@@ -1431,9 +1431,7 @@ fn pub_append_only_data_put_permissions() {
             permissions: perms_1.clone(),
             permissions_index: 1,
         },
-        // TODO: InvalidPermissions because client B doesn't have any key avail. We should consider
-        // changing this behaviour to AccessDenied.
-        NdError::InvalidPermissions,
+        NdError::AccessDenied,
     );
 
     common::perform_mutation(
@@ -1534,9 +1532,7 @@ fn unpub_append_only_data_put_permissions() {
             permissions: perms_1.clone(),
             permissions_index: 1,
         },
-        // TODO: InvalidPermissions because client B doesn't have any key avail. We should consider
-        // changing this behaviour to AccessDenied.
-        NdError::InvalidPermissions,
+        NdError::AccessDenied,
     );
 
     common::perform_mutation(
@@ -1658,9 +1654,7 @@ fn append_only_data_put_owners() {
             owner: owner_1,
             owners_index: 1,
         },
-        // TODO - InvalidPermissions because client B doesn't have their key registered. Maybe we
-        //        should consider changing this.
-        NdError::InvalidPermissions,
+        NdError::AccessDenied,
     );
     common::perform_mutation(
         &mut env,
