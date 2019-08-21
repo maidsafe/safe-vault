@@ -1283,12 +1283,14 @@ impl ClientHandler {
             self.send_response_to_client(
                 payer,
                 message_id,
-                Response::Mutation(Err(NdError::ExceededSize)),
+                Response::Transaction(Err(NdError::ExceededSize)),
             );
             return None;
         }
+        // The requester bears the cost of storing the login packet
+        let new_amount = amount.checked_add(*COST_OF_PUT)?;
         // TODO - (after phase 1) - if `amount` < cost to store login packet return error msg here.
-        match self.withdraw(payer.name(), amount) {
+        match self.withdraw(payer.name(), new_amount) {
             Ok(_) => {
                 let request = Request::CreateLoginPacketFor {
                     new_owner,
@@ -1303,7 +1305,7 @@ impl ClientHandler {
                 }))
             }
             Err(error) => {
-                self.send_response_to_client(payer, message_id, Response::Mutation(Err(error)));
+                self.send_response_to_client(payer, message_id, Response::Transaction(Err(error)));
                 None
             }
         }
@@ -1326,15 +1328,11 @@ impl ClientHandler {
             // Step two - create balance and forward login_packet.
             //
             // TODO: confirm this follows the same failure flow as CreateBalance request.
-
-            // Pre-deduct payment for creating the login packet.
-            let new_amount =
-                Coins::from_nano(amount.as_nano().checked_sub(COST_OF_PUT.as_nano())?).ok()?;
-            if let Err(error) = self.create_balance(&payer, new_owner, new_amount) {
+            if let Err(error) = self.create_balance(&payer, new_owner, amount) {
                 Some(Action::RespondToClientHandlers {
                     sender: XorName::from(new_owner),
                     rpc: Rpc::Response {
-                        response: Response::Mutation(Err(error)),
+                        response: Response::Transaction(Err(error)),
                         requester: payer,
                         message_id,
                     },

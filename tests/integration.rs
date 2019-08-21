@@ -205,8 +205,8 @@ fn create_login_packet_for_other() {
         new_client.sign(&login_packet_data),
     ));
 
+    let amount = *COST_OF_PUT;
     let nano_to_transfer = 2 * COST_OF_PUT.as_nano();
-    let amount = unwrap!(Coins::from_nano(nano_to_transfer));
     common::send_request_expect_ok(
         &mut env,
         &mut established_client,
