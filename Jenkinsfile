@@ -115,7 +115,7 @@ def retrieveBuildArtifacts() {
 def versionChangeCommit() {
     shortCommitHash = sh(
         returnStdout: true,
-        script: "git log -n 1 --pretty=format:'%h'").trim()
+        script: "git log -n 1 --no-merges --pretty=format:'%h'").trim()
     message = sh(
         returnStdout: true,
         script: "git log --format=%B -n 1 ${shortCommitHash}").trim()
