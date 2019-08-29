@@ -928,12 +928,13 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
+        let request = Request::CreateBalance {
+            new_balance_owner: owner_key,
+            amount,
+            transaction_id,
+        };
         let action = Action::ForwardClientRequest(Rpc::Request {
-            request: Request::CreateBalance {
-                new_balance_owner: owner_key,
-                amount,
-                transaction_id,
-            },
+            request: request.clone(),
             requester: requester.clone(),
             message_id,
         });
@@ -943,6 +944,19 @@ impl ClientHandler {
             .map(|key| key == &owner_key)
             .unwrap_or(false);
         if own_request {
+            return Some(action);
+        }
+
+        self.pay(
+            &requester,
+            utils::owner(requester)?.public_key(),
+            &request,
+            message_id,
+            *COST_OF_PUT,
+        )?;
+
+        // Creating a balance without coins
+        if amount.as_nano() == 0 {
             return Some(action);
         }
 
@@ -978,7 +992,8 @@ impl ClientHandler {
                 }
             }
             Err(error) => {
-                // Send refund.
+                let amount = amount.checked_add(*COST_OF_PUT)?;
+                // Send refund. (Including the cost of creating a balance)
                 Rpc::Refund {
                     requester,
                     amount,

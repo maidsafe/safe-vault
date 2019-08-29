@@ -344,27 +344,15 @@ fn coin_operations() {
     common::create_balance(&mut env, &mut client_a, None, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
 
-    // Create B's balance (first attempt with zero balance shouldn't be possible)
-    let amount_zero = unwrap!(Coins::from_nano(0));
-    let transaction_id = 1;
-    common::send_request_expect_err(
-        &mut env,
-        &mut client_a,
-        Request::CreateBalance {
-            new_balance_owner: *client_b.public_id().public_key(),
-            amount: amount_zero,
-            transaction_id,
-        },
-        NdError::InvalidOperation,
-    );
     let amount_b = unwrap!(Coins::from_nano(1));
     common::create_balance(&mut env, &mut client_a, Some(&mut client_b), amount_b);
 
-    let amount_a = unwrap!(Coins::from_nano(9));
+    let amount_a = unwrap!(Coins::from_nano(8));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, amount_b);
 
     // Transfer coins from A to B (first attempt with zero amount doesn't work)
+    let amount_zero = unwrap!(Coins::from_nano(0));
     let transaction_id = 2;
     common::send_request_expect_err(
         &mut env,
@@ -378,7 +366,7 @@ fn coin_operations() {
     );
     common::transfer_coins(&mut env, &mut client_a, &mut client_b, 2, 3);
 
-    let amount_a = unwrap!(Coins::from_nano(7));
+    let amount_a = unwrap!(Coins::from_nano(6));
     let amount_b = unwrap!(Coins::from_nano(3));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, amount_b);
@@ -394,7 +382,7 @@ fn create_balance_that_already_exists() {
     common::create_balance(&mut env, &mut client_a, None, 10);
     common::create_balance(&mut env, &mut client_a, Some(&mut client_b), 4);
 
-    let balance_a = unwrap!(Coins::from_nano(6));
+    let balance_a = unwrap!(Coins::from_nano(5));
     let balance_b = unwrap!(Coins::from_nano(4));
 
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
@@ -1917,8 +1905,9 @@ fn put_immutable_data() {
         NdError::InvalidOwners,
     );
 
-    let mut expected = unwrap!(Coins::from_nano(start_nano));
-    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected);
+    let mut expected_a = unwrap!(Coins::from_nano(start_nano - 1));
+    let mut expected_b = unwrap!(Coins::from_nano(start_nano));
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected_a);
 
     // Check they can both Put valid data.
     common::perform_mutation(
@@ -1932,9 +1921,10 @@ fn put_immutable_data() {
         Request::PutIData(unpub_idata.clone()),
     );
 
-    expected = unwrap!(expected.checked_sub(*COST_OF_PUT));
-    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected);
-    common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected);
+    expected_a = unwrap!(expected_a.checked_sub(*COST_OF_PUT));
+    expected_b = unwrap!(expected_b.checked_sub(*COST_OF_PUT));
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected_a);
+    common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected_b);
 
     // Check the data is retrievable.
     common::send_request_expect_ok(
@@ -1963,9 +1953,10 @@ fn put_immutable_data() {
         NdError::DataExists,
     );
 
-    expected = unwrap!(expected.checked_sub(*COST_OF_PUT));
-    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected);
-    common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected);
+    expected_a = unwrap!(expected_a.checked_sub(*COST_OF_PUT));
+    expected_b = unwrap!(expected_b.checked_sub(*COST_OF_PUT));
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected_a);
+    common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected_b);
 }
 
 #[test]
