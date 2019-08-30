@@ -91,6 +91,11 @@ mod detail {
             .is_test(false)
             .try_init();
 
+        let mut config = Config::new();
+        if config.quic_p2p_config().ip.is_none() {
+            config.listen_on_loopback();
+        }
+
         match update() {
             Ok(status) => {
                 if let Status::Updated { .. } = status {
@@ -99,11 +104,6 @@ mod detail {
                 }
             }
             Err(e) => log::error!("Updating vault failed: {:?}", e),
-        }
-
-        let mut config = Config::new();
-        if config.quic_p2p_config().ip.is_none() {
-            config.listen_on_loopback();
         }
 
         let message = format!(
