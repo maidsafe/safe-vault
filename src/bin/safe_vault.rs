@@ -65,7 +65,7 @@ fn main() {
 #[cfg(not(feature = "mock"))]
 mod detail {
     use env_logger::{fmt::Formatter, Builder as LoggerBuilder};
-    use log::{self, Record};
+    use log::{self, Level, Record};
     use safe_vault::{self, Command, Config, Vault};
     use self_update::cargo_crate_version;
     use self_update::Status;
@@ -74,6 +74,11 @@ mod detail {
 
     /// Runs a SAFE Network vault.
     pub fn main() {
+        let mut config = Config::new();
+        if config.quic_p2p_config().ip.is_none() {
+            config.listen_on_loopback();
+        }
+
         let do_format = move |formatter: &mut Formatter, record: &Record<'_>| {
             let now = formatter.timestamp();
             writeln!(
@@ -86,10 +91,15 @@ mod detail {
                 record.args()
             )
         };
-        let _ = LoggerBuilder::from_default_env()
-            .format(do_format)
-            .is_test(false)
-            .try_init();
+        let mut logger = LoggerBuilder::from_default_env();
+        let _ = logger.format(do_format).is_test(false);
+        if config.verbose() != Level::Error {
+            let _ = logger.filter(
+                Config::clap().get_bin_name(),
+                config.verbose().to_level_filter(),
+            );
+        }
+        let _ = logger.try_init();
 
         let mut config = Config::new();
         if config.quic_p2p_config().ip.is_none() {

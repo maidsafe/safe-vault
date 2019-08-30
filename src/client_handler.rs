@@ -115,6 +115,7 @@ impl ClientHandler {
                 );
             }
         }
+        println!("Waiting for connections ...");
 
         Ok((quic_p2p, event_receiver))
     }

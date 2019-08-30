@@ -8,7 +8,7 @@
 
 use crate::{quic_p2p::Config as QuicP2pConfig, quic_p2p::NodeInfo, Result};
 use directories::ProjectDirs;
-use log::trace;
+use log::{trace, Level};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -27,10 +27,11 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "safe_vault";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 11] = [
+const ARGS: [&str; 12] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
+    "verbose",
     "hard-coded-contacts",
     "port",
     "ip",
@@ -43,7 +44,7 @@ const ARGS: [&str; 11] = [
 
 /// Vault configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, StructOpt)]
-#[structopt(rename_all = "kebab-case")]
+#[structopt(rename_all = "kebab-case", bin_name = "safe_vault")]
 pub struct Config {
     /// The address to be credited when this vault farms SafeCoin.
     #[structopt(short, long, parse(try_from_str))]
@@ -56,6 +57,10 @@ pub struct Config {
     /// within a temporary directory, e.g. %TMP% or $TMPDIR.
     #[structopt(short, long, parse(from_os_str))]
     root_dir: Option<PathBuf>,
+    /// Verbose output. `-v` is equivalent to logging with `warn`, `-vv` to `info`, `-vvv` to
+    /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
+    #[structopt(short, long, parse(from_occurrences))]
+    verbose: u64,
     #[structopt(flatten)]
     #[allow(missing_docs)]
     quic_p2p_config: QuicP2pConfig,
@@ -69,13 +74,19 @@ impl Config {
             wallet_address: None,
             max_capacity: None,
             root_dir: None,
+            verbose: 0,
             quic_p2p_config: Default::default(),
         });
 
         let command_line_args = Config::clap().get_matches();
         for arg in &ARGS {
-            if command_line_args.occurrences_of(arg) != 0 {
-                config.set_value(arg, unwrap!(command_line_args.value_of(arg)));
+            let occurrences = command_line_args.occurrences_of(arg);
+            if occurrences != 0 {
+                if let Some(cla) = command_line_args.value_of(arg) {
+                    config.set_value(arg, cla);
+                } else {
+                    config.set_flag(arg, occurrences);
+                }
             }
         }
 
@@ -106,6 +117,17 @@ impl Config {
         self.root_dir = Some(path.into())
     }
 
+    /// Get the log level.
+    pub fn verbose(&self) -> Level {
+        match self.verbose {
+            0 => Level::Error,
+            1 => Level::Warn,
+            2 => Level::Info,
+            3 => Level::Debug,
+            _ => Level::Trace,
+        }
+    }
+
     /// Quic-P2P configuration options.
     pub fn quic_p2p_config(&self) -> &QuicP2pConfig {
         &self.quic_p2p_config
@@ -129,23 +151,25 @@ impl Config {
         } else if arg == ARGS[2] {
             self.root_dir = Some(unwrap!(value.parse()));
         } else if arg == ARGS[3] {
-            self.quic_p2p_config.hard_coded_contacts = unwrap!(serde_json::from_str(value));
+            self.verbose = unwrap!(value.parse());
         } else if arg == ARGS[4] {
-            self.quic_p2p_config.port = Some(unwrap!(value.parse()));
+            self.quic_p2p_config.hard_coded_contacts = unwrap!(serde_json::from_str(value));
         } else if arg == ARGS[5] {
+            self.quic_p2p_config.port = Some(unwrap!(value.parse()));
+        } else if arg == ARGS[6] {
             self.quic_p2p_config.ip = Some(unwrap!(value.parse()));
-        } else if arg == ARGS[10] {
+        } else if arg == ARGS[11] {
             self.quic_p2p_config.our_type = unwrap!(value.parse());
         } else {
             #[cfg(not(feature = "mock"))]
             {
-                if arg == ARGS[6] {
+                if arg == ARGS[7] {
                     self.quic_p2p_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
-                } else if arg == ARGS[7] {
-                    self.quic_p2p_config.idle_timeout_msec = Some(unwrap!(value.parse()));
                 } else if arg == ARGS[8] {
-                    self.quic_p2p_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
+                    self.quic_p2p_config.idle_timeout_msec = Some(unwrap!(value.parse()));
                 } else if arg == ARGS[9] {
+                    self.quic_p2p_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
+                } else if arg == ARGS[10] {
                     self.quic_p2p_config.our_complete_cert = Some(unwrap!(value.parse()));
                 } else {
                     println!("ERROR");
@@ -153,6 +177,14 @@ impl Config {
             }
 
             #[cfg(feature = "mock")]
+            println!("ERROR");
+        }
+    }
+
+    fn set_flag(&mut self, arg: &str, occurrences: u64) {
+        if arg == ARGS[3] {
+            self.verbose = occurrences;
+        } else {
             println!("ERROR");
         }
     }
@@ -237,7 +269,7 @@ mod test {
     #[test]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
-            232
+            240
         } else {
             152
         };
@@ -258,6 +290,7 @@ mod test {
             ["wallet-address", "abc"],
             ["max-capacity", "1"],
             ["root-dir", "dir"],
+            ["verbose", "None"],
             ["hard-coded-contacts", node_info.as_str()],
             ["port", "1"],
             ["ip", "127.0.0.1"],
@@ -271,18 +304,27 @@ mod test {
         for arg in &ARGS {
             let user_arg = format!("--{}", arg);
             let value = unwrap!(test_values.iter().find(|elt| &elt[0] == arg))[1];
-            let matches =
-                Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str(), value]);
-            assert_eq!(1, matches.occurrences_of(arg));
+            let matches = if value == "None" {
+                Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str()])
+            } else {
+                Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str(), value])
+            };
+            let occurrences = matches.occurrences_of(arg);
+            assert_eq!(1, occurrences);
 
             let mut config = Config {
                 wallet_address: None,
                 max_capacity: None,
                 root_dir: None,
+                verbose: 0,
                 quic_p2p_config: Default::default(),
             };
             let empty_config = config.clone();
-            config.set_value(arg, unwrap!(matches.value_of(arg)));
+            if let Some(val) = matches.value_of(arg) {
+                config.set_value(arg, val);
+            } else {
+                config.set_flag(arg, occurrences);
+            }
             assert!(empty_config != config, "Failed to set_value() for {}", arg);
         }
     }
