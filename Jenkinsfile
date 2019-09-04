@@ -1,33 +1,30 @@
 properties([
     parameters([
         string(name: "ARTIFACTS_BUCKET", defaultValue: "safe-jenkins-build-artifacts"),
-        string(name: 'CACHE_BRANCH', defaultValue: 'master'),
-        string(name: "DEPLOY_BUCKET", defaultValue: "safe-vault")
+        string(name: "CACHE_BRANCH", defaultValue: "master"),
+        string(name: "DEPLOY_BUCKET", defaultValue: "safe-vault"),
+        string(name: "CLEAN_BUILD_BRANCH", defaultValue: "master")
     ])
 ])
 
 stage("build & test") {
-    parallel linux: {
+    parallel test_linux: {
         node("safe_vault") {
             checkout(scm)
             sh("make test")
         }
     },
-    windows: {
+    test_windows: {
         node("windows") {
             checkout(scm)
             retrieveCache()
             sh("make test")
-            packageBuildArtifacts("windows")
-            uploadBuildArtifacts()
         }
     },
-    macos: {
+    test_macos: {
         node("osx") {
             checkout(scm)
             sh("make test")
-            packageBuildArtifacts("macos")
-            uploadBuildArtifacts()
         }
     },
     clippy: {
@@ -36,11 +33,27 @@ stage("build & test") {
             sh("make clippy")
         }
     },
-    musl: {
+    release_linux: {
         node("safe_vault") {
             checkout(scm)
             sh("make musl")
             packageBuildArtifacts("linux")
+            uploadBuildArtifacts()
+        }
+    },
+    release_windows: {
+        node("windows") {
+            checkout(scm)
+            runReleaseBuild()
+            packageBuildArtifacts("windows")
+            uploadBuildArtifacts()
+        }
+    },
+    release_macos: {
+        node("osx") {
+            checkout(scm)
+            runReleaseBuild()
+            packageBuildArtifacts("macos")
             uploadBuildArtifacts()
         }
     }
@@ -71,6 +84,14 @@ stage('deploy') {
     if (env.BRANCH_NAME == "master") {
         build(job: '../rust_cache_build-safe_vault-windows', wait: false)
         build(job: '../docker_build-safe_vault_build_container', wait: false)
+    }
+}
+
+def runReleaseBuild() {
+    if (env.BRANCH_NAME == "${params.CLEAN_BUILD_BRANCH}") {
+        sh("make build-clean")
+    } else {
+        sh("make build")
     }
 }
 

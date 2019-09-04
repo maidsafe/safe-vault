@@ -9,6 +9,39 @@ S3_BUCKET := safe-jenkins-build-artifacts
 GITHUB_REPO_OWNER := maidsafe
 GITHUB_REPO_NAME := safe_vault
 
+build:
+	rm -rf artifacts
+	mkdir artifacts
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-vault-build-${UUID}" \
+		-v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-vault-build:build \
+		cargo build --release
+	docker cp "safe-vault-build-${UUID}":/target .
+	docker rm "safe-vault-build-${UUID}"
+else
+	cargo build --release
+endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
+build-clean:
+	rm -rf artifacts
+	mkdir artifacts
+ifeq ($(UNAME_S),Linux)
+	docker run --name "safe-vault-build-${UUID}" \
+		-v "${PWD}":/usr/src/safe-cli:Z \
+		-u ${USER_ID}:${GROUP_ID} \
+		maidsafe/safe-vault-build:build \
+		bash -c "rm -rf /target/release && cargo build --release"
+	docker cp "safe-vault-build-${UUID}":/target .
+	docker rm "safe-vault-build-${UUID}"
+else
+	rm -rf target
+	cargo build --release
+endif
+	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
+
 build-container:
 	rm -rf target/
 	docker rmi -f maidsafe/safe-vault-build:build
@@ -25,7 +58,7 @@ push-container:
 	docker push maidsafe/safe-vault-build:build
 
 push-mock-container:
-	docker push maidsafe/safe-cli-build:build-mock
+	docker push maidsafe/safe-vault-build:build-mock
 
 clippy:
 ifeq ($(UNAME_S),Linux)
