@@ -3,6 +3,8 @@ properties([
         string(name: "ARTIFACTS_BUCKET", defaultValue: "safe-jenkins-build-artifacts"),
         string(name: "CACHE_BRANCH", defaultValue: "master"),
         string(name: "DEPLOY_BUCKET", defaultValue: "safe-vault"),
+        string(name: "DEPLOY_BRANCH", defaultValue: "master"),
+        string(name: "PUBLISH_BRANCH", defaultValue: "master"),
         string(name: "CLEAN_BUILD_BRANCH", defaultValue: "master")
     ])
 ])
@@ -64,7 +66,7 @@ stage("build & test") {
 
 stage('deploy') {
     node('safe_vault') {
-        if (env.BRANCH_NAME == "master") {
+        if (env.BRANCH_NAME == "${params.DEPLOY_BRANCH}") {
             checkout(scm)
             sh("git fetch --tags --force")
             retrieveBuildArtifacts()
@@ -84,7 +86,7 @@ stage('deploy') {
             echo("${env.BRANCH_NAME} does not match the deployment branch. Nothing to do.")
         }
     }
-    if (env.BRANCH_NAME == "master") {
+    if (env.BRANCH_NAME == "${params.DEPLOY_BRANCH}") {
         build(job: '../rust_cache_build-safe_vault-windows', wait: false)
         build(job: '../docker_build-safe_vault_build_container', wait: false)
     }
@@ -183,10 +185,19 @@ def createGithubRelease(version) {
     }
 }
 
+// This publishCrate method is only called when we've determined that we're on the branch
+// we want to deploy from (usually master). However, due to the fact that crates can't be
+// deleted, we need extra protections for the publish. Sometimes during testing and
+// development, the deploy branch will change, but we only really want to do the publish
+// for a *real* release. For this reason we introduce a PUBLISH_BRANCH parameter, though in
+// practice this should probably never change from master.
 def publishCrate() {
-    withCredentials([string(
-        credentialsId: 'crates_io_token', variable: 'CRATES_IO_TOKEN')]) {
-        sh("make publish")
+    withCredentials(
+        [string(
+            credentialsId: 'crates_io_token', variable: 'CRATES_IO_TOKEN')]) {
+        if (env.BRANCH_NAME == "${params.PUBLISH_BRANCH}") {
+            sh("make publish")
+        }
     }
 }
 
