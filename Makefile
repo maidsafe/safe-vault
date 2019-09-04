@@ -12,10 +12,20 @@ GITHUB_REPO_NAME := safe_vault
 build-container:
 	rm -rf target/
 	docker rmi -f maidsafe/safe-vault-build:build
-	docker build -f Dockerfile.build -t maidsafe/safe-vault-build:build .
+	docker build -f Dockerfile.build -t maidsafe/safe-vault-build:build \
+		--build-arg build_type="non-mock" .
+
+build-mock-container:
+	rm -rf target/
+	docker rmi -f maidsafe/safe-vault-build:build-mock
+	docker build -f Dockerfile.build -t maidsafe/safe-vault-build:build-mock \
+		--build-arg build_type="mock" .
 
 push-container:
 	docker push maidsafe/safe-vault-build:build
+
+push-mock-container:
+	docker push maidsafe/safe-cli-build:build-mock
 
 clippy:
 ifeq ($(UNAME_S),Linux)
