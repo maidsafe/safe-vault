@@ -173,12 +173,19 @@ package-version-artifacts-for-deploy:
 	rm -f *.tar
 	rm -rf deploy
 	mkdir deploy
-	tar -C artifacts/linux/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar safe_vault
-	tar -C artifacts/win/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar safe_vault.exe
-	tar -C artifacts/macos/release -cvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar safe_vault
-	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar deploy
-	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar deploy
-	mv safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar deploy
+	cd deploy
+	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.zip \
+		../../artifacts/linux/release/safe
+	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.zip \
+		../../artifacts/win/release/safe.exe
+	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.zip \
+		../../artifacts/macos/release/safe
+	tar -C ../../artifacts/linux/release \
+		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar.gz safe
+	tar -C ../../artifacts/win/release \
+		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar.gz safe.exe
+	tar -C ../../artifacts/macos/release \
+		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar.gz safe
 
 deploy-github-release:
 ifndef GITHUB_TOKEN
@@ -195,20 +202,38 @@ endif
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_VAULT_VERSION} \
-		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar" \
-		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar;
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.zip" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.zip
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_VAULT_VERSION} \
-		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar" \
-		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar;
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.zip" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.zip
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_VAULT_VERSION} \
-		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar" \
-		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar;
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.zip" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.zip
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_VAULT_VERSION} \
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar.gz
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_VAULT_VERSION} \
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar.gz" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar.gz
+	github-release upload \
+		--user ${GITHUB_REPO_OWNER} \
+		--repo ${GITHUB_REPO_NAME} \
+		--tag ${SAFE_VAULT_VERSION} \
+		--name "safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar.gz" \
+		--file deploy/safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar.gz
 
 publish:
 ifndef CRATES_IO_TOKEN
