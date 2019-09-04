@@ -4,6 +4,7 @@
 *.rsproj
 tags*
 artifacts/
+deploy/
 build/
 build-tests/
 target/*

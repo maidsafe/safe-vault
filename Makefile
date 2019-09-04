@@ -42,6 +42,15 @@ else
 endif
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
+strip-artifacts:
+ifeq ($(OS),Windows_NT)
+	find artifacts -name "safe_vault.exe" -exec strip -x '{}' \;
+else ifeq ($(UNAME_S),Darwin)
+	find artifacts -name "safe_vault" -exec strip -x '{}' \;
+else
+	find artifacts -name "safe_vault" -exec strip '{}' \;
+endif
+
 build-container:
 	rm -rf target/
 	docker rmi -f maidsafe/safe-vault-build:build
@@ -169,23 +178,23 @@ package-commit_hash-artifacts-for-deploy:
 	mv safe_vault-$$(git rev-parse --short HEAD)-x86_64-pc-windows-gnu.tar deploy
 	mv safe_vault-$$(git rev-parse --short HEAD)-x86_64-apple-darwin.tar deploy
 
+.ONESHELL:
 package-version-artifacts-for-deploy:
-	rm -f *.tar
 	rm -rf deploy
 	mkdir deploy
 	cd deploy
-	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-gnu.zip \
-		../../artifacts/linux/release/safe
+	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.zip \
+		../artifacts/linux/release/safe_vault
 	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.zip \
-		../../artifacts/win/release/safe.exe
+		../artifacts/win/release/safe_vault.exe
 	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.zip \
-		../../artifacts/macos/release/safe
-	tar -C ../../artifacts/linux/release \
-		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar.gz safe
-	tar -C ../../artifacts/win/release \
-		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar.gz safe.exe
-	tar -C ../../artifacts/macos/release \
-		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar.gz safe
+		../artifacts/macos/release/safe_vault
+	tar -C ../artifacts/linux/release \
+		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar.gz safe_vault
+	tar -C ../artifacts/win/release \
+		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar.gz safe_vault.exe
+	tar -C ../artifacts/macos/release \
+		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar.gz safe_vault
 
 deploy-github-release:
 ifndef GITHUB_TOKEN

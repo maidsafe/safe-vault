@@ -37,6 +37,7 @@ stage("build & test") {
         node("safe_vault") {
             checkout(scm)
             sh("make musl")
+            stripArtifacts()
             packageBuildArtifacts("linux")
             uploadBuildArtifacts()
         }
@@ -45,6 +46,7 @@ stage("build & test") {
         node("windows") {
             checkout(scm)
             runReleaseBuild()
+            stripArtifacts()
             packageBuildArtifacts("windows")
             uploadBuildArtifacts()
         }
@@ -53,6 +55,7 @@ stage("build & test") {
         node("osx") {
             checkout(scm)
             runReleaseBuild()
+            stripArtifacts()
             packageBuildArtifacts("macos")
             uploadBuildArtifacts()
         }
@@ -93,6 +96,10 @@ def runReleaseBuild() {
     } else {
         sh("make build")
     }
+}
+
+def stripArtifacts() {
+    sh("make strip-artifacts")
 }
 
 def retrieveCache() {
