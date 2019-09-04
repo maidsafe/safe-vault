@@ -197,7 +197,7 @@ endif
 		--repo ${GITHUB_REPO_NAME} \
 		--tag ${SAFE_VAULT_VERSION} \
 		--name "safe-vault" \
-		--description "Command line interface for the SAFE Network";
+		--description "$$(./scripts/get_release_description.sh ${SAFE_VAULT_VERSION})"
 	github-release upload \
 		--user ${GITHUB_REPO_OWNER} \
 		--repo ${GITHUB_REPO_NAME} \
