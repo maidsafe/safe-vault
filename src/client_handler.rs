@@ -448,12 +448,14 @@ impl ClientHandler {
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::Parsec(ParsecAction::PayAndForwardClientRequest {
-            request,
-            client_public_id: client.public_id.clone(),
-            message_id,
-            cost: *COST_OF_PUT,
-        }))
+        Some(Action::ParsecVote(
+            ParsecAction::PayAndForwardClientRequest {
+                request,
+                client_public_id: client.public_id.clone(),
+                message_id,
+                cost: *COST_OF_PUT,
+            },
+        ))
     }
 
     fn handle_delete_mdata(

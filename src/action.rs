@@ -8,9 +8,11 @@
 
 use crate::rpc::Rpc;
 use safe_nd::{Coins, MessageId, PublicId, Request, XorName};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+// Need to Serialize/Deserialize to go through Parsec
 pub(crate) enum ParsecAction {
     // Process pay for request and forward request to client.
     PayAndForwardClientRequest {
@@ -24,8 +26,11 @@ pub(crate) enum ParsecAction {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Action {
+    // Trigger a vote for an event so we can process the deferred action on consensus.
+    // (Currently immediately.)
+    ParsecVote(ParsecAction),
     // Process deferred action (eventually will wait for Parsec consensus).
-    Parsec(ParsecAction),
+    ParsecConsensus(ParsecAction),
     // Send a validated client request from client handlers to the appropriate destination.
     ForwardClientRequest(Rpc),
     // Send a request from client handlers of Client A to Client B to then be handled as if Client B
