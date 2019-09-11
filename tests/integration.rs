@@ -2248,14 +2248,28 @@ fn auth_keys() {
     list_keys(&mut env, &mut owner, Ok((expected_map.clone(), 1)));
 
     // Check the app isn't allowed to get a listing of authorised keys, nor insert, nor delete any.
-    // No response should be returned to any of these requests.
-    common::send_request_expect_no_response(&mut env, &mut app, Request::ListAuthKeysAndVersion);
-    common::send_request_expect_no_response(&mut env, &mut app, make_ins_request(2));
+    common::send_request_expect_err(
+        &mut env,
+        &mut app,
+        Request::ListAuthKeysAndVersion,
+        NdError::AccessDenied,
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut app,
+        make_ins_request(2),
+        NdError::AccessDenied,
+    );
     let del_auth_key_request = Request::DelAuthKey {
         key: *app.public_id().public_key(),
         version: 2,
     };
-    common::send_request_expect_no_response(&mut env, &mut app, del_auth_key_request.clone());
+    common::send_request_expect_err(
+        &mut env,
+        &mut app,
+        del_auth_key_request.clone(),
+        NdError::AccessDenied,
+    );
 
     // Remove the app, then list the keys.
     common::perform_mutation(&mut env, &mut owner, del_auth_key_request);

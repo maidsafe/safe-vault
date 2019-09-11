@@ -486,16 +486,6 @@ pub fn send_request_expect_err<T: TestClientTrait>(
     assert_eq!(expected_response, client.expect_response(message_id));
 }
 
-pub fn send_request_expect_no_response<T: TestClientTrait>(
-    env: &mut Environment,
-    client: &mut T,
-    request: Request,
-) {
-    let _message_id = client.send_request(request);
-    env.poll();
-    client.expect_no_new_message();
-}
-
 pub fn create_balance(
     env: &mut Environment,
     src_client: &mut TestClient,

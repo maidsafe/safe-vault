@@ -151,6 +151,8 @@ pub(crate) enum AuthorisationKind {
     GetBalance,
     // Mutation request.
     Mut,
+    // Request to manage app keys.
+    ManageAppKeys,
 }
 
 // Returns the type of authorisation needed for the given request.
@@ -176,9 +178,7 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | CreateBalance { .. }
         | CreateLoginPacket(_)
         | CreateLoginPacketFor { .. }
-        | UpdateLoginPacket(_)
-        | InsAuthKey { .. }
-        | DelAuthKey { .. } => AuthorisationKind::Mut,
+        | UpdateLoginPacket(_) => AuthorisationKind::Mut,
         GetIData(IDataAddress::Pub(_)) => AuthorisationKind::GetPub,
         GetIData(IDataAddress::Unpub(_))
         | GetMData(_)
@@ -190,8 +190,7 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | ListMDataValues(_)
         | ListMDataPermissions(_)
         | ListMDataUserPermissions { .. }
-        | GetLoginPacket(_)
-        | ListAuthKeysAndVersion => AuthorisationKind::GetUnpub,
+        | GetLoginPacket(_) => AuthorisationKind::GetUnpub,
         GetAData(address)
         | GetADataValue { address, .. }
         | GetADataShell { address, .. }
@@ -209,5 +208,8 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
             }
         }
         GetBalance => AuthorisationKind::GetBalance,
+        ListAuthKeysAndVersion | InsAuthKey { .. } | DelAuthKey { .. } => {
+            AuthorisationKind::ManageAppKeys
+        }
     }
 }
