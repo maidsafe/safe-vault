@@ -200,6 +200,7 @@ impl Vault {
     fn handle_action(&mut self, action: Action) -> Option<Action> {
         use Action::*;
         match action {
+            Parsec(action) => self.client_handler_mut()?.handle_parsec_action(action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
             RespondToOurDataHandlers { sender, rpc } => {

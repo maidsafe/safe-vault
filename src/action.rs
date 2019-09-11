@@ -7,12 +7,25 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::rpc::Rpc;
-use safe_nd::XorName;
+use safe_nd::{Coins, MessageId, PublicId, Request, XorName};
 use std::collections::BTreeSet;
+
+#[derive(Debug)]
+pub(crate) enum ParsecAction {
+    // Process pay for request and forward request to client.
+    PayAndForwardClientRequest {
+        request: Request,
+        client_public_id: PublicId,
+        message_id: MessageId,
+        cost: Coins,
+    },
+}
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Action {
+    // Process deferred action (eventually will wait for Parsec consensus).
+    Parsec(ParsecAction),
     // Send a validated client request from client handlers to the appropriate destination.
     ForwardClientRequest(Rpc),
     // Send a request from client handlers of Client A to Client B to then be handled as if Client B

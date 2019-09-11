@@ -14,7 +14,7 @@ use self::{
     balance::{Balance, BalancesDb},
 };
 use crate::{
-    action::Action,
+    action::{Action, ParsecAction},
     chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
     config_handler::write_connection_info,
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
@@ -166,6 +166,33 @@ impl ClientHandler {
                 "{}: Disconnected from client candidate on {}",
                 self, peer_addr
             );
+        }
+    }
+
+    pub fn handle_parsec_action(&mut self, action: ParsecAction) -> Option<Action> {
+        use ParsecAction::*;
+        match action {
+            PayAndForwardClientRequest {
+                request,
+                client_public_id,
+                message_id,
+                cost,
+            } => {
+                let owner = utils::owner(&client_public_id)?;
+                self.pay(
+                    &client_public_id,
+                    owner.public_key(),
+                    &request,
+                    message_id,
+                    cost,
+                )?;
+
+                Some(Action::ForwardClientRequest(Rpc::Request {
+                    requester: client_public_id,
+                    request,
+                    message_id,
+                }))
+            }
         }
     }
 
@@ -421,19 +448,11 @@ impl ClientHandler {
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
-        let owner = utils::owner(&client.public_id)?;
-        self.pay(
-            &client.public_id,
-            owner.public_key(),
-            &request,
-            message_id,
-            *COST_OF_PUT,
-        )?;
-
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
+        Some(Action::Parsec(ParsecAction::PayAndForwardClientRequest {
             request,
+            client_public_id: client.public_id.clone(),
             message_id,
+            cost: *COST_OF_PUT,
         }))
     }
 
