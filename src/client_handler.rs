@@ -496,19 +496,15 @@ impl ClientHandler {
         }
 
         let request = Request::PutMData(chunk);
-        self.pay(
-            &client.public_id,
-            owner.public_key(),
-            &request,
-            message_id,
-            *COST_OF_PUT,
-        )?;
 
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request,
-            message_id,
-        }))
+        Some(Action::ParsecVote(
+            ParsecAction::PayAndForwardClientRequest {
+                request,
+                client_public_id: client.public_id.clone(),
+                message_id,
+                cost: *COST_OF_PUT,
+            },
+        ))
     }
 
     fn handle_put_idata(
@@ -539,19 +535,14 @@ impl ClientHandler {
         }
 
         let request = Request::PutIData(chunk);
-        self.pay(
-            &client.public_id,
-            owner.public_key(),
-            &request,
-            message_id,
-            *COST_OF_PUT,
-        )?;
-
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request,
-            message_id,
-        }))
+        Some(Action::ParsecVote(
+            ParsecAction::PayAndForwardClientRequest {
+                request,
+                client_public_id: client.public_id.clone(),
+                message_id,
+                cost: *COST_OF_PUT,
+            },
+        ))
     }
 
     fn handle_get_idata(
@@ -625,19 +616,14 @@ impl ClientHandler {
         }
 
         let request = Request::PutAData(chunk);
-        self.pay(
-            &client.public_id,
-            owner.public_key(),
-            &request,
-            message_id,
-            *COST_OF_PUT,
-        )?;
-
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request,
-            message_id,
-        }))
+        Some(Action::ParsecVote(
+            ParsecAction::PayAndForwardClientRequest {
+                request,
+                client_public_id: client.public_id.clone(),
+                message_id,
+                cost: *COST_OF_PUT,
+            },
+        ))
     }
 
     fn handle_delete_adata(
@@ -668,20 +654,14 @@ impl ClientHandler {
         request: Request,
         message_id: MessageId,
     ) -> Option<Action> {
-        let owner = utils::owner(&client.public_id)?;
-        self.pay(
-            &client.public_id,
-            owner.public_key(),
-            &request,
-            message_id,
-            *COST_OF_PUT,
-        )?;
-
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request,
-            message_id,
-        }))
+        Some(Action::ParsecVote(
+            ParsecAction::PayAndForwardClientRequest {
+                request,
+                client_public_id: client.public_id.clone(),
+                message_id,
+                cost: *COST_OF_PUT,
+            },
+        ))
     }
 
     /// Handles a received challenge response.
