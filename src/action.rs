@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// Need to Serialize/Deserialize to go through Parsec
-pub(crate) enum ParsecAction {
+// Need to Serialize/Deserialize to go through the consensus process.
+pub(crate) enum ConsensusAction {
     // Process pay for request and forward request to client.
     PayAndForwardClientRequest {
         request: Request,
@@ -28,9 +28,7 @@ pub(crate) enum ParsecAction {
 pub(crate) enum Action {
     // Trigger a vote for an event so we can process the deferred action on consensus.
     // (Currently immediately.)
-    ParsecVote(ParsecAction),
-    // Process deferred action (eventually will wait for Parsec consensus).
-    ParsecConsensus(ParsecAction),
+    ConsensusVote(ConsensusAction),
     // Send a validated client request from client handlers to the appropriate destination.
     ForwardClientRequest(Rpc),
     // Send a request from client handlers of Client A to Client B to then be handled as if Client B

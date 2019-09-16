@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{chunk_store, quic_p2p};
+use crate::{chunk_store, quic_p2p, routing};
 use quick_error::quick_error;
 use safe_nd::{self, Request, Response};
 use serde_json;
@@ -67,6 +67,11 @@ quick_error! {
         /// NetworkData Entry error.
         NetworkDataEntry(error: safe_nd::EntryError) {
             display("NetworkData Entry error: {:?}", error)
+            from()
+        }
+        /// Routing error.
+        Routing(error: routing::RoutingError) {
+            display("Routing error: {:?}", error)
             from()
         }
         /// Unknown Request type.

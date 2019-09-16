@@ -14,7 +14,7 @@ use self::{
     balance::{Balance, BalancesDb},
 };
 use crate::{
-    action::{Action, ParsecAction},
+    action::{Action, ConsensusAction},
     chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
     config_handler::write_connection_info,
     quic_p2p::{self, Config as QuicP2pConfig, Event, NodeInfo, Peer, QuicP2p},
@@ -169,8 +169,8 @@ impl ClientHandler {
         }
     }
 
-    pub fn handle_parsec_action(&mut self, action: ParsecAction) -> Option<Action> {
-        use ParsecAction::*;
+    pub fn handle_consensused_action(&mut self, action: ConsensusAction) -> Option<Action> {
+        use ConsensusAction::*;
         match action {
             PayAndForwardClientRequest {
                 request,
@@ -448,8 +448,8 @@ impl ClientHandler {
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::ParsecVote(
-            ParsecAction::PayAndForwardClientRequest {
+        Some(Action::ConsensusVote(
+            ConsensusAction::PayAndForwardClientRequest {
                 request,
                 client_public_id: client.public_id.clone(),
                 message_id,
@@ -497,8 +497,8 @@ impl ClientHandler {
 
         let request = Request::PutMData(chunk);
 
-        Some(Action::ParsecVote(
-            ParsecAction::PayAndForwardClientRequest {
+        Some(Action::ConsensusVote(
+            ConsensusAction::PayAndForwardClientRequest {
                 request,
                 client_public_id: client.public_id.clone(),
                 message_id,
@@ -535,8 +535,8 @@ impl ClientHandler {
         }
 
         let request = Request::PutIData(chunk);
-        Some(Action::ParsecVote(
-            ParsecAction::PayAndForwardClientRequest {
+        Some(Action::ConsensusVote(
+            ConsensusAction::PayAndForwardClientRequest {
                 request,
                 client_public_id: client.public_id.clone(),
                 message_id,
@@ -616,8 +616,8 @@ impl ClientHandler {
         }
 
         let request = Request::PutAData(chunk);
-        Some(Action::ParsecVote(
-            ParsecAction::PayAndForwardClientRequest {
+        Some(Action::ConsensusVote(
+            ConsensusAction::PayAndForwardClientRequest {
                 request,
                 client_public_id: client.public_id.clone(),
                 message_id,
@@ -654,8 +654,8 @@ impl ClientHandler {
         request: Request,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::ParsecVote(
-            ParsecAction::PayAndForwardClientRequest {
+        Some(Action::ConsensusVote(
+            ConsensusAction::PayAndForwardClientRequest {
                 request,
                 client_public_id: client.public_id.clone(),
                 message_id,
