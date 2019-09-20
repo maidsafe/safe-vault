@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::enum_variant_names)]
 // Need to Serialize/Deserialize to go through the consensus process.
 pub(crate) enum ConsensusAction {
     // Process pay for request and forward request to client.
@@ -26,6 +27,14 @@ pub(crate) enum ConsensusAction {
         request: Request,
         client_public_id: PublicId,
         message_id: MessageId,
+    },
+    // Process pay for request and proxy the request to a different client's handler.
+    // Only used by `CreateLoginPacketFor`
+    PayAndProxyClientRequest {
+        request: Request,
+        client_public_id: PublicId,
+        message_id: MessageId,
+        cost: Coins,
     },
 }
 

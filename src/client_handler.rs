@@ -202,6 +202,27 @@ impl ClientHandler {
                 request,
                 message_id,
             })),
+            PayAndProxyClientRequest {
+                request,
+                client_public_id,
+                message_id,
+                cost,
+            } => {
+                let owner = utils::owner(&client_public_id)?;
+                self.pay(
+                    &client_public_id,
+                    owner.public_key(),
+                    &request,
+                    message_id,
+                    cost,
+                )?;
+
+                Some(Action::ProxyClientRequest(Rpc::Request {
+                    requester: client_public_id,
+                    request,
+                    message_id,
+                }))
+            }
         }
     }
 
@@ -1280,19 +1301,15 @@ impl ClientHandler {
         }
 
         let request = Request::CreateLoginPacket(login_packet);
-        self.pay(
-            client_id,
-            utils::client(client_id)?.public_key(),
-            &request,
-            message_id,
-            *COST_OF_PUT,
-        )?;
 
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client_id.clone(),
-            request,
-            message_id,
-        }))
+        Some(Action::ConsensusVote(
+            ConsensusAction::PayAndForwardClientRequest {
+                request,
+                client_public_id: client_id.clone(),
+                message_id,
+                cost: *COST_OF_PUT,
+            },
+        ))
     }
 
     fn handle_create_login_packet_vault_req(
@@ -1339,26 +1356,19 @@ impl ClientHandler {
         }
         // The requester bears the cost of storing the login packet
         let new_amount = amount.checked_add(*COST_OF_PUT)?;
-        // TODO - (after phase 1) - if `amount` < cost to store login packet return error msg here.
-        match self.withdraw(payer.name(), new_amount) {
-            Ok(_) => {
-                let request = Request::CreateLoginPacketFor {
+        Some(Action::ConsensusVote(
+            ConsensusAction::PayAndProxyClientRequest {
+                request: Request::CreateLoginPacketFor {
                     new_owner,
                     amount,
                     transaction_id,
                     new_login_packet: login_packet,
-                };
-                Some(Action::ProxyClientRequest(Rpc::Request {
-                    request,
-                    requester: payer.clone(),
-                    message_id,
-                }))
-            }
-            Err(error) => {
-                self.send_response_to_client(payer, message_id, Response::Transaction(Err(error)));
-                None
-            }
-        }
+                },
+                client_public_id: payer.clone(),
+                message_id,
+                cost: new_amount,
+            },
+        ))
     }
 
     /// Step two or three of the process - the payer is effectively doing a `CreateBalance` request
