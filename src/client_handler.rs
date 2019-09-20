@@ -193,6 +193,15 @@ impl ClientHandler {
                     message_id,
                 }))
             }
+            ForwardClientRequest {
+                request,
+                client_public_id,
+                message_id,
+            } => Some(Action::ForwardClientRequest(Rpc::Request {
+                requester: client_public_id,
+                request,
+                message_id,
+            })),
         }
     }
 
@@ -464,11 +473,13 @@ impl ClientHandler {
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request,
-            message_id,
-        }))
+        Some(Action::ConsensusVote(
+            ConsensusAction::ForwardClientRequest {
+                request,
+                client_public_id: client.public_id.clone(),
+                message_id,
+            },
+        ))
     }
 
     fn handle_put_mdata(
@@ -572,11 +583,13 @@ impl ClientHandler {
             );
             return None;
         }
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request: Request::DeleteUnpubIData(address),
-            message_id,
-        }))
+        Some(Action::ConsensusVote(
+            ConsensusAction::ForwardClientRequest {
+                request: Request::DeleteUnpubIData(address),
+                client_public_id: client.public_id.clone(),
+                message_id,
+            },
+        ))
     }
 
     fn handle_get_adata(
@@ -641,11 +654,13 @@ impl ClientHandler {
             return None;
         }
 
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request: Request::DeleteAData(address),
-            message_id,
-        }))
+        Some(Action::ConsensusVote(
+            ConsensusAction::ForwardClientRequest {
+                request: Request::DeleteAData(address),
+                client_public_id: client.public_id.clone(),
+                message_id,
+            },
+        ))
     }
 
     fn handle_mutate_adata(

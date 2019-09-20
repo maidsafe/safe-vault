@@ -21,6 +21,12 @@ pub(crate) enum ConsensusAction {
         message_id: MessageId,
         cost: Coins,
     },
+    // Process request that doesn't need a payment and forward request to client.
+    ForwardClientRequest {
+        request: Request,
+        client_public_id: PublicId,
+        message_id: MessageId,
+    },
 }
 
 #[derive(Debug)]
