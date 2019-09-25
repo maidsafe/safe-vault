@@ -172,7 +172,7 @@ impl ClientHandler {
     pub fn handle_consensused_action(&mut self, action: ConsensusAction) -> Option<Action> {
         use ConsensusAction::*;
         match action {
-            PayAndForwardClientRequest {
+            PayAndForward {
                 request,
                 client_public_id,
                 message_id,
@@ -193,7 +193,7 @@ impl ClientHandler {
                     message_id,
                 }))
             }
-            ForwardClientRequest {
+            Forward {
                 request,
                 client_public_id,
                 message_id,
@@ -202,7 +202,7 @@ impl ClientHandler {
                 request,
                 message_id,
             })),
-            PayAndProxyClientRequest {
+            PayAndProxy {
                 request,
                 client_public_id,
                 message_id,
@@ -478,14 +478,12 @@ impl ClientHandler {
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::ConsensusVote(
-            ConsensusAction::PayAndForwardClientRequest {
-                request,
-                client_public_id: client.public_id.clone(),
-                message_id,
-                cost: *COST_OF_PUT,
-            },
-        ))
+        Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
+            request,
+            client_public_id: client.public_id.clone(),
+            message_id,
+            cost: *COST_OF_PUT,
+        }))
     }
 
     fn handle_delete_mdata(
@@ -494,13 +492,11 @@ impl ClientHandler {
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::ConsensusVote(
-            ConsensusAction::ForwardClientRequest {
-                request,
-                client_public_id: client.public_id.clone(),
-                message_id,
-            },
-        ))
+        Some(Action::ConsensusVote(ConsensusAction::Forward {
+            request,
+            client_public_id: client.public_id.clone(),
+            message_id,
+        }))
     }
 
     fn handle_put_mdata(
@@ -529,14 +525,12 @@ impl ClientHandler {
 
         let request = Request::PutMData(chunk);
 
-        Some(Action::ConsensusVote(
-            ConsensusAction::PayAndForwardClientRequest {
-                request,
-                client_public_id: client.public_id.clone(),
-                message_id,
-                cost: *COST_OF_PUT,
-            },
-        ))
+        Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
+            request,
+            client_public_id: client.public_id.clone(),
+            message_id,
+            cost: *COST_OF_PUT,
+        }))
     }
 
     fn handle_put_idata(
@@ -567,14 +561,12 @@ impl ClientHandler {
         }
 
         let request = Request::PutIData(chunk);
-        Some(Action::ConsensusVote(
-            ConsensusAction::PayAndForwardClientRequest {
-                request,
-                client_public_id: client.public_id.clone(),
-                message_id,
-                cost: *COST_OF_PUT,
-            },
-        ))
+        Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
+            request,
+            client_public_id: client.public_id.clone(),
+            message_id,
+            cost: *COST_OF_PUT,
+        }))
     }
 
     fn handle_get_idata(
@@ -604,13 +596,11 @@ impl ClientHandler {
             );
             return None;
         }
-        Some(Action::ConsensusVote(
-            ConsensusAction::ForwardClientRequest {
-                request: Request::DeleteUnpubIData(address),
-                client_public_id: client.public_id.clone(),
-                message_id,
-            },
-        ))
+        Some(Action::ConsensusVote(ConsensusAction::Forward {
+            request: Request::DeleteUnpubIData(address),
+            client_public_id: client.public_id.clone(),
+            message_id,
+        }))
     }
 
     fn handle_get_adata(
@@ -650,14 +640,12 @@ impl ClientHandler {
         }
 
         let request = Request::PutAData(chunk);
-        Some(Action::ConsensusVote(
-            ConsensusAction::PayAndForwardClientRequest {
-                request,
-                client_public_id: client.public_id.clone(),
-                message_id,
-                cost: *COST_OF_PUT,
-            },
-        ))
+        Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
+            request,
+            client_public_id: client.public_id.clone(),
+            message_id,
+            cost: *COST_OF_PUT,
+        }))
     }
 
     fn handle_delete_adata(
@@ -675,13 +663,11 @@ impl ClientHandler {
             return None;
         }
 
-        Some(Action::ConsensusVote(
-            ConsensusAction::ForwardClientRequest {
-                request: Request::DeleteAData(address),
-                client_public_id: client.public_id.clone(),
-                message_id,
-            },
-        ))
+        Some(Action::ConsensusVote(ConsensusAction::Forward {
+            request: Request::DeleteAData(address),
+            client_public_id: client.public_id.clone(),
+            message_id,
+        }))
     }
 
     fn handle_mutate_adata(
@@ -690,14 +676,12 @@ impl ClientHandler {
         request: Request,
         message_id: MessageId,
     ) -> Option<Action> {
-        Some(Action::ConsensusVote(
-            ConsensusAction::PayAndForwardClientRequest {
-                request,
-                client_public_id: client.public_id.clone(),
-                message_id,
-                cost: *COST_OF_PUT,
-            },
-        ))
+        Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
+            request,
+            client_public_id: client.public_id.clone(),
+            message_id,
+            cost: *COST_OF_PUT,
+        }))
     }
 
     /// Handles a received challenge response.
@@ -1056,25 +1040,16 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        match self.withdraw(requester.name(), amount) {
-            Ok(()) => Some(Action::ForwardClientRequest(Rpc::Request {
-                request: Request::TransferCoins {
-                    destination,
-                    amount,
-                    transaction_id,
-                },
-                requester: requester.clone(),
-                message_id,
-            })),
-            Err(error) => {
-                self.send_response_to_client(
-                    requester,
-                    message_id,
-                    Response::Transaction(Err(error)),
-                );
-                None
-            }
-        }
+        Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
+            request: Request::TransferCoins {
+                destination,
+                amount,
+                transaction_id,
+            },
+            client_public_id: requester.clone(),
+            message_id,
+            cost: amount,
+        }))
     }
 
     fn handle_transfer_coins_vault_req(
@@ -1302,14 +1277,12 @@ impl ClientHandler {
 
         let request = Request::CreateLoginPacket(login_packet);
 
-        Some(Action::ConsensusVote(
-            ConsensusAction::PayAndForwardClientRequest {
-                request,
-                client_public_id: client_id.clone(),
-                message_id,
-                cost: *COST_OF_PUT,
-            },
-        ))
+        Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
+            request,
+            client_public_id: client_id.clone(),
+            message_id,
+            cost: *COST_OF_PUT,
+        }))
     }
 
     fn handle_create_login_packet_vault_req(
@@ -1356,19 +1329,17 @@ impl ClientHandler {
         }
         // The requester bears the cost of storing the login packet
         let new_amount = amount.checked_add(*COST_OF_PUT)?;
-        Some(Action::ConsensusVote(
-            ConsensusAction::PayAndProxyClientRequest {
-                request: Request::CreateLoginPacketFor {
-                    new_owner,
-                    amount,
-                    transaction_id,
-                    new_login_packet: login_packet,
-                },
-                client_public_id: payer.clone(),
-                message_id,
-                cost: new_amount,
+        Some(Action::ConsensusVote(ConsensusAction::PayAndProxy {
+            request: Request::CreateLoginPacketFor {
+                new_owner,
+                amount,
+                transaction_id,
+                new_login_packet: login_packet,
             },
-        ))
+            client_public_id: payer.clone(),
+            message_id,
+            cost: new_amount,
+        }))
     }
 
     /// Step two or three of the process - the payer is effectively doing a `CreateBalance` request
