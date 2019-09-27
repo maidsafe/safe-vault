@@ -21,6 +21,7 @@ use bincode;
 use crossbeam_channel::{select, Receiver};
 use log::{error, info, trace};
 use safe_nd::{NodeFullId, Request, XorName};
+use std::borrow::Cow;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -299,8 +300,12 @@ impl Vault {
             match utils::destination_address(&request) {
                 Some(address) => address,
                 None => {
-                    error!("{}: Logic error - no data handler address available.", self);
-                    return None;
+                    if let Request::InsAuthKey { .. } | Request::DelAuthKey { .. } = request {
+                        Cow::Borrowed(self.id.public_id().name())
+                    } else {
+                        error!("{}: Logic error - no data handler address available.", self);
+                        return None;
+                    }
                 }
             }
         } else {
@@ -334,6 +339,14 @@ impl Vault {
                 }
                 | Rpc::Request {
                     request: Request::UpdateLoginPacket(..),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::InsAuthKey { .. },
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::DelAuthKey { .. },
                     ..
                 } => self
                     .client_handler_mut()?

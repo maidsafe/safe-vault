@@ -429,9 +429,9 @@ impl ClientHandler {
                 key,
                 version,
                 permissions,
-            } => self.handle_ins_auth_key(client, key, version, permissions, message_id),
+            } => self.handle_ins_auth_key_client_req(client, key, version, permissions, message_id),
             DelAuthKey { key, version } => {
-                self.handle_del_auth_key(client, key, version, message_id)
+                self.handle_del_auth_key_client_req(client, key, version, message_id)
             }
         }
     }
@@ -823,6 +823,14 @@ impl ClientHandler {
                 updated_login_packet,
                 message_id,
             ),
+            InsAuthKey {
+                key,
+                version,
+                permissions,
+            } => self.handle_ins_auth_key_vault(requester, key, version, permissions, message_id),
+            DelAuthKey { key, version } => {
+                self.handle_del_auth_key_vault(requester, key, version, message_id)
+            }
             PutIData(_)
             | GetIData(_)
             | DeleteUnpubIData(_)
@@ -859,8 +867,6 @@ impl ClientHandler {
             | AppendUnseq(_)
             | GetBalance
             | ListAuthKeysAndVersion
-            | InsAuthKey { .. }
-            | DelAuthKey { .. }
             | GetLoginPacket(..) => {
                 error!(
                     "{}: Should not receive {:?} as a client handler.",
@@ -1510,36 +1516,81 @@ impl ClientHandler {
         None
     }
 
-    fn handle_ins_auth_key(
-        &mut self,
+    fn handle_ins_auth_key_client_req(
+        &self,
         client: &ClientInfo,
         key: PublicKey,
         new_version: u64,
         permissions: AppPermissions,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self.auth_keys.ins_auth_key(
-            utils::client(&client.public_id)?,
-            key,
-            new_version,
-            permissions,
-        );
-        self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
-        None
+        Some(Action::ConsensusVote(ConsensusAction::Forward {
+            request: Request::InsAuthKey {
+                key,
+                version: new_version,
+                permissions,
+            },
+            client_public_id: client.public_id.clone(),
+            message_id,
+        }))
     }
 
-    fn handle_del_auth_key(
+    fn handle_ins_auth_key_vault(
+        &mut self,
+        client: PublicId,
+        key: PublicKey,
+        new_version: u64,
+        permissions: AppPermissions,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result =
+            self.auth_keys
+                .ins_auth_key(utils::client(&client)?, key, new_version, permissions);
+        Some(Action::RespondToClientHandlers {
+            sender: *self.id.name(),
+            rpc: Rpc::Response {
+                response: Response::Mutation(result),
+                requester: client,
+                message_id,
+            },
+        })
+    }
+
+    fn handle_del_auth_key_client_req(
         &mut self,
         client: &ClientInfo,
         key: PublicKey,
         new_version: u64,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result =
-            self.auth_keys
-                .del_auth_key(utils::client(&client.public_id)?, key, new_version);
-        self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
-        None
+        Some(Action::ConsensusVote(ConsensusAction::Forward {
+            request: Request::DelAuthKey {
+                key,
+                version: new_version,
+            },
+            client_public_id: client.public_id.clone(),
+            message_id,
+        }))
+    }
+
+    fn handle_del_auth_key_vault(
+        &mut self,
+        client: PublicId,
+        key: PublicKey,
+        new_version: u64,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = self
+            .auth_keys
+            .del_auth_key(utils::client(&client)?, key, new_version);
+        Some(Action::RespondToClientHandlers {
+            sender: *self.id.name(),
+            rpc: Rpc::Response {
+                response: Response::Mutation(result),
+                requester: client,
+                message_id,
+            },
+        })
     }
 
     // Verify that valid signature is provided if the request requires it.
