@@ -21,6 +21,7 @@ use bincode;
 use crossbeam_channel::{select, Receiver};
 use log::{error, info, trace};
 use safe_nd::{NodeFullId, Request, XorName};
+use std::borrow::Cow;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -294,10 +295,7 @@ impl Vault {
         let dst_address = if let Rpc::Request { ref request, .. } = rpc {
             match utils::destination_address(&request) {
                 Some(address) => address,
-                None => {
-                    error!("{}: Logic error - no data handler address available.", self);
-                    return None;
-                }
+                None => Cow::Borrowed(&requester_name),
             }
         } else {
             error!("{}: Logic error - unexpected RPC.", self);
@@ -326,6 +324,14 @@ impl Vault {
                 }
                 | Rpc::Request {
                     request: Request::TransferCoins { .. },
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::InsAuthKey { .. },
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::DelAuthKey { .. },
                     ..
                 } => self
                     .client_handler_mut()?
