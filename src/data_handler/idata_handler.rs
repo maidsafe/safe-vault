@@ -42,7 +42,7 @@ pub(super) struct IDataHandler {
 
 impl IDataHandler {
     pub(super) fn new(id: NodePublicId, config: &Config, init_mode: Init) -> Result<Self> {
-        let root_dir = config.root_dir();
+        let root_dir = config.root_dir()?;
         let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
 

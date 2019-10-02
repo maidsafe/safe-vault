@@ -71,11 +71,13 @@ impl ClientHandler {
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<(Self, Receiver<Event>)> {
-        let auth_keys = AuthKeysDb::new(config.root_dir(), init_mode)?;
-        let balances = BalancesDb::new(config.root_dir(), init_mode)?;
+        let root_dir = config.root_dir()?;
+        let root_dir = root_dir.as_path();
+        let auth_keys = AuthKeysDb::new(root_dir, init_mode)?;
+        let balances = BalancesDb::new(root_dir, init_mode)?;
         let (quic_p2p, event_receiver) = Self::setup_quic_p2p(config.quic_p2p_config())?;
         let login_packets = LoginPacketChunkStore::new(
-            config.root_dir(),
+            root_dir,
             config.max_capacity(),
             Rc::clone(&total_used_space),
             init_mode,

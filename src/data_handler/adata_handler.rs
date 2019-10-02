@@ -41,7 +41,7 @@ impl ADataHandler {
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
-        let root_dir = config.root_dir();
+        let root_dir = config.root_dir()?;
         let max_capacity = config.max_capacity();
         let chunks = AppendOnlyChunkStore::new(
             &root_dir,
