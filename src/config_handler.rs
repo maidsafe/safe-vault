@@ -8,10 +8,10 @@
 
 use crate::{quic_p2p::Config as QuicP2pConfig, quic_p2p::NodeInfo, Result};
 use directories::ProjectDirs;
+use lazy_static::lazy_static;
 use log::{trace, Level};
 use serde::{Deserialize, Serialize};
 use std::{
-    env,
     fs::{self, File},
     io::{self, BufReader},
     net::{IpAddr, Ipv4Addr},
@@ -20,12 +20,20 @@ use std::{
 use structopt::StructOpt;
 use unwrap::unwrap;
 
+lazy_static! {
+    static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from(
+        CONFIG_DIR_QUALIFIER,
+        CONFIG_DIR_ORGANISATION,
+        CONFIG_DIR_APPLICATION,
+    );
+}
+
 const CONFIG_DIR_QUALIFIER: &str = "net";
 const CONFIG_DIR_ORGANISATION: &str = "MaidSafe";
 const CONFIG_DIR_APPLICATION: &str = "safe_vault";
 const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
-const DEFAULT_ROOT_DIR_NAME: &str = "safe_vault";
+const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
 const ARGS: [&str; 12] = [
     "wallet-address",
@@ -45,6 +53,7 @@ const ARGS: [&str; 12] = [
 /// Vault configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, StructOpt)]
 #[structopt(rename_all = "kebab-case", bin_name = "safe_vault")]
+#[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
 pub struct Config {
     /// The address to be credited when this vault farms SafeCoin.
     #[structopt(short, long, parse(try_from_str))]
@@ -53,8 +62,11 @@ pub struct Config {
     /// Upper limit in bytes for allowed network storage on this vault.
     #[structopt(short, long)]
     max_capacity: Option<u64>,
-    /// Root directory for ChunkStores and cached state.  If not set, it defaults to "safe_vault"
-    /// within a temporary directory, e.g. %TMP% or $TMPDIR.
+    /// Root directory for ChunkStores and cached state. If not set, it defaults to "root_dir"
+    /// within the safe_vault project data directory, located at... Linux: $XDG_DATA_HOME/safe_vault
+    /// or $HOME/.local/share/safe_vault | Windows:
+    /// {FOLDERID_RoamingAppData}/MaidSafe/safe_vault/data | MacOS: $HOME/Library/Application
+    /// Support/net.MaidSafe.safe_vault
     #[structopt(short, long, parse(from_os_str))]
     root_dir: Option<PathBuf>,
     /// Verbose output. `-v` is equivalent to logging with `warn`, `-vv` to `info`, `-vvv` to
@@ -103,13 +115,14 @@ impl Config {
         self.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY)
     }
 
-    /// Root directory for `ChunkStore`s and cached state.  If not set, it defaults to
-    /// `DEFAULT_ROOT_DIR_NAME` within
-    /// [`env::temp_dir()`](https://doc.rust-lang.org/std/env/fn.temp_dir.html).
-    pub fn root_dir(&self) -> PathBuf {
-        self.root_dir
-            .clone()
-            .unwrap_or_else(|| env::temp_dir().join(DEFAULT_ROOT_DIR_NAME))
+    /// Root directory for `ChunkStore`s and cached state. If not set, it defaults to
+    /// `DEFAULT_ROOT_DIR_NAME` within the project's data directory (see `Config::root_dir` for the
+    /// directories on each platform).
+    pub fn root_dir(&self) -> Result<PathBuf> {
+        Ok(match &self.root_dir {
+            Some(root_dir) => root_dir.clone(),
+            None => project_dirs()?.data_dir().join(DEFAULT_ROOT_DIR_NAME),
+        })
     }
 
     /// Set the root directory for `ChunkStore`s and cached state.
@@ -191,7 +204,7 @@ impl Config {
 
     /// Reads the default vault config file.
     fn read_from_file() -> Result<Config> {
-        let path = dirs()?.config_dir().join(CONFIG_FILE);
+        let path = project_dirs()?.config_dir().join(CONFIG_FILE);
         let file = match File::open(&path) {
             Ok(file) => {
                 trace!("Reading settings from {}", path.display());
@@ -231,8 +244,8 @@ fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<PathBuf>
 where
     T: Serialize,
 {
-    let dirs = dirs()?;
-    let dir = dirs.config_dir();
+    let project_dirs = project_dirs()?;
+    let dir = project_dirs.config_dir();
     fs::create_dir_all(dir)?;
 
     let path = dir.join(file);
@@ -243,13 +256,10 @@ where
     Ok(path)
 }
 
-fn dirs() -> Result<ProjectDirs> {
-    ProjectDirs::from(
-        CONFIG_DIR_QUALIFIER,
-        CONFIG_DIR_ORGANISATION,
-        CONFIG_DIR_APPLICATION,
-    )
-    .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found").into())
+fn project_dirs() -> Result<&'static ProjectDirs> {
+    PROJECT_DIRS
+        .as_ref()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found").into())
 }
 
 #[cfg(test)]

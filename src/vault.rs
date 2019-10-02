@@ -75,6 +75,9 @@ impl Vault {
             (true, id)
         });
 
+        let root_dir = config.root_dir()?;
+        let root_dir = root_dir.as_path();
+
         let (state, event_receiver) = if is_elder {
             let total_used_space = Rc::new(Cell::new(0));
             let (client_handler, event_receiver) = ClientHandler::new(
@@ -89,8 +92,7 @@ impl Vault {
                 &total_used_space,
                 init_mode,
             )?;
-            let coins_handler =
-                CoinsHandler::new(id.public_id().clone(), config.root_dir(), init_mode)?;
+            let coins_handler = CoinsHandler::new(id.public_id().clone(), root_dir, init_mode)?;
             (
                 State::Elder {
                     client_handler,
@@ -102,7 +104,7 @@ impl Vault {
         } else {
             let _adult = Adult::new(
                 id.public_id().clone(),
-                config.root_dir(),
+                root_dir,
                 config.max_capacity(),
                 init_mode,
             )?;
@@ -111,7 +113,7 @@ impl Vault {
 
         let vault = Self {
             id,
-            root_dir: config.root_dir().to_path_buf(),
+            root_dir: root_dir.to_path_buf(),
             state,
             event_receiver,
             command_receiver,
@@ -421,7 +423,7 @@ impl Vault {
 
     /// Returns Some((is_elder, ID)) or None if file doesn't exist.
     fn read_state(config: &Config) -> Result<Option<(bool, NodeFullId)>> {
-        let path = config.root_dir().join(STATE_FILENAME);
+        let path = config.root_dir()?.join(STATE_FILENAME);
         if !path.is_file() {
             return Ok(None);
         }
