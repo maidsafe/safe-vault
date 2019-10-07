@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{IDataOp, OpType};
+use super::{IDataOp, IDataRequest, OpType};
 use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
 use log::{trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response,
+    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Response,
     Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,6 @@ use std::{
     fmt::{self, Display, Formatter},
     iter,
 };
-use unwrap::unwrap;
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
@@ -77,19 +76,20 @@ impl IDataHandler {
 
         // Does the data already exist?
         if self.metadata.exists(&(*data.address()).to_db_key()) {
-            if data.is_pub() {
+            return if data.is_pub() {
                 trace!(
                     "{}: Replying success for Put {:?}, it already exists.",
                     self,
                     data
                 );
-                return respond(Ok(()));
+                respond(Ok(()))
             } else {
                 // Only for unpublished immutable data do we return `DataExists` when attempting to
                 // put data that already exists.
-                return respond(Err(NdError::DataExists));
-            }
+                respond(Err(NdError::DataExists))
+            };
         }
+
         let target_holders = self
             .non_full_adults_sorted(data.name())
             .chain(self.elders_sorted(data.name()))
@@ -97,12 +97,12 @@ impl IDataHandler {
             .cloned()
             .collect::<BTreeSet<_>>();
         let data_name = *data.name();
-        // Can't fail
-        let idata_op = unwrap!(IDataOp::new(
+        let idata_op = IDataOp::new(
             requester.clone(),
-            Request::PutIData(data),
-            target_holders.clone()
-        ));
+            IDataRequest::PutIData(data),
+            target_holders.clone(),
+        );
+
         match self.idata_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
             Entry::Vacant(vacant_entry) => {
@@ -111,7 +111,7 @@ impl IDataHandler {
                     sender: data_name,
                     targets: target_holders,
                     rpc: Rpc::Request {
-                        request: idata_op.request().clone(),
+                        request: idata_op.request(),
                         requester,
                         message_id,
                     },
@@ -143,12 +143,11 @@ impl IDataHandler {
             Err(error) => return respond(Err(error)),
         };
 
-        // Can't fail
-        let idata_op = unwrap!(IDataOp::new(
+        let idata_op = IDataOp::new(
             requester.clone(),
-            Request::DeleteUnpubIData(address),
-            metadata.holders.clone()
-        ));
+            IDataRequest::DeleteUnpubIData(address),
+            metadata.holders.clone(),
+        );
         match self.idata_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
             Entry::Vacant(vacant_entry) => {
@@ -157,7 +156,7 @@ impl IDataHandler {
                     sender: *address.name(),
                     targets: metadata.holders,
                     rpc: Rpc::Request {
-                        request: idata_op.request().clone(),
+                        request: idata_op.request(),
                         requester,
                         message_id,
                     },
@@ -190,12 +189,11 @@ impl IDataHandler {
             Err(error) => return respond(Err(error)),
         };
 
-        // Can't fail
-        let idata_op = unwrap!(IDataOp::new(
+        let idata_op = IDataOp::new(
             requester.clone(),
-            Request::GetIData(address),
-            metadata.holders.clone()
-        ));
+            IDataRequest::GetIData(address),
+            metadata.holders.clone(),
+        );
         match self.idata_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
             Entry::Vacant(vacant_entry) => {
@@ -204,7 +202,7 @@ impl IDataHandler {
                     sender: *address.name(),
                     targets: metadata.holders,
                     rpc: Rpc::Request {
-                        request: idata_op.request().clone(),
+                        request: idata_op.request(),
                         requester,
                         message_id,
                     },

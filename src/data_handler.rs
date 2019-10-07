@@ -16,7 +16,7 @@ use crate::{action::Action, rpc::Rpc, vault::Init, Config, Result};
 use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
-use idata_op::{IDataOp, OpType};
+use idata_op::{IDataOp, IDataRequest, OpType};
 use log::{error, trace};
 use mdata_handler::MDataHandler;
 
@@ -376,8 +376,9 @@ impl DataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         if &src == address.name() {
-            // Since the src is the chunk's name, this message was sent by the data handlers to us as a
-            // single data handler, implying that we're a data handler where the chunk is stored.
+            // Since the src is the chunk's name, this message was sent by the data handlers to us
+            // as a single data handler, implying that we're a data handler where the chunk is
+            // stored.
             let client = self.client_id(&message_id)?.clone();
             self.idata_holder
                 .delete_unpub_idata(address, client, message_id)
@@ -396,8 +397,8 @@ impl DataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         if &src == address.name() {
-            // The message was sent by the data handlers to us as the one who is supposed to store the
-            // chunk. See the sent Get request below.
+            // The message was sent by the data handlers to us as the one who is supposed to store
+            // the chunk. See the sent Get request below.
             let client = self.client_id(&message_id)?.clone();
             self.idata_holder.get_idata(address, client, message_id)
         } else {

@@ -11,24 +11,24 @@ use safe_nd::{Coins, MessageId, PublicId, Request, XorName};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
 // Need to Serialize/Deserialize to go through the consensus process.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) enum ConsensusAction {
-    // Process pay for request and forward request to client.
+    /// Process pay for request and forward request to client.
     PayAndForward {
         request: Request,
         client_public_id: PublicId,
         message_id: MessageId,
         cost: Coins,
     },
-    // Process request that doesn't need a payment and forward request to client.
+    /// Process request that doesn't need a payment and forward request to client.
     Forward {
         request: Request,
         client_public_id: PublicId,
         message_id: MessageId,
     },
-    // Process pay for request and proxy the request to a different client's handler.
-    // Only used by `CreateLoginPacketFor`
+    /// Process pay for request and proxy the request to a different client's handler.
+    /// Only used by `CreateLoginPacketFor`
     PayAndProxy {
         request: Request,
         client_public_id: PublicId,
@@ -40,16 +40,16 @@ pub(crate) enum ConsensusAction {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Action {
-    // Trigger a vote for an event so we can process the deferred action on consensus.
-    // (Currently immediately.)
+    /// Trigger a vote for an event so we can process the deferred action on consensus.
+    /// (Currently immediately.)
     ConsensusVote(ConsensusAction),
-    // Send a validated client request from client handlers to the appropriate destination.
+    /// Send a validated client request from client handlers to the appropriate destination.
     ForwardClientRequest(Rpc),
-    // Send a request from client handlers of Client A to Client B to then be handled as if Client B
-    // had made the request.  Only used by `CreateLoginPacketFor`, where Client A is creating the
-    // new balance for Client B, but also effectively bundles B's `CreateLoginPacket` with it.
+    /// Send a request from client handlers of Client A to Client B to then be handled as if Client
+    /// B had made the request. Only used by `CreateLoginPacketFor`, where Client A is creating the
+    /// new balance for Client B, but also effectively bundles B's `CreateLoginPacket` with it.
     ProxyClientRequest(Rpc),
-    // Send a response as an adult or elder to own section's elders.
+    /// Send a response as an adult or elder to own section's elders.
     RespondToOurDataHandlers {
         sender: XorName,
         rpc: Rpc,
@@ -58,7 +58,7 @@ pub(crate) enum Action {
         sender: XorName,
         rpc: Rpc,
     },
-    // Send the same request to each individual peer (used to send IData requests to adults).
+    /// Send the same request to each individual peer (used to send IData requests to adults).
     SendToPeers {
         sender: XorName,
         targets: BTreeSet<XorName>,
