@@ -60,6 +60,7 @@ impl IDataHolder {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
+
         Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
@@ -91,6 +92,7 @@ impl IDataHolder {
                 }
                 _ => Ok(idata),
             });
+
         Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {

@@ -15,11 +15,11 @@ use std::collections::BTreeSet;
 pub(crate) enum Action {
     // Send a validated client request from client handlers to the appropriate destination.
     ForwardClientRequest(Rpc),
-    // Send a request from client handlers of Client A to Client B to then be handled as if Client B
-    // had made the request.  Only used by `CreateLoginPacketFor`, where Client A is creating the
-    // new balance for Client B, but also effectively bundles B's `CreateLoginPacket` with it.
+    /// Send a request from client handlers of Client A to Client B to then be handled as if Client
+    /// B had made the request. Only used by `CreateLoginPacketFor`, where Client A is creating the
+    /// new balance for Client B, but also effectively bundles B's `CreateLoginPacket` with it.
     ProxyClientRequest(Rpc),
-    // Send a response as an adult or elder to own section's elders.
+    /// Send a response as an adult or elder to own section's elders.
     RespondToOurDataHandlers {
         sender: XorName,
         rpc: Rpc,
@@ -28,7 +28,7 @@ pub(crate) enum Action {
         sender: XorName,
         rpc: Rpc,
     },
-    // Send the same request to each individual peer (used to send IData requests to adults).
+    /// Send the same request to each individual peer (used to send IData requests to adults).
     SendToPeers {
         sender: XorName,
         targets: BTreeSet<XorName>,
