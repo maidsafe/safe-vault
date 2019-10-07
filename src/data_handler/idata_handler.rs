@@ -57,11 +57,11 @@ impl IDataHandler {
     pub(super) fn handle_put_idata_req(
         &mut self,
         requester: PublicId,
-        kind: IData,
+        data: IData,
         message_id: MessageId,
     ) -> Option<Action> {
         // We're acting as data handler, received request from client handlers
-        let data_name = *kind.name();
+        let data_name = *data.name();
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
@@ -75,12 +75,13 @@ impl IDataHandler {
             })
         };
 
-        if self.metadata.exists(&(*kind.address()).to_db_key()) {
-            if kind.is_pub() {
+        // Does the data already exist?
+        if self.metadata.exists(&(*data.address()).to_db_key()) {
+            if data.is_pub() {
                 trace!(
                     "{}: Replying success for Put {:?}, it already exists.",
                     self,
-                    kind
+                    data
                 );
                 return respond(Ok(()));
             } else {
@@ -90,16 +91,16 @@ impl IDataHandler {
             }
         }
         let target_holders = self
-            .non_full_adults_sorted(kind.name())
-            .chain(self.elders_sorted(kind.name()))
+            .non_full_adults_sorted(data.name())
+            .chain(self.elders_sorted(data.name()))
             .take(IMMUTABLE_DATA_COPY_COUNT)
             .cloned()
             .collect::<BTreeSet<_>>();
-        let data_name = *kind.name();
+        let data_name = *data.name();
         // Can't fail
         let idata_op = unwrap!(IDataOp::new(
             requester.clone(),
-            Request::PutIData(kind),
+            Request::PutIData(data),
             target_holders.clone()
         ));
         match self.idata_ops.entry(message_id) {
