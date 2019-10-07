@@ -95,7 +95,7 @@ impl DataHandler {
             //
             // ===== Immutable Data =====
             //
-            PutIData(kind) => self.handle_put_idata_req(src, requester, kind, message_id),
+            PutIData(data) => self.handle_put_idata_req(src, requester, data, message_id),
             GetIData(address) => self.handle_get_idata_req(src, requester, address, message_id),
             DeleteUnpubIData(address) => {
                 self.handle_delete_unpub_idata_req(src, requester, address, message_id)
@@ -354,17 +354,17 @@ impl DataHandler {
         &mut self,
         src: XorName,
         requester: PublicId,
-        kind: IData,
+        data: IData,
         message_id: MessageId,
     ) -> Option<Action> {
-        if &src == kind.name() {
+        if &src == data.name() {
             // Since the src is the chunk's name, this message was sent by the data handlers to us
             // as a single data handler, implying that we're a data handler chosen to store the
             // chunk.
-            self.idata_holder.store_idata(kind, requester, message_id)
+            self.idata_holder.store_idata(data, requester, message_id)
         } else {
             self.idata_handler
-                .handle_put_idata_req(requester, kind, message_id)
+                .handle_put_idata_req(requester, data, message_id)
         }
     }
 

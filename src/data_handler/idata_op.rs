@@ -125,7 +125,7 @@ impl IDataOp {
         self.set_to_actioned(&sender, result.err(), own_id)?;
 
         match self.request {
-            Request::PutIData(ref kind) => Some(*kind.address()),
+            Request::PutIData(ref data) => Some(*data.address()),
             Request::DeleteUnpubIData(address) => Some(address),
             _ => None, // unreachable - we checked above
         }

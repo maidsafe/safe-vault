@@ -44,20 +44,20 @@ impl IDataHolder {
 
     pub(super) fn store_idata(
         &mut self,
-        kind: IData,
+        data: IData,
         requester: PublicId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = if self.chunks.has(kind.address()) {
+        let result = if self.chunks.has(data.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
-                kind.address()
+                data.address()
             );
             Ok(())
         } else {
             self.chunks
-                .put(&kind)
+                .put(&data)
                 .map_err(|error| error.to_string().into())
         };
         Some(Action::RespondToOurDataHandlers {
@@ -81,15 +81,15 @@ impl IDataHolder {
             .chunks
             .get(&address)
             .map_err(|error| error.to_string().into())
-            .and_then(|kind| match kind {
+            .and_then(|idata| match idata {
                 IData::Unpub(ref data) => {
                     if data.owner() != client_pk {
                         Err(NdError::AccessDenied)
                     } else {
-                        Ok(kind)
+                        Ok(idata)
                     }
                 }
-                _ => Ok(kind),
+                _ => Ok(idata),
             });
         Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
@@ -114,7 +114,7 @@ impl IDataHolder {
             .chunks
             .get(&address)
             .map_err(|error| error.to_string().into())
-            .and_then(|kind| match kind {
+            .and_then(|data| match data {
                 IData::Unpub(ref data) => {
                     if data.owner() != client_pk {
                         Err(NdError::AccessDenied)
