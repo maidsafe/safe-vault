@@ -412,8 +412,8 @@ impl ClientHandler {
                 new_login_packet,
                 message_id,
             ),
-            UpdateLoginPacket(ref updated_login_packet) => self.handle_update_login_packet_req(
-                &client.public_id,
+            UpdateLoginPacket(updated_login_packet) => self.handle_update_login_packet_req(
+                client.public_id.clone(),
                 updated_login_packet,
                 message_id,
             ),
@@ -817,6 +817,11 @@ impl ClientHandler {
                 transaction_id,
                 message_id,
             ),
+            UpdateLoginPacket(updated_login_packet) => self.handle_update_login_packet_vault_req(
+                requester,
+                updated_login_packet,
+                message_id,
+            ),
             PutIData(_)
             | GetIData(_)
             | DeleteUnpubIData(_)
@@ -855,7 +860,6 @@ impl ClientHandler {
             | ListAuthKeysAndVersion
             | InsAuthKey { .. }
             | DelAuthKey { .. }
-            | UpdateLoginPacket { .. }
             | GetLoginPacket(..) => {
                 error!(
                     "{}: Should not receive {:?} as a client handler.",
@@ -1092,6 +1096,35 @@ impl ClientHandler {
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc,
+        })
+    }
+
+    fn handle_update_login_packet_vault_req(
+        &mut self,
+        requester: PublicId,
+        updated_login_packet: LoginPacket,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let result = self
+            .login_packet(
+                utils::own_key(&requester)?,
+                updated_login_packet.destination(),
+            )
+            .and_then(|_existing_login_packet| {
+                if !updated_login_packet.size_is_valid() {
+                    return Err(NdError::ExceededSize);
+                }
+                self.login_packets
+                    .put(&updated_login_packet)
+                    .map_err(|err| err.to_string().into())
+            });
+        Some(Action::RespondToClientHandlers {
+            sender: *self.id.name(),
+            rpc: Rpc::Response {
+                response: Response::Mutation(result),
+                requester,
+                message_id,
+            },
         })
     }
 
@@ -1411,25 +1444,15 @@ impl ClientHandler {
 
     fn handle_update_login_packet_req(
         &mut self,
-        client_id: &PublicId,
-        updated_login_packet: &LoginPacket,
+        client_id: PublicId,
+        updated_login_packet: LoginPacket,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self
-            .login_packet(
-                utils::own_key(client_id)?,
-                updated_login_packet.destination(),
-            )
-            .and_then(|_existing_login_packet| {
-                if !updated_login_packet.size_is_valid() {
-                    return Err(NdError::ExceededSize);
-                }
-                self.login_packets
-                    .put(updated_login_packet)
-                    .map_err(|err| err.to_string().into())
-            });
-        self.send_response_to_client(client_id, message_id, Response::Mutation(result));
-        None
+        Some(Action::ConsensusVote(ConsensusAction::Forward {
+            request: Request::UpdateLoginPacket(updated_login_packet),
+            client_public_id: client_id,
+            message_id,
+        }))
     }
 
     fn handle_get_login_packet_req(
