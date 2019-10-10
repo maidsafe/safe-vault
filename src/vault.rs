@@ -328,6 +328,10 @@ impl Vault {
                 | Rpc::Request {
                     request: Request::TransferCoins { .. },
                     ..
+                }
+                | Rpc::Request {
+                    request: Request::UpdateLoginPacket(..),
+                    ..
                 } => self
                     .client_handler_mut()?
                     .handle_vault_rpc(requester_name, rpc),
