@@ -455,7 +455,8 @@ fn coin_operations_by_app() {
     // Create initial balance.
     common::create_balance(&mut env, &mut client_a, None, 10);
 
-    // Create an app with permission to transfer coins.
+    // Create an app with all permissions.
+    // The `perform_mutations` permission is required to send a `CreateBalance` request.
     let mut app = env.new_disconnected_app(client_a.public_id().clone());
     common::perform_mutation(
         &mut env,
@@ -2212,8 +2213,9 @@ fn auth_keys() {
     let mut owner = env.new_connected_client();
     let mut app = env.new_connected_app(owner.public_id().clone());
 
+    // Create an app with some permissions to mutate and view the balance.
     let permissions = AppPermissions {
-        transfer_coins: true,
+        transfer_coins: false,
         perform_mutations: true,
         get_balance: true,
     };
@@ -2300,10 +2302,10 @@ fn app_permissions() {
     let mut env = Environment::new();
 
     let mut owner = env.new_connected_client();
-    let balance = common::multiply_coins(*COST_OF_PUT, 4);
+    let balance = unwrap!(Coins::from_nano(1000));
     common::create_balance(&mut env, &mut owner, None, balance);
 
-    // App 0 is authorized with permission to transfer coins.
+    // App 0 is authorized with permission to perform mutations.
     let mut app_0 = env.new_disconnected_app(owner.public_id().clone());
     common::perform_mutation(
         &mut env,
@@ -2320,7 +2322,7 @@ fn app_permissions() {
     );
     env.establish_connection(&mut app_0);
 
-    // App 1 is authorized, but cannot transfer coins.
+    // App 1 is authorized, and can only read balance.
     let mut app_1 = env.new_disconnected_app(owner.public_id().clone());
     common::perform_mutation(
         &mut env,
@@ -2330,7 +2332,7 @@ fn app_permissions() {
             version: 2,
             permissions: AppPermissions {
                 transfer_coins: false,
-                get_balance: false,
+                get_balance: true,
                 perform_mutations: false,
             },
         },
@@ -2339,6 +2341,23 @@ fn app_permissions() {
 
     // App 2 is not authorized.
     let mut app_2 = env.new_connected_app(owner.public_id().clone());
+
+    // App 3 is authorized with permission to transfer coins only.
+    let mut app_3 = env.new_disconnected_app(owner.public_id().clone());
+    common::perform_mutation(
+        &mut env,
+        &mut owner,
+        Request::InsAuthKey {
+            key: *app_3.public_id().public_key(),
+            version: 3,
+            permissions: AppPermissions {
+                perform_mutations: false,
+                get_balance: false,
+                transfer_coins: true,
+            },
+        },
+    );
+    env.establish_connection(&mut app_3);
 
     let adata_owner = ADataOwner {
         public_key: *owner.public_id().public_key(),
@@ -2436,6 +2455,64 @@ fn app_permissions() {
             NdError::AccessDenied,
         );
     }
+
+    // A new client to credit coins to.
+    let mut creditor = env.new_connected_client();
+    common::create_balance(&mut env, &mut creditor, None, unwrap!(Coins::from_nano(0)));
+
+    // App 1 cannot transfer coins.
+    common::send_request_expect_err(
+        &mut env,
+        &mut app_1,
+        Request::TransferCoins {
+            destination: *creditor.public_id().name(),
+            amount: unwrap!(Coins::from_nano(50)),
+            transaction_id: 0,
+        },
+        NdError::AccessDenied,
+    );
+
+    // App1 can read balance
+    common::send_request_expect_ok(
+        &mut env,
+        &mut app_1,
+        Request::GetBalance,
+        Response::GetBalance(Ok(unwrap!(Coins::from_nano(996)))),
+    );
+
+    let amount = unwrap!(Coins::from_nano(900));
+    let expected = Response::Transaction(Ok(Transaction { id: 1, amount }));
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let data = SeqMutableData::new(name, tag, *owner.public_id().public_key());
+
+    // App 3 can transfer coins on behalf of the user
+    common::send_request_expect_ok(
+        &mut env,
+        &mut app_3,
+        Request::TransferCoins {
+            destination: *creditor.public_id().name(),
+            amount,
+            transaction_id: 1,
+        },
+        expected,
+    );
+
+    // App 3 cannot mutate on behalf of the user
+    common::send_request_expect_err(
+        &mut env,
+        &mut app_3,
+        Request::PutMData(MData::from(data)),
+        NdError::AccessDenied,
+    );
+
+    // App 3 cannot read balance of the user
+    common::send_request_expect_err(
+        &mut env,
+        &mut app_3,
+        Request::GetBalance,
+        NdError::AccessDenied,
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////
