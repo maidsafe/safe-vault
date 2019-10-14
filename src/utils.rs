@@ -153,6 +153,10 @@ pub(crate) enum AuthorisationKind {
     Mut,
     // Request to manage app keys.
     ManageAppKeys,
+    // Request to transfer coins
+    TransferCoins,
+    // Request to mutate and transfer coins
+    MutAndTransferCoins,
 }
 
 // Returns the type of authorisation needed for the given request.
@@ -174,11 +178,16 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | SetADataOwner { .. }
         | AppendSeq { .. }
         | AppendUnseq(_)
-        | TransferCoins { .. }
-        | CreateBalance { .. }
         | CreateLoginPacket(_)
-        | CreateLoginPacketFor { .. }
         | UpdateLoginPacket(_) => AuthorisationKind::Mut,
+        CreateBalance { amount, .. } | CreateLoginPacketFor { amount, .. } => {
+            if amount.as_nano() == 0 {
+                AuthorisationKind::Mut
+            } else {
+                AuthorisationKind::MutAndTransferCoins
+            }
+        }
+        TransferCoins { .. } => AuthorisationKind::TransferCoins,
         GetIData(IDataAddress::Pub(_)) => AuthorisationKind::GetPub,
         GetIData(IDataAddress::Unpub(_))
         | GetMData(_)

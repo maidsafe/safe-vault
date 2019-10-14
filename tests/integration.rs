@@ -465,6 +465,8 @@ fn coin_operations_by_app() {
             version: 1,
             permissions: AppPermissions {
                 transfer_coins: true,
+                get_balance: true,
+                perform_mutations: true,
             },
         },
     );
@@ -519,7 +521,9 @@ fn coin_operations_by_app_with_insufficient_permissions() {
             key: *app.public_id().public_key(),
             version: 1,
             permissions: AppPermissions {
+                get_balance: false,
                 transfer_coins: false,
+                perform_mutations: false,
             },
         },
     );
@@ -2210,6 +2214,8 @@ fn auth_keys() {
 
     let permissions = AppPermissions {
         transfer_coins: true,
+        perform_mutations: true,
+        get_balance: true,
     };
     let app_public_key = *app.public_id().public_key();
     let make_ins_request = |version| Request::InsAuthKey {
@@ -2306,7 +2312,9 @@ fn app_permissions() {
             key: *app_0.public_id().public_key(),
             version: 1,
             permissions: AppPermissions {
-                transfer_coins: true,
+                perform_mutations: true,
+                get_balance: false,
+                transfer_coins: false,
             },
         },
     );
@@ -2322,6 +2330,8 @@ fn app_permissions() {
             version: 2,
             permissions: AppPermissions {
                 transfer_coins: false,
+                get_balance: false,
+                perform_mutations: false,
             },
         },
     );

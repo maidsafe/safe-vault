@@ -1528,7 +1528,9 @@ impl ClientHandler {
         let signature_required = match utils::authorisation_kind(request) {
             AuthorisationKind::GetUnpub
             | AuthorisationKind::GetBalance
+            | AuthorisationKind::TransferCoins
             | AuthorisationKind::Mut
+            | AuthorisationKind::MutAndTransferCoins
             | AuthorisationKind::ManageAppKeys => true,
             AuthorisationKind::GetPub => false,
         };
@@ -1575,12 +1577,17 @@ impl ClientHandler {
             AuthorisationKind::GetPub => Ok(()),
             AuthorisationKind::GetUnpub => self.check_app_permissions(app_id, |_| true),
             AuthorisationKind::GetBalance => {
-                // TODO: Check `get_balance` instead of `transfer_coins` here, when it is implemented.
-                self.check_app_permissions(app_id, |perms| perms.transfer_coins)
+                self.check_app_permissions(app_id, |perms| perms.get_balance)
             }
             AuthorisationKind::Mut => {
+                self.check_app_permissions(app_id, |perms| perms.perform_mutations)
+            }
+            AuthorisationKind::TransferCoins => {
                 self.check_app_permissions(app_id, |perms| perms.transfer_coins)
             }
+            AuthorisationKind::MutAndTransferCoins => self.check_app_permissions(app_id, |perms| {
+                perms.transfer_coins && perms.perform_mutations
+            }),
             AuthorisationKind::ManageAppKeys => Err(NdError::AccessDenied),
         };
 
