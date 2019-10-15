@@ -751,7 +751,18 @@ impl ClientHandler {
                 response,
                 requester,
                 message_id,
-            } => self.handle_response(src, requester, response, message_id),
+                refund,
+            } => {
+                if let Some(refund_amount) = refund {
+                    if let Err(error) = self.deposit(requester.name(), refund_amount) {
+                        error!(
+                            "{}: Failed to refund {} coins for {:?}: {:?}",
+                            self, refund_amount, requester, error,
+                        )
+                    };
+                }
+                self.handle_response(src, requester, response, message_id)
+            }
             Rpc::Refund {
                 requester,
                 amount,
@@ -1028,6 +1039,8 @@ impl ClientHandler {
                     response: Response::Transaction(Ok(transaction)),
                     requester,
                     message_id,
+                    // TODO: Can we handle refund here instead of Rpc::Refund ?
+                    refund: None,
                 }
             }
             Err(error) => {
@@ -1090,6 +1103,8 @@ impl ClientHandler {
                     response: Response::Transaction(Ok(transaction)),
                     requester,
                     message_id,
+                    // TODO: Can we handle refund here instead of Rpc::Refund ?
+                    refund: None,
                 }
             }
             Err(error) => {
@@ -1135,6 +1150,8 @@ impl ClientHandler {
                 response: Response::Mutation(result),
                 requester,
                 message_id,
+                // Updating the login packet is free
+                refund: None,
             },
         })
     }
@@ -1344,12 +1361,18 @@ impl ClientHandler {
                 .put(login_packet)
                 .map_err(|error| error.to_string().into())
         };
+        let refund = if result.is_err() {
+            Some(*COST_OF_PUT)
+        } else {
+            None
+        };
         Some(Action::RespondToClientHandlers {
             sender: *login_packet.destination(),
             rpc: Rpc::Response {
                 response: Response::Mutation(result),
                 requester,
                 message_id,
+                refund,
             },
         })
     }
@@ -1412,6 +1435,8 @@ impl ClientHandler {
                         response: Response::Transaction(Err(error)),
                         requester: payer,
                         message_id,
+                        // TODO: Refund here?
+                        refund: None,
                     },
                 })
             } else {
@@ -1428,9 +1453,6 @@ impl ClientHandler {
             }
         } else {
             // Step three - store login_packet.
-
-            // TODO - (after phase one) On failure, respond to src to allow them to refund the
-            //        original payer
             let result = if self.login_packets.has(login_packet.destination()) {
                 Err(NdError::LoginPacketExists)
             } else {
@@ -1442,12 +1464,18 @@ impl ClientHandler {
                     })
                     .map_err(|error| error.to_string().into())
             };
+            let refund = if result.is_err() {
+                Some(*COST_OF_PUT)
+            } else {
+                None
+            };
             Some(Action::RespondToClientHandlers {
                 sender: *login_packet.destination(),
                 rpc: Rpc::Response {
                     response: Response::Transaction(result),
                     requester: payer,
                     message_id,
+                    refund,
                 },
             })
         }

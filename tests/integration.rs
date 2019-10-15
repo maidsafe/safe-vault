@@ -1959,7 +1959,6 @@ fn put_immutable_data() {
     );
 
     expected_a = unwrap!(expected_a.checked_sub(*COST_OF_PUT));
-    expected_b = unwrap!(expected_b.checked_sub(*COST_OF_PUT));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected_b);
 }

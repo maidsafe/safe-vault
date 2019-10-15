@@ -26,6 +26,7 @@ pub(crate) enum Rpc {
         response: Response,
         requester: PublicId,
         message_id: MessageId,
+        refund: Option<Coins>,
     },
     /// Refund for a failed coin transfer. Send between ClientHandlers.
     Refund {
