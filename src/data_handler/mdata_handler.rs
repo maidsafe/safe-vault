@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::client_handler::COST_OF_PUT;
 use crate::{
     action::Action,
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
@@ -106,13 +107,18 @@ impl MDataHandler {
                     .put(&mdata)
                     .map_err(|error| error.to_string().into())
             });
-
+        let refund = if result.is_err() {
+            Some(*COST_OF_PUT)
+        } else {
+            None
+        };
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
+                refund,
             },
         })
     }
@@ -131,12 +137,18 @@ impl MDataHandler {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
+        let refund = if result.is_err() {
+            Some(*COST_OF_PUT)
+        } else {
+            None
+        };
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
+                refund,
             },
         })
     }
@@ -170,6 +182,8 @@ impl MDataHandler {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
+                // Deletion is free so no refund
+                refund: None,
             },
         })
     }
@@ -242,6 +256,7 @@ impl MDataHandler {
                 requester,
                 response: Response::GetMData(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -263,6 +278,7 @@ impl MDataHandler {
                 requester,
                 response: Response::GetMDataShell(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -284,6 +300,7 @@ impl MDataHandler {
                 requester,
                 response: Response::GetMDataVersion(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -319,6 +336,7 @@ impl MDataHandler {
                 requester,
                 response,
                 message_id,
+                refund: None,
             },
         })
     }
@@ -340,6 +358,7 @@ impl MDataHandler {
                 requester,
                 response: Response::ListMDataKeys(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -364,6 +383,7 @@ impl MDataHandler {
                 requester,
                 response,
                 message_id,
+                refund: None,
             },
         })
     }
@@ -388,6 +408,7 @@ impl MDataHandler {
                 requester,
                 response,
                 message_id,
+                refund: None,
             },
         })
     }
@@ -409,6 +430,7 @@ impl MDataHandler {
                 requester,
                 response: Response::ListMDataPermissions(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -431,6 +453,7 @@ impl MDataHandler {
                 requester,
                 response: Response::ListMDataUserPermissions(result),
                 message_id,
+                refund: None,
             },
         })
     }
