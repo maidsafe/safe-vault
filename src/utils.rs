@@ -79,9 +79,9 @@ pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
 /// Returns the requester's address.  An App's address is the name of its owner.
 pub(crate) fn requester_address(rpc: &Rpc) -> &XorName {
     match rpc {
-        Rpc::Request { ref requester, .. }
-        | Rpc::Response { ref requester, .. }
-        | Rpc::Refund { ref requester, .. } => requester.name(),
+        Rpc::Request { ref requester, .. } | Rpc::Response { ref requester, .. } => {
+            requester.name()
+        }
     }
 }
 
