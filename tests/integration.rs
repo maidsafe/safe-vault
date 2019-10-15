@@ -173,6 +173,14 @@ fn login_packets() {
         NdError::LoginPacketExists,
     );
 
+    // The balance should be unchanged
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(1)),
+    );
+
     // Getting login packet from non-owning client should fail.
     {
         let mut client = env.new_connected_client();
@@ -248,6 +256,14 @@ fn create_login_packet_for_other() {
             new_login_packet: login_packet.clone(),
         },
         NdError::BalanceExists,
+    );
+
+    // The balance should remain unchanged
+    common::send_request_expect_ok(
+        &mut env,
+        &mut established_client,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(start_nano - nano_to_transfer)),
     );
 
     // Getting login packet from non-owning client should fail.
@@ -719,6 +735,9 @@ fn put_append_only_data() {
         Request::PutAData(unpub_unseq_adata.clone()),
     );
 
+    let balance_a = unwrap!(Coins::from_nano(start_nano - 4));
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
+
     // Get the data to verify
     common::send_request_expect_ok(
         &mut env,
@@ -795,6 +814,9 @@ fn put_append_only_data() {
         Request::DeleteAData(*unpub_unseq_adata.address()),
     );
 
+    // Deletions are free so A's balance should remain the same.
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
+
     // Delete again to test if it's gone
     common::send_request_expect_err(
         &mut env,
@@ -808,6 +830,9 @@ fn put_append_only_data() {
         Request::DeleteAData(*unpub_unseq_adata.address()),
         NdError::NoSuchData,
     );
+
+    // The balance should remain the same when deletion fails
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 }
 
 #[test]
@@ -846,6 +871,13 @@ fn delete_append_only_data_that_doesnt_exist() {
             *AData::UnpubUnseq(UnpubUnseqAppendOnlyData::new(name, tag)).address(),
         ),
         NdError::NoSuchData,
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(start_nano)),
     );
 }
 
