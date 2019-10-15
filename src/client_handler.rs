@@ -741,13 +741,6 @@ impl ClientHandler {
                 }
                 self.handle_response(src, requester, response, message_id)
             }
-            Rpc::Refund {
-                requester,
-                amount,
-                transaction_id,
-                reason,
-                message_id,
-            } => self.handle_refund(src, requester, amount, transaction_id, reason, message_id),
         }
     }
 
@@ -914,26 +907,6 @@ impl ClientHandler {
         }
     }
 
-    fn handle_refund(
-        &mut self,
-        _src: XorName,
-        requester: PublicId,
-        amount: Coins,
-        _transaction_id: TransactionId,
-        reason: NdError,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        if let Err(error) = self.deposit(requester.name(), amount) {
-            error!(
-                "{}: Failed to refund {} coins for {:?}: {:?}",
-                self, amount, requester, error,
-            )
-        }
-
-        self.send_response_to_client(&requester, message_id, Response::Transaction(Err(reason)));
-        None
-    }
-
     fn handle_create_balance_client_req(
         &mut self,
         requester: &PublicId,
@@ -991,7 +964,7 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let rpc = match self.create_balance(&requester, owner_key, amount) {
+        let (result, refund) = match self.create_balance(&requester, owner_key, amount) {
             Ok(()) => {
                 let destination = XorName::from(owner_key);
                 let transaction = Transaction {
@@ -999,30 +972,23 @@ impl ClientHandler {
                     amount,
                 };
                 self.notify_destination_owners(&destination, transaction);
-                Rpc::Response {
-                    response: Response::Transaction(Ok(transaction)),
-                    requester,
-                    message_id,
-                    // TODO: Can we handle refund here instead of Rpc::Refund ?
-                    refund: None,
-                }
+                (Ok(transaction), None)
             }
             Err(error) => {
+                // Refund amount (Including the cost of creating a balance)
                 let amount = amount.checked_add(*COST_OF_PUT)?;
-                // Send refund. (Including the cost of creating a balance)
-                Rpc::Refund {
-                    requester,
-                    amount,
-                    transaction_id,
-                    reason: error,
-                    message_id,
-                }
+                (Err(error), Some(amount))
             }
         };
 
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
-            rpc,
+            rpc: Rpc::Response {
+                response: Response::Transaction(result),
+                requester,
+                message_id,
+                refund,
+            },
         })
     }
 
@@ -1063,7 +1029,7 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let rpc = match self.deposit(&destination, amount) {
+        let (result, refund) = match self.deposit(&destination, amount) {
             Ok(()) => {
                 let transaction = Transaction {
                     id: transaction_id,
@@ -1071,30 +1037,19 @@ impl ClientHandler {
                 };
 
                 self.notify_destination_owners(&destination, transaction);
-
-                Rpc::Response {
-                    response: Response::Transaction(Ok(transaction)),
-                    requester,
-                    message_id,
-                    // TODO: Can we handle refund here instead of Rpc::Refund ?
-                    refund: None,
-                }
+                (Ok(transaction), None)
             }
-            Err(error) => {
-                // Send refund
-                Rpc::Refund {
-                    requester,
-                    amount,
-                    transaction_id,
-                    reason: error,
-                    message_id,
-                }
-            }
+            Err(error) => (Err(error), Some(amount)),
         };
 
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
-            rpc,
+            rpc: Rpc::Response {
+                response: Response::Transaction(result),
+                requester,
+                message_id,
+                refund,
+            },
         })
     }
 
@@ -1383,17 +1338,19 @@ impl ClientHandler {
     ) -> Option<Action> {
         if &src == payer.name() {
             // Step two - create balance and forward login_packet.
-            //
-            // TODO: confirm this follows the same failure flow as CreateBalance request.
             if let Err(error) = self.create_balance(&payer, new_owner, amount) {
+                // Refund amount (Including the cost of creating the balance)
+                let refund = Some(amount.checked_add(*COST_OF_PUT)?);
+
                 Some(Action::RespondToClientHandlers {
                     sender: XorName::from(new_owner),
                     rpc: Rpc::Response {
                         response: Response::Transaction(Err(error)),
                         requester: payer,
                         message_id,
-                        // TODO: Refund here?
-                        refund: None,
+                        // TODO: Does CreateLoginPacketFor charge
+                        // for creation of balance *and* login packet ?
+                        refund,
                     },
                 })
             } else {
