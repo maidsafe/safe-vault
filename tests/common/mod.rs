@@ -41,6 +41,8 @@ use unwrap::unwrap;
 
 /// Default number of vaults to run the tests with.
 const DEFAULT_NUM_VAULTS: usize = 5;
+/// Default number of vaults to which the test-clients connect to.
+pub const DEFAULT_NUM_CONNECTED_VAULTS: usize = 3;
 
 macro_rules! unexpected {
     ($e:expr) => {
@@ -136,13 +138,17 @@ impl Environment {
     }
 
     pub fn establish_connection<T: TestClientTrait>(&mut self, client: &mut T) {
-        let conn_info = self.vaults[0].connection_info();
-        client.quic_p2p().connect_to(conn_info.clone());
-        self.poll();
-
-        client.expect_connected_to(&conn_info);
-        client.handle_challenge_from(&conn_info);
-        self.poll();
+        let mut conn_infos = vec![];
+        for x in 0..DEFAULT_NUM_CONNECTED_VAULTS {
+            conn_infos.push(self.vaults[x].connection_info());
+        }
+        for conn in conn_infos {
+            client.quic_p2p().connect_to(conn.clone());
+            self.poll();
+            client.expect_connected_to(&conn);
+            client.handle_challenge_from(&conn);
+            self.poll();
+        }
     }
 }
 
@@ -235,7 +241,7 @@ pub trait TestClientTrait {
     fn rx(&self) -> &Receiver<Event>;
     fn full_id(&self) -> &FullId;
     fn set_connected_vault(&mut self, connected_vault: NodeInfo);
-    fn connected_vault(&self) -> NodeInfo;
+    fn connected_vaults(&self) -> Vec<NodeInfo>;
 
     fn sign<T: AsRef<[u8]>>(&self, data: T) -> Signature {
         self.full_id().sign(data)
@@ -263,7 +269,7 @@ pub trait TestClientTrait {
         let signature = self.full_id().sign(payload);
         let response = Challenge::Response(self.full_id().public_id().clone(), signature);
         self.set_connected_vault(conn_info.clone());
-        self.send(&response);
+        self.send(&response, conn_info.clone());
     }
 
     fn expect_new_message(&self) -> (SocketAddr, Bytes) {
@@ -280,11 +286,10 @@ pub trait TestClientTrait {
         }
     }
 
-    fn send<T: Serialize>(&mut self, msg: &T) {
+    fn send<T: Serialize>(&mut self, msg: &T, dst: NodeInfo) {
         let msg = unwrap!(bincode::serialize(msg));
-        let node_info = self.connected_vault();
         self.quic_p2p()
-            .send(Peer::Node { node_info }, Bytes::from(msg), 0)
+            .send(Peer::Node { node_info: dst }, Bytes::from(msg), 0)
     }
 
     fn send_request(&mut self, request: Request) -> MessageId {
@@ -300,8 +305,10 @@ pub trait TestClientTrait {
             signature: Some(signature),
         };
 
-        self.send(&msg);
-
+        let node_infos = self.connected_vaults();
+        for info in node_infos {
+            self.send(&msg, info);
+        }
         message_id
     }
 
@@ -342,7 +349,7 @@ pub struct TestClient {
     rx: Receiver<Event>,
     full_id: FullId,
     public_id: ClientPublicId,
-    connected_vault: Option<NodeInfo>,
+    connected_vaults: Vec<NodeInfo>,
 }
 
 impl TestClient {
@@ -360,7 +367,7 @@ impl TestClient {
             rx,
             full_id: FullId::Client(client_full_id),
             public_id,
-            connected_vault: None,
+            connected_vaults: Vec::new(),
         }
     }
 
@@ -383,11 +390,15 @@ impl TestClientTrait for TestClient {
     }
 
     fn set_connected_vault(&mut self, connected_vault: NodeInfo) {
-        self.connected_vault = Some(connected_vault);
+        if !self.connected_vaults.is_empty() {
+            self.connected_vaults.push(connected_vault);
+        } else {
+            self.connected_vaults = vec![connected_vault];
+        }
     }
 
-    fn connected_vault(&self) -> NodeInfo {
-        unwrap!(self.connected_vault.clone())
+    fn connected_vaults(&self) -> Vec<NodeInfo> {
+        self.connected_vaults.clone()
     }
 }
 
@@ -410,7 +421,7 @@ pub struct TestApp {
     rx: Receiver<Event>,
     full_id: FullId,
     public_id: AppPublicId,
-    connected_vault: Option<NodeInfo>,
+    connected_vaults: Vec<NodeInfo>,
 }
 
 impl TestApp {
@@ -428,7 +439,7 @@ impl TestApp {
             rx,
             full_id: FullId::App(app_full_id),
             public_id,
-            connected_vault: None,
+            connected_vaults: Vec::new(),
         }
     }
 
@@ -451,11 +462,15 @@ impl TestClientTrait for TestApp {
     }
 
     fn set_connected_vault(&mut self, connected_vault: NodeInfo) {
-        self.connected_vault = Some(connected_vault);
+        if !self.connected_vaults.is_empty() {
+            self.connected_vaults.push(connected_vault);
+        } else {
+            self.connected_vaults = vec![connected_vault];
+        }
     }
 
-    fn connected_vault(&self) -> NodeInfo {
-        unwrap!(self.connected_vault.clone())
+    fn connected_vaults(&self) -> Vec<NodeInfo> {
+        self.connected_vaults.clone()
     }
 }
 
@@ -481,7 +496,15 @@ where
 {
     let message_id = client.send_request(request);
     env.poll();
+
+    // Taking the first response.
     let response = client.expect_response(message_id);
+
+    // Dropping the rest of the responses
+    for _ in 0..DEFAULT_NUM_CONNECTED_VAULTS - 1 {
+        let _ = client.expect_response(message_id);
+    }
+
     unwrap!(response.try_into())
 }
 
@@ -515,7 +538,9 @@ pub fn send_request_expect_err<T: TestClientTrait>(
     let expected_response = request.error_response(expected_error);
     let message_id = client.send_request(request);
     env.poll();
-    assert_eq!(expected_response, client.expect_response(message_id));
+    for _ in 0..DEFAULT_NUM_CONNECTED_VAULTS {
+        assert_eq!(expected_response, client.expect_response(message_id));
+    }
 }
 
 pub fn create_balance(
@@ -543,12 +568,29 @@ pub fn create_balance(
         amount,
     };
 
-    let notification = dst_client.unwrap_or(src_client).expect_notification();
-    assert_eq!(notification, Notification(expected));
-
-    let response = src_client.expect_response(message_id);
-    let actual = unwrap!(Transaction::try_from(response));
-    assert_eq!(actual, expected);
+    match dst_client {
+        Some(dst) => {
+            for _ in 0..DEFAULT_NUM_CONNECTED_VAULTS {
+                // Notification reaches the dst client and not the src client for a CreateBalance Request
+                let notification = dst.expect_notification();
+                assert_eq!(notification, Notification(expected));
+                // Response reaches the src client
+                let response = src_client.expect_response(message_id);
+                let actual = unwrap!(Transaction::try_from(response));
+                assert_eq!(actual, expected);
+            }
+        }
+        None => {
+            for _ in 0..DEFAULT_NUM_CONNECTED_VAULTS {
+                // Notification reaches the src client if Balance is created for the src itself.
+                let notification = src_client.expect_notification();
+                assert_eq!(notification, Notification(expected));
+                let response = src_client.expect_response(message_id);
+                let actual = unwrap!(Transaction::try_from(response));
+                assert_eq!(actual, expected);
+            }
+        }
+    }
 }
 
 pub fn transfer_coins(
@@ -572,12 +614,15 @@ pub fn transfer_coins(
         amount,
     };
 
-    let notification = dst_client.expect_notification();
-    assert_eq!(notification, Notification(expected));
-
-    let response = src_client.expect_response(message_id);
-    let actual = unwrap!(Transaction::try_from(response));
-    assert_eq!(actual, expected);
+    for _ in 0..DEFAULT_NUM_CONNECTED_VAULTS {
+        // Notification reaches the dst client for a TransferCoins Request
+        let notification = dst_client.expect_notification();
+        assert_eq!(notification, Notification(expected));
+        // Response reaches the src client for a TransferCoins Request
+        let response = src_client.expect_response(message_id);
+        let actual = unwrap!(Transaction::try_from(response));
+        assert_eq!(actual, expected);
+    }
 }
 
 pub fn gen_public_key(rng: &mut TestRng) -> PublicKey {
