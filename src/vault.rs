@@ -13,7 +13,7 @@ use crate::{
     coins_handler::CoinsHandler,
     data_handler::DataHandler,
     quic_p2p::{Event, NodeInfo},
-    routing::{Event as RoutingEvent, Node},
+    routing::{Event as RoutingEvent, EventStream, Node},
     rpc::Rpc,
     utils, Config, Error, Result,
 };
@@ -210,6 +210,7 @@ impl Vault {
                     }
                 }
             }
+            _ => unimplemented!(),
         }
     }
 

@@ -72,10 +72,11 @@ mod vault;
 
 pub(crate) use to_db_key::ToDbKey;
 
-/// Utilities for testing.
+/// Mock version of QUIC P2P.
 #[cfg(feature = "mock")]
 pub mod mock;
 /// Mock version of Routing
+#[cfg(feature = "mock")]
 pub mod mock_routing;
 
 // `crate::quic_p2p` refers to real or mock quic_p2p, depending on the "mock" feature flag.
@@ -83,10 +84,12 @@ pub mod mock_routing;
 pub use self::mock::quic_p2p;
 #[cfg(not(feature = "mock"))]
 pub use quic_p2p;
-// FIXME: uncomment once we have compatible Routing API.
-// #[cfg(not(feature = "mock"))]
-// pub use routing;
+
+// `crate::routing` refers to real or mock routing, depending on the "mock" feature flag.
+#[cfg(feature = "mock")]
 pub use crate::mock_routing as routing;
+#[cfg(not(feature = "mock"))]
+pub use routing;
 
 pub use crate::{
     chunk_store::error::Error as ChunkStoreError,

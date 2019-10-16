@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crossbeam_channel::TryRecvError;
+use crossbeam_channel::{RecvError, TryRecvError};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::{Rc, Weak};
@@ -61,17 +61,29 @@ impl Node {
             self.events.borrow_mut().push_back(event);
         }
     }
+}
+
+impl EventStream for Node {
+    type Item = Event;
+
+    fn next_ev(&mut self) -> Result<Self::Item, RecvError> {
+        unimplemented!()
+    }
 
     /// Try to read the next available event from the stream without blocking.
     ///
     /// Implementations should return an error if there are no items available, OR
     /// a real error occurs.
-    pub fn try_next_ev(&mut self) -> Result<Event, TryRecvError> {
+    fn try_next_ev(&mut self) -> Result<Self::Item, TryRecvError> {
         if let Some(event) = self.events.borrow_mut().pop_front() {
             Ok(Event::Consensus(event))
         } else {
             Err(TryRecvError::Empty)
         }
+    }
+
+    fn poll(&mut self) -> bool {
+        unimplemented!()
     }
 }
 
@@ -111,6 +123,29 @@ impl NodeBuilder {
 pub enum Event {
     /// Event from PARSEC.
     Consensus(Vec<u8>),
+    // TODO: remove.
+    /// Needed to fix compilation error.
+    Dummy,
+}
+
+/// Trait to fake a channel.
+pub trait EventStream {
+    /// Item produced by this stream.
+    type Item;
+
+    /// Read the next available event from the stream, blocking until one becomes available.
+    fn next_ev(&mut self) -> Result<Self::Item, RecvError>;
+
+    /// Try to read the next available event from the stream without blocking.
+    ///
+    /// Implementations should return an error if there are no items available, OR
+    /// a real error occurs.
+    fn try_next_ev(&mut self) -> Result<Self::Item, TryRecvError>;
+
+    /// Process events, storing them on the internal buffer.
+    ///
+    /// After calling poll, any events produced will be accessible via `next_ev` and `try_next_ev`.
+    fn poll(&mut self) -> bool;
 }
 
 /// The type of errors that can occur during handling of routing events.
