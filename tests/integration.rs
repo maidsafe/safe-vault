@@ -53,7 +53,7 @@
 #[macro_use]
 mod common;
 
-use self::common::{Environment, TestClientTrait};
+use self::common::{Environment, TestClientTrait, DEFAULT_NUM_CONNECTED_VAULTS};
 use maplit::btreemap;
 use rand::{distributions::Standard, Rng};
 use safe_nd::{
@@ -88,11 +88,16 @@ fn invalid_signature() {
     let message_id = MessageId::new();
 
     // Missing signature
-    client.send(&Message::Request {
-        request: request.clone(),
-        message_id,
-        signature: None,
-    });
+    for info in client.connected_vaults() {
+        client.send(
+            &Message::Request {
+                request: request.clone(),
+                message_id,
+                signature: None,
+            },
+            info,
+        );
+    }
     env.poll();
     match client.expect_response(message_id) {
         Response::GetIData(Err(NdError::InvalidSignature)) => (),
@@ -105,11 +110,16 @@ fn invalid_signature() {
     let to_sign = unwrap!(bincode::serialize(&to_sign));
     let signature = other_full_id.sign(&to_sign);
 
-    client.send(&Message::Request {
-        request,
-        message_id,
-        signature: Some(signature),
-    });
+    for info in client.connected_vaults() {
+        client.send(
+            &Message::Request {
+                request: request.clone(),
+                message_id,
+                signature: Some(signature.clone()),
+            },
+            info,
+        );
+    }
     env.poll();
     match client.expect_response(message_id) {
         Response::GetIData(Err(NdError::InvalidSignature)) => (),
@@ -2244,7 +2254,9 @@ fn auth_keys() {
     common::create_balance(&mut env, &mut owner, None, start_nano);
 
     // The app receives the transaction notification too.
-    let _ = app.expect_notification();
+    for _ in 0..DEFAULT_NUM_CONNECTED_VAULTS {
+        let _ = app.expect_notification();
+    }
 
     // Check that listing authorised keys returns an empty collection.
     let mut expected_map = BTreeMap::new();

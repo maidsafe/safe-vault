@@ -8,7 +8,7 @@
 
 use crossbeam_channel::TryRecvError;
 use std::cell::RefCell;
-use std::collections::VecDeque;
+use std::collections::{btree_set::BTreeSet, VecDeque};
 use std::rc::{Rc, Weak};
 
 /// Default events `VecDeque` pre-allocated capacity
@@ -21,6 +21,9 @@ type EventsRef = Rc<RefCell<VecDeque<Vec<u8>>>>;
 /// Consensus
 pub struct ConsensusGroup {
     event_buckets: Vec<EventsRef>,
+    // A list to maintain already consensused event from
+    // entering the consensus queue again
+    processed_events: BTreeSet<Vec<u8>>,
 }
 
 impl ConsensusGroup {
@@ -28,13 +31,19 @@ impl ConsensusGroup {
     pub fn new() -> ConsensusGroupRef {
         Rc::new(RefCell::new(Self {
             event_buckets: Vec::new(),
+            processed_events: BTreeSet::new(),
         }))
     }
 
-    fn vote_for(&self, event: Vec<u8>) {
-        for bucket in &self.event_buckets {
-            let mut events = bucket.borrow_mut();
-            events.push_back(event.clone());
+    fn vote_for(&mut self, event: Vec<u8>) {
+        // If the event is already consensused, we don't have to insert it again
+        if !self.processed_events.contains(event.as_slice()) {
+            for bucket in &self.event_buckets {
+                let mut events = bucket.borrow_mut();
+                events.push_back(event.clone());
+            }
+            // Push the event into the processed list.
+            let _ = self.processed_events.insert(event.clone());
         }
     }
 }
