@@ -66,6 +66,7 @@ fn main() {
 mod detail {
     use env_logger::{fmt::Formatter, Builder as LoggerBuilder};
     use log::{self, Level, Record};
+    use safe_vault::routing::Node;
     use safe_vault::{self, Command, Config, Vault};
     use self_update::cargo_crate_version;
     use self_update::Status;
@@ -128,7 +129,15 @@ mod detail {
             log::error!("Failed to set interrupt handler: {:?}", error)
         }
 
-        match Vault::new(config, command_rx) {
+        let routing_node = match Node::builder().create() {
+            Ok(node) => node,
+            Err(e) => {
+                eprintln!("Could not start a Routing node: {:?}", e);
+                process::exit(-1);
+            }
+        };
+
+        match Vault::new(routing_node, config, command_rx) {
             Ok(mut vault) => vault.run(),
             Err(e) => {
                 println!("Cannot start vault due to error: {:?}", e);

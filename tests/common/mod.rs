@@ -24,6 +24,7 @@ use safe_nd::{
 use safe_vault::{
     mock::Network,
     quic_p2p::{self, Builder, Event, NodeInfo, OurType, Peer, QuicP2p},
+    routing::{ConsensusGroup, ConsensusGroupRef, Node},
     Config, Vault,
 };
 use serde::Serialize;
@@ -38,6 +39,9 @@ use std::{
 use tempdir::TempDir;
 use unwrap::unwrap;
 
+/// Default number of vaults to run the tests with.
+const DEFAULT_NUM_VAULTS: usize = 5;
+
 macro_rules! unexpected {
     ($e:expr) => {
         panic!("Unexpected {:?}", $e)
@@ -47,11 +51,14 @@ macro_rules! unexpected {
 pub struct Environment {
     rng: TestRng,
     network: Network,
-    vault: TestVault,
+    vaults: Vec<TestVault>,
+    _consensus_group: ConsensusGroupRef,
 }
 
 impl Environment {
-    pub fn new() -> Self {
+    pub fn with_multiple_vaults(num_vaults: usize) -> Self {
+        assert!(num_vaults > 0);
+
         let do_format = move |formatter: &mut Formatter, record: &Record<'_>| {
             let now = formatter.timestamp();
             writeln!(
@@ -73,11 +80,30 @@ impl Environment {
         let mut rng = rng::new();
         let network_rng = rng::from_rng(&mut rng);
 
+        let network = Network::new(network_rng);
+
+        let consensus_group = ConsensusGroup::new();
+
+        let vaults = if num_vaults > 1 {
+            let mut vaults = Vec::with_capacity(num_vaults);
+            for _ in 0..num_vaults {
+                vaults.push(TestVault::new(Some(consensus_group.clone())));
+            }
+            vaults
+        } else {
+            vec![TestVault::new(None)]
+        };
+
         Self {
             rng,
-            network: Network::new(network_rng),
-            vault: TestVault::new(),
+            network,
+            vaults,
+            _consensus_group: consensus_group,
         }
+    }
+
+    pub fn new() -> Self {
+        Self::with_multiple_vaults(DEFAULT_NUM_VAULTS)
     }
 
     pub fn rng(&mut self) -> &mut TestRng {
@@ -89,7 +115,7 @@ impl Environment {
         let mut progress = true;
         while progress {
             self.network.poll();
-            progress = self.vault.inner.poll();
+            progress = self.vaults.iter_mut().any(|vault| vault.inner.poll());
         }
     }
 
@@ -110,7 +136,7 @@ impl Environment {
     }
 
     pub fn establish_connection<T: TestClientTrait>(&mut self, client: &mut T) {
-        let conn_info = self.vault.connection_info();
+        let conn_info = self.vaults[0].connection_info();
         client.quic_p2p().connect_to(conn_info.clone());
         self.poll();
 
@@ -130,7 +156,8 @@ struct TestVault {
 }
 
 impl TestVault {
-    fn new() -> Self {
+    /// Create a test Vault within a group.
+    fn new(consensus_group: Option<ConsensusGroupRef>) -> Self {
         let root_dir = unwrap!(TempDir::new("safe_vault"));
 
         let mut config = Config::default();
@@ -138,7 +165,12 @@ impl TestVault {
 
         let (_, command_rx) = crossbeam_channel::bounded(0);
 
-        let inner = unwrap!(Vault::new(config, command_rx));
+        let routing_node = if let Some(group) = consensus_group {
+            unwrap!(Node::builder().create_within_group(group))
+        } else {
+            unwrap!(Node::builder().create())
+        };
+        let inner = unwrap!(Vault::new(routing_node, config, command_rx));
 
         Self {
             inner,

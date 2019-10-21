@@ -21,6 +21,7 @@ use bincode;
 use crossbeam_channel::{select, Receiver};
 use log::{error, info, trace};
 use safe_nd::{NodeFullId, Request, XorName};
+use std::borrow::Cow;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -68,7 +69,11 @@ pub struct Vault {
 
 impl Vault {
     /// Construct a new vault instance.
-    pub fn new(config: Config, command_receiver: Receiver<Command>) -> Result<Self> {
+    pub fn new(
+        routing_node: Node,
+        config: Config,
+        command_receiver: Receiver<Command>,
+    ) -> Result<Self> {
         let mut init_mode = Init::Load;
         let (is_elder, id) = Self::read_state(&config)?.unwrap_or_else(|| {
             let mut rng = rand::thread_rng();
@@ -77,7 +82,6 @@ impl Vault {
             (true, id)
         });
 
-        let routing_node = Node::builder().create()?;
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
 
@@ -296,8 +300,12 @@ impl Vault {
             match utils::destination_address(&request) {
                 Some(address) => address,
                 None => {
-                    error!("{}: Logic error - no data handler address available.", self);
-                    return None;
+                    if let Request::InsAuthKey { .. } | Request::DelAuthKey { .. } = request {
+                        Cow::Borrowed(self.id.public_id().name())
+                    } else {
+                        error!("{}: Logic error - no data handler address available.", self);
+                        return None;
+                    }
                 }
             }
         } else {
@@ -331,6 +339,14 @@ impl Vault {
                 }
                 | Rpc::Request {
                     request: Request::UpdateLoginPacket(..),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::InsAuthKey { .. },
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::DelAuthKey { .. },
                     ..
                 } => self
                     .client_handler_mut()?
