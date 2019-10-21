@@ -968,44 +968,26 @@ impl ClientHandler {
             amount,
             transaction_id,
         };
-        let action = Action::ForwardClientRequest(Rpc::Request {
-            request: request.clone(),
-            requester: requester.clone(),
-            message_id,
-        });
-
-        // For phase 1 we allow owners to create their own balance freely.
+        // For phases 1 & 2 we allow owners to create their own balance freely.
         let own_request = utils::own_key(requester)
             .map(|key| key == &owner_key)
             .unwrap_or(false);
         if own_request {
             return Some(Action::ConsensusVote(ConsensusAction::Forward {
-                request,
+                request: request.clone(),
                 client_public_id: requester.clone(),
                 message_id,
             }));
         }
 
-        self.pay(
-            &requester,
-            utils::owner(requester)?.public_key(),
-            &request,
+        let total_amount = amount.checked_add(*COST_OF_PUT)?;
+        // When ClientA(owner/app with permissions) creates a balance for ClientB
+        Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
+            request,
+            client_public_id: requester.clone(),
             message_id,
-            *COST_OF_PUT,
-        )?;
-
-        // Creating a balance without coins
-        if amount.as_nano() == 0 {
-            return Some(action);
-        }
-
-        let result = match self.withdraw(requester.name(), amount) {
-            Ok(()) => return Some(action),
-            Err(error) => Err(error),
-        };
-
-        self.send_response_to_client(requester, message_id, Response::Transaction(result));
-        None
+            cost: total_amount,
+        }))
     }
 
     fn handle_create_balance_vault_req(
