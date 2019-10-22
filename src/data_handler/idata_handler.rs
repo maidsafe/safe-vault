@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{IDataOp, IDataRequest, OpType};
-use crate::client_handler::COST_OF_PUT;
 use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
 use log::{trace, warn};
 use pickledb::PickleDb;
@@ -65,11 +64,7 @@ impl IDataHandler {
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
-            let refund = if result.is_err() {
-                Some(*COST_OF_PUT)
-            } else {
-                None
-            };
+            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: data_name,
                 rpc: Rpc::Response {

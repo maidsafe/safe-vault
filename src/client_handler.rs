@@ -752,17 +752,7 @@ impl ClientHandler {
                 requester,
                 message_id,
                 refund,
-            } => {
-                if let Some(refund_amount) = refund {
-                    if let Err(error) = self.deposit(requester.name(), refund_amount) {
-                        error!(
-                            "{}: Failed to refund {} coins for {:?}: {:?}",
-                            self, refund_amount, requester, error,
-                        )
-                    };
-                }
-                self.handle_response(src, requester, response, message_id)
-            }
+            } => self.handle_response(src, requester, response, message_id, refund),
         }
     }
 
@@ -888,6 +878,7 @@ impl ClientHandler {
         requester: PublicId,
         response: Response,
         message_id: MessageId,
+        refund: Option<Coins>,
     ) -> Option<Action> {
         use Response::*;
         trace!(
@@ -898,6 +889,15 @@ impl ClientHandler {
             requester,
             data_handlers
         );
+
+        if let Some(refund_amount) = refund {
+            if let Err(error) = self.deposit(requester.name(), refund_amount) {
+                error!(
+                    "{}: Failed to refund {} coins for {:?}: {:?}",
+                    self, refund_amount, requester, error,
+                )
+            };
+        }
 
         match response {
             // Transfer the response from data handlers to clients
@@ -1316,11 +1316,7 @@ impl ClientHandler {
                 .put(login_packet)
                 .map_err(|error| error.to_string().into())
         };
-        let refund = if result.is_err() {
-            Some(*COST_OF_PUT)
-        } else {
-            None
-        };
+        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *login_packet.destination(),
             rpc: Rpc::Response {
@@ -1421,11 +1417,7 @@ impl ClientHandler {
                     })
                     .map_err(|error| error.to_string().into())
             };
-            let refund = if result.is_err() {
-                Some(*COST_OF_PUT)
-            } else {
-                None
-            };
+            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: *login_packet.destination(),
                 rpc: Rpc::Response {
@@ -1537,6 +1529,8 @@ impl ClientHandler {
                 response: Response::Mutation(result),
                 requester: client,
                 message_id,
+                // Free operation
+                refund: None,
             },
         })
     }
@@ -1574,6 +1568,8 @@ impl ClientHandler {
                 response: Response::Mutation(result),
                 requester: client,
                 message_id,
+                // Free operation
+                refund: None,
             },
         })
     }
