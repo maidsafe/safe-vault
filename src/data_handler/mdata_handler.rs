@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::client_handler::COST_OF_PUT;
 use crate::{
     action::Action,
     chunk_store::{error::Error as ChunkStoreError, MutableChunkStore},
@@ -107,11 +106,7 @@ impl MDataHandler {
                     .put(&mdata)
                     .map_err(|error| error.to_string().into())
             });
-        let refund = if result.is_err() {
-            Some(*COST_OF_PUT)
-        } else {
-            None
-        };
+        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
@@ -137,11 +132,7 @@ impl MDataHandler {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-        let refund = if result.is_err() {
-            Some(*COST_OF_PUT)
-        } else {
-            None
-        };
+        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             rpc: Rpc::Response {
