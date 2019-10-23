@@ -6,12 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::client_handler::COST_OF_PUT;
 use crate::{rpc::Rpc, vault::Init, Result};
 use bincode;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, thread_rng, Rng};
-use safe_nd::{ClientPublicId, IDataAddress, PublicId, PublicKey, Request, XorName};
+use safe_nd::{
+    ClientPublicId, Coins, IDataAddress, PublicId, PublicKey, Request, Result as NdResult, XorName,
+};
 use serde::Serialize;
 use std::{borrow::Cow, fs, path::Path};
 use unwrap::unwrap;
@@ -79,9 +82,9 @@ pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
 /// Returns the requester's address.  An App's address is the name of its owner.
 pub(crate) fn requester_address(rpc: &Rpc) -> &XorName {
     match rpc {
-        Rpc::Request { ref requester, .. }
-        | Rpc::Response { ref requester, .. }
-        | Rpc::Refund { ref requester, .. } => requester.name(),
+        Rpc::Request { ref requester, .. } | Rpc::Response { ref requester, .. } => {
+            requester.name()
+        }
     }
 }
 
@@ -220,5 +223,13 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         ListAuthKeysAndVersion | InsAuthKey { .. } | DelAuthKey { .. } => {
             AuthorisationKind::ManageAppKeys
         }
+    }
+}
+
+pub(crate) fn get_refund_for_put<T>(result: &NdResult<T>) -> Option<Coins> {
+    if result.is_err() {
+        Some(*COST_OF_PUT)
+    } else {
+        None
     }
 }

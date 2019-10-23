@@ -2,6 +2,7 @@ env:
   global:
     - RUST_BACKTRACE=1
     - PATH=$PATH:$HOME/.cargo/bin
+    - RUSTFLAGS="-D warnings"
 language: rust
 rust: stable
 branches:

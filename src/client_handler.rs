@@ -751,14 +751,8 @@ impl ClientHandler {
                 response,
                 requester,
                 message_id,
-            } => self.handle_response(src, requester, response, message_id),
-            Rpc::Refund {
-                requester,
-                amount,
-                transaction_id,
-                reason,
-                message_id,
-            } => self.handle_refund(src, requester, amount, transaction_id, reason, message_id),
+                refund,
+            } => self.handle_response(src, requester, response, message_id, refund),
         }
     }
 
@@ -884,6 +878,7 @@ impl ClientHandler {
         requester: PublicId,
         response: Response,
         message_id: MessageId,
+        refund: Option<Coins>,
     ) -> Option<Action> {
         use Response::*;
         trace!(
@@ -894,6 +889,15 @@ impl ClientHandler {
             requester,
             data_handlers
         );
+
+        if let Some(refund_amount) = refund {
+            if let Err(error) = self.deposit(requester.name(), refund_amount) {
+                error!(
+                    "{}: Failed to refund {} coins for {:?}: {:?}",
+                    self, refund_amount, requester, error,
+                )
+            };
+        }
 
         match response {
             // Transfer the response from data handlers to clients
@@ -933,26 +937,6 @@ impl ClientHandler {
                 None
             }
         }
-    }
-
-    fn handle_refund(
-        &mut self,
-        _src: XorName,
-        requester: PublicId,
-        amount: Coins,
-        _transaction_id: TransactionId,
-        reason: NdError,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        if let Err(error) = self.deposit(requester.name(), amount) {
-            error!(
-                "{}: Failed to refund {} coins for {:?}: {:?}",
-                self, amount, requester, error,
-            )
-        }
-
-        self.send_response_to_client(&requester, message_id, Response::Transaction(Err(reason)));
-        None
     }
 
     fn handle_create_balance_client_req(
@@ -998,7 +982,7 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let rpc = match self.create_balance(&requester, owner_key, amount) {
+        let (result, refund) = match self.create_balance(&requester, owner_key, amount) {
             Ok(()) => {
                 let destination = XorName::from(owner_key);
                 let transaction = Transaction {
@@ -1006,28 +990,23 @@ impl ClientHandler {
                     amount,
                 };
                 self.notify_destination_owners(&destination, transaction);
-                Rpc::Response {
-                    response: Response::Transaction(Ok(transaction)),
-                    requester,
-                    message_id,
-                }
+                (Ok(transaction), None)
             }
             Err(error) => {
+                // Refund amount (Including the cost of creating a balance)
                 let amount = amount.checked_add(*COST_OF_PUT)?;
-                // Send refund. (Including the cost of creating a balance)
-                Rpc::Refund {
-                    requester,
-                    amount,
-                    transaction_id,
-                    reason: error,
-                    message_id,
-                }
+                (Err(error), Some(amount))
             }
         };
 
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
-            rpc,
+            rpc: Rpc::Response {
+                response: Response::Transaction(result),
+                requester,
+                message_id,
+                refund,
+            },
         })
     }
 
@@ -1059,7 +1038,7 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let rpc = match self.deposit(&destination, amount) {
+        let (result, refund) = match self.deposit(&destination, amount) {
             Ok(()) => {
                 let transaction = Transaction {
                     id: transaction_id,
@@ -1067,28 +1046,19 @@ impl ClientHandler {
                 };
 
                 self.notify_destination_owners(&destination, transaction);
-
-                Rpc::Response {
-                    response: Response::Transaction(Ok(transaction)),
-                    requester,
-                    message_id,
-                }
+                (Ok(transaction), None)
             }
-            Err(error) => {
-                // Send refund
-                Rpc::Refund {
-                    requester,
-                    amount,
-                    transaction_id,
-                    reason: error,
-                    message_id,
-                }
-            }
+            Err(error) => (Err(error), Some(amount)),
         };
 
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
-            rpc,
+            rpc: Rpc::Response {
+                response: Response::Transaction(result),
+                requester,
+                message_id,
+                refund,
+            },
         })
     }
 
@@ -1117,6 +1087,8 @@ impl ClientHandler {
                 response: Response::Mutation(result),
                 requester,
                 message_id,
+                // Updating the login packet is free
+                refund: None,
             },
         })
     }
@@ -1326,12 +1298,14 @@ impl ClientHandler {
                 .put(login_packet)
                 .map_err(|error| error.to_string().into())
         };
+        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *login_packet.destination(),
             rpc: Rpc::Response {
                 response: Response::Mutation(result),
                 requester,
                 message_id,
+                refund,
             },
         })
     }
@@ -1385,15 +1359,19 @@ impl ClientHandler {
     ) -> Option<Action> {
         if &src == payer.name() {
             // Step two - create balance and forward login_packet.
-            //
-            // TODO: confirm this follows the same failure flow as CreateBalance request.
             if let Err(error) = self.create_balance(&payer, new_owner, amount) {
+                // Refund amount (Including the cost of creating the balance)
+                let refund = Some(amount.checked_add(*COST_OF_PUT)?);
+
                 Some(Action::RespondToClientHandlers {
                     sender: XorName::from(new_owner),
                     rpc: Rpc::Response {
                         response: Response::Transaction(Err(error)),
                         requester: payer,
                         message_id,
+                        // TODO: Does CreateLoginPacketFor charge
+                        // for creation of balance *and* login packet ?
+                        refund,
                     },
                 })
             } else {
@@ -1410,9 +1388,6 @@ impl ClientHandler {
             }
         } else {
             // Step three - store login_packet.
-
-            // TODO - (after phase one) On failure, respond to src to allow them to refund the
-            //        original payer
             let result = if self.login_packets.has(login_packet.destination()) {
                 Err(NdError::LoginPacketExists)
             } else {
@@ -1424,12 +1399,14 @@ impl ClientHandler {
                     })
                     .map_err(|error| error.to_string().into())
             };
+            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: *login_packet.destination(),
                 rpc: Rpc::Response {
                     response: Response::Transaction(result),
                     requester: payer,
                     message_id,
+                    refund,
                 },
             })
         }
@@ -1534,6 +1511,8 @@ impl ClientHandler {
                 response: Response::Mutation(result),
                 requester: client,
                 message_id,
+                // Free operation
+                refund: None,
             },
         })
     }
@@ -1571,6 +1550,8 @@ impl ClientHandler {
                 response: Response::Mutation(result),
                 requester: client,
                 message_id,
+                // Free operation
+                refund: None,
             },
         })
     }

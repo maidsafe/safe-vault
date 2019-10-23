@@ -8,46 +8,17 @@
 
 // TODO: make these tests work without mock too.
 #![cfg(feature = "mock")]
-#![forbid(
-    exceeding_bitshifts,
-    mutable_transmutes,
-    no_mangle_const_items,
-    unknown_crate_types,
-    warnings
-)]
-#![deny(
-    bad_style,
-    deprecated,
-    improper_ctypes,
-    missing_docs,
-    non_shorthand_field_patterns,
-    overflowing_literals,
-    plugin_as_library,
-    stable_features,
-    unconditional_recursion,
-    unknown_lints,
-    unsafe_code,
-    unused,
-    unused_allocation,
-    unused_attributes,
-    unused_comparisons,
-    unused_features,
-    unused_parens,
-    while_true
-)]
+// For explanation of lint checks, run `rustc -W help`.
+#![deny(unsafe_code)]
 #![warn(
+    missing_debug_implementations,
+    missing_docs,
     trivial_casts,
     trivial_numeric_casts,
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
     unused_results
-)]
-#![allow(
-    box_pointers,
-    missing_copy_implementations,
-    missing_debug_implementations,
-    variant_size_differences
 )]
 
 #[macro_use]
@@ -173,6 +144,14 @@ fn login_packets() {
         NdError::LoginPacketExists,
     );
 
+    // The balance should be unchanged
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(1)),
+    );
+
     // Getting login packet from non-owning client should fail.
     {
         let mut client = env.new_connected_client();
@@ -248,6 +227,14 @@ fn create_login_packet_for_other() {
             new_login_packet: login_packet.clone(),
         },
         NdError::BalanceExists,
+    );
+
+    // The balance should remain unchanged
+    common::send_request_expect_ok(
+        &mut env,
+        &mut established_client,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(start_nano - nano_to_transfer)),
     );
 
     // Getting login packet from non-owning client should fail.
@@ -719,6 +706,9 @@ fn put_append_only_data() {
         Request::PutAData(unpub_unseq_adata.clone()),
     );
 
+    let balance_a = unwrap!(Coins::from_nano(start_nano - 4));
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
+
     // Get the data to verify
     common::send_request_expect_ok(
         &mut env,
@@ -795,6 +785,9 @@ fn put_append_only_data() {
         Request::DeleteAData(*unpub_unseq_adata.address()),
     );
 
+    // Deletions are free so A's balance should remain the same.
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
+
     // Delete again to test if it's gone
     common::send_request_expect_err(
         &mut env,
@@ -808,6 +801,9 @@ fn put_append_only_data() {
         Request::DeleteAData(*unpub_unseq_adata.address()),
         NdError::NoSuchData,
     );
+
+    // The balance should remain the same when deletion fails
+    common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 }
 
 #[test]
@@ -846,6 +842,13 @@ fn delete_append_only_data_that_doesnt_exist() {
             *AData::UnpubUnseq(UnpubUnseqAppendOnlyData::new(name, tag)).address(),
         ),
         NdError::NoSuchData,
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(start_nano)),
     );
 }
 
@@ -1959,7 +1962,6 @@ fn put_immutable_data() {
     );
 
     expected_a = unwrap!(expected_a.checked_sub(*COST_OF_PUT));
-    expected_b = unwrap!(expected_b.checked_sub(*COST_OF_PUT));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected_b);
 }
