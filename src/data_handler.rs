@@ -68,10 +68,6 @@ impl DataHandler {
                 message_id,
                 ..
             } => self.handle_response(src, response, message_id),
-            _ => {
-                error!("{}: Received invalid vault RPC: {:?}", self, rpc);
-                None
-            }
         }
     }
 

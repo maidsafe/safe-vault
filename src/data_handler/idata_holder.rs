@@ -60,13 +60,14 @@ impl IDataHolder {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-
+        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
+                refund,
             },
         })
     }
@@ -99,6 +100,7 @@ impl IDataHolder {
                 requester: client.clone(),
                 response: Response::GetIData(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -144,6 +146,7 @@ impl IDataHolder {
                 requester: client.clone(),
                 response: Response::Mutation(result),
                 message_id,
+                refund: None,
             },
         })
     }
