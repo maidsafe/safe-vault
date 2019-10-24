@@ -244,7 +244,14 @@ impl Vault {
     fn handle_action(&mut self, action: Action) -> Option<Action> {
         use Action::*;
         match action {
-            ConsensusVote(action) => self.vote_for_action(action),
+            ConsensusVote(action) => {
+                if cfg!(feature = "phase-one") {
+                    let client_handler = self.client_handler_mut()?;
+                    client_handler.handle_consensused_action(action)
+                } else {
+                    self.vote_for_action(action)
+                }
+            }
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
             RespondToOurDataHandlers { sender, rpc } => {
