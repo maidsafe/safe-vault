@@ -105,6 +105,7 @@ impl Environment {
     }
 
     pub fn new() -> Self {
+        assert!(DEFAULT_NUM_VAULTS >= DEFAULT_NUM_CONNECTED_VAULTS);
         Self::with_multiple_vaults(DEFAULT_NUM_VAULTS)
     }
 

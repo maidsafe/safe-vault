@@ -10,6 +10,7 @@ use crossbeam_channel::TryRecvError;
 use std::cell::RefCell;
 use std::collections::{btree_set::BTreeSet, VecDeque};
 use std::rc::{Rc, Weak};
+use tiny_keccak::sha3_256;
 
 /// Default events `VecDeque` pre-allocated capacity
 const DEFAULT_EVENTS_CAP: usize = 64;
@@ -37,13 +38,14 @@ impl ConsensusGroup {
 
     fn vote_for(&mut self, event: Vec<u8>) {
         // If the event is already consensused, we don't have to insert it again
-        if !self.processed_events.contains(event.as_slice()) {
+        let hash = sha3_256(event.as_slice());
+        if !self.processed_events.contains(hash.as_ref()) {
             for bucket in &self.event_buckets {
                 let mut events = bucket.borrow_mut();
                 events.push_back(event.clone());
             }
             // Push the event into the processed list.
-            let _ = self.processed_events.insert(event.clone());
+            let _ = self.processed_events.insert(hash.to_vec());
         }
     }
 }
