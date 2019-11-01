@@ -9,7 +9,7 @@
 // TODO: make these tests work without mock too.
 #![cfg(feature = "mock")]
 // For explanation of lint checks, run `rustc -W help`.
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,
     missing_docs,
