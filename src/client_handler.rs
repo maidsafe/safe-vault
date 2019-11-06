@@ -690,16 +690,6 @@ impl ClientHandler {
         if let Some(challenge) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
-                    // See if we already have a peer connected with the same ID
-                    if let Some(old_peer_addr) = self.lookup_client_peer_addr(&public_id) {
-                        info!(
-                            "{}: We already have {} on {}. Cancelling the new connection from {}.",
-                            self, public_id, old_peer_addr, peer_addr
-                        );
-                        self.quic_p2p.disconnect_from(peer_addr);
-                        return;
-                    }
-
                     info!("{}: Accepted {} on {}.", self, public_id, peer_addr,);
                     let _ = self.clients.insert(peer_addr, ClientInfo { public_id });
                 }
@@ -1091,20 +1081,24 @@ impl ClientHandler {
     }
 
     fn send_notification_to_client(&mut self, client_id: PublicId, notification: Notification) {
-        let peer_addr = if let Some(peer_addr) = self.lookup_client_peer_addr(&client_id) {
-            *peer_addr
-        } else {
+        let peer_addrs = self.lookup_client_peer_addrs(&client_id);
+
+        if peer_addrs.is_empty() {
             info!(
-                "{}: can't notify {} as it's not connected.",
+                "{}: can't notify {} as none of the instances of the client is connected.",
                 self, client_id
             );
             return;
         };
 
-        self.send(
-            Peer::Client { peer_addr },
-            &Message::Notification { notification },
-        )
+        for peer_addr in peer_addrs {
+            self.send(
+                Peer::Client { peer_addr },
+                &Message::Notification {
+                    notification: notification.clone(),
+                },
+            )
+        }
     }
 
     fn send_response_to_client(&mut self, message_id: MessageId, response: Response) {
@@ -1125,11 +1119,17 @@ impl ClientHandler {
         )
     }
 
-    fn lookup_client_peer_addr(&self, id: &PublicId) -> Option<&SocketAddr> {
+    fn lookup_client_peer_addrs(&self, id: &PublicId) -> Vec<SocketAddr> {
         self.clients
             .iter()
-            .find(|(_, client)| &client.public_id == id)
-            .map(|(peer_addr, _)| peer_addr)
+            .filter_map(|(peer_addr, client)| {
+                if &client.public_id == id {
+                    Some(*peer_addr)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
