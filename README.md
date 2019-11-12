@@ -1,8 +1,8 @@
 # SAFE Vault
 
-|Crate|Documentation|Linux/macOS|Windows|
-|:---:|:-----------:|:---------:|:-----:|
-|[![](http://meritbadge.herokuapp.com/safe_vault)](https://crates.io/crates/safe_vault)|[![Documentation](https://docs.rs/safe_vault/badge.svg)](https://docs.rs/safe_vault)|[![Build Status](https://travis-ci.com/maidsafe/safe_vault.svg?branch=master)](https://travis-ci.com/maidsafe/safe_vault)|[![Build status](https://ci.appveyor.com/api/projects/status/ohu678c6ufw8b2bn/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-vault/branch/master)|
+|Crate|Documentation|Linux/macOS|Windows|Safe Rust|
+|:---:|:-----------:|:---------:|:-----:|:-------:|
+|[![](http://meritbadge.herokuapp.com/safe_vault)](https://crates.io/crates/safe_vault)|[![Documentation](https://docs.rs/safe_vault/badge.svg)](https://docs.rs/safe_vault)|[![Build Status](https://travis-ci.com/maidsafe/safe_vault.svg?branch=master)](https://travis-ci.com/maidsafe/safe_vault)|[![Build status](https://ci.appveyor.com/api/projects/status/ohu678c6ufw8b2bn/branch/master?svg=true)](https://ci.appveyor.com/project/MaidSafe-QA/safe-vault/branch/master)|[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 
 | [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|

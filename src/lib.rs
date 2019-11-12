@@ -14,7 +14,7 @@
     test(attr(forbid(warnings)))
 )]
 // For explanation of lint checks, run `rustc -W help`.
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(
     // TODO: add missing debug implementations for structs?
     // missing_debug_implementations,
