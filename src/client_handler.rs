@@ -1491,14 +1491,15 @@ impl ClientHandler {
                     })
                     .map_err(|error| error.to_string().into())
             };
-            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: *login_packet.destination(),
                 rpc: Rpc::Response {
                     response: Response::Transaction(result),
                     requester: payer,
                     message_id,
-                    refund,
+                    // A new balance is already created as
+                    // a part of the flow. So no refund is processed.
+                    refund: None,
                 },
             })
         }

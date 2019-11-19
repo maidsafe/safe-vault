@@ -168,6 +168,7 @@ fn create_login_packet_for_other() {
     let mut env = Environment::new();
     let mut established_client = env.new_connected_client();
     let mut new_client = env.new_connected_client();
+    let mut new_client2 = env.new_connected_client();
 
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
@@ -223,7 +224,7 @@ fn create_login_packet_for_other() {
             new_owner: *new_client.public_id().public_key(),
             amount: unwrap!(Coins::from_nano(nano_to_transfer)),
             transaction_id: 2,
-            new_login_packet: login_packet,
+            new_login_packet: login_packet.clone(),
         },
         NdError::BalanceExists,
     );
@@ -234,6 +235,31 @@ fn create_login_packet_for_other() {
         &mut established_client,
         Request::GetBalance,
         unwrap!(Coins::from_nano(start_nano - nano_to_transfer)),
+    );
+
+    // Putting login packet to the same address with different balance should fail
+    // with `LoginPacketExists`
+    common::send_request_expect_err(
+        &mut env,
+        &mut established_client,
+        Request::CreateLoginPacketFor {
+            new_owner: *new_client2.public_id().public_key(),
+            amount,
+            transaction_id: 3,
+            new_login_packet: login_packet,
+        },
+        NdError::LoginPacketExists,
+    );
+
+    // The new balance should be created
+    common::send_request_expect_ok(&mut env, &mut new_client2, Request::GetBalance, amount);
+
+    // The client's balance should be updated
+    common::send_request_expect_ok(
+        &mut env,
+        &mut established_client,
+        Request::GetBalance,
+        unwrap!(Coins::from_nano(start_nano - 2 * nano_to_transfer)),
     );
 
     // Getting login packet from non-owning client should fail.
