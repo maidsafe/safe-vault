@@ -944,7 +944,7 @@ impl ClientHandler {
             Err(error) => Err(error),
         };
 
-        self.send_response_to_client(requester, message_id, Response::Transaction(result));
+        self.send_response_to_client(message_id, Response::Transaction(result));
         None
     }
 
@@ -1003,11 +1003,7 @@ impl ClientHandler {
                 message_id,
             })),
             Err(error) => {
-                self.send_response_to_client(
-                    requester,
-                    message_id,
-                    Response::Transaction(Err(error)),
-                );
+                self.send_response_to_client(message_id, Response::Transaction(Err(error)));
                 None
             }
         }
@@ -1305,7 +1301,7 @@ impl ClientHandler {
                 }))
             }
             Err(error) => {
-                self.send_response_to_client(payer, message_id, Response::Transaction(Err(error)));
+                self.send_response_to_client(message_id, Response::Transaction(Err(error)));
                 None
             }
         }
@@ -1398,7 +1394,7 @@ impl ClientHandler {
                     .put(updated_login_packet)
                     .map_err(|err| err.to_string().into())
             });
-        self.send_response_to_client(client_id, message_id, Response::Mutation(result));
+        self.send_response_to_client(message_id, Response::Mutation(result));
         None
     }
 
@@ -1462,7 +1458,7 @@ impl ClientHandler {
             new_version,
             permissions,
         );
-        self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
+        self.send_response_to_client(message_id, Response::Mutation(result));
         None
     }
 
@@ -1476,7 +1472,7 @@ impl ClientHandler {
         let result =
             self.auth_keys
                 .del_auth_key(utils::client(&client.public_id)?, key, new_version);
-        self.send_response_to_client(&client.public_id, message_id, Response::Mutation(result));
+        self.send_response_to_client(message_id, Response::Mutation(result));
         None
     }
 
