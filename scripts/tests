@@ -2,5 +2,5 @@
 
 set -e -x
 
-cargo test $@ --release
-cargo test $@ --release --features=mock --no-default-features
+cargo test "$@" --release
+cargo test "$@" --release --features=mock --no-default-features

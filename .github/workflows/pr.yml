@@ -1,0 +1,47 @@
+# PR workflow.
+#
+# Runs full suite of checks, with warnings treated as errors.
+
+name: PR
+
+on: pull_request
+
+env:
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  clippy:
+    name: Rustfmt-Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      - shell: bash
+        run: ./scripts/clippy --verbose
+
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+      - uses: actions/checkout@v1
+      # TODO: Measure if any speedup from caching (no Cargo.lock, so always reuse cache)
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - shell: bash
+        run: ./scripts/tests --verbose
