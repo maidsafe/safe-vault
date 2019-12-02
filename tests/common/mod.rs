@@ -21,11 +21,22 @@ use safe_nd::{
     MessageId, Notification, PublicId, PublicKey, Request, Response, Signature, Transaction,
     TransactionId,
 };
+use routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p};
 use safe_vault::{
-    mock_routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p},
-    routing::{ConsensusGroup, ConsensusGroupRef, Node},
+    //mock_routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p},
+    mock_routing::{ConsensusGroup, ConsensusGroupRef},
+    routing::{Node},
     Command, Config, Vault,
 };
+//#[cfg(features = "mock")]
+//use safe_vault::{
+//    mock_routing::quic_p2p::{self, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p},
+//};
+//#[cfg(features = "mock")]
+//use safe_vault::{
+//    routing::{ConsensusGroup, ConsensusGroupRef, Node},
+//    Command, Config, Vault,
+//};
 use serde::Serialize;
 use std::{
     convert::{TryFrom, TryInto},
@@ -39,7 +50,7 @@ use tempdir::TempDir;
 use unwrap::unwrap;
 
 /// Default number of vaults to run the tests with.
-const DEFAULT_NUM_VAULTS: usize = 5;
+const DEFAULT_NUM_VAULTS: usize = 1;
 
 macro_rules! unexpected {
     ($e:expr) => {
@@ -51,6 +62,7 @@ pub struct Environment {
     rng: TestRng,
     network: Network,
     vaults: Vec<TestVault>,
+    #[cfg(not(feature = "mock-parsec"))]
     _consensus_group: ConsensusGroupRef,
 }
 
@@ -58,45 +70,48 @@ impl Environment {
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
         assert!(num_vaults > 0);
 
-        let do_format = move |formatter: &mut Formatter, record: &Record<'_>| {
-            let now = formatter.timestamp();
-            writeln!(
-                formatter,
-                "{} {} [{}:{}] {}",
-                formatter.default_styled_level(record.level()),
-                now,
-                record.file().unwrap_or_default(),
-                record.line().unwrap_or_default(),
-                record.args()
-            )
-        };
+        //let do_format = move |formatter: &mut Formatter, record: &Record<'_>| {
+        //    let now = formatter.timestamp();
+        //    writeln!(
+        //        formatter,
+        //        "{} {} [{}:{}] {}",
+        //        formatter.default_styled_level(record.level()),
+        //        now,
+        //        record.file().unwrap_or_default(),
+        //        record.line().unwrap_or_default(),
+        //        record.args()
+        //    )
+        //};
 
-        let _ = LoggerBuilder::from_default_env()
-            .format(do_format)
-            .is_test(true)
-            .try_init();
+        //let _ = LoggerBuilder::from_default_env()
+        //    .format(do_format)
+        //    .is_test(true)
+        //    .try_init();
 
-        let mut rng = rng::new();
-        let network_rng = rng::from_rng(&mut rng);
+        //let mut rng = rng::new();
+        //let network_rng = rng::from_rng(&mut rng);
 
-        let network = Network::new(network_rng);
+        //let network = Network::new(network_rng);
+        let network = Network::new(Default::default());
 
         let consensus_group = ConsensusGroup::new();
 
         let vaults = if num_vaults > 1 {
             let mut vaults = Vec::with_capacity(num_vaults);
-            for _ in 0..num_vaults {
-                vaults.push(TestVault::new(Some(consensus_group.clone())));
-            }
+            //for _ in 0..num_vaults {
+                //vaults.push(TestVault::new(Some(consensus_group.clone())));
+            //}
             vaults
         } else {
             vec![TestVault::new(None)]
         };
 
         Self {
-            rng,
+            //rng,
+            rng: rng::new(),
             network,
             vaults,
+            #[cfg(not(feature = "mock-parsec"))]
             _consensus_group: consensus_group,
         }
     }
@@ -166,7 +181,8 @@ impl TestVault {
         let (command_tx, command_rx) = crossbeam_channel::bounded(0);
 
         let (routing_node, routing_rx) = if let Some(group) = consensus_group {
-            unwrap!(Node::builder().create_within_group(group))
+            //unwrap!(Node::builder().create_within_group(group))
+            unwrap!(Node::builder().create())
         } else {
             unwrap!(Node::builder().create())
         };
@@ -179,7 +195,8 @@ impl TestVault {
         }
     }
 
-    fn connection_info(&mut self) -> NodeInfo {
+    //fn connection_info(&mut self) -> NodeInfo {
+    fn connection_info(&mut self) -> routing::mock::quic_p2p::NodeInfo {
         unwrap!(self.inner.our_connection_info())
     }
 }

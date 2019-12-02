@@ -27,7 +27,8 @@ log = "~0.4.7"
 pickledb = "~0.4.0"
 quick-error = "~1.2.2"
 rand = "~0.6.5"
-routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" }
+#routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" }
+routing = { path = "../routing" }
 safe-nd = "~0.4.0"
 self_update = "0.5.1"
 serde = { version = "~1.0.97", features = ["derive"] }
@@ -47,4 +48,5 @@ doc = false
 
 [features]
 mock = ["fxhash", "hex_fmt"]
+mock-parsec = ["routing/mock_parsec", "routing/mock_crypto"]
 phase-one = []

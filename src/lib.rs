@@ -48,9 +48,9 @@ pub(crate) use to_db_key::ToDbKey;
 #[cfg(feature = "mock")]
 pub mod mock_routing;
 
-#[cfg(feature = "mock")]
-pub use crate::mock_routing as routing;
-#[cfg(not(feature = "mock"))]
+//#[cfg(feature = "mock")]
+//pub use crate::mock_routing as routing;
+//#[cfg(not(feature = "mock"))]
 pub use routing;
 
 pub use crate::{

@@ -185,7 +185,7 @@ impl Config {
         } else if arg == ARGS[11] {
             self.network_config.our_type = unwrap!(value.parse());
         } else {
-            #[cfg(not(feature = "mock"))]
+            #[cfg(not(any(feature = "mock", feature = "mock-parsec")))]
             {
                 if arg == ARGS[7] {
                     self.network_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
@@ -200,7 +200,7 @@ impl Config {
                 }
             }
 
-            #[cfg(feature = "mock")]
+            #[cfg(any(feature = "mock", feature = "mock-parsec"))]
             println!("ERROR");
         }
     }
@@ -278,17 +278,17 @@ fn project_dirs() -> Result<&'static ProjectDirs> {
 #[cfg(test)]
 mod test {
     use super::Config;
-    #[cfg(not(feature = "mock"))]
+    #[cfg(not(any(feature = "mock", feature = "mock-parsec")))]
     use super::ARGS;
     use serde_json;
-    #[cfg(not(feature = "mock"))]
+    #[cfg(not(any(feature = "mock", feature = "mock-parsec")))]
     use std::mem;
     use std::{fs::File, io::Read, path::Path};
-    #[cfg(not(feature = "mock"))]
+    #[cfg(not(any(feature = "mock", feature = "mock-parsec")))]
     use structopt::StructOpt;
     use unwrap::unwrap;
 
-    #[cfg(not(feature = "mock"))]
+    #[cfg(not(any(feature = "mock", feature = "mock-parsec")))]
     #[test]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
