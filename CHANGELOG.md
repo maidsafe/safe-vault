@@ -1,5 +1,9 @@
 # Safe Vault - Change Log
 
+## [0.20.0]
+
+TODO
+
 ## [0.19.2]
 - This is a technical release without any changes from `0.19.1`.
 
