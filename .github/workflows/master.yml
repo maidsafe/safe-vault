@@ -108,7 +108,7 @@ jobs:
       # Upload all the release archives to S3
       - uses: actions/aws/cli@master
         with:
-          args: s3 sync deploy/prod s3://safe_vault --acl public-read
+          args: s3 sync deploy/prod s3://safe-vault --acl public-read
 
       # Create the release and attach safe_vault archives as assets.
       - uses: csexton/create-release@add-body
