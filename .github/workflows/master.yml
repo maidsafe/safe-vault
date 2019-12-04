@@ -88,6 +88,9 @@ jobs:
           echo "::set-output name=version::$version"
 
       # Create `deploy` directory and put the artifacts into tar/zip archives for deployment with the release.
+      - name: chmod
+        shell: bash
+        run: chmod -R +x artifacts/prod
       - shell: bash
         run: make package-commit_hash-artifacts-for-deploy
         if: "!startsWith(steps.commit_message.outputs.commit_message, 'Version change')"
