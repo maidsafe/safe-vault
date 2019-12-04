@@ -1,5 +1,8 @@
 # Safe Vault - Change Log
 
+## [0.20.1]
+- Set execution permission on safe_vault binary before packaging for release
+
 ## [0.20.0]
 - Return `AccessDenied` when apps request to insert, delete or list auth keys instead of ignoring the request.
 - Use project's data directory as the root directory.
