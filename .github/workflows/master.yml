@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     env:
-      AWS_ACCESS_KEY_ID: AKIAVVODCRMSDTFZ72NK
+      AWS_ACCESS_KEY_ID: AKIAVVODCRMSJ5MV63VB
       AWS_SECRET_ACCESS_KEY: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: eu-west-2
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
