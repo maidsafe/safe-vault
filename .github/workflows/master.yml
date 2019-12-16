@@ -13,6 +13,8 @@ on:
       - master
 
 env:
+  # Run all cargo commands with --verbose.
+  CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: 1
 
 jobs:
@@ -34,14 +36,33 @@ jobs:
             target: x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v1
-      # TODO: Measure if any speedup from caching (no Cargo.lock, so always reuse cache)
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
+
+      # Cache.
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      # Run build.
       - shell: bash
         run: ${{ matrix.build-script }}
+      # Upload artifacts.
       - uses: actions/upload-artifact@master
         with:
           name: safe_vault-${{ matrix.target }}-prod
