@@ -44,7 +44,7 @@ mod detail {
 
     /// Runs a SAFE Network vault.
     pub fn main() {
-        let mut config = Config::new();
+        let mut config = Config::new().expect("Error reading configuration file");
 
         if let Some(c) = &config.completions() {
             match c.parse::<clap::Shell>() {

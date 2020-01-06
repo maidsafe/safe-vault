@@ -10,7 +10,7 @@ use crate::routing::NetworkConfig;
 use crate::Result;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
-use log::{trace, Level};
+use log::Level;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
@@ -102,19 +102,8 @@ pub struct Config {
 impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default vault config file location,
     /// and overrides values with any equivalent command line args.
-    pub fn new() -> Self {
-        let mut config = Self::read_from_file().unwrap_or(Self {
-            wallet_address: None,
-            max_capacity: None,
-            root_dir: None,
-            verbose: 0,
-            network_config: Default::default(),
-            first: false,
-            completions: None,
-            log_dir: None,
-            update: false,
-            update_only: false,
-        });
+    pub fn new() -> Result<Self> {
+        let mut config = Self::read_from_file()?.unwrap_or_default();
 
         let command_line_args = Config::clap().get_matches();
         for arg in &ARGS {
@@ -128,7 +117,7 @@ impl Config {
             }
         }
 
-        config
+        Ok(config)
     }
 
     /// The address to be credited when this vault farms SafeCoin.
@@ -264,21 +253,25 @@ impl Config {
     }
 
     /// Reads the default vault config file.
-    fn read_from_file() -> Result<Config> {
+    fn read_from_file() -> Result<Option<Config>> {
         let path = project_dirs()?.config_dir().join(CONFIG_FILE);
-        let file = match File::open(&path) {
+
+        match File::open(&path) {
             Ok(file) => {
-                trace!("Reading settings from {}", path.display());
-                file
+                println!("Reading settings from {}", path.display());
+                let reader = BufReader::new(file);
+                let config = serde_json::from_reader(reader)?;
+                Ok(config)
             }
             Err(error) => {
-                trace!("No config file available at {}", path.display());
-                return Err(error.into());
+                if error.kind() == std::io::ErrorKind::NotFound {
+                    println!("No config file available at {}", path.display());
+                    Ok(None)
+                } else {
+                    Err(error.into())
+                }
             }
-        };
-        let reader = BufReader::new(file);
-        let config = serde_json::from_reader(reader)?;
-        Ok(config)
+        }
     }
 
     /// Writes a Vault config file **for use by tests and examples**.
