@@ -21,8 +21,6 @@ use crossbeam_channel::{Receiver, Select};
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-#[cfg(feature = "mock_parsec")]
-use routing::EventStream;
 use safe_nd::{NodeFullId, Request, XorName};
 use std::borrow::Cow;
 use std::{
@@ -211,11 +209,6 @@ impl<R: CryptoRng + Rng> Vault<R> {
     pub fn poll(&mut self) -> bool {
         let mut _processed = false;
         loop {
-            #[cfg(feature = "mock_parsec")]
-            {
-                _processed = self.routing_node.borrow_mut().poll();
-            }
-
             let mut sel = Select::new();
             let mut r_node = self.routing_node.borrow_mut();
             r_node.register(&mut sel);
