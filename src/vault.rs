@@ -12,7 +12,7 @@ use crate::{
     client_handler::ClientHandler,
     coins_handler::CoinsHandler,
     data_handler::DataHandler,
-    routing::{ClientEvent, ConnectionInfo, Event as RoutingEvent, Node},
+    routing::{Client as ClientEvent, ConnectionInfo, Event as RoutingEvent, Node},
     rpc::Rpc,
     utils, Config, Result,
 };
@@ -265,7 +265,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
     fn handle_routing_event(&mut self, event: RoutingEvent) -> Option<Action> {
         match event {
-            RoutingEvent::ClientEvent(ev) => self.handle_client_event(ev),
+            RoutingEvent::Client(ev) => self.handle_client_event(ev),
             RoutingEvent::Consensus(custom_event) => {
                 match bincode::deserialize::<ConsensusAction>(&custom_event) {
                     Ok(consensus_action) => {
@@ -290,17 +290,17 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
         let client_handler = self.client_handler_mut()?;
         match event {
-            ConnectedToClient { peer_addr } => client_handler.handle_new_connection(peer_addr),
-            ConnectionFailureToClient { peer_addr } => {
+            Connected { peer_addr } => client_handler.handle_new_connection(peer_addr),
+            ConnectionFailure { peer_addr } => {
                 client_handler.handle_connection_failure(peer_addr);
             }
-            NewMessageFromClient { peer_addr, msg } => {
+            NewMessage { peer_addr, msg } => {
                 return client_handler.handle_client_message(peer_addr, &msg, &mut rng);
             }
-            SentUserMsgToClient { peer_addr, .. } => {
+            SentUserMsg { peer_addr, .. } => {
                 trace!("{}: Succesfully sent message to: {}", self, peer_addr);
             }
-            UnsentUserMsgToClient { peer_addr, .. } => {
+            UnsentUserMsg { peer_addr, .. } => {
                 info!("{}: Not sent message to: {}", self, peer_addr);
             }
         }

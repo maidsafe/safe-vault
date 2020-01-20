@@ -6,14 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use routing::{
-    ClientEvent, ConnectionInfo, Event, InterfaceError, NetworkConfig, P2pNode, RoutingError,
-};
+pub use routing::{Client, ConnectionInfo, Event, NetworkConfig, P2pNode, RoutingError};
 
 use bytes::Bytes;
 use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
 use log::trace;
 use mock_quic_p2p::{self as quic_p2p, Error, Event as NetworkEvent, Peer, QuicP2p};
+use routing::Client as ClientEvent;
 use routing::XorName;
 use std::{
     cell::RefCell,
@@ -117,8 +116,7 @@ impl Node {
         _name: &XorName,
     ) -> Result<impl Iterator<Item = &P2pNode>, RoutingError> {
         // Currently due to there being just one section, return our section eleders.
-        self.our_elders_info()
-            .ok_or(RoutingError::InvalidStateForOperation)
+        self.our_elders_info().ok_or(RoutingError::InvalidState)
     }
 
     /// Return the client connection info
@@ -132,44 +130,43 @@ impl Node {
         peer_addr: SocketAddr,
         msg: Bytes,
         token: Token,
-    ) -> Result<(), InterfaceError> {
+    ) -> Result<(), RoutingError> {
         trace!("({}) Sending message to {}", token, peer_addr);
         self.quic_p2p.send(Peer::Client { peer_addr }, msg, token);
         Ok(())
     }
 
     /// Disconnect form a client peer
-    pub fn disconnect_from_client(&mut self, peer_addr: SocketAddr) -> Result<(), InterfaceError> {
+    pub fn disconnect_from_client(&mut self, peer_addr: SocketAddr) -> Result<(), RoutingError> {
         self.quic_p2p.disconnect_from(peer_addr);
         Ok(())
     }
 
     fn handle_network_event(&mut self, event: NetworkEvent) {
         if let Ok(client_event) = into_client_event(event) {
-            unwrap!(self.events_tx.send(Event::ClientEvent(client_event)));
+            unwrap!(self.events_tx.send(Event::Client(client_event)));
         }
     }
 }
 
 /// Map a Network event into a ClientEvent if applies.
 pub fn into_client_event(network_event: NetworkEvent) -> Result<ClientEvent, ()> {
-    use ClientEvent::*;
     use NetworkEvent::*;
 
     let client_event = match network_event {
-        ConnectedTo { peer } => ConnectedToClient {
+        ConnectedTo { peer } => ClientEvent::Connected {
             peer_addr: peer.peer_addr(),
         },
-        NewMessage { peer_addr, msg } => NewMessageFromClient { peer_addr, msg },
+        NewMessage { peer_addr, msg } => ClientEvent::NewMessage { peer_addr, msg },
         ConnectionFailure {
             peer_addr,
             err: _err,
-        } => ConnectionFailureToClient { peer_addr },
+        } => ClientEvent::ConnectionFailure { peer_addr },
         UnsentUserMessage {
             peer_addr,
             msg,
             token,
-        } => UnsentUserMsgToClient {
+        } => ClientEvent::UnsentUserMsg {
             peer_addr,
             msg,
             token,
@@ -178,7 +175,7 @@ pub fn into_client_event(network_event: NetworkEvent) -> Result<ClientEvent, ()>
             peer_addr,
             msg,
             token,
-        } => SentUserMsgToClient {
+        } => ClientEvent::SentUserMsg {
             peer_addr,
             msg,
             token,
@@ -197,11 +194,11 @@ pub struct NodeBuilder {}
 
 impl NodeBuilder {
     /// Creates new `Node`.
-    pub fn create(self) -> Result<(Node, Receiver<Event>), RoutingError> {
+    pub fn create(self) -> (Node, Receiver<Event>) {
         let (quic_p2p, network_rx) = unwrap!(setup_quic_p2p(&Default::default()));
         let (events_tx, events_rx) = mpmc::unbounded();
 
-        Ok((
+        (
             Node {
                 network_rx,
                 quic_p2p,
@@ -210,14 +207,14 @@ impl NodeBuilder {
                 consensus_group: None,
             },
             events_rx,
-        ))
+        )
     }
 
     /// Creates new `Node` within a section of nodes.
     pub fn create_within_group(
         self,
         consensus_group: ConsensusGroupRef,
-    ) -> Result<(Node, Receiver<Event>), RoutingError> {
+    ) -> (Node, Receiver<Event>) {
         let (quic_p2p, network_rx) = unwrap!(setup_quic_p2p(&Default::default()));
         let (events_tx, events_rx) = mpmc::unbounded();
 
@@ -226,7 +223,7 @@ impl NodeBuilder {
             .event_channels
             .push(events_tx.clone());
 
-        Ok((
+        (
             Node {
                 network_rx,
                 quic_p2p,
@@ -235,7 +232,7 @@ impl NodeBuilder {
                 consensus_group: Some(Rc::downgrade(&consensus_group)),
             },
             events_rx,
-        ))
+        )
     }
 }
 

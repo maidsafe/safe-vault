@@ -115,17 +115,10 @@ mod detail {
             log::error!("Failed to set interrupt handler: {:?}", error)
         }
 
-        let (routing_node, routing_rx) = match Node::builder()
+        let (routing_node, routing_rx) = Node::builder()
             .first(config.is_first())
             .network_config(config.network_config().clone())
-            .create()
-        {
-            Ok(node) => node,
-            Err(e) => {
-                eprintln!("Could not start a Routing node: {:?}", e);
-                process::exit(-1);
-            }
-        };
+            .create();
 
         let is_first = config.is_first();
 

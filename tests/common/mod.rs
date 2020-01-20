@@ -240,9 +240,9 @@ impl TestVault {
         let (command_tx, command_rx) = crossbeam_channel::bounded(0);
 
         let (routing_node, routing_rx) = if let Some(group) = consensus_group {
-            unwrap!(Node::builder().create_within_group(group))
+            Node::builder().create_within_group(group)
         } else {
-            unwrap!(Node::builder().create())
+            Node::builder().create()
         };
         let inner = unwrap!(Vault::new(
             routing_node,
@@ -270,12 +270,12 @@ impl TestVault {
         let (command_tx, command_rx) = crossbeam_channel::bounded(0);
 
         let (routing_node, routing_rx) = if let Some(network_config) = network_config {
-            unwrap!(Node::builder()
+            Node::builder()
                 .network_config(network_config)
                 .rng(rng)
-                .create())
+                .create()
         } else {
-            unwrap!(Node::builder().first(true).rng(rng).create())
+            Node::builder().first(true).rng(rng).create()
         };
 
         let inner = unwrap!(Vault::new(
