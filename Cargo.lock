@@ -2262,8 +2262,7 @@ checksum = "bfa8506c1de11c9c4e4c38863ccbe02a305c8188e85a05a784c9e11e1c3910c8"
 [[package]]
 name = "safe-nd"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c3d264c8abe486c1eb91c96621fc98b980907edd282eecdd39ad961834b7b77"
+source = "git+https://github.com/oetyng/safe-nd/?branch=replace-ad-with-sequence#f3476910f3446fe5a73c5d61ad9f53f992b5ef9b"
 dependencies = [
  "bincode 1.1.4",
  "ed25519-dalek",

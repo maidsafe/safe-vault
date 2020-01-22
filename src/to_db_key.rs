@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -9,7 +9,7 @@
 use crate::utils;
 use base64;
 use safe_nd::{
-    ADataAddress, ClientPublicId, IDataAddress, MDataAddress, NodePublicId, PublicKey, XorName,
+    Address, ClientPublicId, IDataAddress, MDataAddress, NodePublicId, PublicKey, XorName,
 };
 use serde::Serialize;
 
@@ -22,7 +22,7 @@ pub(crate) trait ToDbKey: Serialize {
     }
 }
 
-impl ToDbKey for ADataAddress {}
+impl ToDbKey for Address {}
 impl ToDbKey for ClientPublicId {}
 impl ToDbKey for IDataAddress {}
 impl ToDbKey for MDataAddress {}

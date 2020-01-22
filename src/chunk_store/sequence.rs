@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::{Chunk, ChunkId};
-use safe_nd::{AData, ADataAddress};
+use safe_nd::{Address, Sequence};
 
-impl Chunk for AData {
-    type Id = ADataAddress;
+impl Chunk for Sequence {
+    type Id = Address;
     fn id(&self) -> &Self::Id {
         self.address()
     }
 }
 
-impl ChunkId for ADataAddress {}
+impl ChunkId for Address {}

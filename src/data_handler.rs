@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,19 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod adata_handler;
 mod idata_handler;
 mod idata_holder;
 mod idata_op;
 mod mdata_handler;
+mod sequence_handler;
 
 use crate::{action::Action, rpc::Rpc, vault::Init, Config, Result};
-use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use idata_op::{IDataOp, IDataRequest, OpType};
 use log::{error, trace};
 use mdata_handler::MDataHandler;
+use sequence_handler::SequenceHandler;
 
 use safe_nd::{IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response, XorName};
 
@@ -33,7 +33,7 @@ pub(crate) struct DataHandler {
     idata_handler: IDataHandler,
     idata_holder: IDataHolder,
     mdata_handler: MDataHandler,
-    adata_handler: ADataHandler,
+    sequence_handler: SequenceHandler,
 }
 
 impl DataHandler {
@@ -46,13 +46,14 @@ impl DataHandler {
         let idata_handler = IDataHandler::new(id.clone(), config, init_mode)?;
         let idata_holder = IDataHolder::new(id.clone(), config, total_used_space, init_mode)?;
         let mdata_handler = MDataHandler::new(id.clone(), config, total_used_space, init_mode)?;
-        let adata_handler = ADataHandler::new(id.clone(), config, total_used_space, init_mode)?;
+        let sequence_handler =
+            SequenceHandler::new(id.clone(), config, total_used_space, init_mode)?;
         Ok(Self {
             id,
             idata_handler,
             idata_holder,
             mdata_handler,
-            adata_handler,
+            sequence_handler,
         })
     }
 
@@ -156,118 +157,132 @@ impl DataHandler {
                 .mdata_handler
                 .handle_mutate_mdata_entries_req(requester, address, actions, message_id),
             //
-            // ===== Append Only Data =====
+            // ===== Sequence =====
             //
-            PutAData(data) => self
-                .adata_handler
-                .handle_put_adata_req(requester, &data, message_id),
-            GetAData(address) => self
-                .adata_handler
-                .handle_get_adata_req(requester, address, message_id),
-            GetADataValue { address, key } => self
-                .adata_handler
-                .handle_get_adata_value_req(requester, address, &key, message_id),
-            GetADataShell {
+            PutSequence(data) => self.sequence_handler.put(requester, data, message_id),
+            GetSequence(address) => self.sequence_handler.get(requester, address, message_id),
+            GetSequenceValue { address, version } => self
+                .sequence_handler
+                .get_value(requester, address, version, message_id),
+            GetSequenceShell {
                 address,
-                data_index,
-            } => self
-                .adata_handler
-                .handle_get_adata_shell_req(requester, address, data_index, message_id),
-            GetADataRange { address, range } => self
-                .adata_handler
-                .handle_get_adata_range_req(requester, address, range, message_id),
-            GetADataIndices(address) => self
-                .adata_handler
-                .handle_get_adata_indices_req(requester, address, message_id),
-            GetADataLastEntry(address) => self
-                .adata_handler
-                .handle_get_adata_last_entry_req(requester, address, message_id),
-            GetADataOwners {
-                address,
-                owners_index,
-            } => self.adata_handler.handle_get_adata_owners_req(
+                expected_data_version,
+            } => self.sequence_handler.get_shell(
                 requester,
                 address,
-                owners_index,
+                expected_data_version,
                 message_id,
             ),
-            GetPubADataUserPermissions {
+            GetSequenceRange { address, range } => self
+                .sequence_handler
+                .get_range(requester, address, range, message_id),
+            GetSequenceExpectedVersions(address) => self
+                .sequence_handler
+                .get_versions(requester, address, message_id),
+            GetSequenceCurrentEntry(address) => self
+                .sequence_handler
+                .get_current_entry(requester, address, message_id),
+            GetSequenceOwner(address) => self
+                .sequence_handler
+                .get_owner(requester, address, message_id),
+            GetSequenceOwnerAt { address, version } => self
+                .sequence_handler
+                .get_owner_at(requester, address, version, message_id),
+            GetSequenceOwnerHistory(address) => self
+                .sequence_handler
+                .get_owner_history(requester, address, message_id),
+            GetSequenceOwnerHistoryRange {
                 address,
-                permissions_index,
+                start,
+                end,
+            } => self
+                .sequence_handler
+                .get_owner_history_range(requester, address, start, end, message_id),
+            GetSequenceAccessList(address) => self
+                .sequence_handler
+                .get_access_list(requester, address, message_id),
+            GetSequenceAccessListAt { address, version } => self
+                .sequence_handler
+                .get_access_list_at(requester, address, version, message_id),
+            GetPublicSequenceAccessListHistory(address) => self
+                .sequence_handler
+                .get_public_access_list_history(requester, address, message_id),
+            GetPublicSequenceAccessListHistoryRange {
+                address,
+                start,
+                end,
+            } => self
+                .sequence_handler
+                .get_public_access_list_history_range(requester, address, start, end, message_id),
+            GetPrivateSequenceAccessListHistory(address) => self
+                .sequence_handler
+                .get_private_access_list_history(requester, address, message_id),
+            GetPrivateSequenceAccessListHistoryRange {
+                address,
+                start,
+                end,
+            } => self
+                .sequence_handler
+                .get_private_access_list_history_range(requester, address, start, end, message_id),
+            GetPublicSequenceUserPermissions { address, user } => self
+                .sequence_handler
+                .get_public_user_access(requester, address, user, message_id),
+            GetPrivateSequenceUserPermissions { address, user } => self
+                .sequence_handler
+                .get_private_user_access(requester, address, user, message_id),
+            GetPublicSequenceUserPermissionsAt {
+                address,
+                version,
                 user,
             } => self
-                .adata_handler
-                .handle_get_pub_adata_user_permissions_req(
-                    requester,
-                    address,
-                    permissions_index,
-                    user,
-                    message_id,
-                ),
-            GetUnpubADataUserPermissions {
+                .sequence_handler
+                .get_public_user_access_at(requester, address, version, user, message_id),
+            GetPrivateSequenceUserPermissionsAt {
                 address,
-                permissions_index,
+                version,
                 public_key,
             } => self
-                .adata_handler
-                .handle_get_unpub_adata_user_permissions_req(
-                    requester,
-                    address,
-                    permissions_index,
-                    public_key,
-                    message_id,
-                ),
-            GetADataPermissions {
+                .sequence_handler
+                .get_private_user_access_at(requester, address, version, public_key, message_id),
+            DeletePrivateSequence(address) => {
+                self.sequence_handler.delete(requester, address, message_id)
+            }
+            SetPublicSequenceAccessList {
                 address,
-                permissions_index,
-            } => self.adata_handler.handle_get_adata_permissions_req(
+                access_list,
+                expected_version,
+            } => self.sequence_handler.set_public_access_list(
                 requester,
                 address,
-                permissions_index,
+                access_list,
+                expected_version,
                 message_id,
             ),
-            DeleteAData(address) => self
-                .adata_handler
-                .handle_delete_adata_req(requester, address, message_id),
-            AddPubADataPermissions {
+            SetPrivateSequenceAccessList {
                 address,
-                permissions,
-                permissions_index,
-            } => self.adata_handler.handle_add_pub_adata_permissions_req(
-                &requester,
+                access_list,
+                expected_version,
+            } => self.sequence_handler.set_private_access_list(
+                requester,
                 address,
-                permissions,
-                permissions_index,
+                access_list,
+                expected_version,
                 message_id,
             ),
-            AddUnpubADataPermissions {
-                address,
-                permissions,
-                permissions_index,
-            } => self.adata_handler.handle_add_unpub_adata_permissions_req(
-                &requester,
-                address,
-                permissions,
-                permissions_index,
-                message_id,
-            ),
-            SetADataOwner {
+            SetSequenceOwner {
                 address,
                 owner,
-                owners_index,
-            } => self.adata_handler.handle_set_adata_owner_req(
-                &requester,
+                expected_version,
+            } => self.sequence_handler.set_owner(
+                requester,
                 address,
                 owner,
-                owners_index,
+                expected_version,
                 message_id,
             ),
-            AppendSeq { append, index } => self
-                .adata_handler
-                .handle_append_seq_req(&requester, append, index, message_id),
-            AppendUnseq(operation) => self
-                .adata_handler
-                .handle_append_unseq_req(&requester, operation, message_id),
+            Append(operation) => self
+                .sequence_handler
+                .append(requester, &operation, message_id),
             //
             // ===== Invalid =====
             //
@@ -323,16 +338,26 @@ impl DataHandler {
             | ListMDataUserPermissions(_)
             | ListMDataPermissions(_)
             | GetMDataValue(_)
-            | GetAData(_)
-            | GetADataValue(_)
-            | GetADataShell(_)
-            | GetADataOwners(_)
-            | GetADataRange(_)
-            | GetADataIndices(_)
-            | GetADataLastEntry(_)
-            | GetADataPermissions(_)
-            | GetPubADataUserPermissions(_)
-            | GetUnpubADataUserPermissions(_)
+            | GetSequence(_)
+            | GetSequenceShell(_)
+            | GetSequenceOwner(_)
+            | GetSequenceOwnerAt(_)
+            | GetSequenceOwnerHistory(_)
+            | GetSequenceOwnerHistoryRange(_)
+            | GetSequenceRange(_)
+            | GetSequenceValue(_)
+            | GetSequenceExpectedVersions(_)
+            | GetSequenceCurrentEntry(_)
+            | GetSequenceAccessList(_)
+            | GetSequenceAccessListAt(_)
+            | GetPublicSequenceAccessListHistory(_)
+            | GetPublicSequenceAccessListHistoryRange(_)
+            | GetPrivateSequenceAccessListHistory(_)
+            | GetPrivateSequenceAccessListHistoryRange(_)
+            | GetPublicSequenceUserPermissions(_)
+            | GetPrivateSequenceUserPermissions(_)
+            | GetPublicSequenceUserPermissionsAt(_)
+            | GetPrivateSequenceUserPermissionsAt(_)
             | Transaction(_)
             | GetBalance(_)
             | ListAuthKeysAndVersion(_)

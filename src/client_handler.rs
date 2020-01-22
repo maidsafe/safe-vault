@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -27,10 +27,10 @@ use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng};
 use safe_nd::{
-    AData, ADataAddress, AppPermissions, AppPublicId, Coins, ConnectionInfo, Error as NdError,
+    Address, AppPermissions, AppPublicId, Coins, ConnectionInfo, Error as NdError,
     HandshakeRequest, HandshakeResponse, IData, IDataAddress, IDataKind, LoginPacket, MData,
     Message, MessageId, NodePublicId, Notification, PublicId, PublicKey, Request, Response,
-    Result as NdResult, Signature, Transaction, TransactionId, XorName,
+    Result as NdResult, Sequence, Signature, Transaction, TransactionId, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -276,7 +276,6 @@ impl ClientHandler {
 
         self.verify_signature(&client.public_id, &request, message_id, signature)?;
         self.authorise_app(&client.public_id, &request, message_id)?;
-        self.verify_consistent_address(&request, message_id)?;
 
         match request {
             //
@@ -316,25 +315,38 @@ impl ClientHandler {
             | ListMDataKeys(..)
             | ListMDataValues(..) => self.handle_get_mdata(request, client, message_id),
             //
-            // ===== Append Only Data =====
+            // ===== Sequence =====
             //
-            PutAData(chunk) => self.handle_put_adata(client, chunk, message_id),
-            GetAData(_)
-            | GetADataShell { .. }
-            | GetADataRange { .. }
-            | GetADataIndices(_)
-            | GetADataLastEntry(_)
-            | GetADataOwners { .. }
-            | GetADataPermissions { .. }
-            | GetPubADataUserPermissions { .. }
-            | GetUnpubADataUserPermissions { .. }
-            | GetADataValue { .. } => self.handle_get_adata(client, request, message_id),
-            DeleteAData(address) => self.handle_delete_adata(client, address, message_id),
-            AddPubADataPermissions { .. }
-            | AddUnpubADataPermissions { .. }
-            | SetADataOwner { .. }
-            | AppendSeq { .. }
-            | AppendUnseq(..) => self.handle_mutate_adata(client, request, message_id),
+            PutSequence(chunk) => self.handle_put_sequence(client, chunk, message_id),
+            GetSequence(_)
+            | GetSequenceValue { .. }
+            | GetSequenceShell { .. }
+            | GetSequenceRange { .. }
+            | GetSequenceExpectedVersions(_)
+            | GetSequenceCurrentEntry(_)
+            | GetPublicSequenceUserPermissions { .. }
+            | GetPrivateSequenceUserPermissions { .. }
+            | GetPublicSequenceUserPermissionsAt { .. }
+            | GetPrivateSequenceUserPermissionsAt { .. }
+            | GetSequenceOwner(_)
+            | GetSequenceOwnerAt { .. }
+            | GetSequenceOwnerHistory(_)
+            | GetSequenceOwnerHistoryRange { .. }
+            | GetSequenceAccessList(_)
+            | GetSequenceAccessListAt { .. }
+            | GetPublicSequenceAccessListHistory(_)
+            | GetPrivateSequenceAccessListHistory(_)
+            | GetPublicSequenceAccessListHistoryRange { .. }
+            | GetPrivateSequenceAccessListHistoryRange { .. } => {
+                self.handle_get_sequence(client, request, message_id)
+            }
+            DeletePrivateSequence(address) => {
+                self.handle_delete_sequence(client, address, message_id)
+            }
+            SetPublicSequenceAccessList { .. }
+            | SetPrivateSequenceAccessList { .. }
+            | SetSequenceOwner { .. }
+            | Append(_) => self.handle_mutate_sequence(client, request, message_id),
             //
             // ===== Coins =====
             //
@@ -579,7 +591,7 @@ impl ClientHandler {
         }))
     }
 
-    fn handle_get_adata(
+    fn handle_get_sequence(
         &mut self,
         client: &ClientInfo,
         request: Request,
@@ -592,18 +604,18 @@ impl ClientHandler {
         }))
     }
 
-    fn handle_put_adata(
+    fn handle_put_sequence(
         &mut self,
         client: &ClientInfo,
-        chunk: AData,
+        chunk: Sequence,
         message_id: MessageId,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
         // TODO - Should we replace this with a adata.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
-        if chunk.check_is_last_owner(*owner.public_key()).is_err() {
+        if !chunk.is_owner(*owner.public_key()) {
             trace!(
-                "{}: {} attempted Put AppendOnlyData with invalid owners.",
+                "{}: {} attempted Put Sequence with invalid owners.",
                 self,
                 client.public_id
             );
@@ -614,7 +626,7 @@ impl ClientHandler {
             return None;
         }
 
-        let request = Request::PutAData(chunk);
+        let request = Request::PutSequence(chunk);
         Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
@@ -623,13 +635,13 @@ impl ClientHandler {
         }))
     }
 
-    fn handle_delete_adata(
+    fn handle_delete_sequence(
         &mut self,
         client: &ClientInfo,
-        address: ADataAddress,
+        address: Address,
         message_id: MessageId,
     ) -> Option<Action> {
-        if address.is_pub() {
+        if address.is_public() {
             self.send_response_to_client(
                 message_id,
                 Response::Mutation(Err(NdError::InvalidOperation)),
@@ -638,13 +650,13 @@ impl ClientHandler {
         }
 
         Some(Action::ConsensusVote(ConsensusAction::Forward {
-            request: Request::DeleteAData(address),
+            request: Request::DeletePrivateSequence(address),
             client_public_id: client.public_id.clone(),
             message_id,
         }))
     }
 
-    fn handle_mutate_adata(
+    fn handle_mutate_sequence(
         &mut self,
         client: &ClientInfo,
         request: Request,
@@ -849,23 +861,35 @@ impl ClientHandler {
             | ListMDataPermissions(_)
             | ListMDataUserPermissions { .. }
             | MutateMDataEntries { .. }
-            | PutAData(_)
-            | GetAData(_)
-            | GetADataShell { .. }
-            | GetADataValue { .. }
-            | DeleteAData(_)
-            | GetADataRange { .. }
-            | GetADataIndices(_)
-            | GetADataLastEntry(_)
-            | GetADataPermissions { .. }
-            | GetPubADataUserPermissions { .. }
-            | GetUnpubADataUserPermissions { .. }
-            | GetADataOwners { .. }
-            | AddPubADataPermissions { .. }
-            | AddUnpubADataPermissions { .. }
-            | SetADataOwner { .. }
-            | AppendSeq { .. }
-            | AppendUnseq(_)
+            //
+            // ===== Sequence =====
+            //
+            | PutSequence(_)
+            | GetSequence(_)
+            | GetSequenceValue { .. }
+            | GetSequenceShell { .. }
+            | GetSequenceRange { .. }
+            | GetSequenceExpectedVersions(_)
+            | GetSequenceCurrentEntry(_)
+            | GetPublicSequenceUserPermissions { .. }
+            | GetPrivateSequenceUserPermissions { .. }
+            | GetPublicSequenceUserPermissionsAt { .. }
+            | GetPrivateSequenceUserPermissionsAt { .. }
+            | GetSequenceOwner(_)
+            | GetSequenceOwnerAt { .. }
+            | GetSequenceOwnerHistory(_)
+            | GetSequenceOwnerHistoryRange { .. }
+            | GetSequenceAccessList(_)
+            | GetSequenceAccessListAt { .. }
+            | GetPublicSequenceAccessListHistory(_)
+            | GetPrivateSequenceAccessListHistory(_)
+            | GetPublicSequenceAccessListHistoryRange { .. }
+            | GetPrivateSequenceAccessListHistoryRange { .. }
+            | DeletePrivateSequence(_)
+            | SetPublicSequenceAccessList { .. }
+            | SetPrivateSequenceAccessList { .. }
+            | SetSequenceOwner { .. }
+            | Append(_)
             | GetBalance
             | ListAuthKeysAndVersion
             | GetLoginPacket(..) => {
@@ -909,16 +933,26 @@ impl ClientHandler {
         match response {
             // Transfer the response from data handlers to clients
             GetIData(..)
-            | GetAData(..)
-            | GetADataShell(..)
-            | GetADataRange(..)
-            | GetADataIndices(..)
-            | GetADataLastEntry(..)
-            | GetADataOwners(..)
-            | GetPubADataUserPermissions(..)
-            | GetUnpubADataUserPermissions(..)
-            | GetADataPermissions(..)
-            | GetADataValue(..)
+            | GetSequence(..)
+            | GetSequenceShell(..)
+            | GetSequenceExpectedVersions(..)
+            | GetSequenceValue(..)
+            | GetSequenceCurrentEntry(..)
+            | GetSequenceRange(..)
+            | GetSequenceOwner(..)
+            | GetSequenceOwnerAt(..)
+            | GetSequenceOwnerHistory(..)
+            | GetSequenceOwnerHistoryRange(..)
+            | GetSequenceAccessList(..)
+            | GetSequenceAccessListAt(..)
+            | GetPublicSequenceAccessListHistory(..)
+            | GetPublicSequenceAccessListHistoryRange(..)
+            | GetPrivateSequenceAccessListHistory(..)
+            | GetPrivateSequenceAccessListHistoryRange(..)
+            | GetPublicSequenceUserPermissions(..)
+            | GetPrivateSequenceUserPermissions(..)
+            | GetPublicSequenceUserPermissionsAt(..)
+            | GetPrivateSequenceUserPermissionsAt(..)
             | GetMData(..)
             | GetMDataShell(..)
             | GetMDataVersion(..)
@@ -1740,29 +1774,6 @@ impl ClientHandler {
             Ok(())
         } else {
             Err(NdError::AccessDenied)
-        }
-    }
-
-    fn verify_consistent_address(
-        &mut self,
-        request: &Request,
-        message_id: MessageId,
-    ) -> Option<()> {
-        use Request::*;
-        let consistent = match request {
-            AppendSeq { ref append, .. } => append.address.is_seq(),
-            AppendUnseq(ref append) => !&append.address.is_seq(),
-            // TODO: any other requests for which this can happen?
-            _ => true,
-        };
-        if !consistent {
-            self.send_response_to_client(
-                message_id,
-                Response::Mutation(Err(NdError::InvalidOperation)),
-            );
-            None
-        } else {
-            Some(())
         }
     }
 }

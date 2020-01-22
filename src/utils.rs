@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -109,24 +109,32 @@ pub(crate) fn destination_address(request: &Request) -> Option<Cow<XorName>> {
         | ListMDataPermissions(ref address)
         | ListMDataUserPermissions { ref address, .. }
         | MutateMDataEntries { ref address, .. } => Some(Cow::Borrowed(address.name())),
-        PutAData(ref data) => Some(Cow::Borrowed(data.name())),
-        GetAData(ref address)
-        | GetADataValue { ref address, .. }
-        | GetADataShell { ref address, .. }
-        | DeleteAData(ref address)
-        | GetADataRange { ref address, .. }
-        | GetADataIndices(ref address)
-        | GetADataLastEntry(ref address)
-        | GetADataPermissions { ref address, .. }
-        | GetPubADataUserPermissions { ref address, .. }
-        | GetUnpubADataUserPermissions { ref address, .. }
-        | GetADataOwners { ref address, .. }
-        | AddPubADataPermissions { ref address, .. }
-        | AddUnpubADataPermissions { ref address, .. }
-        | SetADataOwner { ref address, .. } => Some(Cow::Borrowed(address.name())),
-        AppendSeq { ref append, .. } | AppendUnseq(ref append) => {
-            Some(Cow::Borrowed(append.address.name()))
-        }
+        PutSequence(ref data) => Some(Cow::Borrowed(data.name())),
+        GetSequence(ref address)
+        | GetSequenceValue { ref address, .. }
+        | GetSequenceShell { ref address, .. }
+        | DeletePrivateSequence(ref address)
+        | GetSequenceRange { ref address, .. }
+        | GetSequenceExpectedVersions(ref address)
+        | GetSequenceCurrentEntry(ref address)
+        | GetPublicSequenceUserPermissions { ref address, .. }
+        | GetPrivateSequenceUserPermissions { ref address, .. }
+        | GetPublicSequenceUserPermissionsAt { ref address, .. }
+        | GetPrivateSequenceUserPermissionsAt { ref address, .. }
+        | GetSequenceOwner(ref address)
+        | GetSequenceOwnerAt { ref address, .. }
+        | GetSequenceOwnerHistory(ref address)
+        | GetSequenceOwnerHistoryRange { ref address, .. }
+        | GetSequenceAccessList(ref address)
+        | GetSequenceAccessListAt { ref address, .. }
+        | SetPublicSequenceAccessList { ref address, .. }
+        | SetPrivateSequenceAccessList { ref address, .. }
+        | GetPublicSequenceAccessListHistory(ref address)
+        | GetPrivateSequenceAccessListHistory(ref address)
+        | GetPublicSequenceAccessListHistoryRange { ref address, .. }
+        | GetPrivateSequenceAccessListHistoryRange { ref address, .. }
+        | SetSequenceOwner { ref address, .. } => Some(Cow::Borrowed(address.name())),
+        Append(ref append) => Some(Cow::Borrowed(append.address.name())),
         TransferCoins {
             ref destination, ..
         } => Some(Cow::Borrowed(destination)),
@@ -174,13 +182,12 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | SetMDataUserPermissions { .. }
         | DelMDataUserPermissions { .. }
         | MutateMDataEntries { .. }
-        | PutAData(_)
-        | DeleteAData(_)
-        | AddPubADataPermissions { .. }
-        | AddUnpubADataPermissions { .. }
-        | SetADataOwner { .. }
-        | AppendSeq { .. }
-        | AppendUnseq(_)
+        | PutSequence(_)
+        | DeletePrivateSequence(_)
+        | SetPublicSequenceAccessList { .. }
+        | SetPrivateSequenceAccessList { .. }
+        | SetSequenceOwner { .. }
+        | Append(_)
         | CreateLoginPacket(_)
         | UpdateLoginPacket(_) => AuthorisationKind::Mut,
         CreateBalance { amount, .. } | CreateLoginPacketFor { amount, .. } => {
@@ -203,17 +210,27 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | ListMDataPermissions(_)
         | ListMDataUserPermissions { .. }
         | GetLoginPacket(_) => AuthorisationKind::GetUnpub,
-        GetAData(address)
-        | GetADataValue { address, .. }
-        | GetADataShell { address, .. }
-        | GetADataRange { address, .. }
-        | GetADataIndices(address)
-        | GetADataLastEntry(address)
-        | GetADataPermissions { address, .. }
-        | GetPubADataUserPermissions { address, .. }
-        | GetUnpubADataUserPermissions { address, .. }
-        | GetADataOwners { address, .. } => {
-            if address.is_pub() {
+        GetSequence(address)
+        | GetSequenceValue { address, .. }
+        | GetSequenceShell { address, .. }
+        | GetSequenceRange { address, .. }
+        | GetSequenceExpectedVersions(address)
+        | GetSequenceCurrentEntry(address)
+        | GetPublicSequenceUserPermissions { address, .. }
+        | GetPrivateSequenceUserPermissions { address, .. }
+        | GetPublicSequenceUserPermissionsAt { address, .. }
+        | GetPrivateSequenceUserPermissionsAt { address, .. }
+        | GetSequenceOwner(address)
+        | GetSequenceOwnerAt { address, .. }
+        | GetSequenceOwnerHistory(address)
+        | GetSequenceOwnerHistoryRange { address, .. }
+        | GetSequenceAccessList(address)
+        | GetSequenceAccessListAt { address, .. }
+        | GetPublicSequenceAccessListHistory(address)
+        | GetPrivateSequenceAccessListHistory(address)
+        | GetPublicSequenceAccessListHistoryRange { address, .. }
+        | GetPrivateSequenceAccessListHistoryRange { address, .. } => {
+            if address.is_public() {
                 AuthorisationKind::GetPub
             } else {
                 AuthorisationKind::GetUnpub

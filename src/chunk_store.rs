@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,12 +8,12 @@
 
 //! A simple, persistent, disk-based key-value store.
 
-mod append_only;
 mod chunk;
 pub(super) mod error;
 mod immutable;
 mod login_packet;
 mod mutable;
+mod sequence;
 #[cfg(test)]
 mod tests;
 mod used_space;
@@ -23,7 +23,7 @@ use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
 use hex;
 use log::trace;
-use safe_nd::{AData, IData, LoginPacket, MData};
+use safe_nd::{IData, LoginPacket, MData, Sequence};
 use std::{
     cell::Cell,
     fs::{self, DirEntry, File, Metadata},
@@ -41,7 +41,7 @@ const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 
 pub(crate) type ImmutableChunkStore = ChunkStore<IData>;
 pub(crate) type MutableChunkStore = ChunkStore<MData>;
-pub(crate) type AppendOnlyChunkStore = ChunkStore<AData>;
+pub(crate) type SequenceChunkStore = ChunkStore<Sequence>;
 pub(crate) type LoginPacketChunkStore = ChunkStore<LoginPacket>;
 
 /// `ChunkStore` is a store of data held as serialised files on disk, implementing a maximum disk
@@ -203,7 +203,7 @@ impl Subdir for MutableChunkStore {
     }
 }
 
-impl Subdir for AppendOnlyChunkStore {
+impl Subdir for SequenceChunkStore {
     fn subdir() -> &'static Path {
         Path::new("append_only")
     }
