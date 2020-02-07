@@ -166,11 +166,11 @@ impl DataHandler {
                 .get_value(requester, address, version, message_id),
             GetSequenceShell {
                 address,
-                expected_data_version,
+                data_version,
             } => self.sequence_handler.get_shell(
                 requester,
                 address,
-                expected_data_version,
+                data_version,
                 message_id,
             ),
             GetSequenceRange { address, range } => self
@@ -229,7 +229,7 @@ impl DataHandler {
                 .get_public_user_access(requester, address, user, message_id),
             GetPrivateSequenceUserPermissions { address, user } => self
                 .sequence_handler
-                .get_private_user_access(requester, address, user, message_id),
+                .get_private_user_access(requester, address, &user, message_id),
             GetPublicSequenceUserPermissionsAt {
                 address,
                 version,
@@ -243,7 +243,7 @@ impl DataHandler {
                 public_key,
             } => self
                 .sequence_handler
-                .get_private_user_access_at(requester, address, version, public_key, message_id),
+                .get_private_user_access_at(requester, address, version, &public_key, message_id),
             DeletePrivateSequence(address) => {
                 self.sequence_handler.delete(requester, address, message_id)
             }

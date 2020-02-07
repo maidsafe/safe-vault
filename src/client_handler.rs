@@ -613,7 +613,7 @@ impl ClientHandler {
         let owner = utils::owner(&client.public_id)?;
         // TODO - Should we replace this with a adata.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
-        if !chunk.is_owner(*owner.public_key()) {
+        if !chunk.is_owner(owner.public_key()) {
             trace!(
                 "{}: {} attempted Put Sequence with invalid owners.",
                 self,

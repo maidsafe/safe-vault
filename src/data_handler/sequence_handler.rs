@@ -82,7 +82,7 @@ impl SequenceHandler {
         address: Address,
         message_id: MessageId,
     ) -> Option<Action> {
-        let requester_pk = *utils::own_key(&requester)?;
+        let requester_pk = utils::own_key(&requester)?;
         let result = self
             .chunks
             .get(&address)
@@ -133,12 +133,12 @@ impl SequenceHandler {
         &self,
         requester: PublicId,
         address: Address,
-        data_index: Version,
+        data_version: Option<Version>,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
             .try_read(&requester, address)
-            .and_then(|data| data.shell(data_index));
+            .and_then(|data| data.shell(data_version));
 
         let response = Response::GetSequenceShell(result);
         self.respond_on_get(requester, response, address, message_id)
@@ -228,7 +228,7 @@ impl SequenceHandler {
     ) -> Option<Action> {
         let result = self
             .try_read(&requester, address)
-            .and_then(|data| data.owner_history());
+            .and_then(|data| self.deref(data.owner_history()));
 
         let response = Response::GetSequenceOwnerHistory(result);
         self.respond_on_get(requester, response, address, message_id)
@@ -244,7 +244,7 @@ impl SequenceHandler {
     ) -> Option<Action> {
         let result = self
             .try_read(&requester, address)
-            .and_then(|data| data.owner_history_range(start, end));
+            .and_then(|data| self.deref_vec(data.owner_history_range(start, end)));
 
         let response = Response::GetSequenceOwnerHistoryRange(result);
         self.respond_on_get(requester, response, address, message_id)
@@ -303,7 +303,7 @@ impl SequenceHandler {
     ) -> Option<Action> {
         let result = self
             .try_read(&requester, address)
-            .and_then(|data| data.public_access_list_history());
+            .and_then(|data| self.deref(data.public_access_list_history()));
 
         let response = Response::GetPublicSequenceAccessListHistory(result);
         self.respond_on_get(requester, response, address, message_id)
@@ -333,7 +333,7 @@ impl SequenceHandler {
     ) -> Option<Action> {
         let result = self
             .try_read(&requester, address)
-            .and_then(|data| data.private_access_list_history());
+            .and_then(|data| self.deref(data.private_access_list_history()));
 
         let response = Response::GetPrivateSequenceAccessListHistory(result);
         self.respond_on_get(requester, response, address, message_id)
@@ -364,7 +364,7 @@ impl SequenceHandler {
     ) -> Option<Action> {
         let result = self
             .try_read(&requester, address)
-            .and_then(|data| data.public_user_access_at(user, Version::FromEnd(0)));
+            .and_then(|data| self.deref(data.public_user_access_at(user, Version::FromEnd(0))));
 
         let response = Response::GetPublicSequenceUserPermissions(result);
         self.respond_on_get(requester, response, address, message_id)
@@ -374,12 +374,12 @@ impl SequenceHandler {
         &self,
         requester: PublicId,
         address: Address,
-        user: PublicKey,
+        user: &PublicKey,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
             .try_read(&requester, address)
-            .and_then(|data| data.private_user_access_at(user, Version::FromEnd(0)));
+            .and_then(|data| self.deref(data.private_user_access_at(user, Version::FromEnd(0))));
 
         let response = Response::GetPrivateSequenceUserPermissions(result);
         self.respond_on_get(requester, response, address, message_id)
@@ -395,7 +395,7 @@ impl SequenceHandler {
     ) -> Option<Action> {
         let result = self
             .try_read(&requester, address)
-            .and_then(|data| data.public_user_access_at(user, version));
+            .and_then(|data| self.deref(data.public_user_access_at(user, version)));
 
         let response = Response::GetPublicSequenceUserPermissionsAt(result);
         self.respond_on_get(requester, response, address, message_id)
@@ -406,12 +406,12 @@ impl SequenceHandler {
         requester: PublicId,
         address: Address,
         version: Version,
-        public_key: PublicKey,
+        public_key:  &PublicKey,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
             .try_read(&requester, address)
-            .and_then(|data| data.private_user_access_at(public_key, version));
+            .and_then(|data| self.deref(data.private_user_access_at(public_key, version)));
 
         let response = Response::GetPrivateSequenceUserPermissionsAt(result);
         self.respond_on_get(requester, response, address, message_id)
@@ -549,6 +549,24 @@ impl SequenceHandler {
         })
     }
 
+    fn deref_vec<T>(&self, result: safe_nd::Result<Vec<&T>>) -> safe_nd::Result<Vec<T>> where T: Clone {
+        match result {
+            Ok(t) => Ok(t.into_iter().cloned().collect()),
+            Err(e) => match e {
+                _ => Err(e)
+            },
+        }
+    }
+
+    fn deref<T>(&self, result: safe_nd::Result<&T>) -> safe_nd::Result<T> where T: Clone {
+        match result {
+            Ok(t) => Ok(t.clone()),
+            Err(e) => match e {
+                _ => Err(e)
+            },
+        }
+    }
+
     fn try_read(&self, requester: &PublicId, address: Address) -> Result<Sequence, NdError> {
         self.try_get(requester, address, AccessType::Read)
     }
@@ -565,7 +583,7 @@ impl SequenceHandler {
             _ => error.to_string().into(),
         })?;
 
-        if data.is_allowed(action, *requester_key) {
+        if data.is_allowed(action, requester_key) {
             Ok(data)
         } else {
             Err(NdError::AccessDenied)
