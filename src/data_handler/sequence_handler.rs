@@ -550,21 +550,11 @@ impl SequenceHandler {
     }
 
     fn deref_vec<T>(&self, result: safe_nd::Result<Vec<&T>>) -> safe_nd::Result<Vec<T>> where T: Clone {
-        match result {
-            Ok(t) => Ok(t.into_iter().cloned().collect()),
-            Err(e) => match e {
-                _ => Err(e)
-            },
-        }
-    }
+        Ok(result?.into_iter().cloned().collect())
+     }
 
     fn deref<T>(&self, result: safe_nd::Result<&T>) -> safe_nd::Result<T> where T: Clone {
-        match result {
-            Ok(t) => Ok(t.clone()),
-            Err(e) => match e {
-                _ => Err(e)
-            },
-        }
+        Ok(result?.clone())
     }
 
     fn try_read(&self, requester: &PublicId, address: Address) -> Result<Sequence, NdError> {
