@@ -6,14 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use routing::{Client, ConnectionInfo, Event, NetworkConfig, P2pNode, RoutingError};
+pub use routing::{event, ConnectionInfo, NetworkConfig, P2pNode, RoutingError};
 
 use bytes::Bytes;
 use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
 use log::trace;
 use mock_quic_p2p::{self as quic_p2p, Error, Event as NetworkEvent, Peer, QuicP2p};
-use routing::Client as ClientEvent;
-use routing::XorName;
+use routing::event::Client as ClientEvent;
+use routing::{event::Event, XorName};
 use std::{
     cell::RefCell,
     net::SocketAddr,
