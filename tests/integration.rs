@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -27,15 +27,13 @@ use self::common::{Environment, TestClientTrait};
 use maplit::btreemap;
 use rand::{distributions::Standard, Rng};
 use safe_nd::{
-    AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
-    ADataPermissions, ADataPubPermissionSet, ADataPubPermissions, ADataUnpubPermissionSet,
-    ADataUnpubPermissions, ADataUser, AppPermissions, AppendOnlyData, ClientFullId, Coins,
+    AccessList, AccessType, Address, AppPermissions, AppendOperation, ClientFullId, Coins,
     EntryError, Error as NdError, IData, IDataAddress, LoginPacket, MData, MDataAction,
     MDataAddress, MDataEntries, MDataKind, MDataPermissionSet, MDataSeqEntryActions, MDataSeqValue,
-    MDataUnseqEntryActions, MDataValue, MDataValues, Message, MessageId, PubImmutableData,
-    PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
-    SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData,
-    UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
+    MDataUnseqEntryActions, MDataValue, MDataValues, Message, MessageId, Owner, PrivateAccessList,
+    PrivateSequence, PrivateUserAccess, PubImmutableData, PublicAccessList, PublicKey,
+    PublicSequence, PublicUserAccess, Request, Response, Result as NdResult, SeqMutableData,
+    Sequence, Transaction, UnpubImmutableData, UnseqMutableData, User, Version, XorName,
 };
 use safe_vault::COST_OF_PUT;
 use std::collections::{BTreeMap, BTreeSet};
@@ -580,103 +578,39 @@ fn put_append_only_data() {
     let mut client_a = env.new_connected_client();
     let mut client_b = env.new_connected_client();
 
-    let owner_a = ADataOwner {
+    let owner_a = Owner {
         public_key: *client_a.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
 
     // Published sequential data
     let pub_seq_adata_name: XorName = env.rng().gen();
-    let mut pub_seq_adata = PubSeqAppendOnlyData::new(pub_seq_adata_name, 100);
-    unwrap!(pub_seq_adata.append_owner(owner_a, 0));
-    unwrap!(pub_seq_adata.append(
-        vec![ADataEntry {
-            key: b"one".to_vec(),
-            value: b"pub sec".to_vec()
-        }],
-        0
-    ));
-    unwrap!(pub_seq_adata.append(
-        vec![ADataEntry {
-            key: b"two".to_vec(),
-            value: b"pub sec".to_vec()
-        }],
-        1
-    ));
-    let pub_seq_adata = AData::PubSeq(pub_seq_adata);
-
-    // Published unsequential data
-    let pub_unseq_adata_name: XorName = env.rng().gen();
-    let mut pub_unseq_adata = PubUnseqAppendOnlyData::new(pub_unseq_adata_name, 100);
-    unwrap!(pub_unseq_adata.append_owner(owner_a, 0));
-    unwrap!(pub_unseq_adata.append(vec![ADataEntry {
-        key: b"one".to_vec(),
-        value: b"pub unsec".to_vec()
-    }]));
-    unwrap!(pub_unseq_adata.append(vec![ADataEntry {
-        key: b"two".to_vec(),
-        value: b"pub unsec".to_vec()
-    }]));
-    let pub_unseq_adata = AData::PubUnseq(pub_unseq_adata);
+    let mut pub_seq_adata = PublicSequence::new(pub_seq_adata_name, 100);
+    unwrap!(pub_seq_adata.set_owner(owner_a, 0));
+    unwrap!(pub_seq_adata.append(vec![b"one".to_vec(), b"pub sec".to_vec()], Some(0)));
+    unwrap!(pub_seq_adata.append(vec![b"two".to_vec(), b"pub sec".to_vec()], Some(1)));
+    let pub_seq_adata = Sequence::Public(pub_seq_adata);
 
     // Unpublished sequential
     let unpub_seq_adata_name: XorName = env.rng().gen();
-    let mut unpub_seq_adata = UnpubSeqAppendOnlyData::new(unpub_seq_adata_name, 100);
-    unwrap!(unpub_seq_adata.append_owner(owner_a, 0));
-    unwrap!(unpub_seq_adata.append(
-        vec![ADataEntry {
-            key: b"one".to_vec(),
-            value: b"unpub sec".to_vec()
-        }],
-        0
-    ));
-    unwrap!(unpub_seq_adata.append(
-        vec![ADataEntry {
-            key: b"two".to_vec(),
-            value: b"unpub sec".to_vec()
-        }],
-        1
-    ));
-    let unpub_seq_adata = AData::UnpubSeq(unpub_seq_adata);
-
-    // Unpublished unsequential data
-    let unpub_unseq_adata_name: XorName = env.rng().gen();
-    let mut unpub_unseq_adata = UnpubUnseqAppendOnlyData::new(unpub_unseq_adata_name, 100);
-    unwrap!(unpub_unseq_adata.append_owner(owner_a, 0));
-    unwrap!(unpub_unseq_adata.append(vec![ADataEntry {
-        key: b"one".to_vec(),
-        value: b"unpub unsec".to_vec()
-    }]));
-    unwrap!(unpub_unseq_adata.append(vec![ADataEntry {
-        key: b"two".to_vec(),
-        value: b"unpub unsec".to_vec()
-    }]));
-    let unpub_unseq_adata = AData::UnpubUnseq(unpub_unseq_adata);
+    let mut unpub_seq_adata = PrivateSequence::new(unpub_seq_adata_name, 100);
+    unwrap!(unpub_seq_adata.set_owner(owner_a, 0));
+    unwrap!(unpub_seq_adata.append(vec![b"one".to_vec(), b"unpub sec".to_vec()], Some(0)));
+    unwrap!(unpub_seq_adata.append(vec![b"two".to_vec(), b"unpub sec".to_vec()], Some(1)));
+    let unpub_seq_adata = Sequence::Private(unpub_seq_adata);
 
     // First try to put some data without any associated balance.
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        Request::PutAData(pub_seq_adata.clone()),
+        Request::PutSequence(pub_seq_adata.clone()),
         NdError::NoSuchBalance,
     );
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        Request::PutAData(pub_unseq_adata.clone()),
-        NdError::NoSuchBalance,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client_a,
-        Request::PutAData(unpub_seq_adata.clone()),
-        NdError::NoSuchBalance,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client_a,
-        Request::PutAData(unpub_unseq_adata.clone()),
+        Request::PutSequence(unpub_seq_adata.clone()),
         NdError::NoSuchBalance,
     );
 
@@ -687,25 +621,13 @@ fn put_append_only_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::PutAData(pub_seq_adata.clone()),
+        Request::PutSequence(pub_seq_adata.clone()),
         NdError::InvalidOwners,
     );
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::PutAData(pub_unseq_adata.clone()),
-        NdError::InvalidOwners,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client_b,
-        Request::PutAData(unpub_seq_adata.clone()),
-        NdError::InvalidOwners,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client_b,
-        Request::PutAData(unpub_unseq_adata.clone()),
+        Request::PutSequence(unpub_seq_adata.clone()),
         NdError::InvalidOwners,
     );
 
@@ -713,22 +635,12 @@ fn put_append_only_data() {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::PutAData(pub_seq_adata.clone()),
+        Request::PutSequence(pub_seq_adata.clone()),
     );
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::PutAData(pub_unseq_adata.clone()),
-    );
-    common::perform_mutation(
-        &mut env,
-        &mut client_a,
-        Request::PutAData(unpub_seq_adata.clone()),
-    );
-    common::perform_mutation(
-        &mut env,
-        &mut client_a,
-        Request::PutAData(unpub_unseq_adata.clone()),
+        Request::PutSequence(unpub_seq_adata.clone()),
     );
 
     let balance_a = unwrap!(Coins::from_nano(start_nano - 4));
@@ -738,51 +650,27 @@ fn put_append_only_data() {
     common::send_request_expect_ok(
         &mut env,
         &mut client_a,
-        Request::GetAData(*pub_seq_adata.address()),
+        Request::GetSequence(*pub_seq_adata.address()),
         pub_seq_adata.clone(),
     );
     common::send_request_expect_ok(
         &mut env,
         &mut client_a,
-        Request::GetAData(*pub_unseq_adata.address()),
-        pub_unseq_adata.clone(),
-    );
-    common::send_request_expect_ok(
-        &mut env,
-        &mut client_a,
-        Request::GetAData(*unpub_seq_adata.address()),
+        Request::GetSequence(*unpub_seq_adata.address()),
         unpub_seq_adata.clone(),
-    );
-    common::send_request_expect_ok(
-        &mut env,
-        &mut client_a,
-        Request::GetAData(*unpub_unseq_adata.address()),
-        unpub_unseq_adata.clone(),
     );
 
     // Verify that B cannot delete A's data
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::DeleteAData(*pub_seq_adata.address()),
+        Request::DeletePrivateSequence(*pub_seq_adata.address()),
         NdError::InvalidOperation,
     );
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::DeleteAData(*pub_unseq_adata.address()),
-        NdError::InvalidOperation,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client_b,
-        Request::DeleteAData(*unpub_seq_adata.address()),
-        NdError::AccessDenied,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client_b,
-        Request::DeleteAData(*unpub_unseq_adata.address()),
+        Request::DeletePrivateSequence(*unpub_seq_adata.address()),
         NdError::AccessDenied,
     );
 
@@ -790,24 +678,13 @@ fn put_append_only_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        Request::DeleteAData(*pub_seq_adata.address()),
-        NdError::InvalidOperation,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client_a,
-        Request::DeleteAData(*pub_unseq_adata.address()),
+        Request::DeletePrivateSequence(*pub_seq_adata.address()),
         NdError::InvalidOperation,
     );
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::DeleteAData(*unpub_seq_adata.address()),
-    );
-    common::perform_mutation(
-        &mut env,
-        &mut client_a,
-        Request::DeleteAData(*unpub_unseq_adata.address()),
+        Request::DeletePrivateSequence(*unpub_seq_adata.address()),
     );
 
     // Deletions are free so A's balance should remain the same.
@@ -817,13 +694,7 @@ fn put_append_only_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        Request::DeleteAData(*unpub_seq_adata.address()),
-        NdError::NoSuchData,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client_a,
-        Request::DeleteAData(*unpub_unseq_adata.address()),
+        Request::DeletePrivateSequence(*unpub_seq_adata.address()),
         NdError::NoSuchData,
     );
 
@@ -845,26 +716,14 @@ fn delete_append_only_data_that_doesnt_exist() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::DeleteAData(*AData::PubSeq(PubSeqAppendOnlyData::new(name, tag)).address()),
+        Request::DeletePrivateSequence(*Sequence::Public(PublicSequence::new(name, tag)).address()),
         NdError::InvalidOperation,
     );
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::DeleteAData(*AData::PubUnseq(PubUnseqAppendOnlyData::new(name, tag)).address()),
-        NdError::InvalidOperation,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client,
-        Request::DeleteAData(*AData::UnpubSeq(UnpubSeqAppendOnlyData::new(name, tag)).address()),
-        NdError::NoSuchData,
-    );
-    common::send_request_expect_err(
-        &mut env,
-        &mut client,
-        Request::DeleteAData(
-            *AData::UnpubUnseq(UnpubUnseqAppendOnlyData::new(name, tag)).address(),
+        Request::DeletePrivateSequence(
+            *Sequence::Private(PrivateSequence::new(name, tag)).address(),
         ),
         NdError::NoSuchData,
     );
@@ -883,30 +742,30 @@ fn get_pub_append_only_data() {
     let mut client = env.new_connected_client();
     common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
-    let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
+    let mut data = PublicSequence::new(env.rng().gen(), 100);
 
-    let owner = ADataOwner {
+    let owner = Owner {
         public_key: *client.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
-    unwrap!(data.append_owner(owner, 0));
+    unwrap!(data.set_owner(owner, 0));
 
-    let data = AData::PubSeq(data);
+    let data = Sequence::Public(data);
     let address = *data.address();
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
+    common::perform_mutation(&mut env, &mut client, Request::PutSequence(data.clone()));
 
     // Success
     common::send_request_expect_ok(
         &mut env,
         &mut client,
-        Request::GetAData(address),
+        Request::GetSequence(address),
         data.clone(),
     );
 
     // Failure - non-existing data
     let invalid_name: XorName = env.rng().gen();
-    let invalid_address = ADataAddress::PubSeq {
+    let invalid_address = Address::Public {
         name: invalid_name,
         tag: 100,
     };
@@ -914,7 +773,7 @@ fn get_pub_append_only_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::GetAData(invalid_address),
+        Request::GetSequence(invalid_address),
         NdError::NoSuchData,
     );
 
@@ -923,7 +782,7 @@ fn get_pub_append_only_data() {
     common::send_request_expect_ok(
         &mut env,
         &mut other_client,
-        Request::GetAData(address),
+        Request::GetSequence(address),
         data,
     );
 }
@@ -935,25 +794,25 @@ fn get_unpub_append_only_data() {
 
     common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
-    let mut data = UnpubSeqAppendOnlyData::new(env.rng().gen(), 100);
+    let mut data = PrivateSequence::new(env.rng().gen(), 100);
 
-    let owner = ADataOwner {
+    let owner = Owner {
         public_key: *client.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
-    unwrap!(data.append_owner(owner, 0));
+    unwrap!(data.set_owner(owner, 0));
 
-    let data = AData::UnpubSeq(data);
+    let data = Sequence::Private(data);
     let address = *data.address();
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
+    common::perform_mutation(&mut env, &mut client, Request::PutSequence(data.clone()));
 
     // Success
-    common::send_request_expect_ok(&mut env, &mut client, Request::GetAData(address), data);
+    common::send_request_expect_ok(&mut env, &mut client, Request::GetSequence(address), data);
 
     // Failure - non-existing data
     let invalid_name: XorName = env.rng().gen();
-    let invalid_address = ADataAddress::UnpubSeq {
+    let invalid_address = Address::Private {
         name: invalid_name,
         tag: 100,
     };
@@ -961,7 +820,7 @@ fn get_unpub_append_only_data() {
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::GetAData(invalid_address),
+        Request::GetSequence(invalid_address),
         NdError::NoSuchData,
     );
 
@@ -972,7 +831,7 @@ fn get_unpub_append_only_data() {
     common::send_request_expect_err(
         &mut env,
         &mut other_client,
-        Request::GetAData(address),
+        Request::GetSequence(address),
         NdError::AccessDenied,
     );
 }
@@ -984,40 +843,42 @@ fn append_only_data_get_entries() {
 
     common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
 
-    let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
+    let mut data = PublicSequence::new(env.rng().gen(), 100);
 
-    let owner = ADataOwner {
+    let owner = Owner {
         public_key: *client.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
 
-    unwrap!(data.append_owner(owner, 0));
+    unwrap!(data.set_owner(owner, 0));
     unwrap!(data.append(
         vec![
-            ADataEntry::new(b"one".to_vec(), b"foo".to_vec()),
-            ADataEntry::new(b"two".to_vec(), b"bar".to_vec()),
+            b"one".to_vec(),
+            b"foo".to_vec(),
+            b"two".to_vec(),
+            b"bar".to_vec(),
         ],
-        0,
+        Some(0),
     ));
 
-    let data = AData::PubSeq(data);
+    let data = Sequence::Public(data);
     let address = *data.address();
     common::send_request_expect_ok(&mut env, &mut client, Request::GetBalance, *COST_OF_PUT);
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
+    common::perform_mutation(&mut env, &mut client, Request::PutSequence(data.clone()));
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::PutAData(data),
+        Request::PutSequence(data),
         NdError::InsufficientBalance,
     );
 
-    // GetADataRange
+    // GetSequenceRange
     let mut range_scenario = |start, end, expected_result| {
         common::send_request_expect_ok(
             &mut env,
             &mut client,
-            Request::GetADataRange {
+            Request::GetSequenceRange {
                 address,
                 range: (start, end),
             },
@@ -1025,57 +886,59 @@ fn append_only_data_get_entries() {
         )
     };
 
-    range_scenario(ADataIndex::FromStart(0), ADataIndex::FromStart(0), vec![]);
+    range_scenario(Version::FromStart(0), Version::FromStart(0), vec![]);
     range_scenario(
-        ADataIndex::FromStart(0),
-        ADataIndex::FromStart(1),
-        vec![ADataEntry::new(b"one".to_vec(), b"foo".to_vec())],
+        Version::FromStart(0),
+        Version::FromStart(1),
+        vec![b"one".to_vec(), b"foo".to_vec()],
     );
     range_scenario(
-        ADataIndex::FromStart(1),
-        ADataIndex::FromStart(2),
-        vec![ADataEntry::new(b"two".to_vec(), b"bar".to_vec())],
+        Version::FromStart(1),
+        Version::FromStart(2),
+        vec![b"two".to_vec(), b"bar".to_vec()],
     );
     range_scenario(
-        ADataIndex::FromEnd(1),
-        ADataIndex::FromEnd(0),
-        vec![ADataEntry::new(b"two".to_vec(), b"bar".to_vec())],
+        Version::FromEnd(1),
+        Version::FromEnd(0),
+        vec![b"two".to_vec(), b"bar".to_vec()],
     );
     range_scenario(
-        ADataIndex::FromStart(0),
-        ADataIndex::FromEnd(0),
+        Version::FromStart(0),
+        Version::FromEnd(0),
         vec![
-            ADataEntry::new(b"one".to_vec(), b"foo".to_vec()),
-            ADataEntry::new(b"two".to_vec(), b"bar".to_vec()),
+            b"one".to_vec(),
+            b"foo".to_vec(),
+            b"two".to_vec(),
+            b"bar".to_vec(),
         ],
     );
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::GetADataRange {
+        Request::GetSequenceRange {
             address,
-            range: (ADataIndex::FromStart(0), ADataIndex::FromStart(3)),
+            range: (Version::FromStart(0), Version::FromStart(3)),
         },
         NdError::NoSuchEntry,
     );
 
-    // GetADataLastEntry
+    // GetSequenceCurrentEntry
     common::send_request_expect_ok(
         &mut env,
         &mut client,
-        Request::GetADataLastEntry(address),
-        ADataEntry::new(b"two".to_vec(), b"bar".to_vec()),
+        Request::GetSequenceCurrentEntry(address),
+        vec![b"two".to_vec(), b"bar".to_vec()],
     );
 
-    // GetADataValue
+    // GetSequenceValue
     common::send_request_expect_ok(
         &mut env,
         &mut client,
-        Request::GetADataValue {
+        Request::GetSequenceValue {
             address,
-            key: b"one".to_vec(),
+            version: Version::FromStart(1),
         },
-        b"foo".to_vec(),
+        vec![b"one".to_vec(), b"foo".to_vec()],
     );
 }
 
@@ -1087,54 +950,51 @@ fn append_only_data_get_owners() {
 
     let name: XorName = env.rng().gen();
     let tag = 100;
-    let mut data = PubSeqAppendOnlyData::new(name, tag);
+    let mut data = PublicSequence::new(name, tag);
 
-    let owner_0 = ADataOwner {
+    let owner_0 = Owner {
         public_key: common::gen_public_key(env.rng()),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
-    let owner_1 = ADataOwner {
+    let owner_1 = Owner {
         public_key: common::gen_public_key(env.rng()),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
-    let owner_2 = ADataOwner {
+    let owner_2 = Owner {
         public_key: *client.public_id().public_key(),
-        entries_index: 1,
-        permissions_index: 0,
+        expected_data_version: 1,
+        expected_access_list_version: 0,
     };
 
-    unwrap!(data.append_owner(owner_0, 0));
-    unwrap!(data.append_owner(owner_1, 1));
+    unwrap!(data.set_owner(owner_0, 0));
+    unwrap!(data.set_owner(owner_1, 1));
 
-    unwrap!(data.append(vec![ADataEntry::new(b"one".to_vec(), b"foo".to_vec())], 0));
-    unwrap!(data.append_owner(owner_2, 2));
+    unwrap!(data.append(vec![b"one".to_vec(), b"foo".to_vec()], Some(0)));
+    unwrap!(data.set_owner(owner_2, 2));
 
     let address = *data.address();
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.into()));
+    common::perform_mutation(&mut env, &mut client, Request::PutSequence(data.into()));
 
-    let mut scenario = |owners_index, expected_response| {
-        let req = Request::GetADataOwners {
-            address,
-            owners_index,
-        };
+    let mut scenario = |version, expected_response| {
+        let req = Request::GetSequenceOwnerAt { address, version };
         match expected_response {
             Ok(expected) => common::send_request_expect_ok(&mut env, &mut client, req, expected),
             Err(expected) => common::send_request_expect_err(&mut env, &mut client, req, expected),
         }
     };
 
-    scenario(ADataIndex::FromStart(0), Ok(owner_0));
-    scenario(ADataIndex::FromStart(1), Ok(owner_1));
-    scenario(ADataIndex::FromStart(2), Ok(owner_2));
-    scenario(ADataIndex::FromStart(3), Err(NdError::InvalidOwners));
+    scenario(Version::FromStart(0), Ok(owner_0));
+    scenario(Version::FromStart(1), Ok(owner_1));
+    scenario(Version::FromStart(2), Ok(owner_2));
+    scenario(Version::FromStart(3), Err(NdError::InvalidOwners));
 
-    scenario(ADataIndex::FromEnd(0), Err(NdError::InvalidOwners));
-    scenario(ADataIndex::FromEnd(1), Ok(owner_2));
-    scenario(ADataIndex::FromEnd(2), Ok(owner_1));
-    scenario(ADataIndex::FromEnd(3), Ok(owner_0));
-    scenario(ADataIndex::FromEnd(4), Err(NdError::InvalidOwners));
+    scenario(Version::FromEnd(0), Err(NdError::InvalidOwners));
+    scenario(Version::FromEnd(1), Ok(owner_2));
+    scenario(Version::FromEnd(2), Ok(owner_1));
+    scenario(Version::FromEnd(3), Ok(owner_0));
+    scenario(Version::FromEnd(4), Err(NdError::InvalidOwners));
 }
 
 #[test]
@@ -1145,42 +1005,44 @@ fn pub_append_only_data_get_permissions() {
 
     let name: XorName = env.rng().gen();
     let tag = 100;
-    let mut data = PubSeqAppendOnlyData::new(name, tag);
+    let mut data = PublicSequence::new(name, tag);
 
-    let owner = ADataOwner {
+    let owner = Owner {
         public_key: *client.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
 
-    unwrap!(data.append_owner(owner, 0));
+    unwrap!(data.set_owner(owner, 0));
 
-    let perms_0 = ADataPubPermissions {
-        permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, false)],
-        entries_index: 0,
-        owners_index: 1,
+    let set = btreemap![AccessType::Read => true, AccessType::Append => true];
+
+    let perms_0 = PublicAccessList {
+        access_list: btreemap![User::Anyone => PublicUserAccess::new(set.clone())], // true, false
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
-    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.set_access_list(perms_0.clone(), 0));
 
     let public_key = common::gen_public_key(env.rng());
-    let perms_1 = ADataPubPermissions {
-        permissions: btreemap![
-            ADataUser::Anyone => ADataPubPermissionSet::new(false, false),
-            ADataUser::Key(public_key) => ADataPubPermissionSet::new(true, false)
+    let perms_1 = PublicAccessList {
+        access_list: btreemap![
+            User::Anyone => PublicUserAccess::new(set.clone()), // false, false
+            User::Specific(public_key) => PublicUserAccess::new(set.clone()) // true, false
         ],
-        entries_index: 0,
-        owners_index: 1,
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
-    unwrap!(data.append_permissions(perms_1.clone(), 1));
+    unwrap!(data.set_access_list(perms_1.clone(), 1));
 
     let address = *data.address();
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.into()));
+    common::perform_mutation(&mut env, &mut client, Request::PutSequence(data.into()));
 
-    // GetPubADataUserPermissions
-    let mut scenario = |permissions_index, user, expected_response| {
-        let req = Request::GetPubADataUserPermissions {
+    // GetPubUserPermissions
+    let mut scenario = |version, user, expected_response| {
+        let req = Request::GetPublicSequenceUserPermissionsAt {
             address,
-            permissions_index,
+            version,
             user,
         };
         match expected_response {
@@ -1189,80 +1051,75 @@ fn pub_append_only_data_get_permissions() {
         }
     };
 
+    let set = btreemap![AccessType::Read => true, AccessType::Append => true];
+
     scenario(
-        ADataIndex::FromStart(0),
-        ADataUser::Anyone,
-        Ok(ADataPubPermissionSet::new(true, false)),
+        Version::FromStart(0),
+        User::Anyone,
+        Ok(PublicUserAccess::new(set.clone())), // true, false
     );
     scenario(
-        ADataIndex::FromStart(0),
-        ADataUser::Key(public_key),
+        Version::FromStart(0),
+        User::Specific(public_key),
         Err(NdError::NoSuchEntry),
     );
     scenario(
-        ADataIndex::FromStart(1),
-        ADataUser::Anyone,
-        Ok(ADataPubPermissionSet::new(false, false)),
+        Version::FromStart(1),
+        User::Anyone,
+        Ok(PublicUserAccess::new(set.clone())), // false, false
     );
     scenario(
-        ADataIndex::FromStart(1),
-        ADataUser::Key(public_key),
-        Ok(ADataPubPermissionSet::new(true, false)),
+        Version::FromStart(1),
+        User::Specific(public_key),
+        Ok(PublicUserAccess::new(set.clone())), // true, false
     );
     scenario(
-        ADataIndex::FromStart(2),
-        ADataUser::Anyone,
+        Version::FromStart(2),
+        User::Anyone,
         Err(NdError::NoSuchEntry),
     );
 
     scenario(
-        ADataIndex::FromEnd(1),
-        ADataUser::Anyone,
-        Ok(ADataPubPermissionSet::new(false, false)),
+        Version::FromEnd(1),
+        User::Anyone,
+        Ok(PublicUserAccess::new(set.clone())), // false, false
     );
     scenario(
-        ADataIndex::FromEnd(2),
-        ADataUser::Anyone,
-        Ok(ADataPubPermissionSet::new(true, false)),
+        Version::FromEnd(2),
+        User::Anyone,
+        Ok(PublicUserAccess::new(set.clone())), // true, false
     );
-    scenario(
-        ADataIndex::FromEnd(3),
-        ADataUser::Anyone,
-        Err(NdError::NoSuchEntry),
-    );
+    scenario(Version::FromEnd(3), User::Anyone, Err(NdError::NoSuchEntry));
 
-    // GetUnpubADataUserPermissions (failure - incorrect data kind)
+    // GetUnpubUserPermissions (failure - incorrect data kind)
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::GetUnpubADataUserPermissions {
+        Request::GetPrivateSequenceUserPermissionsAt {
             address,
-            permissions_index: ADataIndex::FromStart(1),
+            version: Version::FromStart(1),
             public_key,
         },
         NdError::NoSuchData,
     );
 
-    // GetADataPermissions
-    let mut scenario = |permissions_index, expected_response| {
-        let req = Request::GetADataPermissions {
-            address,
-            permissions_index,
-        };
+    // GetAccessList
+    let mut scenario = |version, expected_response| {
+        let req = Request::GetSequenceAccessListAt { address, version };
         match expected_response {
             Ok(expected) => common::send_request_expect_ok(
                 &mut env,
                 &mut client,
                 req,
-                ADataPermissions::from(expected),
+                AccessList::from(expected),
             ),
             Err(expected) => common::send_request_expect_err(&mut env, &mut client, req, expected),
         }
     };
 
-    scenario(ADataIndex::FromStart(0), Ok(perms_0));
-    scenario(ADataIndex::FromStart(1), Ok(perms_1));
-    scenario(ADataIndex::FromStart(2), Err(NdError::NoSuchEntry));
+    scenario(Version::FromStart(0), Ok(perms_0));
+    scenario(Version::FromStart(1), Ok(perms_1));
+    scenario(Version::FromStart(2), Err(NdError::NoSuchEntry));
 }
 
 #[test]
@@ -1275,46 +1132,51 @@ fn unpub_append_only_data_get_permissions() {
 
     let name: XorName = env.rng().gen();
     let tag = 100;
-    let mut data = UnpubSeqAppendOnlyData::new(name, tag);
+    let mut data = PrivateSequence::new(name, tag);
 
-    let owner = ADataOwner {
+    let owner = Owner {
         public_key: *client.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
 
-    unwrap!(data.append_owner(owner, 0));
+    unwrap!(data.set_owner(owner, 0));
 
     let public_key_0 = common::gen_public_key(env.rng());
     let public_key_1 = common::gen_public_key(env.rng());
 
-    let perms_0 = ADataUnpubPermissions {
-        permissions: btreemap![
-            public_key_0 => ADataUnpubPermissionSet::new(true, true, false)
-        ],
-        entries_index: 0,
-        owners_index: 1,
-    };
-    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    let set = BTreeSet::new();
+    set.insert(AccessType::Read);
+    set.insert(AccessType::Append);
+    set.insert(AccessType::ModifyPermissions);
 
-    let perms_1 = ADataUnpubPermissions {
-        permissions: btreemap![
-            public_key_0 => ADataUnpubPermissionSet::new(true, false, false),
-            public_key_1 => ADataUnpubPermissionSet::new(true, true, true)
+    let perms_0 = PrivateAccessList {
+        access_list: btreemap![
+            public_key_0 => PrivateUserAccess::new(set.clone()) // true, true, false
         ],
-        entries_index: 0,
-        owners_index: 1,
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
-    unwrap!(data.append_permissions(perms_1.clone(), 1));
+    unwrap!(data.set_access_list(perms_0.clone(), 0));
+
+    let perms_1 = PrivateAccessList {
+        access_list: btreemap![
+            public_key_0 => PrivateUserAccess::new(set.clone()), // true, false, false
+            public_key_1 => PrivateUserAccess::new(set.clone()) // true, true, true
+        ],
+        expected_data_version: 0,
+        expected_owners_version: 1,
+    };
+    unwrap!(data.set_access_list(perms_1.clone(), 1));
 
     let address = *data.address();
-    common::perform_mutation(&mut env, &mut client, Request::PutAData(data.into()));
+    common::perform_mutation(&mut env, &mut client, Request::PutSequence(data.into()));
 
-    // GetUnpubADataUserPermissions
-    let mut scenario = |permissions_index, public_key, expected_response| {
-        let req = Request::GetUnpubADataUserPermissions {
+    // Get private UserPermissions
+    let mut scenario = |version, public_key, expected_response| {
+        let req = Request::GetPrivateSequenceUserPermissionsAt {
             address,
-            permissions_index,
+            version,
             public_key,
         };
         match expected_response {
@@ -1323,80 +1185,78 @@ fn unpub_append_only_data_get_permissions() {
         }
     };
 
+    let set = BTreeSet::new();
+    set.insert(AccessType::Read);
+    set.insert(AccessType::Append);
+    set.insert(AccessType::ModifyPermissions);
+
     scenario(
-        ADataIndex::FromStart(0),
+        Version::FromStart(0),
         public_key_0,
-        Ok(ADataUnpubPermissionSet::new(true, true, false)),
+        Ok(PrivateUserAccess::new(set.clone())), // true, true, false
     );
     scenario(
-        ADataIndex::FromStart(0),
+        Version::FromStart(0),
         public_key_1,
         Err(NdError::NoSuchEntry),
     );
     scenario(
-        ADataIndex::FromStart(1),
+        Version::FromStart(1),
         public_key_0,
-        Ok(ADataUnpubPermissionSet::new(true, false, false)),
+        Ok(PrivateUserAccess::new(set.clone())), // true, false, false
     );
     scenario(
-        ADataIndex::FromStart(1),
+        Version::FromStart(1),
         public_key_1,
-        Ok(ADataUnpubPermissionSet::new(true, true, true)),
+        Ok(PrivateUserAccess::new(set.clone())), // true, true, true
     );
     scenario(
-        ADataIndex::FromStart(2),
+        Version::FromStart(2),
         public_key_0,
         Err(NdError::NoSuchEntry),
     );
 
     scenario(
-        ADataIndex::FromEnd(1),
+        Version::FromEnd(1),
         public_key_0,
-        Ok(ADataUnpubPermissionSet::new(true, false, false)),
+        Ok(PrivateUserAccess::new(set.clone())), // true, false, false
     );
     scenario(
-        ADataIndex::FromEnd(2),
+        Version::FromEnd(2),
         public_key_0,
-        Ok(ADataUnpubPermissionSet::new(true, true, false)),
+        Ok(PrivateUserAccess::new(set.clone())), // true, true, false
     );
-    scenario(
-        ADataIndex::FromEnd(3),
-        public_key_0,
-        Err(NdError::NoSuchEntry),
-    );
+    scenario(Version::FromEnd(3), public_key_0, Err(NdError::NoSuchEntry));
 
-    // GetPubADataUserPermissions (failure - incorrect data kind)
+    // GetPubUserPermissions (failure - incorrect data kind)
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::GetPubADataUserPermissions {
+        Request::GetPublicSequenceUserPermissionsAt {
             address,
-            permissions_index: ADataIndex::FromStart(1),
-            user: ADataUser::Key(public_key_0),
+            version: Version::FromStart(1),
+            user: User::Specific(public_key_0),
         },
         NdError::NoSuchData,
     );
 
-    // GetADataPermissions
-    let mut scenario = |permissions_index, expected_response| {
-        let req = Request::GetADataPermissions {
-            address,
-            permissions_index,
-        };
+    // GetAccessList
+    let mut scenario = |version, expected_response| {
+        let req = Request::GetSequenceAccessListAt { address, version };
         match expected_response {
             Ok(expected) => common::send_request_expect_ok(
                 &mut env,
                 &mut client,
                 req,
-                ADataPermissions::from(expected),
+                AccessList::from(expected),
             ),
             Err(expected) => common::send_request_expect_err(&mut env, &mut client, req, expected),
         }
     };
 
-    scenario(ADataIndex::FromStart(0), Ok(perms_0));
-    scenario(ADataIndex::FromStart(1), Ok(perms_1));
-    scenario(ADataIndex::FromStart(2), Err(NdError::NoSuchEntry));
+    scenario(Version::FromStart(0), Ok(perms_0));
+    scenario(Version::FromStart(1), Ok(perms_1));
+    scenario(Version::FromStart(2), Err(NdError::NoSuchEntry));
 }
 
 #[test]
@@ -1414,66 +1274,68 @@ fn pub_append_only_data_put_permissions() {
 
     let name: XorName = env.rng().gen();
     let tag = 100;
-    let mut data = PubSeqAppendOnlyData::new(name, tag);
+    let mut data = PublicSequence::new(name, tag);
 
-    let owner = ADataOwner {
+    let owner = Owner {
         public_key: *client_a.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
 
-    unwrap!(data.append_owner(owner, 0));
+    unwrap!(data.set_owner(owner, 0));
 
+    let set = btreemap![AccessType::Append => true, AccessType::Read => true];
     // Client A can manage permissions, but not B
-    let perms_0 = ADataPubPermissions {
-        permissions: btreemap![ADataUser::Key(public_key_a) => ADataPubPermissionSet::new(true, true)],
-        entries_index: 0,
-        owners_index: 1,
+    let perms_0 = PublicAccessList {
+        access_list: btreemap![User::Specific(public_key_a) => PublicUserAccess::new(set)],
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
-    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.set_access_list(perms_0.clone(), 0));
 
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::PutAData(AData::PubSeq(data.clone())),
+        Request::PutSequence(Sequence::Public(data.clone())),
     );
 
     // Before
     common::send_request_expect_ok(
         &mut env,
         &mut client_a,
-        Request::GetADataPermissions {
+        Request::GetSequenceAccessListAt {
             address: *data.address(),
-            permissions_index: ADataIndex::FromStart(0),
+            version: Version::FromStart(0),
         },
-        ADataPermissions::from(perms_0),
+        AccessList::from(perms_0),
     );
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        Request::GetADataPermissions {
+        Request::GetSequenceAccessListAt {
             address: *data.address(),
-            permissions_index: ADataIndex::FromStart(1),
+            version: Version::FromStart(1),
         },
         NdError::NoSuchEntry,
     );
 
-    let perms_1 = ADataPubPermissions {
-        permissions: btreemap![
-            ADataUser::Key(public_key_b) => ADataPubPermissionSet::new(true, true)
+    let set = btreemap![AccessType::Append => true, AccessType::Read => true];
+    let perms_1 = PublicAccessList {
+        access_list: btreemap![
+            User::Specific(public_key_b) => PublicUserAccess::new(set)
         ],
-        entries_index: 0,
-        owners_index: 1,
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
 
     // Only client A has permissions to add permissions
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::AddPubADataPermissions {
+        Request::SetPublicSequenceAccessList {
             address: *data.address(),
-            permissions: perms_1.clone(),
-            permissions_index: 1,
+            access_list: perms_1.clone(),
+            expected_version: 1,
         },
         NdError::AccessDenied,
     );
@@ -1481,10 +1343,10 @@ fn pub_append_only_data_put_permissions() {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::AddPubADataPermissions {
+        Request::SetPublicSequenceAccessList {
             address: *data.address(),
-            permissions: perms_1.clone(),
-            permissions_index: 1,
+            access_list: perms_1.clone(),
+            expected_version: 1,
         },
     );
 
@@ -1492,11 +1354,11 @@ fn pub_append_only_data_put_permissions() {
     common::send_request_expect_ok(
         &mut env,
         &mut client_a,
-        Request::GetADataPermissions {
+        Request::GetSequenceAccessListAt {
             address: *data.address(),
-            permissions_index: ADataIndex::FromStart(1),
+            version: Version::FromStart(1),
         },
-        ADataPermissions::from(perms_1),
+        AccessList::from(perms_1),
     );
 }
 
@@ -1515,66 +1377,74 @@ fn unpub_append_only_data_put_permissions() {
 
     let name: XorName = env.rng().gen();
     let tag = 100;
-    let mut data = UnpubSeqAppendOnlyData::new(name, tag);
+    let mut data = PrivateSequence::new(name, tag);
 
-    let owner = ADataOwner {
+    let owner = Owner {
         public_key: *client_a.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
 
-    unwrap!(data.append_owner(owner, 0));
+    unwrap!(data.set_owner(owner, 0));
 
+    let set = BTreeSet::new();
+    set.insert(AccessType::Append);
+    set.insert(AccessType::Read);
+    set.insert(AccessType::ModifyPermissions);
     // Client A can manage permissions, but not B
-    let perms_0 = ADataUnpubPermissions {
-        permissions: btreemap![public_key_a => ADataUnpubPermissionSet::new(true, true, true)],
-        entries_index: 0,
-        owners_index: 1,
+    let perms_0 = PrivateAccessList {
+        access_list: btreemap![public_key_a => PrivateUserAccess::new(set)],
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
-    unwrap!(data.append_permissions(perms_0.clone(), 0));
+    unwrap!(data.set_access_list(perms_0.clone(), 0));
 
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::PutAData(AData::UnpubSeq(data.clone())),
+        Request::PutSequence(Sequence::Private(data.clone())),
     );
 
     // Before
     common::send_request_expect_ok(
         &mut env,
         &mut client_a,
-        Request::GetADataPermissions {
+        Request::GetSequenceAccessListAt {
             address: *data.address(),
-            permissions_index: ADataIndex::FromStart(0),
+            version: Version::FromStart(0),
         },
-        ADataPermissions::from(perms_0),
+        AccessList::from(perms_0),
     );
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        Request::GetADataPermissions {
+        Request::GetSequenceAccessListAt {
             address: *data.address(),
-            permissions_index: ADataIndex::FromStart(1),
+            version: Version::FromStart(1),
         },
         NdError::NoSuchEntry,
     );
 
-    let perms_1 = ADataUnpubPermissions {
-        permissions: btreemap![
-            public_key_b => ADataUnpubPermissionSet::new(true, true, true)
+    let set = BTreeSet::new();
+    set.insert(AccessType::Append);
+    set.insert(AccessType::Read);
+    set.insert(AccessType::ModifyPermissions);
+    let perms_1 = PrivateAccessList {
+        access_list: btreemap![
+            public_key_b => PrivateUserAccess::new(set)
         ],
-        entries_index: 0,
-        owners_index: 1,
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
 
     // Only client A has permissions to add permissions
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::AddUnpubADataPermissions {
+        Request::SetPrivateSequenceAccessList {
             address: *data.address(),
-            permissions: perms_1.clone(),
-            permissions_index: 1,
+            access_list: perms_1.clone(),
+            expected_version: 1,
         },
         NdError::AccessDenied,
     );
@@ -1582,10 +1452,10 @@ fn unpub_append_only_data_put_permissions() {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::AddUnpubADataPermissions {
+        Request::SetPrivateSequenceAccessList {
             address: *data.address(),
-            permissions: perms_1.clone(),
-            permissions_index: 1,
+            access_list: perms_1.clone(),
+            expected_version: 1,
         },
     );
 
@@ -1593,11 +1463,11 @@ fn unpub_append_only_data_put_permissions() {
     common::send_request_expect_ok(
         &mut env,
         &mut client_a,
-        Request::GetADataPermissions {
+        Request::GetSequenceAccessListAt {
             address: *data.address(),
-            permissions_index: ADataIndex::FromStart(1),
+            version: Version::FromStart(1),
         },
-        ADataPermissions::from(perms_1),
+        AccessList::from(perms_1),
     );
 }
 
@@ -1616,49 +1486,38 @@ fn append_only_data_put_owners() {
 
     let name: XorName = env.rng().gen();
     let tag = 100;
-    let mut data = PubSeqAppendOnlyData::new(name, tag);
+    let mut data = PublicSequence::new(name, tag);
 
-    let owner_0 = ADataOwner {
+    let owner_0 = Owner {
         public_key: public_key_a,
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
-    unwrap!(data.append_owner(owner_0, 0));
+    unwrap!(data.set_owner(owner_0, 0));
 
-    let perms_0 = ADataPubPermissions {
-        permissions: btreemap![ADataUser::Key(public_key_a) => ADataPubPermissionSet::new(true, true)],
-        entries_index: 0,
-        owners_index: 1,
+    let set = btreemap![AccessType::Append => true, AccessType::Read => true];
+    let perms_0 = PublicAccessList {
+        access_list: btreemap![User::Specific(public_key_a) => PublicUserAccess::new(set)],
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
 
-    unwrap!(data.append_permissions(perms_0, 0));
-    unwrap!(data.append(
-        vec![ADataEntry {
-            key: b"one".to_vec(),
-            value: b"foo".to_vec()
-        }],
-        0
-    ));
-    unwrap!(data.append(
-        vec![ADataEntry {
-            key: b"two".to_vec(),
-            value: b"foo".to_vec()
-        }],
-        1
-    ));
+    unwrap!(data.set_access_list(perms_0, 0));
+    unwrap!(data.append(vec![b"one".to_vec(), b"foo".to_vec()], Some(0)));
+    unwrap!(data.append(vec![b"two".to_vec(), b"foo".to_vec()], Some(1)));
 
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::PutAData(data.clone().into()),
+        Request::PutSequence(data.clone().into()),
     );
 
     common::send_request_expect_ok(
         &mut env,
         &mut client_a,
-        Request::GetADataOwners {
+        Request::GetSequenceOwnerAt {
             address: *data.address(),
-            owners_index: ADataIndex::FromStart(0),
+            version: Version::FromStart(0),
         },
         owner_0,
     );
@@ -1666,47 +1525,47 @@ fn append_only_data_put_owners() {
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
-        Request::GetADataOwners {
+        Request::GetSequenceOwnerAt {
             address: *data.address(),
-            owners_index: ADataIndex::FromStart(1),
+            version: Version::FromStart(1),
         },
         NdError::InvalidOwners,
     );
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::GetADataOwners {
+        Request::GetSequenceOwnerAt {
             address: *data.address(),
-            owners_index: ADataIndex::FromStart(1),
+            version: Version::FromStart(1),
         },
         NdError::InvalidOwners,
     );
 
     // Set the new owner, change from A -> B
-    let owner_1 = ADataOwner {
+    let owner_1 = Owner {
         public_key: public_key_b,
-        entries_index: 2,
-        permissions_index: 1,
+        expected_data_version: 2,
+        expected_access_list_version: 1,
     };
 
     // B can't set the new owner, but A can
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::SetADataOwner {
+        Request::SetSequenceOwner {
             address: *data.address(),
             owner: owner_1,
-            owners_index: 1,
+            expected_version: 1,
         },
         NdError::AccessDenied,
     );
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::SetADataOwner {
+        Request::SetSequenceOwner {
             address: *data.address(),
             owner: owner_1,
-            owners_index: 1,
+            expected_version: 1,
         },
     );
 
@@ -1714,18 +1573,18 @@ fn append_only_data_put_owners() {
     common::send_request_expect_ok(
         &mut env,
         &mut client_a,
-        Request::GetADataOwners {
+        Request::GetSequenceOwnerAt {
             address: *data.address(),
-            owners_index: ADataIndex::FromStart(1),
+            version: Version::FromStart(1),
         },
         owner_1,
     );
     common::send_request_expect_ok(
         &mut env,
         &mut client_b,
-        Request::GetADataOwners {
+        Request::GetSequenceOwnerAt {
             address: *data.address(),
-            owners_index: ADataIndex::FromStart(1),
+            version: Version::FromStart(1),
         },
         owner_1,
     );
@@ -1742,73 +1601,60 @@ fn append_only_data_append_seq() {
 
     let name: XorName = env.rng().gen();
     let tag = 100;
-    let mut data = PubSeqAppendOnlyData::new(name, tag);
+    let mut data = PublicSequence::new(name, tag);
 
-    let owner_0 = ADataOwner {
+    let owner_0 = Owner {
         public_key,
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
-    unwrap!(data.append_owner(owner_0, 0));
+    unwrap!(data.set_owner(owner_0, 0));
 
-    let perms_0 = ADataPubPermissions {
-        permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
-        entries_index: 0,
-        owners_index: 1,
+    let set = btreemap![AccessType::Append => true, AccessType::Read => true];
+    let perms_0 = PublicAccessList {
+        access_list: btreemap![User::Anyone => PublicUserAccess::new(set)],
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
 
-    unwrap!(data.append_permissions(perms_0, 0));
-    unwrap!(data.append(
-        vec![ADataEntry {
-            key: b"one".to_vec(),
-            value: b"foo".to_vec()
-        }],
-        0
-    ));
-    unwrap!(data.append(
-        vec![ADataEntry {
-            key: b"two".to_vec(),
-            value: b"foo".to_vec()
-        }],
-        1
-    ));
+    unwrap!(data.set_access_list(perms_0, 0));
+    unwrap!(data.append(vec![b"one".to_vec(), b"foo".to_vec()], Some(0)));
+    unwrap!(data.append(vec![b"two".to_vec(), b"foo".to_vec()], Some(1)));
 
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::PutAData(data.clone().into()),
+        Request::PutSequence(data.clone().into()),
     );
 
     common::send_request_expect_ok(
         &mut env,
         &mut client,
-        Request::GetADataLastEntry(*data.address()),
-        ADataEntry::new(b"two".to_vec(), b"foo".to_vec()),
+        Request::GetSequenceCurrentEntry(*data.address()),
+        vec![b"two".to_vec(), b"foo".to_vec()],
     );
 
-    let appended_values = ADataEntry::new(b"three".to_vec(), b"bar".to_vec());
-    let append = ADataAppendOperation {
+    let appended_values = vec![b"three".to_vec(), b"bar".to_vec()];
+    let append = AppendOperation {
         address: *data.address(),
-        values: vec![appended_values.clone()],
+        expected_version: Some(2),
+        values: appended_values.clone(),
     };
+
     // First try an invalid append
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::AppendUnseq(append.clone()),
+        Request::Append(append.clone()),
         NdError::InvalidOperation,
     );
-    common::perform_mutation(
-        &mut env,
-        &mut client,
-        Request::AppendSeq { append, index: 2 },
-    );
+    common::perform_mutation(&mut env, &mut client, Request::Append(append));
 
     // Check the result
     common::send_request_expect_ok(
         &mut env,
         &mut client,
-        Request::GetADataLastEntry(*data.address()),
+        Request::GetSequenceCurrentEntry(*data.address()),
         appended_values,
     );
 }
@@ -1824,67 +1670,62 @@ fn append_only_data_append_unseq() {
 
     let name: XorName = env.rng().gen();
     let tag = 100;
-    let mut data = PubUnseqAppendOnlyData::new(name, tag);
+    let mut data = PublicSequence::new(name, tag);
 
-    let owner_0 = ADataOwner {
+    let owner_0 = Owner {
         public_key,
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
-    unwrap!(data.append_owner(owner_0, 0));
+    unwrap!(data.set_owner(owner_0, 0));
 
-    let perms_0 = ADataPubPermissions {
-        permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
-        entries_index: 0,
-        owners_index: 1,
+    let map = BTreeMap::new();
+    map.insert(AccessType::Read, true);
+    map.insert(AccessType::Append, true);
+    let perms_0 = PublicAccessList {
+        access_list: btreemap![User::Anyone => PublicUserAccess::new(map)],
+        expected_data_version: 0,
+        expected_owners_version: 1,
     };
 
-    unwrap!(data.append_permissions(perms_0, 0));
-    unwrap!(data.append(vec![ADataEntry {
-        key: b"one".to_vec(),
-        value: b"foo".to_vec()
-    }]));
-    unwrap!(data.append(vec![ADataEntry {
-        key: b"two".to_vec(),
-        value: b"foo".to_vec()
-    }]));
+    unwrap!(data.set_access_list(perms_0, 0));
+    unwrap!(data.append(vec![b"one".to_vec(), b"foo".to_vec()], None));
+    unwrap!(data.append(vec![b"two".to_vec(), b"foo".to_vec()], None));
 
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::PutAData(data.clone().into()),
+        Request::PutSequence(data.clone().into()),
     );
 
     common::send_request_expect_ok(
         &mut env,
         &mut client,
-        Request::GetADataLastEntry(*data.address()),
-        ADataEntry::new(b"two".to_vec(), b"foo".to_vec()),
+        Request::GetSequenceCurrentEntry(*data.address()),
+        vec![b"two".to_vec(), b"foo".to_vec()],
     );
 
-    let appended_values = ADataEntry::new(b"three".to_vec(), b"bar".to_vec());
-    let append = ADataAppendOperation {
+    let appended_values = vec![b"three".to_vec(), b"bar".to_vec()];
+    let append = AppendOperation {
         address: *data.address(),
-        values: vec![appended_values.clone()],
+        expected_version: Some(2),
+        values: appended_values.clone(),
     };
 
     // First try an invalid append
     common::send_request_expect_err(
         &mut env,
         &mut client,
-        Request::AppendSeq {
-            append: append.clone(),
-            index: 2,
-        },
+        Request::Append(append.clone()),
         NdError::InvalidOperation,
     );
-    common::perform_mutation(&mut env, &mut client, Request::AppendUnseq(append));
+    common::perform_mutation(&mut env, &mut client, Request::Append(append));
 
     // Check the result
     common::send_request_expect_ok(
         &mut env,
         &mut client,
-        Request::GetADataLastEntry(*data.address()),
+        Request::GetSequenceCurrentEntry(*data.address()),
         appended_values,
     );
 }
@@ -2382,19 +2223,19 @@ fn app_permissions() {
     );
     env.establish_connection(&mut app_3);
 
-    let adata_owner = ADataOwner {
+    let adata_owner = Owner {
         public_key: *owner.public_id().public_key(),
-        entries_index: 0,
-        permissions_index: 0,
+        expected_data_version: 0,
+        expected_access_list_version: 0,
     };
 
-    let mut pub_data = PubUnseqAppendOnlyData::new(env.rng().gen(), 100);
-    unwrap!(pub_data.append_owner(adata_owner, 0));
-    unwrap!(pub_data.append_permissions(
-        ADataPubPermissions {
-            permissions: btreemap![ADataUser::Anyone => ADataPubPermissionSet::new(true, true)],
-            entries_index: 0,
-            owners_index: 1,
+    let mut pub_data = PublicSequence::new(env.rng().gen(), 100);
+    unwrap!(pub_data.set_owner(adata_owner, 0));
+    unwrap!(pub_data.set_access_list(
+        PublicAccessList {
+            access_list: btreemap![User::Anyone => PublicUserAccess::new(btreemap![AccessType::Read => true, AccessType::Append => true])],
+            expected_data_version: 0,
+            expected_owners_version: 1,
         },
         0
     ));
@@ -2403,20 +2244,24 @@ fn app_permissions() {
     common::perform_mutation(
         &mut env,
         &mut owner,
-        Request::PutAData(AData::from(pub_data)),
+        Request::PutSequence(Sequence::from(pub_data)),
     );
 
-    let mut unpub_data = UnpubUnseqAppendOnlyData::new(env.rng().gen(), 101);
-    unwrap!(unpub_data.append_owner(adata_owner, 0));
-    unwrap!(unpub_data.append_permissions(
-        ADataUnpubPermissions {
-            permissions: btreemap![
-                *app_0.public_id().public_key() => ADataUnpubPermissionSet::new(true, true, true),
-                *app_1.public_id().public_key() => ADataUnpubPermissionSet::new(true, true, true),
-                *app_2.public_id().public_key() => ADataUnpubPermissionSet::new(true, true, true),
+    let set = BTreeSet::new();
+    set.insert(AccessType::Append);
+    set.insert(AccessType::Read);
+    set.insert(AccessType::ModifyPermissions);
+    let mut unpub_data = PrivateSequence::new(env.rng().gen(), 101);
+    unwrap!(unpub_data.set_owner(adata_owner, 0));
+    unwrap!(unpub_data.set_access_list(
+        PrivateAccessList {
+            access_list: btreemap![
+                *app_0.public_id().public_key() => PrivateUserAccess::new(set.clone()),
+                *app_1.public_id().public_key() => PrivateUserAccess::new(set.clone()),
+                *app_2.public_id().public_key() => PrivateUserAccess::new(set.clone()),
             ],
-            entries_index: 0,
-            owners_index: 1,
+            expected_data_version: 0,
+            expected_owners_version: 1,
         },
         0
     ));
@@ -2425,56 +2270,55 @@ fn app_permissions() {
     common::perform_mutation(
         &mut env,
         &mut owner,
-        Request::PutAData(AData::from(unpub_data)),
+        Request::PutSequence(Sequence::from(unpub_data)),
     );
 
     // All three apps can perform get request against published data
-    let _: AData =
-        common::get_from_response(&mut env, &mut app_0, Request::GetAData(pub_data_address));
-    let _: AData =
-        common::get_from_response(&mut env, &mut app_1, Request::GetAData(pub_data_address));
-    let _: AData =
-        common::get_from_response(&mut env, &mut app_2, Request::GetAData(pub_data_address));
+    let _: Sequence =
+        common::get_from_response(&mut env, &mut app_0, Request::GetSequence(pub_data_address));
+    let _: Sequence =
+        common::get_from_response(&mut env, &mut app_1, Request::GetSequence(pub_data_address));
+    let _: Sequence =
+        common::get_from_response(&mut env, &mut app_2, Request::GetSequence(pub_data_address));
 
     // Only the authorized apps can perform get request against unpublished data
-    let _: AData =
-        common::get_from_response(&mut env, &mut app_0, Request::GetAData(unpub_data_address));
-    let _: AData =
-        common::get_from_response(&mut env, &mut app_1, Request::GetAData(unpub_data_address));
+    let _: Sequence = common::get_from_response(
+        &mut env,
+        &mut app_0,
+        Request::GetSequence(unpub_data_address),
+    );
+    let _: Sequence = common::get_from_response(
+        &mut env,
+        &mut app_1,
+        Request::GetSequence(unpub_data_address),
+    );
     common::send_request_expect_err(
         &mut env,
         &mut app_2,
-        Request::GetAData(unpub_data_address),
+        Request::GetSequence(unpub_data_address),
         NdError::AccessDenied,
     );
 
     // Only the app with the transfer coins permission can perform mutable request.
     for address in [pub_data_address, unpub_data_address].iter().cloned() {
-        let append = ADataAppendOperation {
+        let append = AppendOperation {
             address,
-            values: vec![ADataEntry {
-                key: b"key".to_vec(),
-                value: b"value".to_vec(),
-            }],
+            expected_version: None,
+            values: vec![b"key".to_vec(), b"value".to_vec()],
         };
 
-        common::send_request_expect_ok(
-            &mut env,
-            &mut app_0,
-            Request::AppendUnseq(append.clone()),
-            (),
-        );
+        common::send_request_expect_ok(&mut env, &mut app_0, Request::Append(append.clone()), ());
 
         common::send_request_expect_err(
             &mut env,
             &mut app_1,
-            Request::AppendUnseq(append.clone()),
+            Request::Append(append.clone()),
             NdError::AccessDenied,
         );
         common::send_request_expect_err(
             &mut env,
             &mut app_2,
-            Request::AppendUnseq(append),
+            Request::Append(append),
             NdError::AccessDenied,
         );
     }
