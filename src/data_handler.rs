@@ -167,12 +167,9 @@ impl DataHandler {
             GetSequenceShell {
                 address,
                 data_version,
-            } => self.sequence_handler.get_shell(
-                requester,
-                address,
-                data_version,
-                message_id,
-            ),
+            } => self
+                .sequence_handler
+                .get_shell(requester, address, data_version, message_id),
             GetSequenceRange { address, range } => self
                 .sequence_handler
                 .get_range(requester, address, range, message_id),
@@ -241,9 +238,13 @@ impl DataHandler {
                 address,
                 version,
                 public_key,
-            } => self
-                .sequence_handler
-                .get_private_user_access_at(requester, address, version, &public_key, message_id),
+            } => self.sequence_handler.get_private_user_access_at(
+                requester,
+                address,
+                version,
+                &public_key,
+                message_id,
+            ),
             DeletePrivateSequence(address) => {
                 self.sequence_handler.delete(requester, address, message_id)
             }
@@ -265,6 +266,32 @@ impl DataHandler {
             } => self.sequence_handler.set_private_access_list(
                 requester,
                 address,
+                access_list,
+                expected_version,
+                message_id,
+            ),
+            SetPublicSequenceUserAccess {
+                address,
+                user,
+                access_list,
+                expected_version,
+            } => self.sequence_handler.set_public_user_access(
+                requester,
+                address,
+                user,
+                access_list,
+                expected_version,
+                message_id,
+            ),
+            SetPrivateSequenceUserAccess {
+                address,
+                user,
+                access_list,
+                expected_version,
+            } => self.sequence_handler.set_private_user_access(
+                requester,
+                address,
+                user,
                 access_list,
                 expected_version,
                 message_id,

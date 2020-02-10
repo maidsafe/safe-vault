@@ -129,6 +129,8 @@ pub(crate) fn destination_address(request: &Request) -> Option<Cow<XorName>> {
         | GetSequenceAccessListAt { ref address, .. }
         | SetPublicSequenceAccessList { ref address, .. }
         | SetPrivateSequenceAccessList { ref address, .. }
+        | SetPublicSequenceUserAccess { ref address, .. }
+        | SetPrivateSequenceUserAccess { ref address, .. }
         | GetPublicSequenceAccessListHistory(ref address)
         | GetPrivateSequenceAccessListHistory(ref address)
         | GetPublicSequenceAccessListHistoryRange { ref address, .. }
@@ -186,6 +188,8 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
         | DeletePrivateSequence(_)
         | SetPublicSequenceAccessList { .. }
         | SetPrivateSequenceAccessList { .. }
+        | SetPublicSequenceUserAccess { .. }
+        | SetPrivateSequenceUserAccess { .. }
         | SetSequenceOwner { .. }
         | Append(_)
         | CreateLoginPacket(_)

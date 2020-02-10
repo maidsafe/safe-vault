@@ -2276,7 +2276,7 @@ checksum = "bfa8506c1de11c9c4e4c38863ccbe02a305c8188e85a05a784c9e11e1c3910c8"
 [[package]]
 name = "safe-nd"
 version = "0.7.2"
-source = "git+https://github.com/oetyng/safe-nd/?branch=replace-ad-with-sequence#f3476910f3446fe5a73c5d61ad9f53f992b5ef9b"
+source = "git+https://github.com/oetyng/safe-nd/?branch=replace-ad-with-sequence#18efd545f2f11d2c8658548900b5fd21191097a2"
 dependencies = [
  "bincode 1.1.4",
  "ed25519-dalek",

@@ -14,12 +14,11 @@ use crate::{
     vault::Init,
     Config, Result,
 };
-use log::error;
 
 use safe_nd::{
     AccessList, AccessType, Address, AppendOperation, Error as NdError, MessageId, NodePublicId,
-    Owner, PrivateAccessList, PublicAccessList, PublicId, PublicKey, Response, Result as NdResult,
-    Sequence, User, Version,
+    Owner, PrivateAccessList, PrivateUserAccess, PublicAccessList, PublicId, PublicKey,
+    PublicUserAccess, Response, Result as NdResult, Sequence, User, Version,
 };
 
 use std::{
@@ -406,7 +405,7 @@ impl SequenceHandler {
         requester: PublicId,
         address: Address,
         version: Version,
-        public_key:  &PublicKey,
+        public_key: &PublicKey,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
@@ -440,24 +439,13 @@ impl SequenceHandler {
         expected_version: u64,
         message_id: MessageId,
     ) -> Option<Action> {
-        let own_id = format!("{}", self);
         self.mutate(
             &requester,
             address,
             AccessType::ModifyPermissions,
             message_id,
             move |mut data| {
-                match data {
-                    Sequence::Public(ref mut data) => {
-                        data.set_access_list(access_list, expected_version)?;
-                    }
-                    _ => {
-                        return {
-                            error!("{}: Unexpected chunk encountered", own_id);
-                            Err(NdError::InvalidOperation)
-                        }
-                    }
-                }
+                data.set_public_access_list(access_list, expected_version)?;
                 Ok(data)
             },
         )
@@ -471,22 +459,55 @@ impl SequenceHandler {
         expected_version: u64,
         message_id: MessageId,
     ) -> Option<Action> {
-        let own_id = format!("{}", self);
         self.mutate(
             &requester,
             address,
             AccessType::ModifyPermissions,
             message_id,
             move |mut data| {
-                match data {
-                    Sequence::Private(ref mut data) => {
-                        data.set_access_list(access_list, expected_version)?;
-                    }
-                    _ => {
-                        error!("{}: Unexpected chunk encountered", own_id);
-                        return Err(NdError::InvalidOperation);
-                    }
-                }
+                data.set_private_access_list(access_list, expected_version)?;
+                Ok(data)
+            },
+        )
+    }
+
+    pub(super) fn set_public_user_access(
+        &mut self,
+        requester: PublicId,
+        address: Address,
+        user: User,
+        access_list: PublicUserAccess,
+        expected_version: u64,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        self.mutate(
+            &requester,
+            address,
+            AccessType::ModifyPermissions,
+            message_id,
+            move |mut data| {
+                data.set_public_user_access(user, access_list, expected_version)?;
+                Ok(data)
+            },
+        )
+    }
+
+    pub(super) fn set_private_user_access(
+        &mut self,
+        requester: PublicId,
+        address: Address,
+        user: PublicKey,
+        access_list: PrivateUserAccess,
+        expected_version: u64,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        self.mutate(
+            &requester,
+            address,
+            AccessType::ModifyPermissions,
+            message_id,
+            move |mut data| {
+                data.set_private_user_access(user, access_list, expected_version)?;
                 Ok(data)
             },
         )
@@ -549,11 +570,17 @@ impl SequenceHandler {
         })
     }
 
-    fn deref_vec<T>(&self, result: safe_nd::Result<Vec<&T>>) -> safe_nd::Result<Vec<T>> where T: Clone {
+    fn deref_vec<T>(&self, result: safe_nd::Result<Vec<&T>>) -> safe_nd::Result<Vec<T>>
+    where
+        T: Clone,
+    {
         Ok(result?.into_iter().cloned().collect())
-     }
+    }
 
-    fn deref<T>(&self, result: safe_nd::Result<&T>) -> safe_nd::Result<T> where T: Clone {
+    fn deref<T>(&self, result: safe_nd::Result<&T>) -> safe_nd::Result<T>
+    where
+        T: Clone,
+    {
         Ok(result?.clone())
     }
 

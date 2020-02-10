@@ -345,6 +345,8 @@ impl ClientHandler {
             }
             SetPublicSequenceAccessList { .. }
             | SetPrivateSequenceAccessList { .. }
+            | SetPublicSequenceUserAccess { .. }
+            | SetPrivateSequenceUserAccess { .. }
             | SetSequenceOwner { .. }
             | Append(_) => self.handle_mutate_sequence(client, request, message_id),
             //
@@ -888,6 +890,8 @@ impl ClientHandler {
             | DeletePrivateSequence(_)
             | SetPublicSequenceAccessList { .. }
             | SetPrivateSequenceAccessList { .. }
+            | SetPublicSequenceUserAccess { .. }
+            | SetPrivateSequenceUserAccess { .. }
             | SetSequenceOwner { .. }
             | Append(_)
             | GetBalance
