@@ -422,7 +422,7 @@ pub trait TestClientTrait {
             env.poll();
             match self.rx().try_recv() {
                 Ok(Event::SentUserMessage { .. }) => continue,
-                Ok(Event::NewMessage { peer_addr, msg }) => return (peer_addr, msg),
+                Ok(Event::NewMessage { peer, msg }) => return (peer.peer_addr(), msg),
                 Err(error) => {
                     if error.is_empty() {
                         continue;

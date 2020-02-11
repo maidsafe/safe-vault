@@ -11,7 +11,7 @@ pub use routing::{event, ConnectionInfo, NetworkConfig, P2pNode, RoutingError};
 use bytes::Bytes;
 use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
 use log::trace;
-use mock_quic_p2p::{self as quic_p2p, Error, Event as NetworkEvent, Peer, QuicP2p};
+use mock_quic_p2p::{self as quic_p2p, Event as NetworkEvent, Peer, QuicP2p, QuicP2pError};
 use routing::event::Client as ClientEvent;
 use routing::{event::Event, XorName};
 use std::{
@@ -157,26 +157,20 @@ pub fn into_client_event(network_event: NetworkEvent) -> Result<ClientEvent, ()>
         ConnectedTo { peer } => ClientEvent::Connected {
             peer_addr: peer.peer_addr(),
         },
-        NewMessage { peer_addr, msg } => ClientEvent::NewMessage { peer_addr, msg },
-        ConnectionFailure {
-            peer_addr,
-            err: _err,
-        } => ClientEvent::ConnectionFailure { peer_addr },
-        UnsentUserMessage {
-            peer_addr,
+        NewMessage { peer, msg } => ClientEvent::NewMessage {
+            peer_addr: peer.peer_addr(),
             msg,
-            token,
-        } => ClientEvent::UnsentUserMsg {
-            peer_addr,
+        },
+        ConnectionFailure { peer, err: _err } => ClientEvent::ConnectionFailure {
+            peer_addr: peer.peer_addr(),
+        },
+        UnsentUserMessage { peer, msg, token } => ClientEvent::UnsentUserMsg {
+            peer_addr: peer.peer_addr(),
             msg,
             token,
         },
-        SentUserMessage {
-            peer_addr,
-            msg,
-            token,
-        } => ClientEvent::SentUserMsg {
-            peer_addr,
+        SentUserMessage { peer, msg, token } => ClientEvent::SentUserMsg {
+            peer_addr: peer.peer_addr(),
             msg,
             token,
         },
@@ -236,7 +230,9 @@ impl NodeBuilder {
     }
 }
 
-fn setup_quic_p2p(config: &NetworkConfig) -> Result<(QuicP2p, Receiver<NetworkEvent>), Error> {
+fn setup_quic_p2p(
+    config: &NetworkConfig,
+) -> Result<(QuicP2p, Receiver<NetworkEvent>), QuicP2pError> {
     let (event_sender, event_receiver) = crossbeam_channel::unbounded();
     let quic_p2p = quic_p2p::Builder::new(event_sender)
         .with_config(config.clone())

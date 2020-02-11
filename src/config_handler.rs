@@ -304,9 +304,9 @@ mod test {
     #[test]
     fn smoke() {
         let expected_size = if cfg!(target_pointer_width = "64") {
-            296
+            320
         } else {
-            184
+            200
         };
         assert_eq!(
             expected_size,

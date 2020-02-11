@@ -1167,7 +1167,7 @@ impl ClientHandler {
                             XorName(p2p_node.name().0),
                             ConnectionInfo {
                                 peer_addr,
-                                peer_cert_der,
+                                peer_cert_der: peer_cert_der.to_vec(),
                             },
                         )
                     })
@@ -1201,7 +1201,7 @@ impl ClientHandler {
                             XorName(p2p_node.name().0),
                             ConnectionInfo {
                                 peer_addr,
-                                peer_cert_der,
+                                peer_cert_der: peer_cert_der.to_vec(),
                             },
                         )
                     })
