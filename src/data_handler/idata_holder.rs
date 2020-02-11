@@ -9,7 +9,7 @@
 use crate::{
     action::Action, chunk_store::ImmutableChunkStore, rpc::Rpc, utils, vault::Init, Config, Result,
 };
-use log::{error, info};
+use log::{error, info, trace};
 
 use safe_nd::{Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Response};
 
@@ -39,7 +39,11 @@ impl IDataHolder {
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        Ok(Self { id, chunks })
+
+        let idata_holder = Self { id, chunks };
+        trace!("{}: New ImmutableDataHolder created", idata_holder);
+
+        Ok(idata_holder)
     }
 
     pub(super) fn store_idata(
@@ -50,15 +54,26 @@ impl IDataHolder {
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
             info!(
-                "{}: Immutable chunk already exists, not storing: {:?}",
+                "[{}-{:?}]: Immutable chunk already exists, not storing: {:?}",
                 self,
+                message_id,
                 data.address()
             );
             Ok(())
         } else {
-            self.chunks
+            let put_result = self
+                .chunks
                 .put(&data)
-                .map_err(|error| error.to_string().into())
+                .map_err(|error| error.to_string().into());
+
+            trace!(
+                "[{}-{:?}]: Immutable chunk stored at: {:?}",
+                self,
+                message_id,
+                data.address()
+            );
+
+            put_result
         };
         let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToOurDataHandlers {
@@ -94,6 +109,22 @@ impl IDataHolder {
                 _ => Ok(idata),
             });
 
+        match result {
+            Ok(_) => trace!(
+                "[{}-{:?}]: Immutable chunk returned from: {:?}",
+                self,
+                message_id,
+                address
+            ),
+            Err(ref err) => trace!(
+                "[{}-{:?}]: Failed to return Immutable chunk from {:?}: {}",
+                self,
+                message_id,
+                address,
+                err
+            ),
+        }
+
         Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
@@ -128,7 +159,7 @@ impl IDataHolder {
                 }
                 _ => {
                     error!(
-                        "{}: Invalid DeleteUnpub(IData::Pub) encountered: {:?}",
+                        "[{}-{:?}]: Invalid DeleteUnpub(IData::Pub) encountered",
                         self, message_id
                     );
                     Err(NdError::InvalidOperation)
@@ -139,6 +170,22 @@ impl IDataHolder {
                     .delete(&address)
                     .map_err(|error| error.to_string().into())
             });
+
+        match result {
+            Ok(_) => trace!(
+                "[{}-{:?}]: Immutable chunk deleted from: {:?}",
+                self,
+                message_id,
+                address
+            ),
+            Err(ref err) => trace!(
+                "[{}-{:?}]: Failed to delete Immutable chunk from {:?}: {}",
+                self,
+                message_id,
+                address,
+                err
+            ),
+        }
 
         Some(Action::RespondToOurDataHandlers {
             sender: *self.id.name(),

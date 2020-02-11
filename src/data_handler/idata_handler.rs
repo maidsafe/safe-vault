@@ -80,8 +80,9 @@ impl IDataHandler {
         if self.metadata.exists(&(*data.address()).to_db_key()) {
             return if data.is_pub() {
                 trace!(
-                    "{}: Replying success for Put {:?}, it already exists.",
+                    "[{}-{:?}]: Replying success for Put {:?}, it already exists.",
                     self,
+                    message_id,
                     data
                 );
                 respond(Ok(()))
@@ -262,14 +263,18 @@ impl IDataHandler {
             .unwrap_or_default();
         if !metadata.holders.insert(sender) {
             warn!(
-                "{}: {} already registered as a holder for {:?}",
+                "[{}-{:?}]: {} already registered as a holder for {:?}",
                 self,
+                message_id,
                 sender,
                 self.idata_op(&message_id)?
             );
         }
         if let Err(error) = self.metadata.set(&db_key, &metadata) {
-            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+            warn!(
+                "[{}-{:?}]: Failed to write metadata to DB: {:?}",
+                self, message_id, error
+            );
             // TODO - send failure back to client handlers (hopefully won't accumulate), or
             //        maybe self-terminate if we can't fix this error?
         }
@@ -296,13 +301,16 @@ impl IDataHandler {
         // TODO - Only rudimentary checks for if requests to Adult nodes were successful. These
         // mostly assume we're in practice only delegating to a single Adult (ourself in phase 1).
         if let Err(err) = result {
-            warn!("{}: Node reports error deleting: {}", self, err);
+            warn!(
+                "[{}-{:?}]: Node reports error deleting: {}",
+                self, message_id, err
+            );
         } else {
             let db_key = idata_address.to_db_key();
             let metadata = self.metadata.get::<ChunkMetadata>(&db_key).or_else(|| {
                 warn!(
-                    "{}: Failed to get metadata from DB: {:?}",
-                    self, idata_address
+                    "[{}-{:?}]: Failed to get metadata from DB: {:?}",
+                    self, message_id, idata_address
                 );
                 None
             });
@@ -310,19 +318,26 @@ impl IDataHandler {
             if let Some(mut metadata) = metadata {
                 if !metadata.holders.remove(&sender) {
                     warn!(
-                        "{}: {} is not registered as a holder for {:?}",
+                        "[{}-{:?}]: {} is not registered as a holder for {:?}",
                         self,
+                        message_id,
                         sender,
                         self.idata_op(&message_id)?
                     );
                 }
                 if metadata.holders.is_empty() {
                     if let Err(error) = self.metadata.rem(&db_key) {
-                        warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
+                        warn!(
+                            "[{}-{:?}]: Failed to delete metadata from DB: {:?}",
+                            self, message_id, error
+                        );
                         // TODO - Send failure back to client handlers?
                     }
                 } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
-                    warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+                    warn!(
+                        "[{}-{:?}]: Failed to write metadata to DB: {:?}",
+                        self, message_id, error
+                    );
                     // TODO - Send failure back to client handlers?
                 }
             };
@@ -390,7 +405,7 @@ impl IDataHandler {
     pub(super) fn idata_op(&self, message_id: &MessageId) -> Option<&IDataOp> {
         self.idata_ops.get(message_id).or_else(|| {
             warn!(
-                "{}: No current ImmutableData operation for {:?}",
+                "[{}-{:?}]: No current ImmutableData operation found",
                 self, message_id
             );
             None
@@ -401,7 +416,7 @@ impl IDataHandler {
         let own_id = format!("{}", self);
         self.idata_ops.get_mut(message_id).or_else(|| {
             warn!(
-                "{}: No current ImmutableData operation for {:?}",
+                "[{}-{:?}]: No current ImmutableData operation found",
                 own_id, message_id
             );
             None
@@ -434,6 +449,6 @@ impl IDataHandler {
 
 impl Display for IDataHandler {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "IDataHandler({})", self.id.name())
     }
 }

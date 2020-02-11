@@ -65,3 +65,28 @@ pub(crate) enum Action {
         rpc: Rpc,
     },
 }
+
+impl ConsensusAction {
+    pub fn message_id(&self) -> MessageId {
+        use ConsensusAction::*;
+        match self {
+            PayAndForward { message_id, .. } => *message_id,
+            Forward { message_id, .. } => *message_id,
+            PayAndProxy { message_id, .. } => *message_id,
+        }
+    }
+}
+
+impl Action {
+    pub fn message_id(&self) -> MessageId {
+        use Action::*;
+        match self {
+            ConsensusVote(consensus_action) => consensus_action.message_id(),
+            ForwardClientRequest(rpc) => rpc.message_id(),
+            ProxyClientRequest(rpc) => rpc.message_id(),
+            RespondToOurDataHandlers { rpc, .. } => rpc.message_id(),
+            RespondToClientHandlers { rpc, .. } => rpc.message_id(),
+            SendToPeers { rpc, .. } => rpc.message_id(),
+        }
+    }
+}

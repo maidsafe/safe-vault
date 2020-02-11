@@ -264,6 +264,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn handle_routing_event(&mut self, event: RoutingEvent) -> Option<Action> {
+        trace!("{}: Handling new routing event: {:?}", self, event);
         match event {
             RoutingEvent::Client(ev) => self.handle_client_event(ev),
             RoutingEvent::Consensus(custom_event) => {
@@ -288,6 +289,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
         let mut rng = ChaChaRng::from_seed(self.rng.gen());
 
+        trace!("{}: Handling new client event: {:?}", self, event);
         let client_handler = self.client_handler_mut()?;
         match event {
             Connected { peer_addr } => client_handler.handle_new_connection(peer_addr),
@@ -315,7 +317,12 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn handle_action(&mut self, action: Action) -> Option<Action> {
-        trace!("{} handle action {:?}", self, action);
+        trace!(
+            "[{}-{:?}]: Handling action {:?}",
+            self,
+            action.message_id(),
+            action
+        );
         use Action::*;
         match action {
             ConsensusVote(action) => self.vote_for_action(&action),
@@ -361,7 +368,12 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn forward_client_request(&mut self, rpc: Rpc) -> Option<Action> {
-        trace!("{} received a client request {:?}", self, rpc);
+        trace!(
+            "[{}-{:?}]: received a client request {:?}",
+            self,
+            rpc.message_id(),
+            rpc
+        );
         let requester_name = if let Rpc::Request {
             request: Request::CreateLoginPacketFor { ref new_owner, .. },
             ..

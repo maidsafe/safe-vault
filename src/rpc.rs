@@ -29,3 +29,13 @@ pub(crate) enum Rpc {
         refund: Option<Coins>,
     },
 }
+
+impl Rpc {
+    pub fn message_id(&self) -> MessageId {
+        use Rpc::*;
+        match self {
+            Request { message_id, .. } => *message_id,
+            Response { message_id, .. } => *message_id,
+        }
+    }
+}

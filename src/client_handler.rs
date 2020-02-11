@@ -124,7 +124,6 @@ impl ClientHandler {
 
     pub fn handle_consensused_action(&mut self, action: ConsensusAction) -> Option<Action> {
         use ConsensusAction::*;
-        trace!("{}: Consensused {:?}", self, action,);
         match action {
             PayAndForward {
                 request,
@@ -132,6 +131,12 @@ impl ClientHandler {
                 message_id,
                 cost,
             } => {
+                trace!(
+                    "[{}-{:?}]: Consensused PayAndForward: {:?}",
+                    self,
+                    message_id,
+                    request
+                );
                 let owner = utils::owner(&client_public_id)?;
                 self.pay(
                     &client_public_id,
@@ -151,17 +156,32 @@ impl ClientHandler {
                 request,
                 client_public_id,
                 message_id,
-            } => Some(Action::ForwardClientRequest(Rpc::Request {
-                requester: client_public_id,
-                request,
-                message_id,
-            })),
+            } => {
+                trace!(
+                    "[{}-{:?}]: Consensused Forward: {:?}",
+                    self,
+                    message_id,
+                    request
+                );
+
+                Some(Action::ForwardClientRequest(Rpc::Request {
+                    requester: client_public_id,
+                    request,
+                    message_id,
+                }))
+            }
             PayAndProxy {
                 request,
                 client_public_id,
                 message_id,
                 cost,
             } => {
+                trace!(
+                    "[{}-{:?}]: Consensused PayAndProxy: {:?}",
+                    self,
+                    message_id,
+                    request
+                );
                 let owner = utils::owner(&client_public_id)?;
                 self.pay(
                     &client_public_id,
@@ -193,9 +213,16 @@ impl ClientHandler {
                     message_id,
                     signature,
                 }) => {
-                    // We could receive a consensused vault rpc contains a client request,
-                    // before receiving the request from that client directly.
+                    trace!("[{}-{:?}]: Client message: {:?}", self, message_id, request);
+                    // We could have received a consensused vault rpc containing a client request,
+                    // even before receiving the request from that client directly.
                     if let Some(response) = self.pending_actions.remove(&message_id) {
+                        trace!(
+                            "[{}-{:?}]: Response was already consensused, sending to client: {:?}",
+                            self,
+                            message_id,
+                            response
+                        );
                         self.send(
                             peer_addr,
                             &Message::Response {
@@ -211,8 +238,8 @@ impl ClientHandler {
                         return self.handle_client_request(&client, request, message_id, signature);
                     } else {
                         info!(
-                            "Pending MessageId {:?} reused - ignoring client message.",
-                            message_id
+                            "[{}-{:?}]: Pending MessageId reused - ignoring client message.",
+                            self, message_id
                         );
                     }
                 }
@@ -267,10 +294,10 @@ impl ClientHandler {
     ) -> Option<Action> {
         use Request::*;
         trace!(
-            "{}: Received ({:?} {:?}) from {}",
+            "[{}-{:?}]: Received ({:?}) from {}",
             self,
-            request,
             message_id,
+            request,
             client.public_id
         );
 
@@ -525,8 +552,9 @@ impl ClientHandler {
         if let IData::Unpub(ref unpub_chunk) = &chunk {
             if unpub_chunk.owner() != owner.public_key() {
                 trace!(
-                    "{}: {} attempted Put UnpubIData with invalid owners field.",
+                    "[{}-{:?}]: {} attempted Put UnpubIData with invalid owners field.",
                     self,
+                    message_id,
                     client.public_id
                 );
                 self.send_response_to_client(
@@ -538,6 +566,11 @@ impl ClientHandler {
         }
 
         let request = Request::PutIData(chunk);
+        trace!(
+            "[{}-{:?}]: Sending PubIData action for a consensus vote",
+            self,
+            message_id,
+        );
         Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
@@ -889,19 +922,19 @@ impl ClientHandler {
     ) -> Option<Action> {
         use Response::*;
         trace!(
-            "{}: Received ({:?} {:?}) to {} from {}",
+            "[{}-{:?}]: Received ({:?}) to {} from {}",
             self,
-            response,
             message_id,
+            response,
             requester,
             data_handlers
         );
 
         if let Some(refund_amount) = refund {
-            if let Err(error) = self.deposit(requester.name(), refund_amount) {
+            if let Err(error) = self.deposit(requester.name(), refund_amount, message_id) {
                 error!(
-                    "{}: Failed to refund {} coins for {:?}: {:?}",
-                    self, refund_amount, requester, error,
+                    "[{}-{:?}]: Failed to refund {} coins for {:?}: {:?}",
+                    self, message_id, refund_amount, requester, error,
                 )
             };
         }
@@ -938,8 +971,8 @@ impl ClientHandler {
             //
             GetLoginPacket(_) | GetBalance(_) | ListAuthKeysAndVersion(_) => {
                 error!(
-                    "{}: Should not receive {:?} as a client handler.",
-                    self, response
+                    "[{}-{:?}]: Should not receive {:?} as a client handler.",
+                    self, message_id, response
                 );
                 None
             }
@@ -989,7 +1022,8 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let (result, refund) = match self.create_balance(&requester, owner_key, amount) {
+        let (result, refund) = match self.create_balance(&requester, owner_key, amount, message_id)
+        {
             Ok(()) => {
                 let destination = XorName::from(owner_key);
                 let transaction = Transaction {
@@ -1045,7 +1079,7 @@ impl ClientHandler {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let (result, refund) = match self.deposit(&destination, amount) {
+        let (result, refund) = match self.deposit(&destination, amount, message_id) {
             Ok(()) => {
                 let transaction = Transaction {
                     id: transaction_id,
@@ -1111,20 +1145,21 @@ impl ClientHandler {
         requester: &PublicId,
         owner_key: PublicKey,
         amount: Coins,
+        message_id: MessageId,
     ) -> Result<(), NdError> {
         let own_request = utils::own_key(requester)
             .map(|key| key == &owner_key)
             .unwrap_or(false);
         if !own_request && self.balances.exists(&owner_key) {
             info!(
-                "{}: Failed to create balance for {:?}: already exists.",
-                self, owner_key
+                "[{}-{:?}]: Failed to create balance for {:?}: already exists.",
+                self, message_id, owner_key
             );
 
             Err(NdError::BalanceExists)
         } else {
             let balance = Balance { coins: amount };
-            self.put_balance(&owner_key, &balance)?;
+            self.put_balance(&owner_key, &balance, message_id)?;
             Ok(())
         }
     }
@@ -1242,8 +1277,8 @@ impl ClientHandler {
             Some(peer_addr) => peer_addr,
             None => {
                 info!(
-                    "{} for message-id {:?}, Unable to find the client to respond to.",
-                    self, message_id
+                    "[{}-{:?}]: Unable to find the client to respond to message-id {:?}",
+                    self, message_id, message_id
                 );
                 let _ = self.pending_actions.insert(message_id, response);
                 return;
@@ -1289,7 +1324,12 @@ impl ClientHandler {
         self.balances.get(key).map(|balance| balance.coins)
     }
 
-    fn withdraw<K: balance::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
+    fn withdraw<K: balance::Key>(
+        &mut self,
+        key: &K,
+        amount: Coins,
+        message_id: MessageId,
+    ) -> Result<(), NdError> {
         if amount.as_nano() == 0 {
             return Err(NdError::InvalidOperation);
         }
@@ -1301,10 +1341,15 @@ impl ClientHandler {
             .coins
             .checked_sub(amount)
             .ok_or(NdError::InsufficientBalance)?;
-        self.put_balance(&public_key, &balance)
+        self.put_balance(&public_key, &balance, message_id)
     }
 
-    fn deposit<K: balance::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
+    fn deposit<K: balance::Key>(
+        &mut self,
+        key: &K,
+        amount: Coins,
+        message_id: MessageId,
+    ) -> Result<(), NdError> {
         let (public_key, mut balance) = self
             .balances
             .get_key_value(key)
@@ -1314,20 +1359,26 @@ impl ClientHandler {
             .checked_add(amount)
             .ok_or(NdError::ExcessiveValue)?;
 
-        self.put_balance(&public_key, &balance)
+        self.put_balance(&public_key, &balance, message_id)
     }
 
-    fn put_balance(&mut self, public_key: &PublicKey, balance: &Balance) -> Result<(), NdError> {
+    fn put_balance(
+        &mut self,
+        public_key: &PublicKey,
+        balance: &Balance,
+        message_id: MessageId,
+    ) -> Result<(), NdError> {
         trace!(
-            "{}: Setting balance to {} for {}",
+            "[{}-{:?}]: Setting balance to {} for {}",
             self,
+            message_id,
             balance,
             public_key
         );
         self.balances.put(public_key, balance).map_err(|error| {
             error!(
-                "{}: Failed to update balance of {}: {}",
-                self, public_key, error
+                "[{}-{:?}]: Failed to update balance of {}: {}",
+                self, message_id, public_key, error
             );
 
             NdError::from("Failed to update balance")
@@ -1343,11 +1394,23 @@ impl ClientHandler {
         message_id: MessageId,
         cost: Coins,
     ) -> Option<()> {
-        trace!("{}: {} is paying {} coins", self, requester_id, cost);
-        match self.withdraw(requester_key, cost) {
+        trace!(
+            "[{}-{:?}]: {} coins are being paid by {}",
+            self,
+            message_id,
+            cost,
+            requester_id
+        );
+        match self.withdraw(requester_key, cost, message_id) {
             Ok(()) => Some(()),
             Err(error) => {
-                trace!("{}: Unable to withdraw {} coins: {}", self, cost, error);
+                trace!(
+                    "[{}-{:?}]: Unable to withdraw {} coins: {}",
+                    self,
+                    message_id,
+                    cost,
+                    error
+                );
                 self.send_response_to_client(message_id, request.error_response(error));
                 None
             }
@@ -1451,7 +1514,7 @@ impl ClientHandler {
     ) -> Option<Action> {
         if &src == payer.name() {
             // Step two - create balance and forward login_packet.
-            if let Err(error) = self.create_balance(&payer, new_owner, amount) {
+            if let Err(error) = self.create_balance(&payer, new_owner, amount, message_id) {
                 // Refund amount (Including the cost of creating the balance)
                 let refund = Some(amount.checked_add(*COST_OF_PUT)?);
 
@@ -1664,6 +1727,12 @@ impl ClientHandler {
         };
 
         if !signature_required {
+            trace!(
+                "[{}-{:?}]: No signature required for: {:?}",
+                self,
+                message_id,
+                request
+            );
             return Some(());
         }
 
@@ -1671,15 +1740,27 @@ impl ClientHandler {
             self.is_valid_client_signature(public_id, request, &message_id, &signature)
         } else {
             warn!(
-                "{}: ({:?}/{:?}) from {} is unsigned",
-                self, request, message_id, public_id
+                "[{}-{:?}]: ({:?}) from {} is unsigned",
+                self, message_id, request, public_id
             );
             false
         };
 
         if valid {
+            trace!(
+                "[{}-{:?}]: Signature is valid for: {:?}",
+                self,
+                message_id,
+                request
+            );
             Some(())
         } else {
+            trace!(
+                "[{}-{:?}]: Signature is not valid for: {:?}",
+                self,
+                message_id,
+                request
+            );
             self.send_response_to_client(
                 message_id,
                 request.error_response(NdError::InvalidSignature),
@@ -1719,9 +1800,22 @@ impl ClientHandler {
         };
 
         if let Err(error) = result {
+            trace!(
+                "[{}-{:?}]: App ({}) is not authorised: {:?}",
+                self,
+                message_id,
+                app_id,
+                error
+            );
             self.send_response_to_client(message_id, request.error_response(error));
             None
         } else {
+            trace!(
+                "[{}-{:?}]: App ({}) is authorised",
+                self,
+                message_id,
+                app_id
+            );
             Some(())
         }
     }
@@ -1756,6 +1850,12 @@ impl ClientHandler {
             _ => true,
         };
         if !consistent {
+            trace!(
+                "[{}-{:?}]: Operation is inconsistent with target content type: {:?}",
+                self,
+                message_id,
+                request
+            );
             self.send_response_to_client(
                 message_id,
                 Response::Mutation(Err(NdError::InvalidOperation)),
@@ -1769,6 +1869,6 @@ impl ClientHandler {
 
 impl Display for ClientHandler {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "ClientHandler({})", self.id.name())
     }
 }

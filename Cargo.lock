@@ -2171,7 +2171,6 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?branch=fleming#481f581ae6b9e742ad58f9ece3760b509b4743e1"
 dependencies = [
  "bincode 1.1.4",
  "bytes",

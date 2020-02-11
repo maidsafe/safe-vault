@@ -80,10 +80,10 @@ impl DataHandler {
     ) -> Option<Action> {
         use Request::*;
         trace!(
-            "{}: Received ({:?} {:?}) from src {} (client {:?})",
+            "[{}-{:?}]: Received ({:?}) from src {} (client {:?})",
             self,
-            request,
             message_id,
+            request,
             src,
             requester
         );
@@ -282,8 +282,8 @@ impl DataHandler {
             | TransferCoins { .. }
             | DelAuthKey { .. } => {
                 error!(
-                    "{}: Should not receive {:?} as a data handler.",
-                    self, request
+                    "[{}-{:?}]: Should not receive {:?} as a data handler.",
+                    self, message_id, request
                 );
                 None
             }
@@ -298,10 +298,10 @@ impl DataHandler {
     ) -> Option<Action> {
         use Response::*;
         trace!(
-            "{}: Received ({:?} {:?}) from {}",
+            "[{}-{:?}]: Received ({:?}) from {}",
             self,
-            response,
             message_id,
+            response,
             src
         );
         match response {
@@ -338,8 +338,8 @@ impl DataHandler {
             | ListAuthKeysAndVersion(_)
             | GetLoginPacket(_) => {
                 error!(
-                    "{}: Should not receive {:?} as a data handler.",
-                    self, response
+                    "[{}-{:?}]: Should not receive {:?} as a data handler.",
+                    self, message_id, response
                 );
                 None
             }
@@ -410,6 +410,6 @@ impl DataHandler {
 
 impl Display for DataHandler {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "DataHandler({})", self.id.name())
     }
 }
