@@ -12,7 +12,7 @@ use crate::{
     client_handler::ClientHandler,
     coins_handler::CoinsHandler,
     data_handler::DataHandler,
-    routing::{event::Client as ClientEvent, event::Event as RoutingEvent, ConnectionInfo, Node},
+    routing::{event::Client as ClientEvent, event::Event as RoutingEvent, Node},
     rpc::Rpc,
     utils, Config, Result,
 };
@@ -27,6 +27,7 @@ use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
     fs,
+    net::SocketAddr,
     path::PathBuf,
     rc::Rc,
 };
@@ -146,7 +147,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     /// Returns our connection info.
-    pub fn our_connection_info(&mut self) -> Result<ConnectionInfo> {
+    pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
         self.routing_node
             .borrow_mut()
             .our_connection_info()
