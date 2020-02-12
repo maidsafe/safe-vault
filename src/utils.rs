@@ -228,7 +228,7 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
 
 pub(crate) fn get_refund_for_put<T>(result: &NdResult<T>) -> Option<Coins> {
     if result.is_err() {
-        Some(*COST_OF_PUT)
+        Some(COST_OF_PUT)
     } else {
         None
     }

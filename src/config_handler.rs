@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::routing::{ConnectionInfo, NetworkConfig};
+use crate::routing::NetworkConfig;
 use crate::Result;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::{self, BufReader},
-    net::{IpAddr, Ipv4Addr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
 };
 use structopt::StructOpt;
@@ -261,8 +261,8 @@ impl Config {
 /// Writes connection info to file for use by clients.
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn write_connection_info(conn_info: &ConnectionInfo) -> Result<PathBuf> {
-    write_file(CONNECTION_INFO_FILE, conn_info)
+pub fn write_connection_info(peer_addr: &SocketAddr) -> Result<PathBuf> {
+    write_file(CONNECTION_INFO_FILE, peer_addr)
 }
 
 fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<PathBuf>
@@ -303,11 +303,7 @@ mod test {
     #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
-        let expected_size = if cfg!(target_pointer_width = "64") {
-            296
-        } else {
-            184
-        };
+        let expected_size = 320;
         assert_eq!(
             expected_size,
             mem::size_of::<Config>(),
@@ -315,22 +311,16 @@ mod test {
         );
 
         let app_name = Config::clap().get_name().to_string();
-        // `SerialisableCertificate` is not exposed by Routing, so we use a faux certificate consisting of zeros only.
-        let certificate = "[0,0,0,0]";
         let base64_certificate = std::iter::repeat("A")
             .take(400)
             .collect::<Vec<_>>()
             .join("");
-        let node_info = format!(
-            "[{{\"peer_addr\":\"127.0.0.1:33292\",\"peer_cert_der\":{}}}]",
-            certificate
-        );
         let test_values = [
             ["wallet-address", "abc"],
             ["max-capacity", "1"],
             ["root-dir", "dir"],
             ["verbose", "None"],
-            ["hard-coded-contacts", node_info.as_str()],
+            ["hard-coded-contacts", "[\"127.0.0.1:33292\"]"],
             ["port", "1"],
             ["ip", "127.0.0.1"],
             ["max-msg-size-allowed", "1"],

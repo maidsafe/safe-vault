@@ -19,7 +19,7 @@ use crossbeam_channel::{Receiver, Sender};
 #[cfg(feature = "mock_parsec")]
 use fake_clock::FakeClock;
 use log::trace;
-use mock_quic_p2p::{self as quic_p2p, Builder, Event, Network, NodeInfo, OurType, Peer, QuicP2p};
+use mock_quic_p2p::{self as quic_p2p, Builder, Event, Network, OurType, Peer, QuicP2p};
 #[cfg(feature = "mock_parsec")]
 use routing::{self, NetworkConfig, Node};
 use safe_nd::{
@@ -293,7 +293,7 @@ impl TestVault {
         }
     }
 
-    fn connection_info(&mut self) -> NodeInfo {
+    fn connection_info(&mut self) -> SocketAddr {
         unwrap!(self.inner.our_connection_info())
     }
 
@@ -354,14 +354,14 @@ pub trait TestClientTrait {
     fn quic_p2p(&mut self) -> &mut QuicP2p;
     fn rx(&self) -> &Receiver<Event>;
     fn full_id(&self) -> &FullId;
-    fn set_connected_vault(&mut self, connected_vault: NodeInfo);
-    fn connected_vaults(&self) -> Vec<NodeInfo>;
+    fn set_connected_vault(&mut self, connected_vault: SocketAddr);
+    fn connected_vaults(&self) -> Vec<SocketAddr>;
 
     fn sign<T: AsRef<[u8]>>(&self, data: T) -> Signature {
         self.full_id().sign(data)
     }
 
-    fn send_bootstrap_request(&mut self, client_public_id: &PublicId, conn_info: &NodeInfo) {
+    fn send_bootstrap_request(&mut self, client_public_id: &PublicId, conn_info: &SocketAddr) {
         let bootstrap_request = HandshakeRequest::Bootstrap(client_public_id.clone());
         self.send_to_target(&bootstrap_request, conn_info.clone());
     }
@@ -369,11 +369,11 @@ pub trait TestClientTrait {
     fn handle_handshake_response_join_from(
         &mut self,
         client_public_id: &PublicId,
-        conn_info: &NodeInfo,
+        conn_info: &SocketAddr,
         env: &mut Environment,
     ) {
         let (sender, bytes) = self.expect_new_message(env);
-        assert_eq!(sender, conn_info.peer_addr);
+        assert_eq!(sender, *conn_info);
 
         let handshake_response: HandshakeResponse = unwrap!(bincode::deserialize(&bytes));
         let _payload = match handshake_response {
@@ -388,12 +388,12 @@ pub trait TestClientTrait {
         self.send_to_target(&request, conn_info.clone());
     }
 
-    fn expect_connected_to(&mut self, conn_info: &NodeInfo) {
+    fn expect_connected_to(&mut self, conn_info: &SocketAddr) {
         loop {
             match self.rx().try_recv() {
                 Ok(Event::ConnectedTo {
-                    peer: Peer::Node { ref node_info },
-                }) if node_info == conn_info => break,
+                    peer: Peer::Node(node_info),
+                }) if node_info == *conn_info => break,
                 Ok(Event::SentUserMessage { .. }) => continue,
                 x => unexpected!(x),
             }
@@ -401,9 +401,9 @@ pub trait TestClientTrait {
         self.set_connected_vault(conn_info.clone());
     }
 
-    fn handle_challenge_from(&mut self, conn_info: &NodeInfo, env: &mut Environment) {
+    fn handle_challenge_from(&mut self, conn_info: &SocketAddr, env: &mut Environment) {
         let (sender, bytes) = self.expect_new_message(env);
-        assert_eq!(sender, conn_info.peer_addr);
+        assert_eq!(sender, *conn_info);
 
         let handshake_response: HandshakeResponse = unwrap!(bincode::deserialize(&bytes));
         let payload = match handshake_response {
@@ -422,7 +422,7 @@ pub trait TestClientTrait {
             env.poll();
             match self.rx().try_recv() {
                 Ok(Event::SentUserMessage { .. }) => continue,
-                Ok(Event::NewMessage { peer_addr, msg }) => return (peer_addr, msg),
+                Ok(Event::NewMessage { peer, msg }) => return (peer.peer_addr(), msg),
                 Err(error) => {
                     if error.is_empty() {
                         continue;
@@ -450,14 +450,13 @@ pub trait TestClientTrait {
     fn send<T: Serialize>(&mut self, msg: &T) {
         let msg = Bytes::from(unwrap!(bincode::serialize(msg)));
         for node_info in self.connected_vaults() {
-            self.quic_p2p()
-                .send(Peer::Node { node_info }, msg.clone(), 0);
+            self.quic_p2p().send(Peer::Node(node_info), msg.clone(), 0);
         }
     }
 
-    fn send_to_target<T: Serialize>(&mut self, msg: &T, node_info: NodeInfo) {
+    fn send_to_target<T: Serialize>(&mut self, msg: &T, node_info: SocketAddr) {
         let msg = Bytes::from(unwrap!(bincode::serialize(msg)));
-        self.quic_p2p().send(Peer::Node { node_info }, msg, 0);
+        self.quic_p2p().send(Peer::Node(node_info), msg, 0);
     }
 
     fn send_request(&mut self, request: Request) -> MessageId {
@@ -573,7 +572,7 @@ pub struct TestClient {
     rx: Receiver<Event>,
     full_id: FullId,
     public_id: ClientPublicId,
-    connected_vaults: Vec<NodeInfo>,
+    connected_vaults: Vec<SocketAddr>,
 }
 
 impl TestClient {
@@ -613,11 +612,11 @@ impl TestClientTrait for TestClient {
         &self.full_id
     }
 
-    fn set_connected_vault(&mut self, connected_vault: NodeInfo) {
+    fn set_connected_vault(&mut self, connected_vault: SocketAddr) {
         self.connected_vaults.push(connected_vault);
     }
 
-    fn connected_vaults(&self) -> Vec<NodeInfo> {
+    fn connected_vaults(&self) -> Vec<SocketAddr> {
         self.connected_vaults.clone()
     }
 }
@@ -641,7 +640,7 @@ pub struct TestApp {
     rx: Receiver<Event>,
     full_id: FullId,
     public_id: AppPublicId,
-    connected_vaults: Vec<NodeInfo>,
+    connected_vaults: Vec<SocketAddr>,
 }
 
 impl TestApp {
@@ -681,11 +680,11 @@ impl TestClientTrait for TestApp {
         &self.full_id
     }
 
-    fn set_connected_vault(&mut self, connected_vault: NodeInfo) {
+    fn set_connected_vault(&mut self, connected_vault: SocketAddr) {
         self.connected_vaults.push(connected_vault);
     }
 
-    fn connected_vaults(&self) -> Vec<NodeInfo> {
+    fn connected_vaults(&self) -> Vec<SocketAddr> {
         self.connected_vaults.clone()
     }
 }
@@ -838,10 +837,10 @@ impl IntoCoins for Coins {
 
 impl IntoCoins for u64 {
     fn into_coins(self) -> Coins {
-        unwrap!(Coins::from_nano(self))
+        Coins::from_nano(self)
     }
 }
 
 pub fn multiply_coins(coins: Coins, factor: u64) -> Coins {
-    unwrap!(Coins::from_nano(coins.as_nano() * factor))
+    Coins::from_nano(coins.as_nano() * factor)
 }

@@ -23,14 +23,13 @@ use crate::{
     Config, Result,
 };
 use bytes::Bytes;
-use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng};
 use safe_nd::{
-    AData, ADataAddress, AppPermissions, AppPublicId, Coins, ConnectionInfo, Error as NdError,
-    HandshakeRequest, HandshakeResponse, IData, IDataAddress, IDataKind, LoginPacket, MData,
-    Message, MessageId, NodePublicId, Notification, PublicId, PublicKey, Request, Response,
-    Result as NdResult, Signature, Transaction, TransactionId, XorName,
+    AData, ADataAddress, AppPermissions, AppPublicId, Coins, Error as NdError, HandshakeRequest,
+    HandshakeResponse, IData, IDataAddress, IDataKind, LoginPacket, MData, Message, MessageId,
+    NodePublicId, Notification, PublicId, PublicKey, Request, Response, Result as NdResult,
+    Signature, Transaction, TransactionId, XorName,
 };
 use serde::Serialize;
 use std::{
@@ -40,12 +39,9 @@ use std::{
     net::SocketAddr,
     rc::Rc,
 };
-use unwrap::unwrap;
 
-lazy_static! {
-    /// The cost to Put a chunk to the network.
-    pub static ref COST_OF_PUT: Coins = unwrap!(Coins::from_nano(1));
-}
+/// The cost to Put a chunk to the network.
+pub const COST_OF_PUT: Coins = Coins::from_nano(1);
 
 #[derive(Clone, Debug)]
 struct ClientInfo {
@@ -461,7 +457,7 @@ impl ClientHandler {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: *COST_OF_PUT,
+            cost: COST_OF_PUT,
         }))
     }
 
@@ -507,7 +503,7 @@ impl ClientHandler {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: *COST_OF_PUT,
+            cost: COST_OF_PUT,
         }))
     }
 
@@ -542,7 +538,7 @@ impl ClientHandler {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: *COST_OF_PUT,
+            cost: COST_OF_PUT,
         }))
     }
 
@@ -619,7 +615,7 @@ impl ClientHandler {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: *COST_OF_PUT,
+            cost: COST_OF_PUT,
         }))
     }
 
@@ -654,7 +650,7 @@ impl ClientHandler {
             request,
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: *COST_OF_PUT,
+            cost: COST_OF_PUT,
         }))
     }
 
@@ -971,7 +967,7 @@ impl ClientHandler {
             }));
         }
 
-        let total_amount = amount.checked_add(*COST_OF_PUT)?;
+        let total_amount = amount.checked_add(COST_OF_PUT)?;
         // When ClientA(owner/app with permissions) creates a balance for ClientB
         Some(Action::ConsensusVote(ConsensusAction::PayAndForward {
             request,
@@ -1001,7 +997,7 @@ impl ClientHandler {
             }
             Err(error) => {
                 // Refund amount (Including the cost of creating a balance)
-                let amount = amount.checked_add(*COST_OF_PUT)?;
+                let amount = amount.checked_add(COST_OF_PUT)?;
                 (Err(error), Some(amount))
             }
         };
@@ -1159,17 +1155,8 @@ impl ClientHandler {
             {
                 Ok(elders_iter) => elders_iter
                     .map(|p2p_node| {
-                        let routing::ConnectionInfo {
-                            peer_addr,
-                            peer_cert_der,
-                        } = p2p_node.connection_info().clone();
-                        (
-                            XorName(p2p_node.name().0),
-                            ConnectionInfo {
-                                peer_addr,
-                                peer_cert_der,
-                            },
-                        )
+                        let peer_addr = *p2p_node.peer_addr();
+                        (XorName(p2p_node.name().0), peer_addr)
                     })
                     .collect::<Vec<_>>(),
                 Err(e) => {
@@ -1193,17 +1180,8 @@ impl ClientHandler {
                 .our_elders_info()
                 .map(|iter| {
                     iter.map(|p2p_node| {
-                        let routing::ConnectionInfo {
-                            peer_addr,
-                            peer_cert_der,
-                        } = p2p_node.connection_info().clone();
-                        (
-                            XorName(p2p_node.name().0),
-                            ConnectionInfo {
-                                peer_addr,
-                                peer_cert_der,
-                            },
-                        )
+                        let peer_addr = *p2p_node.peer_addr();
+                        (XorName(p2p_node.name().0), peer_addr)
                     })
                     .collect::<Vec<_>>()
                 });
@@ -1374,7 +1352,7 @@ impl ClientHandler {
             request,
             client_public_id: client_id.clone(),
             message_id,
-            cost: *COST_OF_PUT,
+            cost: COST_OF_PUT,
         }))
     }
 
@@ -1422,7 +1400,7 @@ impl ClientHandler {
             return None;
         }
         // The requester bears the cost of storing the login packet
-        let new_amount = amount.checked_add(*COST_OF_PUT)?;
+        let new_amount = amount.checked_add(COST_OF_PUT)?;
         Some(Action::ConsensusVote(ConsensusAction::PayAndProxy {
             request: Request::CreateLoginPacketFor {
                 new_owner,
@@ -1453,7 +1431,7 @@ impl ClientHandler {
             // Step two - create balance and forward login_packet.
             if let Err(error) = self.create_balance(&payer, new_owner, amount) {
                 // Refund amount (Including the cost of creating the balance)
-                let refund = Some(amount.checked_add(*COST_OF_PUT)?);
+                let refund = Some(amount.checked_add(COST_OF_PUT)?);
 
                 Some(Action::RespondToClientHandlers {
                     sender: XorName::from(new_owner),

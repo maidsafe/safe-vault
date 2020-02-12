@@ -101,7 +101,7 @@ fn login_packets() {
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
 
-    let balance = common::multiply_coins(*COST_OF_PUT, 2);
+    let balance = common::multiply_coins(COST_OF_PUT, 2);
     common::create_balance(&mut env, &mut client, None, balance);
 
     // Try to get a login packet that does not exist yet.
@@ -148,7 +148,7 @@ fn login_packets() {
         &mut env,
         &mut client,
         Request::GetBalance,
-        unwrap!(Coins::from_nano(1)),
+        Coins::from_nano(1),
     );
 
     // Getting login packet from non-owning client should fail.
@@ -184,7 +184,7 @@ fn create_login_packet_for_other() {
         new_client.sign(&login_packet_data),
     ));
 
-    let amount = *COST_OF_PUT;
+    let amount = COST_OF_PUT;
     let nano_to_transfer = 2 * COST_OF_PUT.as_nano();
     common::send_request_expect_ok(
         &mut env,
@@ -212,9 +212,9 @@ fn create_login_packet_for_other() {
         &mut env,
         &mut established_client,
         Request::GetBalance,
-        unwrap!(Coins::from_nano(start_nano - nano_to_transfer)),
+        Coins::from_nano(start_nano - nano_to_transfer),
     );
-    common::send_request_expect_ok(&mut env, &mut new_client, Request::GetBalance, *COST_OF_PUT);
+    common::send_request_expect_ok(&mut env, &mut new_client, Request::GetBalance, COST_OF_PUT);
 
     // Putting login packet to the same address should fail.
     common::send_request_expect_err(
@@ -222,7 +222,7 @@ fn create_login_packet_for_other() {
         &mut established_client,
         Request::CreateLoginPacketFor {
             new_owner: *new_client.public_id().public_key(),
-            amount: unwrap!(Coins::from_nano(nano_to_transfer)),
+            amount: Coins::from_nano(nano_to_transfer),
             transaction_id: 2,
             new_login_packet: login_packet.clone(),
         },
@@ -234,7 +234,7 @@ fn create_login_packet_for_other() {
         &mut env,
         &mut established_client,
         Request::GetBalance,
-        unwrap!(Coins::from_nano(start_nano - nano_to_transfer)),
+        Coins::from_nano(start_nano - nano_to_transfer),
     );
 
     // Putting login packet to the same address with different balance should fail
@@ -259,7 +259,7 @@ fn create_login_packet_for_other() {
         &mut env,
         &mut established_client,
         Request::GetBalance,
-        unwrap!(Coins::from_nano(start_nano - 2 * nano_to_transfer)),
+        Coins::from_nano(start_nano - 2 * nano_to_transfer),
     );
 
     // Getting login packet from non-owning client should fail.
@@ -276,7 +276,7 @@ fn update_login_packet() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
 
     let login_packet_data = vec![0; 32];
     let login_packet_locator: XorName = env.rng().gen();
@@ -352,19 +352,19 @@ fn coin_operations() {
     );
 
     // Create A's balance
-    let amount_a = unwrap!(Coins::from_nano(10));
+    let amount_a = Coins::from_nano(10);
     common::create_balance(&mut env, &mut client_a, None, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
 
-    let amount_b = unwrap!(Coins::from_nano(1));
+    let amount_b = Coins::from_nano(1);
     common::create_balance(&mut env, &mut client_a, Some(&mut client_b), amount_b);
 
-    let amount_a = unwrap!(Coins::from_nano(8));
+    let amount_a = Coins::from_nano(8);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, amount_b);
 
     // Transfer coins from A to B (first attempt with zero amount doesn't work)
-    let amount_zero = unwrap!(Coins::from_nano(0));
+    let amount_zero = Coins::from_nano(0);
     let transaction_id = 2;
     common::send_request_expect_err(
         &mut env,
@@ -378,8 +378,8 @@ fn coin_operations() {
     );
     common::transfer_coins(&mut env, &mut client_a, &mut client_b, 2, 3);
 
-    let amount_a = unwrap!(Coins::from_nano(6));
-    let amount_b = unwrap!(Coins::from_nano(3));
+    let amount_a = Coins::from_nano(6);
+    let amount_b = Coins::from_nano(3);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, amount_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, amount_b);
 }
@@ -394,15 +394,15 @@ fn create_balance_that_already_exists() {
     common::create_balance(&mut env, &mut client_a, None, 10);
     common::create_balance(&mut env, &mut client_a, Some(&mut client_b), 4);
 
-    let balance_a = unwrap!(Coins::from_nano(5));
-    let balance_b = unwrap!(Coins::from_nano(4));
+    let balance_a = Coins::from_nano(5);
+    let balance_b = Coins::from_nano(4);
 
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, balance_b);
 
     // Attempt to create the balance for B again. The request fails and A receives an error back.
     let transaction_id = 2;
-    let amount = unwrap!(Coins::from_nano(2));
+    let amount = Coins::from_nano(2);
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
@@ -422,7 +422,7 @@ fn create_balance_that_already_exists() {
 
     // Attempt to create the balance for A again. This should however work for phase 1
     common::create_balance(&mut env, &mut client_a, None, 2);
-    let balance_a = unwrap!(Coins::from_nano(2));
+    let balance_a = Coins::from_nano(2);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 }
 
@@ -433,14 +433,14 @@ fn transfer_coins_to_balance_that_doesnt_exist() {
     let mut client_a = env.new_connected_client();
     let client_b = env.new_connected_client();
 
-    let balance_a = unwrap!(Coins::from_nano(10));
+    let balance_a = Coins::from_nano(10);
     common::create_balance(&mut env, &mut client_a, None, balance_a);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 
     // Attempt transfer coins to B's balance which doesn't exist. The request fails and A receives
     // an error back.
     let transaction_id = 4;
-    let amount = unwrap!(Coins::from_nano(4));
+    let amount = Coins::from_nano(4);
     common::send_request_expect_err(
         &mut env,
         &mut client_a,
@@ -490,7 +490,7 @@ fn coin_operations_by_app() {
         &mut env,
         &mut app,
         Request::GetBalance,
-        unwrap!(Coins::from_nano(10)),
+        Coins::from_nano(10),
     );
 
     // Create the destination client with balance.
@@ -506,13 +506,13 @@ fn coin_operations_by_app() {
         &mut env,
         &mut client_a,
         Request::GetBalance,
-        unwrap!(Coins::from_nano(9)),
+        Coins::from_nano(9),
     );
     common::send_request_expect_ok(
         &mut env,
         &mut client_b,
         Request::GetBalance,
-        unwrap!(Coins::from_nano(1)),
+        Coins::from_nano(1),
     );
 }
 
@@ -522,7 +522,7 @@ fn coin_operations_by_app_with_insufficient_permissions() {
     let mut owner = env.new_connected_client();
 
     // Create initial balance.
-    let balance = unwrap!(Coins::from_nano(10));
+    let balance = Coins::from_nano(10);
     common::create_balance(&mut env, &mut owner, None, balance);
 
     // Create an app which does *not* have permission to transfer coins.
@@ -558,7 +558,7 @@ fn coin_operations_by_app_with_insufficient_permissions() {
         &mut app,
         Request::TransferCoins {
             destination,
-            amount: unwrap!(Coins::from_nano(1)),
+            amount: Coins::from_nano(1),
             transaction_id,
         },
         NdError::AccessDenied,
@@ -731,7 +731,7 @@ fn put_append_only_data() {
         Request::PutAData(unpub_unseq_adata.clone()),
     );
 
-    let balance_a = unwrap!(Coins::from_nano(start_nano - 4));
+    let balance_a = Coins::from_nano(start_nano - 4);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 
     // Get the data to verify
@@ -873,7 +873,7 @@ fn delete_append_only_data_that_doesnt_exist() {
         &mut env,
         &mut client,
         Request::GetBalance,
-        unwrap!(Coins::from_nano(start_nano)),
+        Coins::from_nano(start_nano),
     );
 }
 
@@ -881,7 +881,7 @@ fn delete_append_only_data_that_doesnt_exist() {
 fn get_pub_append_only_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
-    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
 
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -933,7 +933,7 @@ fn get_unpub_append_only_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
 
     let mut data = UnpubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -982,7 +982,7 @@ fn append_only_data_get_entries() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
 
     let mut data = PubSeqAppendOnlyData::new(env.rng().gen(), 100);
 
@@ -1003,7 +1003,7 @@ fn append_only_data_get_entries() {
 
     let data = AData::PubSeq(data);
     let address = *data.address();
-    common::send_request_expect_ok(&mut env, &mut client, Request::GetBalance, *COST_OF_PUT);
+    common::send_request_expect_ok(&mut env, &mut client, Request::GetBalance, COST_OF_PUT);
     common::perform_mutation(&mut env, &mut client, Request::PutAData(data.clone()));
     common::send_request_expect_err(
         &mut env,
@@ -1083,7 +1083,7 @@ fn append_only_data_get_entries() {
 fn append_only_data_get_owners() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
-    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1141,7 +1141,7 @@ fn append_only_data_get_owners() {
 fn pub_append_only_data_get_permissions() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
-    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
 
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -1938,8 +1938,8 @@ fn put_immutable_data() {
         NdError::InvalidOwners,
     );
 
-    let mut expected_a = unwrap!(Coins::from_nano(start_nano - 1));
-    let mut expected_b = unwrap!(Coins::from_nano(start_nano));
+    let mut expected_a = Coins::from_nano(start_nano - 1);
+    let mut expected_b = Coins::from_nano(start_nano);
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected_a);
 
     // Check they can both Put valid data.
@@ -1954,8 +1954,8 @@ fn put_immutable_data() {
         Request::PutIData(unpub_idata.clone()),
     );
 
-    expected_a = unwrap!(expected_a.checked_sub(*COST_OF_PUT));
-    expected_b = unwrap!(expected_b.checked_sub(*COST_OF_PUT));
+    expected_a = unwrap!(expected_a.checked_sub(COST_OF_PUT));
+    expected_b = unwrap!(expected_b.checked_sub(COST_OF_PUT));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected_b);
 
@@ -1982,7 +1982,7 @@ fn put_immutable_data() {
         NdError::DataExists,
     );
 
-    expected_a = unwrap!(expected_a.checked_sub(*COST_OF_PUT));
+    expected_a = unwrap!(expected_a.checked_sub(COST_OF_PUT));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, expected_a);
     common::send_request_expect_ok(&mut env, &mut client_b, Request::GetBalance, expected_b);
 }
@@ -2325,7 +2325,7 @@ fn auth_keys() {
 fn app_permissions() {
     let mut env = Environment::new();
     let mut owner = env.new_connected_client();
-    let balance = unwrap!(Coins::from_nano(1000));
+    let balance = Coins::from_nano(1000);
     common::create_balance(&mut env, &mut owner, None, balance);
 
     // App 0 is authorized with permission to perform mutations.
@@ -2481,7 +2481,7 @@ fn app_permissions() {
 
     // A new client to credit coins to.
     let mut creditor = env.new_connected_client();
-    common::create_balance(&mut env, &mut creditor, None, unwrap!(Coins::from_nano(0)));
+    common::create_balance(&mut env, &mut creditor, None, Coins::from_nano(0));
 
     // App 1 cannot transfer coins.
     common::send_request_expect_err(
@@ -2489,7 +2489,7 @@ fn app_permissions() {
         &mut app_1,
         Request::TransferCoins {
             destination: *creditor.public_id().name(),
-            amount: unwrap!(Coins::from_nano(50)),
+            amount: Coins::from_nano(50),
             transaction_id: 0,
         },
         NdError::AccessDenied,
@@ -2500,10 +2500,10 @@ fn app_permissions() {
         &mut env,
         &mut app_1,
         Request::GetBalance,
-        Response::GetBalance(Ok(unwrap!(Coins::from_nano(996)))),
+        Response::GetBalance(Ok(Coins::from_nano(996))),
     );
 
-    let amount = unwrap!(Coins::from_nano(900));
+    let amount = Coins::from_nano(900);
     let expected = Response::Transaction(Ok(Transaction { id: 1, amount }));
     let name: XorName = env.rng().gen();
     let tag = 100;
@@ -2549,7 +2549,7 @@ fn put_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
 
     // Try to put sequenced Mutable Data
     let name: XorName = env.rng().gen();
@@ -2575,7 +2575,7 @@ fn put_unseq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
 
     // Try to put unsequenced Mutable Data
     let name: XorName = env.rng().gen();
@@ -2601,7 +2601,7 @@ fn read_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    common::create_balance(&mut env, &mut client, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
 
     // Try to put sequenced Mutable Data with several entries.
     let entries: BTreeMap<_, _> = (1..4)
@@ -2669,7 +2669,7 @@ fn mutate_seq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    let balance = common::multiply_coins(*COST_OF_PUT, 4);
+    let balance = common::multiply_coins(COST_OF_PUT, 4);
     common::create_balance(&mut env, &mut client, None, balance);
 
     // Try to put sequenced Mutable Data.
@@ -2774,7 +2774,7 @@ fn mutate_unseq_mutable_data() {
     let mut env = Environment::new();
     let mut client = env.new_connected_client();
 
-    let balance = common::multiply_coins(*COST_OF_PUT, 3);
+    let balance = common::multiply_coins(COST_OF_PUT, 3);
     common::create_balance(&mut env, &mut client, None, balance);
 
     // Try to put unsequenced Mutable Data.
@@ -2866,8 +2866,8 @@ fn mutable_data_permissions() {
     let mut client_a = env.new_connected_client();
     let mut client_b = env.new_connected_client();
 
-    let balance_a = common::multiply_coins(*COST_OF_PUT, 3);
-    let balance_b = common::multiply_coins(*COST_OF_PUT, 3);
+    let balance_a = common::multiply_coins(COST_OF_PUT, 3);
+    let balance_b = common::multiply_coins(COST_OF_PUT, 3);
     common::create_balance(&mut env, &mut client_a, None, balance_a);
     common::create_balance(&mut env, &mut client_b, None, balance_b);
 
@@ -2948,9 +2948,9 @@ fn delete_mutable_data() {
     let mut client_a = env.new_connected_client();
     let mut client_b = env.new_connected_client();
 
-    let balance_a = common::multiply_coins(*COST_OF_PUT, 3);
+    let balance_a = common::multiply_coins(COST_OF_PUT, 3);
     common::create_balance(&mut env, &mut client_a, None, balance_a);
-    common::create_balance(&mut env, &mut client_b, None, *COST_OF_PUT);
+    common::create_balance(&mut env, &mut client_b, None, COST_OF_PUT);
 
     let mdata = UnseqMutableData::new(env.rng().gen(), 100, *client_a.public_id().public_key());
     let address = *mdata.address();
@@ -2959,7 +2959,7 @@ fn delete_mutable_data() {
         &mut client_a,
         Request::PutMData(MData::Unseq(mdata)),
     );
-    let balance_a = unwrap!(balance_a.checked_sub(*COST_OF_PUT));
+    let balance_a = unwrap!(balance_a.checked_sub(COST_OF_PUT));
     common::send_request_expect_ok(&mut env, &mut client_a, Request::GetBalance, balance_a);
 
     // Attempt to delete non-existent data.
