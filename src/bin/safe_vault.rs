@@ -33,8 +33,8 @@ fn main() {
 
 #[cfg(not(feature = "mock"))]
 mod detail {
-    use env_logger::{fmt::Formatter, Builder as LoggerBuilder};
-    use log::{self, Level, Record};
+    use env_logger::{fmt::Formatter, Builder as LoggerBuilder, Target};
+    use log::{error, info, Level, Record};
     use safe_vault::{self, routing::Node, write_connection_info, Command, Config, Vault};
     use self_update::cargo_crate_version;
     use self_update::Status;
@@ -51,12 +51,12 @@ mod detail {
                 Ok(shell) => match gen_completions_for_shell(shell) {
                     Ok(buf) => {
                         std::io::stdout().write_all(&buf).unwrap_or_else(|e| {
-                            println!("Failed to print shell completions. {}", e);
+                            error!("Failed to print shell completions. {}", e);
                         });
                     }
-                    Err(e) => println!("{}", e),
+                    Err(e) => error!("{}", e),
                 },
-                Err(e) => println!("Unknown completions option. {}", e),
+                Err(e) => error!("Unknown completions option. {}", e),
             }
             // we exit program on both success and error.
             return;
@@ -79,6 +79,7 @@ mod detail {
             )
         };
         let mut logger = LoggerBuilder::from_default_env();
+        let _ = logger.target(Target::Stdout);
         let _ = logger.format(do_format).is_test(false);
         if config.verbose() != Level::Error {
             let _ = logger.filter(
@@ -91,11 +92,11 @@ mod detail {
         match update() {
             Ok(status) => {
                 if let Status::Updated { .. } = status {
-                    println!("Vault has been updated. Please restart.");
+                    info!("Vault has been updated. Please restart.");
                     process::exit(0);
                 }
             }
-            Err(e) => log::error!("Updating vault failed: {:?}", e),
+            Err(e) => error!("Updating vault failed: {:?}", e),
         }
 
         let message = format!(
@@ -103,7 +104,7 @@ mod detail {
             Config::clap().get_name(),
             env!("CARGO_PKG_VERSION")
         );
-        log::info!("\n\n{}\n{}", message, "=".repeat(message.len()));
+        info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
         let (command_tx, command_rx) = crossbeam_channel::bounded(1);
 
@@ -112,7 +113,7 @@ mod detail {
             let _ = command_tx.send(Command::Shutdown);
         });
         if let Err(error) = result {
-            log::error!("Failed to set interrupt handler: {:?}", error)
+            error!("Failed to set interrupt handler: {:?}", error)
         }
 
         let (routing_node, routing_rx) = Node::builder()
@@ -127,7 +128,7 @@ mod detail {
         match Vault::new(routing_node, routing_rx, &config, command_rx, &mut rng) {
             Ok(mut vault) => {
                 let our_conn_info = unwrap!(vault.our_connection_info());
-                println!(
+                info!(
                     "Vault connection info:\n{}",
                     unwrap!(serde_json::to_string(&our_conn_info))
                 );
@@ -137,13 +138,13 @@ mod detail {
                 vault.run();
             }
             Err(e) => {
-                println!("Cannot start vault due to error: {:?}", e);
+                error!("Cannot start vault due to error: {:?}", e);
             }
         }
     }
 
     fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
-        log::info!("Checking for updates...");
+        info!("Checking for updates...");
         let target = self_update::get_target()?;
         let releases = self_update::backends::github::ReleaseList::configure()
             .repo_owner("maidsafe")
@@ -152,8 +153,8 @@ mod detail {
             .build()?
             .fetch()?;
         if !releases.is_empty() {
-            log::debug!("Target for update is {}", target);
-            log::debug!("Found releases: {:#?}\n", releases);
+            info!("Target for update is {}", target);
+            info!("Found releases: {:#?}\n", releases);
             let bin_name = if target.contains("pc-windows") {
                 "safe_vault.exe"
             } else {
@@ -169,11 +170,11 @@ mod detail {
                 .current_version(cargo_crate_version!())
                 .build()?
                 .update()?;
-            println!("Update status: `{}`!", status.version());
+            info!("Update status: `{}`!", status.version());
             return Ok(status);
         }
-        log::info!("Current version is {}", cargo_crate_version!());
-        log::info!("No releases are available for updates");
+        info!("Current version is {}", cargo_crate_version!());
+        info!("No releases are available for updates");
         Ok(Status::UpToDate(
             "No releases are available for updates".to_string(),
         ))

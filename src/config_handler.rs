@@ -10,7 +10,7 @@ use crate::routing::{ConnectionInfo, NetworkConfig};
 use crate::Result;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
-use log::{trace, Level};
+use log::{error, trace, Level};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
@@ -95,7 +95,7 @@ impl Config {
             wallet_address: None,
             max_capacity: None,
             root_dir: None,
-            verbose: 0,
+            verbose: 2,
             network_config: Default::default(),
             first: false,
             completions: None,
@@ -208,12 +208,12 @@ impl Config {
                 } else if arg == ARGS[10] {
                     self.network_config.our_complete_cert = Some(unwrap!(value.parse()));
                 } else {
-                    println!("ERROR");
+                    error!("Unknown config value from args: {}", arg);
                 }
             }
 
             #[cfg(feature = "mock_base")]
-            println!("ERROR");
+            error!("Unknown config value from args: {}", arg);
         }
     }
 
@@ -223,7 +223,7 @@ impl Config {
         } else if arg == ARGS[12] {
             self.first = occurrences >= 1;
         } else {
-            println!("ERROR");
+            error!("Unknown flag from args: {}", arg);
         }
     }
 
