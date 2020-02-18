@@ -36,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 14] = [
+const ARGS: [&str; 15] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -51,6 +51,7 @@ const ARGS: [&str; 14] = [
     "our-type",
     "first",
     "completions",
+    "log-dir",
 ];
 
 /// Vault configuration
@@ -85,6 +86,9 @@ pub struct Config {
     /// dump shell completions for: [bash, fish, zsh, powershell, elvish]
     #[structopt(long)]
     completions: Option<String>,
+    /// Send logs to a file within the specified directory
+    #[structopt(long)]
+    log_dir: Option<String>,
 }
 
 impl Config {
@@ -99,6 +103,7 @@ impl Config {
             network_config: Default::default(),
             first: false,
             completions: None,
+            log_dir: None,
         });
 
         let command_line_args = Config::clap().get_matches();
@@ -172,6 +177,11 @@ impl Config {
         &self.completions
     }
 
+    /// Directory where to write log file/s if specified
+    pub fn log_dir(&self) -> &Option<String> {
+        &self.log_dir
+    }
+
     /// Set the Quic-P2P `ip` configuration to 127.0.0.1.
     pub fn listen_on_loopback(&mut self) {
         self.network_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
@@ -196,6 +206,8 @@ impl Config {
             self.network_config.our_type = unwrap!(value.parse());
         } else if arg == ARGS[13] {
             self.completions = Some(unwrap!(value.parse()));
+        } else if arg == ARGS[14] {
+            self.log_dir = Some(unwrap!(value.parse()));
         } else {
             #[cfg(not(feature = "mock_base"))]
             {
@@ -303,7 +315,7 @@ mod test {
     #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
-        let expected_size = 320;
+        let expected_size = 344;
         assert_eq!(
             expected_size,
             mem::size_of::<Config>(),
@@ -330,6 +342,7 @@ mod test {
             ["our-type", "client"],
             ["first", "None"],
             ["completions", "bash"],
+            ["log-dir", "log-dir-path"],
         ];
 
         for arg in &ARGS {
@@ -351,6 +364,7 @@ mod test {
                 network_config: Default::default(),
                 first: false,
                 completions: None,
+                log_dir: None,
             };
             let empty_config = config.clone();
             if let Some(val) = matches.value_of(arg) {

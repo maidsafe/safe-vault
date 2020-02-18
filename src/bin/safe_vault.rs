@@ -33,7 +33,7 @@ fn main() {
 
 #[cfg(not(feature = "mock"))]
 mod detail {
-    use env_logger::{fmt::Formatter, Builder as LoggerBuilder};
+    use flexi_logger::{DeferredNow, Logger};
     use log::{self, Level, Record};
     use safe_vault::{self, routing::Node, write_connection_info, Command, Config, Vault};
     use self_update::cargo_crate_version;
@@ -66,27 +66,41 @@ mod detail {
             config.listen_on_loopback();
         }
 
-        let do_format = move |formatter: &mut Formatter, record: &Record<'_>| {
-            let now = formatter.timestamp();
-            writeln!(
-                formatter,
+        // Custom formatter for logs
+        let do_format = move |write: &mut dyn Write, now: &mut DeferredNow, record: &Record| {
+            write!(
+                write,
                 "{} {} [{}:{}] {}",
-                formatter.default_styled_level(record.level()),
-                now,
+                record.level(),
+                now.now().to_rfc3339(),
                 record.file().unwrap_or_default(),
                 record.line().unwrap_or_default(),
                 record.args()
             )
         };
-        let mut logger = LoggerBuilder::from_default_env();
-        let _ = logger.format(do_format).is_test(false);
-        if config.verbose() != Level::Error {
-            let _ = logger.filter(
-                Config::clap().get_bin_name(),
-                config.verbose().to_level_filter(),
-            );
+
+        // Let's filter out logs which are not from this crate, unless level chosen is ERROR
+        let verbosity = config.verbose().to_level_filter();
+        let filter = if verbosity != Level::Error {
+            if let Some(crate_name) = Config::clap().get_bin_name() {
+                format!("{}={}", crate_name, verbosity)
+            } else {
+                verbosity.to_string()
+            }
+        } else {
+            verbosity.to_string()
+        };
+
+        let logger = Logger::with_env_or_str(filter)
+            .format(do_format)
+            .suppress_timestamp();
+
+        let _ = if let Some(log_dir) = config.log_dir() {
+            logger.log_to_file().directory(log_dir).start()
+        } else {
+            logger.start()
         }
-        let _ = logger.try_init();
+        .expect("Error when initialising logger");
 
         match update() {
             Ok(status) => {
@@ -138,6 +152,11 @@ mod detail {
                     "Vault connection info:\n{}",
                     unwrap!(serde_json::to_string(&our_conn_info))
                 );
+                log::info!(
+                    "Vault connection info: {}",
+                    unwrap!(serde_json::to_string(&our_conn_info))
+                );
+
                 if is_first {
                     unwrap!(write_connection_info(&our_conn_info));
                 }
@@ -145,6 +164,7 @@ mod detail {
             }
             Err(e) => {
                 println!("Cannot start vault due to error: {:?}", e);
+                log::error!("Cannot start vault due to error: {:?}", e);
             }
         }
     }
