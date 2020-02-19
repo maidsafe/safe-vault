@@ -33,7 +33,7 @@ rand_chacha = "~0.1.1"
 routing_rand_core = { package = "rand_core", version = "~0.5.1" }
 routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" }
 safe-nd = "~0.8.0"
-self_update = "0.5.1"
+self_update = { version = "0.13.0", default-features = false, features = ["rustls"] }
 serde = { version = "~1.0.97", features = ["derive"] }
 serde_json = "~1.0.40"
 structopt = "~0.2.18"
