@@ -151,7 +151,7 @@ mod detail {
 
     fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
         log::info!("Checking for updates...");
-        let target = self_update::get_target()?;
+        let target = self_update::get_target();
         let releases = self_update::backends::github::ReleaseList::configure()
             .repo_owner("maidsafe")
             .repo_name("safe_vault")
@@ -166,7 +166,7 @@ mod detail {
             } else {
                 "safe_vault"
             };
-            let status = self_update::backends::github::Update::configure()?
+            let status = self_update::backends::github::Update::configure()
                 .repo_owner("maidsafe")
                 .repo_name("safe_vault")
                 .target(&target)
