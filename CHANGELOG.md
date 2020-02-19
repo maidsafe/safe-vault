@@ -1,5 +1,19 @@
 # Safe Vault - Change Log
 
+## [0.20.1]
+- Set execution permission on safe_vault binary before packaging for release
+
+## [0.20.0]
+- Return `AccessDenied` when apps request to insert, delete or list auth keys instead of ignoring the request.
+- Use project's data directory as the root directory.
+- Upgrade safe-nd dependency to 0.4.0. This includes granular permissions for applications.
+- Change usage of idata term "kind" to "data".
+- Introduce IDataRequest to eliminate unwraps.
+- Handle refunds when errors are returned from the data handlers.
+- Deprecate Rpc::Refund to use Rpc::Response instead.
+- Send response to the client that sent the request instead of all connected clients.
+- Use GitHub actions for build and release.
+
 ## [0.19.2]
 - This is a technical release without any changes from `0.19.1`.
 

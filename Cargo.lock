@@ -2413,7 +2413,7 @@ dependencies = [
 
 [[package]]
 name = "safe_vault"
-version = "0.19.2"
+version = "0.20.1"
 dependencies = [
  "base64 0.10.1",
  "bincode 1.1.4",
