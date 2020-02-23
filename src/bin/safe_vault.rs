@@ -34,7 +34,7 @@ fn main() {
 #[cfg(not(feature = "mock"))]
 mod detail {
     use flexi_logger::{DeferredNow, Logger};
-    use log::{self, Level, Record};
+    use log::{self, Record};
     use safe_vault::{self, routing::Node, write_connection_info, Command, Config, Vault};
     use self_update::cargo_crate_version;
     use self_update::Status;
@@ -67,49 +67,41 @@ mod detail {
         }
 
         // Custom formatter for logs
-        let do_format = move |write: &mut dyn Write, now: &mut DeferredNow, record: &Record| {
+        let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
             write!(
-                write,
+                writer,
                 "{} {} [{}:{}] {}",
                 record.level(),
-                now.now().to_rfc3339(),
+                clock.now().to_rfc3339(),
                 record.file().unwrap_or_default(),
                 record.line().unwrap_or_default(),
                 record.args()
             )
         };
 
-        // Let's filter out logs which are not from this crate, unless level chosen is ERROR
-        let verbosity = config.verbose().to_level_filter();
-        let filter = if verbosity != Level::Error {
-            if let Some(crate_name) = Config::clap().get_bin_name() {
-                format!("{}={}", crate_name, verbosity)
-            } else {
-                verbosity.to_string()
-            }
-        } else {
-            verbosity.to_string()
-        };
-
-        let logger = Logger::with_env_or_str(filter)
+        let verbosity = config.verbose().to_level_filter().to_string();
+        let logger = Logger::with_env_or_str(verbosity)
             .format(do_format)
             .suppress_timestamp();
 
         let _ = if let Some(log_dir) = config.log_dir() {
-            logger.log_to_file().directory(log_dir).start()
+            logger.log_to_file().directory(log_dir)
         } else {
-            logger.start()
+            logger
         }
+        .start()
         .expect("Error when initialising logger");
 
-        match update() {
-            Ok(status) => {
-                if let Status::Updated { .. } = status {
-                    println!("Vault has been updated. Please restart.");
-                    process::exit(0);
+        if config.update() {
+            match update() {
+                Ok(status) => {
+                    if let Status::Updated { .. } = status {
+                        println!("Vault has been updated. Please restart.");
+                        process::exit(0);
+                    }
                 }
+                Err(e) => log::error!("Updating vault failed: {:?}", e),
             }
-            Err(e) => log::error!("Updating vault failed: {:?}", e),
         }
 
         let message = format!(

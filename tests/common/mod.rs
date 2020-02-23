@@ -8,6 +8,7 @@
 
 //! Utilities for integration tests
 
+mod logging;
 mod rng;
 
 pub use self::rng::TestRng;
@@ -66,6 +67,8 @@ impl Environment {
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
         assert!(num_vaults > 0);
 
+        logging::init();
+
         let seed = rng::get_seed();
         let mut rng = rng::from_seed(seed);
 
@@ -98,6 +101,7 @@ impl Environment {
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
         assert!(num_vaults > 1);
 
+        logging::init();
         routing::init_mock();
 
         let seed = rng::get_seed();

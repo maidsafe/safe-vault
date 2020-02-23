@@ -36,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 15] = [
+const ARGS: [&str; 16] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -52,6 +52,7 @@ const ARGS: [&str; 15] = [
     "first",
     "completions",
     "log-dir",
+    "update",
 ];
 
 /// Vault configuration
@@ -89,6 +90,9 @@ pub struct Config {
     /// Send logs to a file within the specified directory
     #[structopt(long)]
     log_dir: Option<String>,
+    /// Attempt to self-update?
+    #[structopt(long)]
+    update: bool,
 }
 
 impl Config {
@@ -104,6 +108,7 @@ impl Config {
             first: false,
             completions: None,
             log_dir: None,
+            update: false,
         });
 
         let command_line_args = Config::clap().get_matches();
@@ -182,6 +187,11 @@ impl Config {
         &self.log_dir
     }
 
+    /// Attempt to self-update?
+    pub fn update(&self) -> bool {
+        self.update
+    }
+
     /// Set the Quic-P2P `ip` configuration to 127.0.0.1.
     pub fn listen_on_loopback(&mut self) {
         self.network_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
@@ -234,6 +244,8 @@ impl Config {
             self.verbose = occurrences;
         } else if arg == ARGS[12] {
             self.first = occurrences >= 1;
+        } else if arg == ARGS[15] {
+            self.update = occurrences >= 1;
         } else {
             println!("ERROR");
         }
@@ -343,6 +355,7 @@ mod test {
             ["first", "None"],
             ["completions", "bash"],
             ["log-dir", "log-dir-path"],
+            ["update", "None"],
         ];
 
         for arg in &ARGS {
@@ -365,6 +378,7 @@ mod test {
                 first: false,
                 completions: None,
                 log_dir: None,
+                update: false,
             };
             let empty_config = config.clone();
             if let Some(val) = matches.value_of(arg) {
