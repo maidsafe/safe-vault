@@ -1460,7 +1460,7 @@ dependencies = [
 [[package]]
 name = "parsec"
 version = "0.5.0"
-source = "git+https://github.com/maidsafe/parsec?rev=0f9b1226#0f9b1226018a5b67f99c8b51af6385b7af52837a"
+source = "git+https://github.com/maidsafe/parsec?rev=c878e84c#c878e84c954919d947530240fd86325d87f5d221"
 dependencies = [
  "failure",
  "fnv",
@@ -2071,7 +2071,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?branch=fleming#8a7eb222556f70cc99e22195dabd0e08401edb7c"
+source = "git+https://github.com/maidsafe/routing.git?branch=fleming#c3520cd11acdcc40567a78c95f4f8b2f186a63e0"
 dependencies = [
  "bincode 1.1.4",
  "bytes 0.4.12",
