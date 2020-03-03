@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "safe_vault"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_vault"
-version = "0.20.1"
+version = "0.21.0"
 
 [dependencies]
 base64 = "~0.10.1"
@@ -25,13 +25,13 @@ hex = "~0.3.2"
 hex_fmt = { version = "~0.3.0", optional = true }
 lazy_static = "~1"
 log = "~0.4.7"
-mock-quic-p2p = { git = "https://github.com/maidsafe/quic-p2p", rev = "52f8ae2", optional = true }
+mock-quic-p2p = { git = "https://github.com/maidsafe/quic-p2p", tag = "0.4.0", optional = true }
 pickledb = "~0.4.0"
 quick-error = "~1.2.2"
 rand = "~0.6.5"
 rand_chacha = "~0.1.1"
 routing_rand_core = { package = "rand_core", version = "~0.5.1" }
-routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" }
+routing = { git = "https://github.com/maidsafe/routing.git", tag = "baby_fleming_v1" }
 safe-nd = "~0.8.0"
 self_update = { version = "0.13.0", default-features = false, features = ["rustls"] }
 serde = { version = "~1.0.97", features = ["derive"] }
