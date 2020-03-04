@@ -94,18 +94,18 @@ package-version-artifacts-for-deploy:
 	echo "Contents of artifacts/prod/x86_64-apple-darwin/release/"
 	ls -al artifacts/prod/x86_64-apple-darwin/release/
 
-	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.zip \
+	//zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.zip \
 		artifacts/prod/x86_64-unknown-linux-musl/release/safe_vault
-	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.zip \
+	//zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.zip \
 		artifacts/prod/x86_64-pc-windows-gnu/release/safe_vault.exe
-	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.zip \
+	//zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.zip \
 		artifacts/prod/x86_64-apple-darwin/release/safe_vault
 
-	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
+	//tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
 		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar.gz safe_vault
-	tar -C artifacts/prod/x86_64-pc-windows-gnu/release \
+	//tar -C artifacts/prod/x86_64-pc-windows-gnu/release \
 		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar.gz safe_vault.exe
-	tar -C artifacts/prod/x86_64-apple-darwin/release \
+	//tar -C artifacts/prod/x86_64-apple-darwin/release \
 		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar.gz safe_vault
 
 	mv *.zip ${DEPLOY_PROD_PATH}
