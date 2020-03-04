@@ -84,6 +84,15 @@ package-version-artifacts-for-deploy:
 	rm -f *.zip *.tar.gz
 	rm -rf ${DEPLOY_PATH}
 	mkdir -p ${DEPLOY_PROD_PATH}
+	
+	echo "Contents of artifacts/prod/x86_64-unknown-linux-musl/release/"
+	ls -al artifacts/prod/x86_64-unknown-linux-musl/release/
+	
+	echo "Contents of artifacts/prod/x86_64-pc-windows-gnu/release/"
+	ls -al artifacts/prod/x86_64-pc-windows-gnu/release/
+	
+	echo "Contents of artifacts/prod/x86_64-apple-darwin/release/"
+	ls -al artifacts/prod/x86_64-apple-darwin/release/
 
 	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.zip \
 		artifacts/prod/x86_64-unknown-linux-musl/release/safe_vault
