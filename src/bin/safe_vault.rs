@@ -92,7 +92,7 @@ mod detail {
         .start()
         .expect("Error when initialising logger");
 
-        if config.update() {
+        if config.update() || config.update_only() {
             match update() {
                 Ok(status) => {
                     if let Status::Updated { .. } = status {
@@ -101,6 +101,10 @@ mod detail {
                     }
                 }
                 Err(e) => log::error!("Updating vault failed: {:?}", e),
+            }
+
+            if config.update_only() {
+                process::exit(0);
             }
         }
 

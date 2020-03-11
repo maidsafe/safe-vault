@@ -36,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 16] = [
+const ARGS: [&str; 17] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -53,6 +53,7 @@ const ARGS: [&str; 16] = [
     "completions",
     "log-dir",
     "update",
+    "update-only",
 ];
 
 /// Vault configuration
@@ -93,6 +94,9 @@ pub struct Config {
     /// Attempt to self-update?
     #[structopt(long)]
     update: bool,
+    /// Attempt to self-update without starting the vault process
+    #[structopt(long, name = "update-only")]
+    update_only: bool,
 }
 
 impl Config {
@@ -109,6 +113,7 @@ impl Config {
             completions: None,
             log_dir: None,
             update: false,
+            update_only: false,
         });
 
         let command_line_args = Config::clap().get_matches();
@@ -192,6 +197,11 @@ impl Config {
         self.update
     }
 
+    /// Attempt to self-update without starting the vault process
+    pub fn update_only(&self) -> bool {
+        self.update_only
+    }
+
     /// Set the Quic-P2P `ip` configuration to 127.0.0.1.
     pub fn listen_on_loopback(&mut self) {
         self.network_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
@@ -246,6 +256,8 @@ impl Config {
             self.first = occurrences >= 1;
         } else if arg == ARGS[15] {
             self.update = occurrences >= 1;
+        } else if arg == ARGS[16] {
+            self.update_only = occurrences >= 1;
         } else {
             println!("ERROR");
         }
@@ -356,6 +368,7 @@ mod test {
             ["completions", "bash"],
             ["log-dir", "log-dir-path"],
             ["update", "None"],
+            ["update-only", "None"],
         ];
 
         for arg in &ARGS {
@@ -379,6 +392,7 @@ mod test {
                 completions: None,
                 log_dir: None,
                 update: false,
+                update_only: false,
             };
             let empty_config = config.clone();
             if let Some(val) = matches.value_of(arg) {
