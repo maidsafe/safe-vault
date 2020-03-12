@@ -355,7 +355,9 @@ impl<R: CryptoRng + Rng> Vault<R> {
         trace!("{} handle action {:?}", self, action);
         use Action::*;
         match action {
-            ConsensusVote(action) => self.vote_for_action(&action),
+            // Bypass client requests
+            // ConsensusVote(action) => self.vote_for_action(&action),
+            ConsensusVote(action) => self.client_handler_mut()?.handle_consensused_action(action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
             RespondToOurDataHandlers { sender, rpc } => {
