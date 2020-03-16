@@ -343,7 +343,8 @@ impl<R: CryptoRng + Rng> Vault<R> {
         }
         None
     }
-
+    
+    #[allow(dead_code)]
     fn vote_for_action(&mut self, action: &ConsensusAction) -> Option<Action> {
         self.routing_node
             .borrow_mut()
