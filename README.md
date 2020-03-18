@@ -20,3 +20,11 @@ This SAFE Network library is licensed under the General Public License (GPL), ve
 safe_vault is licensed under GPLv3 with linking exception. This means you can link to and use the library from any program, proprietary or open source; paid or gratis. However, if you modify safe_vault, you must distribute the source to your modified version under the terms of the GPLv3.
 
 See [the LICENSE file](LICENSE) for more details.
+
+## Contributing
+
+Want to contribute? Great :tada:
+
+There are many ways to give back to the project, whether it be writing new code, fixing bugs, or just reporting errors. All forms of contributions are encouraged!
+
+For instructions on how to contribute, see our [Guide to contributing](https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md).
