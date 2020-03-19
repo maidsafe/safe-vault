@@ -2652,7 +2652,7 @@ fn read_seq_mutable_data() {
     );
 
     // Get a value by key.
-    let key = unwrap!(entries.keys().cloned().nth(0));
+    let key = unwrap!(entries.keys().cloned().next());
     common::send_request_expect_ok(
         &mut env,
         &mut client,

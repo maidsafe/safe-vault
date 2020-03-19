@@ -1,5 +1,12 @@
 # Safe Vault - Change Log
 
+## [0.22.0]
+- Support a --update-only flag which only attempts to self-update binary
+- Update readme to link to contributing guidelines doc
+- Don't send client requests to PARSEC
+- Add dead_code on vote_for_action
+- Fix spacing bug for clippy
+
 ## [0.21.0]
 - improve app authorisation
 - introduce ParsecAction
