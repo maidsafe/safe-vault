@@ -59,6 +59,18 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
+      # Run cargo tarpaulin & push result to coveralls.io
+      - name: rust-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1.0
+        with:
+          args: '--features=mock --out Lcov -- --test-threads 1'
+      - name: Coveralls GitHub Action
+        uses: coverallsapp/github-action@v1.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel: true
+          path-to-lcov: ./lcov.info
+
       # Run build.
       - shell: bash
         run: ${{ matrix.build-script }}
@@ -219,3 +231,13 @@ jobs:
   #       with:
   #         command: publish
   #       if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
+
+  coverage:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
