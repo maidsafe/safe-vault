@@ -59,7 +59,20 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-      # Run cargo tarpaulin & push result to coveralls.io
+      # Run build.
+      - shell: bash
+        run: ${{ matrix.build-script }}
+      # Upload artifacts.
+      - uses: actions/upload-artifact@master
+        with:
+          name: safe_vault-${{ matrix.target }}-prod
+          path: artifacts
+
+  # Run cargo tarpaulin & push result to coveralls.io
+  tarpaulin:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
       - name: rust-tarpaulin
         uses: actions-rs/tarpaulin@v0.1.0
         with:
@@ -70,15 +83,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           parallel: true
           path-to-lcov: ./lcov.info
-
-      # Run build.
-      - shell: bash
-        run: ${{ matrix.build-script }}
-      # Upload artifacts.
-      - uses: actions/upload-artifact@master
-        with:
-          name: safe_vault-${{ matrix.target }}-prod
-          path: artifacts
 
   # Unfortunately, for artifact retrieval, there's not really a way to avoid having this huge list of
   # 'download-artifact' actions. We could perhaps implement our own 'retrieve all build artifacts'
@@ -233,7 +237,7 @@ jobs:
   #       if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
 
   coverage:
-    needs: [build, deploy]
+    needs: [build, tarpaulin, deploy]
     runs-on: ubuntu-latest
     steps:
       - name: Coveralls Finished
