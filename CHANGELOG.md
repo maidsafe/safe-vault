@@ -1,5 +1,10 @@
 # Safe Vault - Change Log
 
+## [0.23.0]
+- Enable required features in self-update dependency to support untar and unzip for packages
+- Add tarpaulin to GHA and push result to coveralls
+- Update to latest routing
+
 ## [0.22.0]
 - Support a --update-only flag which only attempts to self-update binary
 - Update readme to link to contributing guidelines doc
