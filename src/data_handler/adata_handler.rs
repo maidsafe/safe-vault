@@ -8,19 +8,18 @@
 
 use crate::{
     action::Action,
-    chunk_store::{error::Error as ChunkStoreError, AppendOnlyChunkStore},
+    chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
     rpc::Rpc,
     utils,
     vault::Init,
     Config, Result,
 };
-use log::error;
+use log::info;
 
 use safe_nd::{
     AData, ADataAction, ADataAddress, ADataAppendOperation, ADataIndex, ADataOwner,
-    ADataPermissions, ADataPubPermissions, ADataUnpubPermissions, ADataUser, AppendOnlyData,
-    Error as NdError, MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult,
-    SeqAppendOnly, UnseqAppendOnly,
+    ADataPermissions, ADataPubPermissions, ADataUnpubPermissions, ADataUser, Error as NdError,
+    MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult, Sequence,
 };
 
 use std::{
@@ -31,7 +30,7 @@ use std::{
 
 pub(super) struct ADataHandler {
     id: NodePublicId,
-    chunks: AppendOnlyChunkStore,
+    crdt_chunks: SequenceChunkStore,
 }
 
 impl ADataHandler {
@@ -41,15 +40,17 @@ impl ADataHandler {
         total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
+        info!("NEW SequenceChunkStore!");
         let root_dir = config.root_dir()?;
         let max_capacity = config.max_capacity();
-        let chunks = AppendOnlyChunkStore::new(
+        let crdt_chunks = SequenceChunkStore::new(
             &root_dir,
             max_capacity,
             Rc::clone(total_used_space),
             init_mode,
         )?;
-        Ok(Self { id, chunks })
+
+        Ok(Self { id, crdt_chunks })
     }
 
     pub(super) fn handle_put_adata_req(
@@ -58,13 +59,16 @@ impl ADataHandler {
         data: &AData,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = if self.chunks.has(data.address()) {
+        info!("PUT Sequence!!!!!!!!");
+        let seq_data = Sequence::new(*data.name(), data.tag());
+        let result = if self.crdt_chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
-            self.chunks
-                .put(&data)
+            self.crdt_chunks
+                .put(&seq_data)
                 .map_err(|error| error.to_string().into())
         };
+
         let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
@@ -83,27 +87,29 @@ impl ADataHandler {
         address: ADataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
+        info!("DEL Sequence!!!!!!!!");
         let requester_pk = *utils::own_key(&requester)?;
         let result = self
-            .chunks
+            .crdt_chunks
             .get(&address)
             .map_err(|error| match error {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
                 error => error.to_string().into(),
             })
-            .and_then(|adata| {
-                // TODO - AData::check_permission() doesn't support Delete yet in safe-nd
-                if adata.address().is_pub() {
+            .and_then(|seq_data| {
+                // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
+                if seq_data.address().is_pub() {
                     Err(NdError::InvalidOperation)
                 } else {
-                    adata.check_is_last_owner(requester_pk)
+                    seq_data.check_is_last_owner(requester_pk)
                 }
             })
             .and_then(|_| {
-                self.chunks
+                self.crdt_chunks
                     .delete(&address)
                     .map_err(|error| error.to_string().into())
             });
+
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
@@ -122,9 +128,10 @@ impl ADataHandler {
         address: ADataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self.get_adata(&requester, address, ADataAction::Read);
+        info!("GET Sequence!!!!!!!!");
+        let result = self.get_seq_data(&requester, address, ADataAction::Read);
 
-        Some(Action::RespondToClientHandlers {
+        /*Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester,
@@ -132,7 +139,8 @@ impl ADataHandler {
                 message_id,
                 refund: None,
             },
-        })
+        })*/
+        None
     }
 
     pub(super) fn handle_get_adata_shell_req(
@@ -142,11 +150,12 @@ impl ADataHandler {
         data_index: ADataIndex,
         message_id: MessageId,
     ) -> Option<Action> {
+        info!("GET Sequence Shell!!!!!!!!");
         let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.shell(data_index));
+            .get_seq_data(&requester, address, ADataAction::Read)
+            .and_then(|seq_data| seq_data.shell(data_index));
 
-        Some(Action::RespondToClientHandlers {
+        /*Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester,
@@ -154,7 +163,8 @@ impl ADataHandler {
                 message_id,
                 refund: None,
             },
-        })
+        })*/
+        None
     }
 
     pub(super) fn handle_get_adata_range_req(
@@ -164,9 +174,14 @@ impl ADataHandler {
         range: (ADataIndex, ADataIndex),
         message_id: MessageId,
     ) -> Option<Action> {
+        info!("GET Sequence Range!!!!!!!!");
         let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.in_range(range.0, range.1).ok_or(NdError::NoSuchEntry));
+            .get_seq_data(&requester, address, ADataAction::Read)
+            .and_then(|seq_data| {
+                seq_data
+                    .in_range(range.0, range.1)
+                    .ok_or(NdError::NoSuchEntry)
+            });
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -185,9 +200,10 @@ impl ADataHandler {
         address: ADataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
+        info!("GET Sequence Indices!!!!!!!!");
         let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.indices());
+            .get_seq_data(&requester, address, ADataAction::Read)
+            .and_then(|seq_data| seq_data.indices());
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -206,15 +222,16 @@ impl ADataHandler {
         address: ADataAddress,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.last_entry().cloned().ok_or(NdError::NoSuchEntry));
+        info!("GET Sequence Last entry!!!");
+        let seq_result = self
+            .get_seq_data(&requester, address, ADataAction::Read)
+            .and_then(|seq_data| seq_data.last_entry().ok_or(NdError::NoSuchEntry));
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester,
-                response: Response::GetADataLastEntry(result),
+                response: Response::GetADataLastEntry(seq_result),
                 message_id,
                 refund: None,
             },
@@ -228,10 +245,11 @@ impl ADataHandler {
         owners_index: ADataIndex,
         message_id: MessageId,
     ) -> Option<Action> {
+        info!("GET Sequence owner!!!");
         let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| {
-                adata
+            .get_seq_data(&requester, address, ADataAction::Read)
+            .and_then(|seq_data| {
+                seq_data
                     .owner(owners_index)
                     .cloned()
                     .ok_or(NdError::InvalidOwners)
@@ -256,9 +274,10 @@ impl ADataHandler {
         user: ADataUser,
         message_id: MessageId,
     ) -> Option<Action> {
+        info!("GET pub Sequence user perms!!!");
         let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.pub_user_permissions(user, permissions_index));
+            .get_seq_data(&requester, address, ADataAction::Read)
+            .and_then(|adata| adata.user_permissions(user, permissions_index));
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -279,9 +298,10 @@ impl ADataHandler {
         public_key: PublicKey,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.unpub_user_permissions(public_key, permissions_index));
+        info!("GET unpub AData user perms!!!");
+        /*let result = self
+            .get_seq_data(&requester, address, ADataAction::Read)
+            .and_then(|seq_data| seq_data.user_permissions(public_key, permissions_index));
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -291,7 +311,8 @@ impl ADataHandler {
                 message_id,
                 refund: None,
             },
-        })
+        })*/
+        None
     }
 
     pub(super) fn handle_get_adata_permissions_req(
@@ -301,16 +322,13 @@ impl ADataHandler {
         permissions_index: ADataIndex,
         message_id: MessageId,
     ) -> Option<Action> {
+        info!("GET Sequence Permissions!!!");
         let response = {
             let result = self
-                .get_adata(&requester, address, ADataAction::Read)
-                .and_then(|adata| {
-                    let res = if adata.is_pub() {
-                        ADataPermissions::from(adata.pub_permissions(permissions_index)?.clone())
-                    } else {
-                        ADataPermissions::from(adata.unpub_permissions(permissions_index)?.clone())
-                    };
-
+                .get_seq_data(&requester, address, ADataAction::Read)
+                .and_then(|seq_data| {
+                    let res =
+                        ADataPermissions::from(seq_data.permissions(permissions_index)?.clone());
                     Ok(res)
                 });
             Response::GetADataPermissions(result)
@@ -334,9 +352,10 @@ impl ADataHandler {
         key: &[u8],
         message_id: MessageId,
     ) -> Option<Action> {
+        info!("GET Sequence value!!!!");
         let result = self
-            .get_adata(&requester, address, ADataAction::Read)
-            .and_then(|adata| adata.get(&key).cloned().ok_or(NdError::NoSuchEntry));
+            .get_seq_data(&requester, address, ADataAction::Read)
+            .and_then(|seq_data| seq_data.get(&key).ok_or(NdError::NoSuchEntry));
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -349,17 +368,21 @@ impl ADataHandler {
         })
     }
 
-    fn get_adata(
+    fn get_seq_data(
         &self,
         requester: &PublicId,
         address: ADataAddress,
         action: ADataAction,
-    ) -> Result<AData, NdError> {
+    ) -> Result<Sequence, NdError> {
+        info!("GET Sequence (private helper)!!!!!");
         let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
-        let data = self.chunks.get(&address).map_err(|error| match error {
-            ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
-            _ => error.to_string().into(),
-        })?;
+        let data = self
+            .crdt_chunks
+            .get(&address)
+            .map_err(|error| match error {
+                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+                _ => error.to_string().into(),
+            })?;
 
         data.check_permission(action, *requester_key)?;
         Ok(data)
@@ -373,28 +396,16 @@ impl ADataHandler {
         permissions_idx: u64,
         message_id: MessageId,
     ) -> Option<Action> {
+        info!("Add PublicSequence permissions!!!!!!!!");
         let own_id = format!("{}", self);
-        self.mutate_adata_chunk(
+        self.mutate_seq_data_chunk(
             &requester,
             address,
             ADataAction::ManagePermissions,
             message_id,
-            move |mut adata| {
-                match adata {
-                    AData::PubSeq(ref mut pub_seq_data) => {
-                        pub_seq_data.append_permissions(permissions, permissions_idx)?;
-                    }
-                    AData::PubUnseq(ref mut pub_unseq_data) => {
-                        pub_unseq_data.append_permissions(permissions, permissions_idx)?;
-                    }
-                    _ => {
-                        return {
-                            error!("{}: Unexpected chunk encountered", own_id);
-                            Err(NdError::InvalidOperation)
-                        }
-                    }
-                }
-                Ok(adata)
+            move |mut seq_data| {
+                seq_data.append_permissions(permissions, permissions_idx)?;
+                Ok(seq_data)
             },
         )
     }
@@ -407,28 +418,20 @@ impl ADataHandler {
         permissions_idx: u64,
         message_id: MessageId,
     ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        self.mutate_adata_chunk(
+        info!("Add PrivateSequence permissions!!!!!!!!");
+        None
+        // TODO: we need the pub/priv sequence first
+        /*let own_id = format!("{}", self);
+        self.mutate_seq_data_chunk(
             &requester,
             address,
             ADataAction::ManagePermissions,
             message_id,
-            move |mut adata| {
-                match adata {
-                    AData::UnpubSeq(ref mut unpub_seq_data) => {
-                        unpub_seq_data.append_permissions(permissions, permissions_idx)?;
-                    }
-                    AData::UnpubUnseq(ref mut unpub_unseq_data) => {
-                        unpub_unseq_data.append_permissions(permissions, permissions_idx)?;
-                    }
-                    _ => {
-                        error!("{}: Unexpected chunk encountered", own_id);
-                        return Err(NdError::InvalidOperation);
-                    }
-                }
-                Ok(adata)
+            move |mut seq_data| {
+                seq_data.append_permissions(permissions, permissions_idx)?;
+                Ok(seq_data)
             },
-        )
+        )*/
     }
 
     pub(super) fn handle_set_adata_owner_req(
@@ -439,19 +442,15 @@ impl ADataHandler {
         owners_idx: u64,
         message_id: MessageId,
     ) -> Option<Action> {
-        self.mutate_adata_chunk(
+        info!("Append Sequence Owner!!!!!!!!");
+        self.mutate_seq_data_chunk(
             &requester,
             address,
             ADataAction::ManagePermissions,
             message_id,
-            move |mut adata| {
-                match adata {
-                    AData::PubSeq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
-                    AData::PubUnseq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
-                    AData::UnpubSeq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
-                    AData::UnpubUnseq(ref mut adata) => adata.append_owner(owner, owners_idx)?,
-                }
-                Ok(adata)
+            move |mut seq_data| {
+                seq_data.append_owner(owner, owners_idx)?;
+                Ok(seq_data)
             },
         )
     }
@@ -459,27 +458,21 @@ impl ADataHandler {
     pub(super) fn handle_append_seq_req(
         &mut self,
         requester: &PublicId,
-        append: ADataAppendOperation,
-        index: u64,
+        operation: ADataAppendOperation,
+        current_index: u64,
         message_id: MessageId,
     ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        let address = append.address;
-        self.mutate_adata_chunk(
+        info!("Append Sequence (guarded)!!!!!!!!");
+        let actor = self.id.name().clone();
+
+        self.mutate_seq_data_chunk(
             &requester,
-            address,
+            operation.address,
             ADataAction::Append,
             message_id,
-            move |mut adata| {
-                match adata {
-                    AData::PubSeq(ref mut adata) => adata.append(append.values, index)?,
-                    AData::UnpubSeq(ref mut adata) => adata.append(append.values, index)?,
-                    AData::PubUnseq(_) | AData::UnpubUnseq(_) => {
-                        error!("{}: Unexpected unseqential chunk encountered", own_id);
-                        return Err(NdError::InvalidOperation);
-                    }
-                }
-                Ok(adata)
+            move |mut seq_data| {
+                seq_data.append(operation.values, Some(current_index), actor);
+                Ok(seq_data)
             },
         )
     }
@@ -490,28 +483,22 @@ impl ADataHandler {
         operation: ADataAppendOperation,
         message_id: MessageId,
     ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        let address = operation.address;
-        self.mutate_adata_chunk(
+        info!("Append Sequence (not guarded)!!!!!!!!");
+        let actor = self.id.name().clone();
+
+        self.mutate_seq_data_chunk(
             &requester,
-            address,
+            operation.address,
             ADataAction::Append,
             message_id,
-            move |mut adata| {
-                match adata {
-                    AData::PubUnseq(ref mut adata) => adata.append(operation.values)?,
-                    AData::UnpubUnseq(ref mut adata) => adata.append(operation.values)?,
-                    AData::PubSeq(_) | AData::UnpubSeq(_) => {
-                        error!("{}: Unexpected sequential chunk encountered", own_id);
-                        return Err(NdError::InvalidOperation);
-                    }
-                }
-                Ok(adata)
+            move |mut seq_data| {
+                seq_data.append(operation.values, None, actor);
+                Ok(seq_data)
             },
         )
     }
 
-    fn mutate_adata_chunk<F>(
+    fn mutate_seq_data_chunk<F>(
         &mut self,
         requester: &PublicId,
         address: ADataAddress,
@@ -520,14 +507,15 @@ impl ADataHandler {
         mutation_fn: F,
     ) -> Option<Action>
     where
-        F: FnOnce(AData) -> NdResult<AData>,
+        F: FnOnce(Sequence) -> NdResult<Sequence>,
     {
+        info!("Mutate Sequence (private helper)!!!!");
         let result = self
-            .get_adata(requester, address, action)
+            .get_seq_data(requester, address, action)
             .and_then(mutation_fn)
-            .and_then(move |adata| {
-                self.chunks
-                    .put(&adata)
+            .and_then(move |seq_data| {
+                self.crdt_chunks
+                    .put(&seq_data)
                     .map_err(|error| error.to_string().into())
             });
         let refund = utils::get_refund_for_put(&result);

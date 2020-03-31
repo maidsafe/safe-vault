@@ -362,6 +362,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "crdts"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65b26d25ab6e3ec42bfe77b805b62ccb024aad0c4d899ecd22cf05ebd68eb397"
+dependencies = [
+ "hashbrown",
+ "num-bigint 0.2.6",
+ "serde",
+]
+
+[[package]]
 name = "crossbeam"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -863,6 +874,17 @@ name = "half"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f36b5f248235f45773d4944f555f83ea61fe07b18b561ccf99d7483d7381e54d"
+
+[[package]]
+name = "hashbrown"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bae29b6653b3412c2e71e9d486db9f9df5d701941d86683005efb9f2d28e3da"
+dependencies = [
+ "byteorder",
+ "scopeguard",
+ "serde",
+]
 
 [[package]]
 name = "heck"
@@ -1400,6 +1422,17 @@ dependencies = [
  "num-traits 0.2.11",
  "rand 0.4.6",
  "rustc-serialize",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
+dependencies = [
+ "autocfg 1.0.0",
+ "num-integer",
+ "num-traits 0.2.11",
 ]
 
 [[package]]
@@ -2099,7 +2132,7 @@ dependencies = [
  "log 0.4.8",
  "lru_time_cache",
  "mock-quic-p2p",
- "num-bigint",
+ "num-bigint 0.1.44",
  "parsec",
  "quic-p2p",
  "rand 0.6.5",
@@ -2184,10 +2217,10 @@ checksum = "535622e6be132bccd223f4bb2b8ac8d53cda3c7a6394944d3b2b33fb974f9d76"
 [[package]]
 name = "safe-nd"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d22dcd7515d740dd0133c19c738830da96813e33dcc949849025d871de59564d"
+source = "git+https://github.com/bochaco/safe-nd.git?branch=crdt-seq#0df8c0ea0be04cee3582ebe662d1dad5d698808b"
 dependencies = [
  "bincode 1.1.4",
+ "crdts",
  "ed25519-dalek",
  "hex_fmt 0.3.0",
  "multibase",
@@ -2249,6 +2282,12 @@ dependencies = [
  "lazy_static 1.4.0",
  "winapi 0.3.8",
 ]
+
+[[package]]
+name = "scopeguard"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94258f53601af11e6a49f722422f6e3425c52b06245a5cf9bc09908b174f5e27"
 
 [[package]]
 name = "sct"
