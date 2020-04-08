@@ -26,9 +26,8 @@ tar.gz: TAR_WIN_CHECKSUM
 ```
 
 ## Related Links
-* [SAFE CLI](https://github.com/maidsafe/safe-cli/releases/latest/)
-* [SAFE Authenticator CLI](https://github.com/maidsafe/safe-authenticator-cli/releases/latest/)
-* [SAFE Browser PoC](https://github.com/maidsafe/safe_browser/releases/)
+* [SAFE CLI and Authenticator daemon](https://github.com/maidsafe/safe-api/releases/latest/)
+* [SAFE Browser](https://github.com/maidsafe/safe_browser/releases/)
 EOF
 
 zip_linux_checksum=$(sha256sum \
