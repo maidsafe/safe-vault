@@ -51,7 +51,7 @@ impl ElderAData {
     }
 
     // client query
-    pub fn get_adata(
+    pub fn get(
         &mut self,
         client: &ClientInfo,
         request: Request,
@@ -65,7 +65,7 @@ impl ElderAData {
     }
 
     // on client request
-    pub fn initiate_adata_creation(
+    pub fn initiate_creation(
         &mut self,
         client: &ClientInfo,
         chunk: AData,
@@ -96,7 +96,7 @@ impl ElderAData {
     }
 
     // on client request
-    pub fn initiate_adata_deletion(
+    pub fn initiate_deletion(
         &mut self,
         client: &ClientInfo,
         address: ADataAddress,
@@ -117,7 +117,7 @@ impl ElderAData {
     }
 
     // on client request
-    pub fn initiate_adata_mutation(
+    pub fn initiate_mutation(
         &mut self,
         client: &ClientInfo,
         request: Request,
@@ -153,7 +153,7 @@ impl ElderIData {
     }
 
     // client query
-    pub fn get_idata(
+    pub fn get(
         &mut self,
         client: &ClientInfo,
         address: IDataAddress,
@@ -167,7 +167,7 @@ impl ElderIData {
     }
 
     // on client request
-    pub fn initiate_idata_creation(
+    pub fn initiate_creation(
         &mut self,
         client: &ClientInfo,
         chunk: IData,
@@ -202,7 +202,7 @@ impl ElderIData {
     }
 
     // on client request
-    pub fn initiate_unpub_idata_deletion(
+    pub fn initiate_deletion(
         &mut self,
         client: &ClientInfo,
         address: IDataAddress,
@@ -243,7 +243,7 @@ impl ElderMData {
     }
 
     // client query
-    pub fn get_mdata(
+    pub fn get(
         &mut self,
         request: Request,
         client: &ClientInfo,
@@ -257,7 +257,7 @@ impl ElderMData {
     }
 
     // on client request
-    pub fn initiate_mdata_mutation(
+    pub fn initiate_mutation(
         &mut self,
         request: Request,
         client: &ClientInfo,
@@ -272,7 +272,7 @@ impl ElderMData {
     }
 
     // on client request
-    pub fn initiate_mdata_deletion(
+    pub fn initiate_deletion(
         &mut self,
         request: Request,
         client: &ClientInfo,
@@ -286,7 +286,7 @@ impl ElderMData {
     }
 
     // on client request
-    pub fn initiate_mdata_creation(
+    pub fn initiate_creation(
         &mut self,
         client: &ClientInfo,
         chunk: MData,

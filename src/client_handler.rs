@@ -8,8 +8,7 @@
 
 mod auth;
 mod auth_keys;
-mod balance;
-mod coin_operations;
+mod balances;
 mod elder_data;
 mod login_packets;
 mod messaging;
@@ -17,8 +16,7 @@ mod messaging;
 use self::{
     auth::{Auth, ClientInfo},
     auth_keys::AuthKeysDb,
-    balance::BalancesDb,
-    coin_operations::CoinOperations,
+    balances::{Balances, BalancesDb},
     elder_data::ElderData,
     login_packets::LoginPackets,
     messaging::Messaging,
@@ -52,7 +50,7 @@ pub const COST_OF_PUT: Coins = Coins::from_nano(1);
 pub(crate) struct ClientHandler {
     id: NodePublicId,
     messaging: Messaging,
-    coin_operations: CoinOperations,
+    balances: Balances,
     auth: Auth,
     login_packets: LoginPackets,
     data: ElderData,
@@ -80,14 +78,14 @@ impl ClientHandler {
         let messaging = Messaging::new(id.clone(), routing_node);
 
         let auth = Auth::new(id.clone(), auth_keys_db);
-        let coin_operations = CoinOperations::new(id.clone(), balances);
+        let balances = Balances::new(id.clone(), balances);
         let login_packets = LoginPackets::new(id.clone(), login_packets_db);
         let data = ElderData::new(id.clone());
 
         let client_handler = Self {
             id,
             messaging,
-            coin_operations,
+            balances,
             auth,
             login_packets,
             data,
@@ -122,10 +120,7 @@ impl ClientHandler {
                 refund,
             } => {
                 if let Some(refund_amount) = refund {
-                    if let Err(error) = self
-                        .coin_operations
-                        .deposit(requester.name(), refund_amount)
-                    {
+                    if let Err(error) = self.balances.deposit(requester.name(), refund_amount) {
                         error!(
                             "{}: Failed to refund {} coins for {:?}: {:?}",
                             self, refund_amount, requester, error,
@@ -150,7 +145,7 @@ impl ClientHandler {
                 cost,
             } => {
                 let owner = utils::owner(&client_public_id)?;
-                if let Some(action) = self.coin_operations.pay(
+                if let Some(action) = self.balances.pay(
                     &client_public_id,
                     owner.public_key(),
                     &request,
@@ -183,7 +178,7 @@ impl ClientHandler {
             } => {
                 let owner = utils::owner(&client_public_id)?;
 
-                if let Some(action) = self.coin_operations.pay(
+                if let Some(action) = self.balances.pay(
                     &client_public_id,
                     owner.public_key(),
                     &request,
@@ -261,10 +256,7 @@ impl ClientHandler {
             //
             // ===== Immutable Data =====
             //
-            PutIData(chunk) => self
-                .data
-                .idata
-                .initiate_idata_creation(client, chunk, message_id),
+            PutIData(chunk) => self.data.idata.initiate_creation(client, chunk, message_id),
             GetIData(address) => {
                 // TODO: We don't check for the existence of a valid signature for published data,
                 // since it's free for anyone to get.  However, as a means of spam prevention, we
@@ -273,29 +265,26 @@ impl ClientHandler {
                 // behaviour is deemed to become more "spammy". (e.g. the get requests include a
                 // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
                 // by brute-force attempts with varying seeds)
-                self.data.idata.get_idata(client, address, message_id)
+                self.data.idata.get(client, address, message_id)
             }
             DeleteUnpubIData(address) => self
                 .data
                 .idata
-                .initiate_unpub_idata_deletion(client, address, message_id),
+                .initiate_deletion(client, address, message_id),
             //
             // ===== Mutable Data =====
             //
-            PutMData(chunk) => self
-                .data
-                .mdata
-                .initiate_mdata_creation(client, chunk, message_id),
+            PutMData(chunk) => self.data.mdata.initiate_creation(client, chunk, message_id),
             MutateMDataEntries { .. }
             | SetMDataUserPermissions { .. }
             | DelMDataUserPermissions { .. } => self
                 .data
                 .mdata
-                .initiate_mdata_mutation(request, client, message_id),
+                .initiate_mutation(request, client, message_id),
             DeleteMData(..) => self
                 .data
                 .mdata
-                .initiate_mdata_deletion(request, client, message_id),
+                .initiate_deletion(request, client, message_id),
             GetMData(..)
             | GetMDataVersion(..)
             | GetMDataShell(..)
@@ -304,14 +293,11 @@ impl ClientHandler {
             | ListMDataUserPermissions { .. }
             | ListMDataEntries(..)
             | ListMDataKeys(..)
-            | ListMDataValues(..) => self.data.mdata.get_mdata(request, client, message_id),
+            | ListMDataValues(..) => self.data.mdata.get(request, client, message_id),
             //
             // ===== Append Only Data =====
             //
-            PutAData(chunk) => self
-                .data
-                .adata
-                .initiate_adata_creation(client, chunk, message_id),
+            PutAData(chunk) => self.data.adata.initiate_creation(client, chunk, message_id),
             GetAData(_)
             | GetADataShell { .. }
             | GetADataRange { .. }
@@ -321,11 +307,11 @@ impl ClientHandler {
             | GetADataPermissions { .. }
             | GetPubADataUserPermissions { .. }
             | GetUnpubADataUserPermissions { .. }
-            | GetADataValue { .. } => self.data.adata.get_adata(client, request, message_id),
+            | GetADataValue { .. } => self.data.adata.get(client, request, message_id),
             DeleteAData(address) => self
                 .data
                 .adata
-                .initiate_adata_deletion(client, address, message_id),
+                .initiate_deletion(client, address, message_id),
             AddPubADataPermissions { .. }
             | AddUnpubADataPermissions { .. }
             | SetADataOwner { .. }
@@ -333,7 +319,7 @@ impl ClientHandler {
             | AppendUnseq(..) => self
                 .data
                 .adata
-                .initiate_adata_mutation(client, request, message_id),
+                .initiate_mutation(client, request, message_id),
             //
             // ===== Coins =====
             //
@@ -341,7 +327,7 @@ impl ClientHandler {
                 destination,
                 amount,
                 transaction_id,
-            } => self.coin_operations.process_transfer_coins_client_req(
+            } => self.balances.initiate_transfer(
                 &client.public_id,
                 destination,
                 amount,
@@ -350,8 +336,8 @@ impl ClientHandler {
             ),
             GetBalance => {
                 let balance = self
-                    .coin_operations
-                    .balance(client.public_id.name())
+                    .balances
+                    .get(client.public_id.name())
                     .ok_or(NdError::NoSuchBalance);
                 let response = Response::GetBalance(balance);
                 self.respond_to_client(message_id, response);
@@ -361,7 +347,7 @@ impl ClientHandler {
                 new_balance_owner,
                 amount,
                 transaction_id,
-            } => self.coin_operations.process_create_balance_client_req(
+            } => self.balances.initiate_creation(
                 &client.public_id,
                 new_balance_owner,
                 amount,
@@ -371,17 +357,16 @@ impl ClientHandler {
             //
             // ===== Login packets =====
             //
-            CreateLoginPacket(login_packet) => self.login_packets.initiate_login_packet_creation(
-                &client.public_id,
-                login_packet,
-                message_id,
-            ),
+            CreateLoginPacket(login_packet) => {
+                self.login_packets
+                    .initiate_creation(&client.public_id, login_packet, message_id)
+            }
             CreateLoginPacketFor {
                 new_owner,
                 amount,
                 new_login_packet,
                 transaction_id,
-            } => self.login_packets.initiate_proxied_login_packet_creation(
+            } => self.login_packets.initiate_proxied_creation(
                 &client.public_id,
                 new_owner,
                 amount,
@@ -389,16 +374,14 @@ impl ClientHandler {
                 new_login_packet,
                 message_id,
             ),
-            UpdateLoginPacket(updated_login_packet) => {
-                self.login_packets.initiate_login_packet_update(
-                    client.public_id.clone(),
-                    updated_login_packet,
-                    message_id,
-                )
-            }
+            UpdateLoginPacket(updated_login_packet) => self.login_packets.initiate_update(
+                client.public_id.clone(),
+                updated_login_packet,
+                message_id,
+            ),
             GetLoginPacket(ref address) => {
                 self.login_packets
-                    .get_login_packet(&client.public_id, address, message_id)
+                    .get(&client.public_id, address, message_id)
             }
             //
             // ===== Client (Owner) to ClientHandlers =====
@@ -436,9 +419,10 @@ impl ClientHandler {
             requester
         );
         match request {
-            CreateLoginPacket(ref login_packet) => self
-                .login_packets
-                .finalize_login_packet_creation(requester, login_packet, message_id),
+            CreateLoginPacket(ref login_packet) => {
+                self.login_packets
+                    .finalize_creation(requester, login_packet, message_id)
+            }
             CreateLoginPacketFor {
                 new_owner,
                 amount,
@@ -447,10 +431,7 @@ impl ClientHandler {
             } => {
                 if &src == requester.name() {
                     // Step two - create balance and forward login_packet.
-                    if let Err(error) = self
-                        .coin_operations
-                        .create_balance(&requester, new_owner, amount)
-                    {
+                    if let Err(error) = self.balances.create(&requester, new_owner, amount) {
                         // Refund amount (Including the cost of creating the balance)
                         let refund = Some(amount.checked_add(COST_OF_PUT)?);
 
@@ -476,7 +457,7 @@ impl ClientHandler {
                         }))
                     }
                 } else {
-                    self.login_packets.finalize_proxied_login_packet_creation(
+                    self.login_packets.finalize_proxied_creation(
                         requester,
                         amount,
                         transaction_id,
@@ -490,7 +471,7 @@ impl ClientHandler {
                 amount,
                 transaction_id,
             } => {
-                let action = self.coin_operations.finalize_create_balance_req(
+                let action = self.balances.finalize_creation(
                     requester,
                     new_balance_owner,
                     amount,
@@ -517,7 +498,7 @@ impl ClientHandler {
                 amount,
                 transaction_id,
             } => {
-                let action = self.coin_operations.finalize_transfer_coins_req(
+                let action = self.balances.finalize_transfer(
                     requester,
                     destination,
                     amount,
@@ -538,9 +519,10 @@ impl ClientHandler {
                 }
                 action
             }
-            UpdateLoginPacket(updated_login_packet) => self
-                .login_packets
-                .finalize_login_packet_update(requester, &updated_login_packet, message_id),
+            UpdateLoginPacket(updated_login_packet) => {
+                self.login_packets
+                    .finalize_update(requester, &updated_login_packet, message_id)
+            }
             InsAuthKey {
                 key,
                 version,

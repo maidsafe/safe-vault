@@ -29,7 +29,7 @@ impl LoginPackets {
     }
 
     // client query
-    pub fn get_login_packet(
+    pub fn get(
         &mut self,
         client_id: &PublicId,
         address: &XorName,
@@ -45,7 +45,7 @@ impl LoginPackets {
     }
 
     // on client request
-    pub fn initiate_login_packet_creation(
+    pub fn initiate_creation(
         &mut self,
         client_id: &PublicId,
         login_packet: LoginPacket,
@@ -69,7 +69,7 @@ impl LoginPackets {
     }
 
     // on consensus
-    pub fn finalize_login_packet_creation(
+    pub fn finalize_creation(
         &mut self,
         requester: PublicId,
         login_packet: &LoginPacket,
@@ -96,7 +96,7 @@ impl LoginPackets {
 
     /// Step one of the process - the payer is effectively doing a `CreateAccount` request to
     /// new_owner, and bundling the new_owner's `CreateLoginPacket` along with it.
-    pub fn initiate_proxied_login_packet_creation(
+    pub fn initiate_proxied_creation(
         &mut self,
         payer: &PublicId,
         new_owner: PublicKey,
@@ -129,7 +129,7 @@ impl LoginPackets {
     /// Step two or three of the process - the payer is effectively doing a `CreateAccount` request
     /// to new_owner, and bundling the new_owner's `CreateLoginPacket` along with it.
     #[allow(clippy::too_many_arguments)]
-    pub fn finalize_proxied_login_packet_creation(
+    pub fn finalize_proxied_creation(
         &mut self,
         payer: PublicId,
         amount: Coins,
@@ -163,7 +163,7 @@ impl LoginPackets {
     }
 
     // on client request
-    pub fn initiate_login_packet_update(
+    pub fn initiate_update(
         &mut self,
         client_id: PublicId,
         updated_login_packet: LoginPacket,
@@ -177,7 +177,7 @@ impl LoginPackets {
     }
 
     // on consensus
-    pub fn finalize_login_packet_update(
+    pub fn finalize_update(
         &mut self,
         requester: PublicId,
         updated_login_packet: &LoginPacket,

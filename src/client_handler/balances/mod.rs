@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{
-    balance::{self, Balance, BalancesDb},
-    COST_OF_PUT,
-};
+mod db;
+
+pub use self::db::{Balance, BalancesDb};
+use super::COST_OF_PUT;
 use crate::{
     action::{Action, ConsensusAction},
     rpc::Rpc,
@@ -22,17 +22,17 @@ use safe_nd::{
 };
 use std::fmt::{self, Display, Formatter};
 
-pub(super) struct CoinOperations {
+pub struct Balances {
     id: NodePublicId,
-    balances: BalancesDb,
+    db: BalancesDb,
 }
 
-impl CoinOperations {
-    pub fn new(id: NodePublicId, balances: BalancesDb) -> Self {
-        Self { id, balances }
+impl Balances {
+    pub fn new(id: NodePublicId, db: BalancesDb) -> Self {
+        Self { id, db }
     }
 
-    pub(super) fn process_create_balance_client_req(
+    pub(super) fn initiate_creation(
         &mut self,
         requester: &PublicId,
         owner_key: PublicKey,
@@ -67,7 +67,7 @@ impl CoinOperations {
         }))
     }
 
-    pub(super) fn finalize_create_balance_req(
+    pub(super) fn finalize_creation(
         &mut self,
         requester: PublicId,
         owner_key: PublicKey,
@@ -75,7 +75,7 @@ impl CoinOperations {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let (result, refund) = match self.create_balance(&requester, owner_key, amount) {
+        let (result, refund) = match self.create(&requester, owner_key, amount) {
             Ok(()) => {
                 let transaction = Transaction {
                     id: transaction_id,
@@ -101,7 +101,7 @@ impl CoinOperations {
         })
     }
 
-    pub(super) fn process_transfer_coins_client_req(
+    pub(super) fn initiate_transfer(
         &mut self,
         requester: &PublicId,
         destination: XorName,
@@ -121,7 +121,7 @@ impl CoinOperations {
         }))
     }
 
-    pub(super) fn finalize_transfer_coins_req(
+    pub(super) fn finalize_transfer(
         &mut self,
         requester: PublicId,
         destination: XorName,
@@ -152,28 +152,9 @@ impl CoinOperations {
         })
     }
 
-    fn withdraw<K: balance::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
-        if amount.as_nano() == 0 {
-            return Err(NdError::InvalidOperation);
-        }
+    pub(super) fn deposit<K: db::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
         let (public_key, mut balance) = self
-            .balances
-            .get_key_value(key)
-            .ok_or(NdError::NoSuchBalance)?;
-        balance.coins = balance
-            .coins
-            .checked_sub(amount)
-            .ok_or(NdError::InsufficientBalance)?;
-        self.put_balance(&public_key, &balance)
-    }
-
-    pub(super) fn deposit<K: balance::Key>(
-        &mut self,
-        key: &K,
-        amount: Coins,
-    ) -> Result<(), NdError> {
-        let (public_key, mut balance) = self
-            .balances
+            .db
             .get_key_value(key)
             .ok_or_else(|| NdError::NoSuchBalance)?;
         balance.coins = balance
@@ -181,24 +162,7 @@ impl CoinOperations {
             .checked_add(amount)
             .ok_or(NdError::ExcessiveValue)?;
 
-        self.put_balance(&public_key, &balance)
-    }
-
-    fn put_balance(&mut self, public_key: &PublicKey, balance: &Balance) -> Result<(), NdError> {
-        trace!(
-            "{}: Setting balance to {} for {}",
-            self,
-            balance,
-            public_key
-        );
-        self.balances.put(public_key, balance).map_err(|error| {
-            error!(
-                "{}: Failed to update balance of {}: {}",
-                self, public_key, error
-            );
-
-            NdError::from("Failed to update balance")
-        })
+        self.set(&public_key, &balance)
     }
 
     // Pays cost of a request.
@@ -223,11 +187,11 @@ impl CoinOperations {
         }
     }
 
-    pub(super) fn balance<K: balance::Key>(&self, key: &K) -> Option<Coins> {
-        self.balances.get(key).map(|balance| balance.coins)
+    pub(super) fn get<K: db::Key>(&self, key: &K) -> Option<Coins> {
+        self.db.get(key).map(|balance| balance.coins)
     }
 
-    pub(super) fn create_balance(
+    pub(super) fn create(
         &mut self,
         requester: &PublicId,
         owner_key: PublicKey,
@@ -236,7 +200,7 @@ impl CoinOperations {
         let own_request = utils::own_key(requester)
             .map(|key| key == &owner_key)
             .unwrap_or(false);
-        if !own_request && self.balances.exists(&owner_key) {
+        if !own_request && self.db.exists(&owner_key) {
             info!(
                 "{}: Failed to create balance for {:?}: already exists.",
                 self, owner_key
@@ -245,13 +209,42 @@ impl CoinOperations {
             Err(NdError::BalanceExists)
         } else {
             let balance = Balance { coins: amount };
-            self.put_balance(&owner_key, &balance)?;
+            self.set(&owner_key, &balance)?;
             Ok(())
         }
     }
+
+    fn set(&mut self, public_key: &PublicKey, balance: &Balance) -> Result<(), NdError> {
+        trace!(
+            "{}: Setting balance to {} for {}",
+            self,
+            balance,
+            public_key
+        );
+        self.db.set(public_key, balance).map_err(|error| {
+            error!(
+                "{}: Failed to set balance of {}: {}",
+                self, public_key, error
+            );
+
+            NdError::from("Failed to set balance")
+        })
+    }
+
+    fn withdraw<K: db::Key>(&mut self, key: &K, amount: Coins) -> Result<(), NdError> {
+        if amount.as_nano() == 0 {
+            return Err(NdError::InvalidOperation);
+        }
+        let (public_key, mut balance) = self.db.get_key_value(key).ok_or(NdError::NoSuchBalance)?;
+        balance.coins = balance
+            .coins
+            .checked_sub(amount)
+            .ok_or(NdError::InsufficientBalance)?;
+        self.set(&public_key, &balance)
+    }
 }
 
-impl Display for CoinOperations {
+impl Display for Balances {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id)
     }

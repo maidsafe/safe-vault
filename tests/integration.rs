@@ -338,7 +338,7 @@ fn update_login_packet() {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn coin_operations() {
+fn balances() {
     let mut env = Environment::new();
 
     let mut client_a = env.new_connected_client();
@@ -460,7 +460,7 @@ fn transfer_coins_to_balance_that_doesnt_exist() {
 }
 
 #[test]
-fn coin_operations_by_app() {
+fn balances_by_app() {
     let mut env = Environment::new();
     let mut client_a = env.new_connected_client();
 
@@ -517,7 +517,7 @@ fn coin_operations_by_app() {
 }
 
 #[test]
-fn coin_operations_by_app_with_insufficient_permissions() {
+fn balances_by_app_with_insufficient_permissions() {
     let mut env = Environment::new();
     let mut owner = env.new_connected_client();
 

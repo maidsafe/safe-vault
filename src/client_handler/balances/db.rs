@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -19,11 +19,11 @@ use std::{
 const BALANCES_DB_NAME: &str = "balances.db";
 
 #[derive(Serialize, Deserialize)]
-pub(super) struct Balance {
+pub struct Balance {
     pub coins: Coins,
 }
 
-pub(super) struct BalancesDb {
+pub struct BalancesDb {
     db: PickleDb,
     index: HashMap<XorName, PublicKey>,
 }
@@ -63,7 +63,7 @@ impl BalancesDb {
             .map(|balance| (*public_key, balance))
     }
 
-    pub fn put(&mut self, public_key: &PublicKey, balance: &Balance) -> Result<()> {
+    pub fn set(&mut self, public_key: &PublicKey, balance: &Balance) -> Result<()> {
         let db_key = public_key.to_db_key();
         self.db.set(&db_key, &balance)?;
         let _ = self
@@ -74,7 +74,7 @@ impl BalancesDb {
     }
 }
 
-pub(super) trait Key {
+pub trait Key {
     fn to_public_key<'a>(&'a self, index: &'a HashMap<XorName, PublicKey>)
         -> Option<&'a PublicKey>;
 }

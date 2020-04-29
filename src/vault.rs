@@ -45,7 +45,7 @@ enum State {
 
 /// Specifies whether to try loading cached data from disk, or to just construct a new instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Init {
+pub enum Init {
     Load,
     New,
 }
