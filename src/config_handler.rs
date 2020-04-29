@@ -321,7 +321,6 @@ mod test {
     use super::Config;
     #[cfg(not(feature = "mock_base"))]
     use super::ARGS;
-    use serde_json;
     #[cfg(not(feature = "mock_base"))]
     use std::mem;
     use std::{fs::File, io::Read, path::Path};

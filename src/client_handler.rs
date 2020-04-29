@@ -8,6 +8,8 @@
 
 mod auth;
 mod auth_keys;
+mod balance;
+mod coin_operations;
 mod elder_data;
 mod login_packets;
 mod messaging;
@@ -15,6 +17,8 @@ mod messaging;
 use self::{
     auth::{Auth, ClientInfo},
     auth_keys::AuthKeysDb,
+    balance::BalancesDb,
+    coin_operations::CoinOperations,
     elder_data::ElderData,
     login_packets::LoginPackets,
     messaging::Messaging,
@@ -24,13 +28,17 @@ use crate::{
     chunk_store::LoginPacketChunkStore,
     routing::Node,
     rpc::Rpc,
+    utils,
     vault::Init,
     Config, Result,
 };
 use bytes::Bytes;
 use log::{error, trace};
 use rand::{CryptoRng, Rng};
-use safe_nd::{Coins, MessageId, NodePublicId, PublicId, Request, Response, Signature, XorName};
+use safe_nd::{
+    Coins, Error as NdError, MessageId, NodePublicId, PublicId, Request, Response, Signature,
+    XorName,
+};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -43,22 +51,11 @@ pub const COST_OF_PUT: Coins = Coins::from_nano(1);
 
 pub(crate) struct ClientHandler {
     id: NodePublicId,
-    messaging: Rc<RefCell<Messaging>>,
+    messaging: Messaging,
+    coin_operations: CoinOperations,
     auth: Auth,
     login_packets: LoginPackets,
     data: ElderData,
-}
-
-pub(crate) struct Responder {
-    messaging: Rc<RefCell<Messaging>>,
-}
-
-impl Responder {
-    pub fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
-        self.messaging
-            .borrow_mut()
-            .respond_to_client(message_id, response)
-    }
 }
 
 impl ClientHandler {
@@ -71,25 +68,26 @@ impl ClientHandler {
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
-        let auth_db = AuthKeysDb::new(root_dir, init_mode)?;
-        let packet_db = LoginPacketChunkStore::new(
+        let auth_keys_db = AuthKeysDb::new(root_dir, init_mode)?;
+        let balances = BalancesDb::new(root_dir, init_mode)?;
+        let login_packets_db = LoginPacketChunkStore::new(
             root_dir,
             config.max_capacity(),
             Rc::clone(&total_used_space),
             init_mode,
         )?;
 
-        let messaging = Rc::new(RefCell::new(Messaging::new(id.clone(), routing_node)));
-        let responder = Rc::new(RefCell::new(Responder {
-            messaging: messaging.clone(),
-        }));
-        let auth = Auth::new(id.clone(), auth_db, responder.clone());
-        let login_packets = LoginPackets::new(id.clone(), packet_db, responder.clone());
-        let data = ElderData::new(id.clone(), responder);
+        let messaging = Messaging::new(id.clone(), routing_node);
+
+        let auth = Auth::new(id.clone(), auth_keys_db);
+        let coin_operations = CoinOperations::new(id.clone(), balances);
+        let login_packets = LoginPackets::new(id.clone(), login_packets_db);
+        let data = ElderData::new(id.clone());
 
         let client_handler = Self {
             id,
             messaging,
+            coin_operations,
             auth,
             login_packets,
             data,
@@ -98,14 +96,16 @@ impl ClientHandler {
         Ok(client_handler)
     }
 
+    pub(crate) fn respond_to_client(&mut self, message_id: MessageId, response: Response) {
+        self.messaging.respond_to_client(message_id, response);
+    }
+
     pub fn handle_new_connection(&mut self, peer_addr: SocketAddr) {
-        self.messaging.borrow_mut().handle_new_connection(peer_addr)
+        self.messaging.handle_new_connection(peer_addr)
     }
 
     pub fn handle_connection_failure(&mut self, peer_addr: SocketAddr) {
-        self.messaging
-            .borrow_mut()
-            .handle_connection_failure(peer_addr)
+        self.messaging.handle_connection_failure(peer_addr)
     }
 
     pub fn handle_vault_rpc(&mut self, src: XorName, rpc: Rpc) -> Option<Action> {
@@ -119,10 +119,23 @@ impl ClientHandler {
                 response,
                 requester,
                 message_id,
-            } => self
-                .messaging
-                .borrow_mut()
-                .relay_reponse_to_client(src, &requester, response, message_id),
+                refund,
+            } => {
+                if let Some(refund_amount) = refund {
+                    if let Err(error) = self
+                        .coin_operations
+                        .deposit(requester.name(), refund_amount)
+                    {
+                        error!(
+                            "{}: Failed to refund {} coins for {:?}: {:?}",
+                            self, refund_amount, requester, error,
+                        )
+                    };
+                }
+
+                self.messaging
+                    .relay_reponse_to_client(src, &requester, response, message_id)
+            }
         }
     }
 
@@ -130,26 +143,62 @@ impl ClientHandler {
         use ConsensusAction::*;
         trace!("{}: Consensused {:?}", self, action,);
         match action {
+            PayAndForward {
+                request,
+                client_public_id,
+                message_id,
+                cost,
+            } => {
+                let owner = utils::owner(&client_public_id)?;
+                if let Some(action) = self.coin_operations.pay(
+                    &client_public_id,
+                    owner.public_key(),
+                    &request,
+                    message_id,
+                    cost,
+                ) {
+                    return Some(action);
+                }
+
+                Some(Action::ForwardClientRequest(Rpc::Request {
+                    requester: client_public_id,
+                    request,
+                    message_id,
+                }))
+            }
             Forward {
                 request,
                 client_public_id,
                 message_id,
-                ..
             } => Some(Action::ForwardClientRequest(Rpc::Request {
                 requester: client_public_id,
                 request,
                 message_id,
             })),
-            Proxy {
+            PayAndProxy {
                 request,
                 client_public_id,
                 message_id,
-                ..
-            } => Some(Action::ProxyClientRequest(Rpc::Request {
-                requester: client_public_id,
-                request,
-                message_id,
-            })),
+                cost,
+            } => {
+                let owner = utils::owner(&client_public_id)?;
+
+                if let Some(action) = self.coin_operations.pay(
+                    &client_public_id,
+                    owner.public_key(),
+                    &request,
+                    message_id,
+                    cost,
+                ) {
+                    return Some(action);
+                }
+
+                Some(Action::ProxyClientRequest(Rpc::Request {
+                    requester: client_public_id,
+                    request,
+                    message_id,
+                }))
+            }
         }
     }
 
@@ -161,16 +210,16 @@ impl ClientHandler {
     ) -> Option<Action> {
         let result = self
             .messaging
-            .borrow_mut()
             .try_parse_client_request(peer_addr, bytes, rng);
-        match result {
-            Some(result) => self.process_client_request(
+        if let Some(result) = result {
+            self.process_client_request(
                 &result.client,
                 result.request,
                 result.message_id,
                 result.signature,
-            ),
-            None => None,
+            )
+        } else {
+            None
         }
     }
 
@@ -192,11 +241,21 @@ impl ClientHandler {
             client.public_id
         );
 
-        self.auth
-            .verify_signature(&client.public_id, &request, message_id, signature)?;
-        self.auth
-            .authorise_app(&client.public_id, &request, message_id)?;
-        self.auth.verify_consistent_address(&request, message_id)?;
+        if let Some(action) =
+            self.auth
+                .verify_signature(&client.public_id, &request, message_id, signature)
+        {
+            return Some(action);
+        };
+        if let Some(action) = self
+            .auth
+            .authorise_app(&client.public_id, &request, message_id)
+        {
+            return Some(action);
+        }
+        if let Some(action) = self.auth.verify_consistent_address(&request, message_id) {
+            return Some(action);
+        }
 
         match request {
             //
@@ -278,7 +337,37 @@ impl ClientHandler {
             //
             // ===== Coins =====
             //
-            TransferCoins { .. } | GetBalance | CreateBalance { .. } => unimplemented!(), // temporarily removed
+            TransferCoins {
+                destination,
+                amount,
+                transaction_id,
+            } => self.coin_operations.process_transfer_coins_client_req(
+                &client.public_id,
+                destination,
+                amount,
+                transaction_id,
+                message_id,
+            ),
+            GetBalance => {
+                let balance = self
+                    .coin_operations
+                    .balance(client.public_id.name())
+                    .ok_or(NdError::NoSuchBalance);
+                let response = Response::GetBalance(balance);
+                self.respond_to_client(message_id, response);
+                None
+            }
+            CreateBalance {
+                new_balance_owner,
+                amount,
+                transaction_id,
+            } => self.coin_operations.process_create_balance_client_req(
+                &client.public_id,
+                new_balance_owner,
+                amount,
+                transaction_id,
+                message_id,
+            ),
             //
             // ===== Login packets =====
             //
@@ -291,10 +380,12 @@ impl ClientHandler {
                 new_owner,
                 amount,
                 new_login_packet,
+                transaction_id,
             } => self.login_packets.initiate_proxied_login_packet_creation(
                 &client.public_id,
                 new_owner,
                 amount,
+                transaction_id,
                 new_login_packet,
                 message_id,
             ),
@@ -352,15 +443,101 @@ impl ClientHandler {
                 new_owner,
                 amount,
                 new_login_packet,
-            } => self.login_packets.finalize_proxied_login_packet_creation(
-                src,
-                requester,
-                new_owner,
+                transaction_id,
+            } => {
+                if &src == requester.name() {
+                    // Step two - create balance and forward login_packet.
+                    if let Err(error) = self
+                        .coin_operations
+                        .create_balance(&requester, new_owner, amount)
+                    {
+                        // Refund amount (Including the cost of creating the balance)
+                        let refund = Some(amount.checked_add(COST_OF_PUT)?);
+
+                        Some(Action::RespondToClientHandlers {
+                            sender: XorName::from(new_owner),
+                            rpc: Rpc::Response {
+                                response: Response::Transaction(Err(error)),
+                                requester,
+                                message_id,
+                                refund,
+                            },
+                        })
+                    } else {
+                        Some(Action::ForwardClientRequest(Rpc::Request {
+                            request: CreateLoginPacketFor {
+                                new_owner,
+                                amount,
+                                new_login_packet,
+                                transaction_id,
+                            },
+                            requester,
+                            message_id,
+                        }))
+                    }
+                } else {
+                    self.login_packets.finalize_proxied_login_packet_creation(
+                        requester,
+                        amount,
+                        transaction_id,
+                        new_login_packet,
+                        message_id,
+                    )
+                }
+            }
+            CreateBalance {
+                new_balance_owner,
                 amount,
-                new_login_packet,
-                message_id,
-            ),
-            CreateBalance { .. } | TransferCoins { .. } => unimplemented!(),
+                transaction_id,
+            } => {
+                let action = self.coin_operations.finalize_create_balance_req(
+                    requester,
+                    new_balance_owner,
+                    amount,
+                    transaction_id,
+                    message_id,
+                );
+                let destination = XorName::from(new_balance_owner);
+                if let Some(Action::RespondToClientHandlers {
+                    rpc:
+                        Rpc::Response {
+                            response: Response::Transaction(Ok(transaction)),
+                            ..
+                        },
+                    ..
+                }) = &action
+                {
+                    self.messaging
+                        .notify_destination_owners(&destination, *transaction);
+                }
+                action
+            }
+            TransferCoins {
+                destination,
+                amount,
+                transaction_id,
+            } => {
+                let action = self.coin_operations.finalize_transfer_coins_req(
+                    requester,
+                    destination,
+                    amount,
+                    transaction_id,
+                    message_id,
+                );
+                if let Some(Action::RespondToClientHandlers {
+                    rpc:
+                        Rpc::Response {
+                            response: Response::Transaction(Ok(transaction)),
+                            ..
+                        },
+                    ..
+                }) = &action
+                {
+                    self.messaging
+                        .notify_destination_owners(&destination, *transaction);
+                }
+                action
+            }
             UpdateLoginPacket(updated_login_packet) => self
                 .login_packets
                 .finalize_login_packet_update(requester, &updated_login_packet, message_id),

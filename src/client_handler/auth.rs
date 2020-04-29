@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Responder;
 use crate::{
     action::{Action, ConsensusAction},
     client_handler::auth_keys::AuthKeysDb,
@@ -15,14 +14,10 @@ use crate::{
 };
 use log::{error, warn};
 use safe_nd::{
-    AppPermissions, AppPublicId, Coins, Error as NdError, MessageId, NodePublicId, PublicId,
-    PublicKey, Request, Response, Signature,
+    AppPermissions, AppPublicId, Error as NdError, MessageId, NodePublicId, PublicId, PublicKey,
+    Request, Response, Signature,
 };
-use std::{
-    cell::RefCell,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Clone, Debug)]
 pub struct ClientInfo {
@@ -32,16 +27,11 @@ pub struct ClientInfo {
 pub(super) struct Auth {
     id: NodePublicId,
     auth_keys: AuthKeysDb,
-    responder: Rc<RefCell<Responder>>,
 }
 
 impl Auth {
-    pub fn new(id: NodePublicId, auth_keys: AuthKeysDb, responder: Rc<RefCell<Responder>>) -> Self {
-        Self {
-            id,
-            auth_keys,
-            responder,
-        }
+    pub fn new(id: NodePublicId, auth_keys: AuthKeysDb) -> Self {
+        Self { id, auth_keys }
     }
 
     // If the client is app, check if it is authorised to perform the given request.
@@ -50,10 +40,10 @@ impl Auth {
         public_id: &PublicId,
         request: &Request,
         message_id: MessageId,
-    ) -> Option<()> {
+    ) -> Option<Action> {
         let app_id = match public_id {
             PublicId::App(app_id) => app_id,
-            _ => return Some(()),
+            _ => return None,
         };
 
         let result = match utils::authorisation_kind(request) {
@@ -75,12 +65,12 @@ impl Auth {
         };
 
         if let Err(error) = result {
-            self.responder
-                .borrow_mut()
-                .respond_to_client(message_id, request.error_response(error));
-            None
+            Some(Action::RespondToClient {
+                message_id,
+                response: request.error_response(error),
+            })
         } else {
-            Some(())
+            None
         }
     }
 
@@ -93,11 +83,10 @@ impl Auth {
         let result = Ok(self
             .auth_keys
             .list_auth_keys_and_version(utils::client(&client.public_id)?));
-
-        self.responder
-            .borrow_mut()
-            .respond_to_client(message_id, Response::ListAuthKeysAndVersion(result));
-        None
+        Some(Action::RespondToClient {
+            message_id,
+            response: Response::ListAuthKeysAndVersion(result),
+        })
     }
 
     // on client request
@@ -117,7 +106,6 @@ impl Auth {
             },
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: Coins::from_nano(0),
         }))
     }
 
@@ -139,6 +127,7 @@ impl Auth {
                 response: Response::Mutation(result),
                 requester: client,
                 message_id,
+                refund: None,
             },
         })
     }
@@ -158,7 +147,6 @@ impl Auth {
             },
             client_public_id: client.public_id.clone(),
             message_id,
-            cost: Coins::from_nano(0),
         }))
     }
 
@@ -179,6 +167,7 @@ impl Auth {
                 response: Response::Mutation(result),
                 requester: client,
                 message_id,
+                refund: None,
             },
         })
     }
@@ -190,7 +179,7 @@ impl Auth {
         request: &Request,
         message_id: MessageId,
         signature: Option<Signature>,
-    ) -> Option<()> {
+    ) -> Option<Action> {
         let signature_required = match utils::authorisation_kind(request) {
             AuthorisationKind::GetUnpub
             | AuthorisationKind::GetBalance
@@ -202,7 +191,7 @@ impl Auth {
         };
 
         if !signature_required {
-            return Some(());
+            return None;
         }
 
         let valid = if let Some(signature) = signature {
@@ -216,13 +205,12 @@ impl Auth {
         };
 
         if valid {
-            Some(())
-        } else {
-            self.responder.borrow_mut().respond_to_client(
-                message_id,
-                request.error_response(NdError::InvalidSignature),
-            );
             None
+        } else {
+            Some(Action::RespondToClient {
+                message_id,
+                response: request.error_response(NdError::InvalidSignature),
+            })
         }
     }
 
@@ -230,7 +218,7 @@ impl Auth {
         &mut self,
         request: &Request,
         message_id: MessageId,
-    ) -> Option<()> {
+    ) -> Option<Action> {
         use Request::*;
         let consistent = match request {
             AppendSeq { ref append, .. } => append.address.is_seq(),
@@ -239,13 +227,12 @@ impl Auth {
             _ => true,
         };
         if !consistent {
-            self.responder.borrow_mut().respond_to_client(
+            Some(Action::RespondToClient {
                 message_id,
-                Response::Mutation(Err(NdError::InvalidOperation)),
-            );
-            None
+                response: Response::Mutation(Err(NdError::InvalidOperation)),
+            })
         } else {
-            Some(())
+            None
         }
     }
 

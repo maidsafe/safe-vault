@@ -1398,7 +1398,7 @@ checksum = "e63899ad0da84ce718c14936262a41cee2c79c981fc0a0e7c7beb47d5a07e8c1"
 dependencies = [
  "num-integer",
  "num-traits 0.2.11",
- "rand 0.4.6",
+ "rand 0.3.23",
  "rustc-serialize",
 ]
 
@@ -2184,7 +2184,8 @@ checksum = "535622e6be132bccd223f4bb2b8ac8d53cda3c7a6394944d3b2b33fb974f9d76"
 [[package]]
 name = "safe-nd"
 version = "0.8.0"
-source = "git+https://github.com/oetyng/safe-nd.git#67a5c50142fefc338e403c36f9c42fb1d48e5023"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d22dcd7515d740dd0133c19c738830da96813e33dcc949849025d871de59564d"
 dependencies = [
  "bincode 1.1.4",
  "ed25519-dalek",

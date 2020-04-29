@@ -8,7 +8,6 @@
 
 use super::error::{Error, Result};
 use crate::vault::Init;
-use bincode;
 use std::{
     cell::Cell,
     fs::{File, OpenOptions},

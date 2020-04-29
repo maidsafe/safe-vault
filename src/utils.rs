@@ -6,12 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{rpc::Rpc, vault::Init, Result};
-use bincode;
+use crate::{rpc::Rpc, vault::Init, Result, COST_OF_PUT};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
-use safe_nd::{ClientPublicId, IDataAddress, PublicId, PublicKey, Request, XorName};
+use safe_nd::{
+    ClientPublicId, Coins, IDataAddress, PublicId, PublicKey, Request, Result as NdResult, XorName,
+};
 use serde::Serialize;
 use std::{borrow::Cow, fs, path::Path};
 use unwrap::unwrap;
@@ -223,10 +224,10 @@ pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
     }
 }
 
-// pub(crate) fn get_refund_for_put<T>(result: &NdResult<T>) -> Option<Coins> {
-//     if result.is_err() {
-//         Some(COST_OF_PUT)
-//     } else {
-//         None
-//     }
-// }
+pub(crate) fn get_refund_for_put<T>(result: &NdResult<T>) -> Option<Coins> {
+    if result.is_err() {
+        Some(COST_OF_PUT)
+    } else {
+        None
+    }
+}

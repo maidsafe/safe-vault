@@ -8,7 +8,7 @@
 
 //! RPC messages internal to Vaults.
 
-use safe_nd::{MessageId, PublicId, Request, Response};
+use safe_nd::{Coins, MessageId, PublicId, Request, Response};
 use serde::{Deserialize, Serialize};
 
 /// RPC messages exchanged between nodes.
@@ -26,5 +26,6 @@ pub(crate) enum Rpc {
         response: Response,
         requester: PublicId,
         message_id: MessageId,
+        refund: Option<Coins>,
     },
 }

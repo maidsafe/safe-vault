@@ -392,6 +392,14 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 }
                 next_action
             }
+            RespondToClient {
+                message_id,
+                response,
+            } => {
+                self.client_handler_mut()?
+                    .respond_to_client(message_id, response);
+                None
+            }
         }
     }
 

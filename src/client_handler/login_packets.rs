@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Responder, COST_OF_PUT};
+use super::COST_OF_PUT;
 use crate::{
     action::{Action, ConsensusAction},
     chunk_store::{error::Error as ChunkStoreError, LoginPacketChunkStore},
@@ -15,27 +15,17 @@ use crate::{
 };
 use safe_nd::{
     Coins, Error as NdError, LoginPacket, MessageId, NodePublicId, PublicId, PublicKey, Request,
-    Response, Result as NdResult, Transaction, XorName,
+    Response, Result as NdResult, Transaction, TransactionId, XorName,
 };
-use std::{cell::RefCell, rc::Rc};
 
 pub(super) struct LoginPackets {
     id: NodePublicId,
     login_packets: LoginPacketChunkStore,
-    responder: Rc<RefCell<Responder>>,
 }
 
 impl LoginPackets {
-    pub fn new(
-        id: NodePublicId,
-        login_packets: LoginPacketChunkStore,
-        responder: Rc<RefCell<Responder>>,
-    ) -> Self {
-        Self {
-            id,
-            login_packets,
-            responder,
-        }
+    pub fn new(id: NodePublicId, login_packets: LoginPacketChunkStore) -> Self {
+        Self { id, login_packets }
     }
 
     // client query
@@ -48,10 +38,10 @@ impl LoginPackets {
         let result = self
             .login_packet(utils::own_key(client_id)?, address)
             .map(LoginPacket::into_data_and_signature);
-        self.responder
-            .borrow_mut()
-            .respond_to_client(message_id, Response::GetLoginPacket(result));
-        None
+        Some(Action::RespondToClient {
+            message_id,
+            response: Response::GetLoginPacket(result),
+        })
     }
 
     // on client request
@@ -62,15 +52,15 @@ impl LoginPackets {
         message_id: MessageId,
     ) -> Option<Action> {
         if !login_packet.size_is_valid() {
-            self.responder
-                .borrow_mut()
-                .respond_to_client(message_id, Response::Mutation(Err(NdError::ExceededSize)));
-            return None;
+            return Some(Action::RespondToClient {
+                message_id,
+                response: Response::Mutation(Err(NdError::ExceededSize)),
+            });
         }
 
         let request = Request::CreateLoginPacket(login_packet);
 
-        Some(Action::VoteFor(ConsensusAction::Forward {
+        Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client_id.clone(),
             message_id,
@@ -92,12 +82,14 @@ impl LoginPackets {
                 .put(login_packet)
                 .map_err(|error| error.to_string().into())
         };
+        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *login_packet.destination(),
             rpc: Rpc::Response {
                 response: Response::Mutation(result),
                 requester,
                 message_id,
+                refund,
             },
         })
     }
@@ -109,23 +101,24 @@ impl LoginPackets {
         payer: &PublicId,
         new_owner: PublicKey,
         amount: Coins,
+        transaction_id: TransactionId,
         login_packet: LoginPacket,
         message_id: MessageId,
     ) -> Option<Action> {
         if !login_packet.size_is_valid() {
-            self.responder.borrow_mut().respond_to_client(
+            return Some(Action::RespondToClient {
                 message_id,
-                Response::Transaction(Err(NdError::ExceededSize)),
-            );
-            return None;
+                response: Response::Transaction(Err(NdError::ExceededSize)),
+            });
         }
         // The requester bears the cost of storing the login packet
         let new_amount = amount.checked_add(COST_OF_PUT)?;
-        Some(Action::VoteFor(ConsensusAction::Proxy {
+        Some(Action::VoteFor(ConsensusAction::PayAndProxy {
             request: Request::CreateLoginPacketFor {
                 new_owner,
                 amount,
                 new_login_packet: login_packet,
+                transaction_id,
             },
             client_public_id: payer.clone(),
             message_id,
@@ -138,59 +131,35 @@ impl LoginPackets {
     #[allow(clippy::too_many_arguments)]
     pub fn finalize_proxied_login_packet_creation(
         &mut self,
-        src: XorName,
         payer: PublicId,
-        new_owner: PublicKey,
         amount: Coins,
+        transaction_id: TransactionId,
         login_packet: LoginPacket,
         message_id: MessageId,
     ) -> Option<Action> {
-        if &src == payer.name() {
-            // Step two - create balance and forward login_packet.
-            //if let Err(error) = self.create_balance(&payer, new_owner, amount) {
-            if false {
-                unimplemented!(); // NB: Temporarily disabled creating of balance.
-                                  // Some(Action::RespondToClientHandlers {
-                                  //     sender: XorName::from(new_owner),
-                                  //     rpc: Rpc::Response {
-                                  //         response: Response::Transaction(Err(error)),
-                                  //         requester: payer,
-                                  //         message_id,
-                                  //     },
-                                  // })
-            } else {
-                Some(Action::ForwardClientRequest(Rpc::Request {
-                    request: Request::CreateLoginPacketFor {
-                        new_owner,
-                        amount,
-                        new_login_packet: login_packet,
-                    },
-                    requester: payer,
-                    message_id,
-                }))
-            }
+        // Step three - store login_packet.
+        let result = if self.login_packets.has(login_packet.destination()) {
+            Err(NdError::LoginPacketExists)
         } else {
-            // Step three - store login_packet.
-            let result = if self.login_packets.has(login_packet.destination()) {
-                Err(NdError::LoginPacketExists)
-            } else {
-                self.login_packets
-                    .put(&login_packet)
-                    .map(|_| Transaction {
-                        id: message_id,
-                        amount,
-                    })
-                    .map_err(|error| error.to_string().into())
-            };
-            Some(Action::RespondToClientHandlers {
-                sender: *login_packet.destination(),
-                rpc: Rpc::Response {
-                    response: Response::Transaction(result),
-                    requester: payer,
-                    message_id,
-                },
-            })
-        }
+            self.login_packets
+                .put(&login_packet)
+                .map(|_| Transaction {
+                    id: transaction_id,
+                    amount,
+                })
+                .map_err(|error| error.to_string().into())
+        };
+        Some(Action::RespondToClientHandlers {
+            sender: *login_packet.destination(),
+            rpc: Rpc::Response {
+                response: Response::Transaction(result),
+                requester: payer,
+                message_id,
+                // A new balance is already created as
+                // a part of the flow. So no refund is processed.
+                refund: None,
+            },
+        })
     }
 
     // on client request
@@ -204,7 +173,6 @@ impl LoginPackets {
             request: Request::UpdateLoginPacket(updated_login_packet),
             client_public_id: client_id,
             message_id,
-            cost: Coins::from_nano(0),
         }))
     }
 
@@ -234,6 +202,8 @@ impl LoginPackets {
                 response: Response::Mutation(result),
                 requester,
                 message_id,
+                // Updating the login packet is free
+                refund: None,
             },
         })
     }

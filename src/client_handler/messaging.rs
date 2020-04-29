@@ -359,7 +359,11 @@ impl Messaging {
         }
     }
 
-    fn send_notification_to_client(&mut self, client_id: &PublicId, notification: &Notification) {
+    pub(crate) fn send_notification_to_client(
+        &mut self,
+        client_id: &PublicId,
+        notification: &Notification,
+    ) {
         let peer_addrs = self.lookup_client_peer_addrs(&client_id);
 
         if peer_addrs.is_empty() {
@@ -393,7 +397,7 @@ impl Messaging {
             .collect()
     }
 
-    fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
+    pub(crate) fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
         self.clients
             .values()
             .filter_map(|client| {
@@ -404,6 +408,16 @@ impl Messaging {
                 }
             })
             .collect::<Vec<_>>()
+    }
+
+    pub(crate) fn notify_destination_owners(
+        &mut self,
+        destination: &XorName,
+        transaction: Transaction,
+    ) {
+        for client_id in self.lookup_client_and_its_apps(destination) {
+            self.send_notification_to_client(&client_id, &Notification(transaction));
+        }
     }
 
     fn try_bootstrap(&mut self, peer_addr: SocketAddr, client_id: &PublicId) {

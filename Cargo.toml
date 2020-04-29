@@ -32,7 +32,7 @@ rand = "~0.6.5"
 rand_chacha = "~0.1.1"
 routing_rand_core = { package = "rand_core", version = "~0.5.1" }
 routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" }
-safe-nd =  { git = "https://github.com/oetyng/safe-nd.git", branch = "master" }
+safe-nd = "0.8.0"
 self_update = { version = "0.13.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "~1.0.97", features = ["derive"] }
 serde_json = "~1.0.40"

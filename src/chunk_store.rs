@@ -21,7 +21,6 @@ mod used_space;
 use crate::{utils, vault::Init};
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
-use hex;
 use log::trace;
 use safe_nd::{AData, IData, LoginPacket, MData};
 use std::{

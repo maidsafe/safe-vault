@@ -106,12 +106,14 @@ impl MDataHandler {
                     .put(&mdata)
                     .map_err(|error| error.to_string().into())
             });
+        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
+                refund,
             },
         })
     }
@@ -130,12 +132,15 @@ impl MDataHandler {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
+
+        let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
             rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
+                refund,
             },
         })
     }
@@ -169,6 +174,7 @@ impl MDataHandler {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -241,6 +247,7 @@ impl MDataHandler {
                 requester,
                 response: Response::GetMData(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -262,6 +269,7 @@ impl MDataHandler {
                 requester,
                 response: Response::GetMDataShell(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -283,6 +291,7 @@ impl MDataHandler {
                 requester,
                 response: Response::GetMDataVersion(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -318,6 +327,7 @@ impl MDataHandler {
                 requester,
                 response,
                 message_id,
+                refund: None,
             },
         })
     }
@@ -339,6 +349,7 @@ impl MDataHandler {
                 requester,
                 response: Response::ListMDataKeys(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -363,6 +374,7 @@ impl MDataHandler {
                 requester,
                 response,
                 message_id,
+                refund: None,
             },
         })
     }
@@ -387,6 +399,7 @@ impl MDataHandler {
                 requester,
                 response,
                 message_id,
+                refund: None,
             },
         })
     }
@@ -408,6 +421,7 @@ impl MDataHandler {
                 requester,
                 response: Response::ListMDataPermissions(result),
                 message_id,
+                refund: None,
             },
         })
     }
@@ -430,6 +444,7 @@ impl MDataHandler {
                 requester,
                 response: Response::ListMDataUserPermissions(result),
                 message_id,
+                refund: None,
             },
         })
     }

@@ -9,7 +9,6 @@
 use crate::{chunk_store, routing};
 use quick_error::quick_error;
 use safe_nd::{self, Request, Response};
-use serde_json;
 use std::io;
 
 quick_error! {

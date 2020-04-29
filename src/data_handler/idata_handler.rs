@@ -64,12 +64,14 @@ impl IDataHandler {
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
+            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: data_name,
                 rpc: Rpc::Response {
                     requester: client_id,
                     response: Response::Mutation(result),
                     message_id,
+                    refund,
                 },
             })
         };
@@ -128,12 +130,14 @@ impl IDataHandler {
     ) -> Option<Action> {
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
+            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: *address.name(),
                 rpc: Rpc::Response {
                     requester: client_id,
                     response: Response::Mutation(result),
                     message_id,
+                    refund,
                 },
             })
         };
@@ -179,6 +183,7 @@ impl IDataHandler {
                     requester: client_id,
                     response: Response::GetIData(result),
                     message_id,
+                    refund: None,
                 },
             })
         };
@@ -277,6 +282,7 @@ impl IDataHandler {
                     requester: idata_op.client().clone(),
                     response: Response::Mutation(Ok(())),
                     message_id,
+                    refund: None,
                 },
             })
     }
@@ -343,6 +349,9 @@ impl IDataHandler {
                         requester: idata_op.client().clone(),
                         response: Response::Mutation(response),
                         message_id,
+                        // Deleting data is free so, no refund
+                        // This field can be put to use when deletion is incentivised
+                        refund: None,
                     },
                 }
             })
