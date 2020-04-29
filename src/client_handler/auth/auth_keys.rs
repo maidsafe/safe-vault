@@ -23,7 +23,7 @@ type AuthKeysAsTuple = (BTreeMap<PublicKey, AppPermissions>, u64);
 const AUTH_KEYS_DB_NAME: &str = "auth_keys.db";
 
 #[derive(Default, Serialize, Deserialize, Debug)]
-pub(super) struct AuthKeys {
+pub struct AuthKeys {
     apps: HashMap<PublicKey, AppPermissions>,
     version: u64,
 }
@@ -34,7 +34,7 @@ impl AuthKeys {
     }
 }
 
-pub(super) struct AuthKeysDb {
+pub struct AuthKeysDb {
     db: PickleDb,
 }
 
@@ -52,7 +52,7 @@ impl AuthKeysDb {
     }
 
     /// If the specified auth_key doesn't exist, a default `AuthKeysAsTuple` is returned.
-    pub fn list_auth_keys_and_version(&self, client_id: &ClientPublicId) -> AuthKeysAsTuple {
+    pub fn list_keys_and_version(&self, client_id: &ClientPublicId) -> AuthKeysAsTuple {
         let db_key = client_id.to_db_key();
         self.db
             .get::<AuthKeys>(&db_key)
@@ -62,7 +62,7 @@ impl AuthKeysDb {
 
     /// Inserts `key` and `permissions` into the specified auth_key, creating the auth_key if it
     /// doesn't already exist.
-    pub fn ins_auth_key(
+    pub fn insert(
         &mut self,
         client_id: &ClientPublicId,
         key: PublicKey,
@@ -70,7 +70,7 @@ impl AuthKeysDb {
         permissions: AppPermissions,
     ) -> NdResult<()> {
         let db_key = client_id.to_db_key();
-        let mut auth_keys = self.get_auth_keys_and_increment_version(&db_key, new_version)?;
+        let mut auth_keys = self.get_keys_and_increment_version(&db_key, new_version)?;
 
         // TODO - should we assert the `key` is an App type?
 
@@ -85,14 +85,14 @@ impl AuthKeysDb {
 
     /// Deletes `key` from the specified auth_key.  Returns `NoSuchKey` if the auth_keys or key doesn't
     /// exist.
-    pub fn del_auth_key(
+    pub fn delete(
         &mut self,
         client_id: &ClientPublicId,
         key: PublicKey,
         new_version: u64,
     ) -> NdResult<()> {
         let db_key = client_id.to_db_key();
-        let mut auth_keys = self.get_auth_keys_and_increment_version(&db_key, new_version)?;
+        let mut auth_keys = self.get_keys_and_increment_version(&db_key, new_version)?;
         if auth_keys.apps.remove(&key).is_none() {
             trace!("Failed to delete non-existent authorised key {}", key);
             return Err(NdError::NoSuchKey);
@@ -105,11 +105,7 @@ impl AuthKeysDb {
         Ok(())
     }
 
-    fn get_auth_keys_and_increment_version(
-        &self,
-        db_key: &str,
-        new_version: u64,
-    ) -> NdResult<AuthKeys> {
+    fn get_keys_and_increment_version(&self, db_key: &str, new_version: u64) -> NdResult<AuthKeys> {
         let mut auth_keys = self.db.get::<AuthKeys>(&db_key).unwrap_or_default();
 
         if auth_keys.version + 1 != new_version {

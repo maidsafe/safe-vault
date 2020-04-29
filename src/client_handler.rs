@@ -7,15 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod auth;
-mod auth_keys;
 mod balances;
 mod elder_data;
 mod login_packets;
 mod messaging;
 
 use self::{
-    auth::{Auth, ClientInfo},
-    auth_keys::AuthKeysDb,
+    auth::{Auth, AuthKeysDb, ClientInfo},
     balances::{Balances, BalancesDb},
     elder_data::ElderData,
     login_packets::LoginPackets,
@@ -67,7 +65,7 @@ impl ClientHandler {
         let root_dir = config.root_dir()?;
         let root_dir = root_dir.as_path();
         let auth_keys_db = AuthKeysDb::new(root_dir, init_mode)?;
-        let balances = BalancesDb::new(root_dir, init_mode)?;
+        let balances_db = BalancesDb::new(root_dir, init_mode)?;
         let login_packets_db = LoginPacketChunkStore::new(
             root_dir,
             config.max_capacity(),
@@ -78,7 +76,7 @@ impl ClientHandler {
         let messaging = Messaging::new(id.clone(), routing_node);
 
         let auth = Auth::new(id.clone(), auth_keys_db);
-        let balances = Balances::new(id.clone(), balances);
+        let balances = Balances::new(id.clone(), balances_db);
         let login_packets = LoginPackets::new(id.clone(), login_packets_db);
         let data = ElderData::new(id.clone());
 
@@ -386,18 +384,17 @@ impl ClientHandler {
             //
             // ===== Client (Owner) to ClientHandlers =====
             //
-            ListAuthKeysAndVersion => self.auth.list_auth_keys_and_version(client, message_id),
+            ListAuthKeysAndVersion => self.auth.list_keys_and_version(client, message_id),
             InsAuthKey {
                 key,
                 version,
                 permissions,
-            } => {
-                self.auth
-                    .initiate_auth_key_insertion(client, key, version, permissions, message_id)
-            }
+            } => self
+                .auth
+                .initiate_key_insertion(client, key, version, permissions, message_id),
             DelAuthKey { key, version } => self
                 .auth
-                .initiate_auth_key_deletion(client, key, version, message_id),
+                .initiate_key_deletion(client, key, version, message_id),
         }
     }
 
@@ -527,16 +524,12 @@ impl ClientHandler {
                 key,
                 version,
                 permissions,
-            } => self.auth.finalize_auth_key_insertion(
-                requester,
-                key,
-                version,
-                permissions,
-                message_id,
-            ),
+            } => self
+                .auth
+                .finalize_key_insertion(requester, key, version, permissions, message_id),
             DelAuthKey { key, version } => self
                 .auth
-                .finalize_auth_key_deletion(requester, key, version, message_id),
+                .finalize_key_deletion(requester, key, version, message_id),
             PutIData(_)
             | GetIData(_)
             | DeleteUnpubIData(_)

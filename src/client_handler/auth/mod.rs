@@ -6,9 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod auth_keys;
+
+pub use self::auth_keys::AuthKeysDb;
+
 use crate::{
     action::{Action, ConsensusAction},
-    client_handler::auth_keys::AuthKeysDb,
     rpc::Rpc,
     utils::{self, AuthorisationKind},
 };
@@ -75,14 +78,14 @@ impl Auth {
     }
 
     // client query
-    pub fn list_auth_keys_and_version(
+    pub fn list_keys_and_version(
         &mut self,
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = Ok(self
             .auth_keys
-            .list_auth_keys_and_version(utils::client(&client.public_id)?));
+            .list_keys_and_version(utils::client(&client.public_id)?));
         Some(Action::RespondToClient {
             message_id,
             response: Response::ListAuthKeysAndVersion(result),
@@ -90,7 +93,7 @@ impl Auth {
     }
 
     // on client request
-    pub fn initiate_auth_key_insertion(
+    pub fn initiate_key_insertion(
         &self,
         client: &ClientInfo,
         key: PublicKey,
@@ -110,7 +113,7 @@ impl Auth {
     }
 
     // on consensus
-    pub fn finalize_auth_key_insertion(
+    pub fn finalize_key_insertion(
         &mut self,
         client: PublicId,
         key: PublicKey,
@@ -118,9 +121,9 @@ impl Auth {
         permissions: AppPermissions,
         message_id: MessageId,
     ) -> Option<Action> {
-        let result =
-            self.auth_keys
-                .ins_auth_key(utils::client(&client)?, key, new_version, permissions);
+        let result = self
+            .auth_keys
+            .insert(utils::client(&client)?, key, new_version, permissions);
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
@@ -133,7 +136,7 @@ impl Auth {
     }
 
     // on client request
-    pub fn initiate_auth_key_deletion(
+    pub fn initiate_key_deletion(
         &mut self,
         client: &ClientInfo,
         key: PublicKey,
@@ -151,7 +154,7 @@ impl Auth {
     }
 
     // on consensus
-    pub fn finalize_auth_key_deletion(
+    pub fn finalize_key_deletion(
         &mut self,
         client: PublicId,
         key: PublicKey,
@@ -160,7 +163,7 @@ impl Auth {
     ) -> Option<Action> {
         let result = self
             .auth_keys
-            .del_auth_key(utils::client(&client)?, key, new_version);
+            .delete(utils::client(&client)?, key, new_version);
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
