@@ -130,14 +130,14 @@ impl IDataHandler {
     ) -> Option<Action> {
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
-            let refund = utils::get_refund_for_put(&result);
             Some(Action::RespondToClientHandlers {
                 sender: *address.name(),
                 rpc: Rpc::Response {
                     requester: client_id,
                     response: Response::Mutation(result),
                     message_id,
-                    refund,
+                    // Deletion is free so no refund
+                    refund: None,
                 },
             })
         };

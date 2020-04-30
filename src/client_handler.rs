@@ -8,14 +8,14 @@
 
 mod auth;
 mod balances;
-mod elder_data;
+mod data_requests;
 mod login_packets;
 mod messaging;
 
 use self::{
     auth::{Auth, AuthKeysDb, ClientInfo},
     balances::{Balances, BalancesDb},
-    elder_data::ElderData,
+    data_requests::Evaluation,
     login_packets::LoginPackets,
     messaging::Messaging,
 };
@@ -51,7 +51,7 @@ pub(crate) struct ClientHandler {
     balances: Balances,
     auth: Auth,
     login_packets: LoginPackets,
-    data: ElderData,
+    data: Evaluation,
 }
 
 impl ClientHandler {
@@ -78,7 +78,7 @@ impl ClientHandler {
         let auth = Auth::new(id.clone(), auth_keys_db);
         let balances = Balances::new(id.clone(), balances_db);
         let login_packets = LoginPackets::new(id.clone(), login_packets_db);
-        let data = ElderData::new(id.clone());
+        let data = Evaluation::new(id.clone());
 
         let client_handler = Self {
             id,
@@ -254,7 +254,10 @@ impl ClientHandler {
             //
             // ===== Immutable Data =====
             //
-            PutIData(chunk) => self.data.idata.initiate_creation(client, chunk, message_id),
+            PutIData(chunk) => self
+                .data
+                .immutable
+                .initiate_creation(client, chunk, message_id),
             GetIData(address) => {
                 // TODO: We don't check for the existence of a valid signature for published data,
                 // since it's free for anyone to get.  However, as a means of spam prevention, we
@@ -263,25 +266,28 @@ impl ClientHandler {
                 // behaviour is deemed to become more "spammy". (e.g. the get requests include a
                 // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
                 // by brute-force attempts with varying seeds)
-                self.data.idata.get(client, address, message_id)
+                self.data.immutable.get(client, address, message_id)
             }
             DeleteUnpubIData(address) => self
                 .data
-                .idata
+                .immutable
                 .initiate_deletion(client, address, message_id),
             //
             // ===== Mutable Data =====
             //
-            PutMData(chunk) => self.data.mdata.initiate_creation(client, chunk, message_id),
+            PutMData(chunk) => self
+                .data
+                .mutable
+                .initiate_creation(client, chunk, message_id),
             MutateMDataEntries { .. }
             | SetMDataUserPermissions { .. }
             | DelMDataUserPermissions { .. } => self
                 .data
-                .mdata
+                .mutable
                 .initiate_mutation(request, client, message_id),
             DeleteMData(..) => self
                 .data
-                .mdata
+                .mutable
                 .initiate_deletion(request, client, message_id),
             GetMData(..)
             | GetMDataVersion(..)
@@ -291,11 +297,14 @@ impl ClientHandler {
             | ListMDataUserPermissions { .. }
             | ListMDataEntries(..)
             | ListMDataKeys(..)
-            | ListMDataValues(..) => self.data.mdata.get(request, client, message_id),
+            | ListMDataValues(..) => self.data.mutable.get(request, client, message_id),
             //
             // ===== Append Only Data =====
             //
-            PutAData(chunk) => self.data.adata.initiate_creation(client, chunk, message_id),
+            PutAData(chunk) => self
+                .data
+                .appendonly
+                .initiate_creation(client, chunk, message_id),
             GetAData(_)
             | GetADataShell { .. }
             | GetADataRange { .. }
@@ -305,10 +314,10 @@ impl ClientHandler {
             | GetADataPermissions { .. }
             | GetPubADataUserPermissions { .. }
             | GetUnpubADataUserPermissions { .. }
-            | GetADataValue { .. } => self.data.adata.get(client, request, message_id),
+            | GetADataValue { .. } => self.data.appendonly.get(client, request, message_id),
             DeleteAData(address) => self
                 .data
-                .adata
+                .appendonly
                 .initiate_deletion(client, address, message_id),
             AddPubADataPermissions { .. }
             | AddUnpubADataPermissions { .. }
@@ -316,7 +325,7 @@ impl ClientHandler {
             | AppendSeq { .. }
             | AppendUnseq(..) => self
                 .data
-                .adata
+                .appendonly
                 .initiate_mutation(client, request, message_id),
             //
             // ===== Coins =====

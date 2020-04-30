@@ -174,6 +174,7 @@ impl MDataHandler {
                 requester,
                 response: Response::Mutation(result),
                 message_id,
+                // Deletion is free so no refund
                 refund: None,
             },
         })

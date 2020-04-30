@@ -20,18 +20,18 @@ use safe_nd::{
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Clone)]
-pub(crate) struct ElderData {
-    pub idata: ElderIData,
-    pub mdata: ElderMData,
-    pub adata: ElderAData,
+pub(crate) struct Evaluation {
+    pub immutable: Immutable,
+    pub mutable: Mutable,
+    pub appendonly: AppendOnly,
 }
 
-impl ElderData {
+impl Evaluation {
     pub fn new(id: NodePublicId) -> Self {
         Self {
-            idata: ElderIData::new(id.clone()),
-            mdata: ElderMData::new(id.clone()),
-            adata: ElderAData::new(id),
+            immutable: Immutable::new(id.clone()),
+            mutable: Mutable::new(id.clone()),
+            appendonly: AppendOnly::new(id),
         }
     }
 }
@@ -41,11 +41,11 @@ impl ElderData {
 // --------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub(crate) struct ElderAData {
+pub(crate) struct AppendOnly {
     id: NodePublicId,
 }
 
-impl ElderAData {
+impl AppendOnly {
     pub fn new(id: NodePublicId) -> Self {
         Self { id }
     }
@@ -72,7 +72,7 @@ impl ElderAData {
         message_id: MessageId,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
-        // TODO - Should we replace this with a adata.check_permission call in data_handler.
+        // TODO - Should we replace this with a appendonly.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
         if chunk.check_is_last_owner(*owner.public_key()).is_err() {
             trace!(
@@ -132,7 +132,7 @@ impl ElderAData {
     }
 }
 
-impl Display for ElderAData {
+impl Display for AppendOnly {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }
@@ -143,11 +143,11 @@ impl Display for ElderAData {
 // --------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub(crate) struct ElderIData {
+pub(crate) struct Immutable {
     id: NodePublicId,
 }
 
-impl ElderIData {
+impl Immutable {
     pub fn new(id: NodePublicId) -> Self {
         Self { id }
     }
@@ -222,7 +222,7 @@ impl ElderIData {
     }
 }
 
-impl Display for ElderIData {
+impl Display for Immutable {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }
@@ -233,11 +233,11 @@ impl Display for ElderIData {
 // --------------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub(crate) struct ElderMData {
+pub(crate) struct Mutable {
     id: NodePublicId,
 }
 
-impl ElderMData {
+impl Mutable {
     pub fn new(id: NodePublicId) -> Self {
         Self { id }
     }
@@ -319,7 +319,7 @@ impl ElderMData {
     }
 }
 
-impl Display for ElderMData {
+impl Display for Mutable {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self.id.name())
     }
