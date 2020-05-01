@@ -11,7 +11,9 @@ use crate::{
 };
 use log::{error, info};
 
-use safe_nd::{Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Response};
+use safe_nd::{
+    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Response, XorName,
+};
 
 use std::{
     cell::Cell,
@@ -46,6 +48,7 @@ impl IDataHolder {
         &mut self,
         data: &IData,
         requester: PublicId,
+        source: XorName,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
@@ -63,7 +66,8 @@ impl IDataHolder {
 
         let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToOurDataHandlers {
-            sender: *self.id.name(),
+            // this is actually the target
+            sender: source,
             rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),

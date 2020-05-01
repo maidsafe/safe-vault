@@ -9,7 +9,7 @@
 pub use routing::{
     event,
     rng::{self, MainRng},
-    FullId, P2pNode, RoutingError, SrcLocation, TransportConfig, TransportEvent,
+    DstLocation, FullId, P2pNode, RoutingError, SrcLocation, TransportConfig, TransportEvent,
 };
 
 use bytes::Bytes;
@@ -108,6 +108,7 @@ pub struct NetworkParams {
 
 /// Interface for sending and receiving messages to and from other nodes, in the role of a full routing node.
 pub struct Node {
+    id: FullId,
     events_tx: Sender<Event>,
     quic_p2p: QuicP2p,
     network_node_rx: Receiver<TransportEvent>,
@@ -132,8 +133,15 @@ impl Node {
             None
         };
 
+        let id = if let Some(id) = config.full_id {
+            id
+        } else {
+            FullId::gen(&mut rng::new())
+        };
+
         (
             Node {
+                id,
                 network_node_rx,
                 quic_p2p,
                 events_tx,
@@ -157,6 +165,24 @@ impl Node {
     /// Returns the connection information of all the current section elders.
     pub fn our_elders(&self) -> impl Iterator<Item = &P2pNode> {
         vec![].into_iter()
+    }
+
+    /// Returns the connection information of all the current section adults.
+    pub fn our_adults(&self) -> impl Iterator<Item = &P2pNode> {
+        vec![].into_iter()
+    }
+
+    pub fn id(&self) -> &routing::PublicId {
+        self.id.public_id()
+    }
+
+    pub fn send_message(
+        &mut self,
+        src: SrcLocation,
+        dst: DstLocation,
+        contents: Vec<u8>,
+    ) -> Result<(), RoutingError> {
+        Ok(())
     }
 
     /// Vote for an event.
@@ -227,59 +253,6 @@ impl Node {
     pub fn disconnect_from_client(&mut self, peer_addr: SocketAddr) -> Result<(), RoutingError> {
         self.quic_p2p.disconnect_from(peer_addr);
         Ok(())
-    }
-}
-
-/// A builder to configure and create a new `Node`.
-pub struct NodeBuilder {}
-
-impl NodeBuilder {
-    /// Creates new `Node`.
-    pub fn create(self) -> (Node, Receiver<Event>, Receiver<TransportEvent>) {
-        let (quic_p2p, network_node_rx, network_client_rx) =
-            unwrap!(setup_quic_p2p(&Default::default()));
-        let (events_tx, events_rx) = mpmc::unbounded();
-
-        (
-            Node {
-                network_node_rx,
-                quic_p2p,
-                events_tx,
-                network_node_rx_idx: 0,
-                consensus_group: None,
-                is_elder: false,
-            },
-            events_rx,
-            network_client_rx,
-        )
-    }
-
-    /// Creates new `Node` within a section of nodes.
-    pub fn create_within_group(
-        self,
-        consensus_group: ConsensusGroupRef,
-    ) -> (Node, Receiver<Event>, Receiver<TransportEvent>) {
-        let (quic_p2p, network_node_rx, network_client_rx) =
-            unwrap!(setup_quic_p2p(&Default::default()));
-        let (events_tx, events_rx) = mpmc::unbounded();
-
-        consensus_group
-            .borrow_mut()
-            .event_channels
-            .push(events_tx.clone());
-
-        (
-            Node {
-                network_node_rx,
-                quic_p2p,
-                events_tx,
-                network_node_rx_idx: 0,
-                consensus_group: Some(Rc::downgrade(&consensus_group)),
-                is_elder: false,
-            },
-            events_rx,
-            network_client_rx,
-        )
     }
 }
 

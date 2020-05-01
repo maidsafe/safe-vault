@@ -10,6 +10,7 @@ use crate::{rpc::Rpc, vault::Init, Result, COST_OF_PUT};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
+use routing::SrcLocation;
 use safe_nd::{ClientPublicId, Coins, PublicId, PublicKey, Result as NdResult, XorName};
 use serde::Serialize;
 use std::{fs, path::Path};
@@ -89,5 +90,13 @@ pub(crate) fn get_refund_for_put<T>(result: &NdResult<T>) -> Option<Coins> {
         Some(COST_OF_PUT)
     } else {
         None
+    }
+}
+
+pub(crate) fn get_source_name(src: SrcLocation) -> XorName {
+    if let SrcLocation::Node(xorname) = src {
+        XorName(xorname.0)
+    } else {
+        XorName::default()
     }
 }
