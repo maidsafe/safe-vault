@@ -8,15 +8,14 @@
 
 use crate::{
     action::{Action, ConsensusAction},
-    adult::Adult,
     client_handler::ClientHandler,
     data_handler::DataHandler,
-    routing::{event::Event as RoutingEvent, NetworkEvent as ClientEvent, Node},
+    routing::{event::Event as RoutingEvent, Node, TransportEvent as ClientEvent},
     rpc::Rpc,
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};
-use log::{error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use safe_nd::{NodeFullId, Request, XorName};
@@ -38,9 +37,9 @@ enum State {
         client_handler: ClientHandler,
         data_handler: DataHandler,
     },
-    // TODO - remove this
-    #[allow(unused)]
-    Adult(Adult),
+    Adult {
+        data_handler: DataHandler,
+    },
 }
 
 /// Specifies whether to try loading cached data from disk, or to just construct a new instance.
@@ -84,7 +83,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         let (is_elder, id) = Self::read_state(&config)?.unwrap_or_else(|| {
             let id = NodeFullId::new(&mut rng);
             init_mode = Init::New;
-            (true, id)
+            (false, id)
         });
 
         #[cfg(feature = "mock_parsec")]
@@ -115,19 +114,25 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 &config,
                 &total_used_space,
                 init_mode,
+                is_elder,
+                routing_node.clone(),
             )?;
             State::Elder {
                 client_handler,
                 data_handler,
             }
         } else {
-            let _adult = Adult::new(
+            info!("Initializing new Vault as Adult");
+            let total_used_space = Rc::new(Cell::new(0));
+            let data_handler = DataHandler::new(
                 id.public_id().clone(),
-                root_dir,
-                config.max_capacity(),
+                &config,
+                &total_used_space,
                 init_mode,
+                false,
+                routing_node.clone(),
             )?;
-            unimplemented!();
+            State::Adult { data_handler }
         };
 
         let vault = Self {
@@ -152,7 +157,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             .map_err(From::from)
     }
 
-    #[cfg(feature = "mock_parsec")]
+    #[cfg(any(feature = "mock_parsec", feature = "mock"))]
     /// Returns whether routing node is in elder state.
     pub fn is_elder(&mut self) -> bool {
         self.routing_node.borrow().is_elder()
@@ -209,6 +214,32 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 }
             }
         }
+    }
+
+    fn promote_to_elder(&mut self) -> Result<()> {
+        let mut config = Config::default();
+        config.set_root_dir(self.root_dir.clone());
+        let total_used_space = Rc::new(Cell::new(0));
+        let client_handler = ClientHandler::new(
+            self.id.public_id().clone(),
+            &config,
+            &total_used_space,
+            Init::New,
+            self.routing_node.clone(),
+        )?;
+        let data_handler = DataHandler::new(
+            self.id.public_id().clone(),
+            &config,
+            &total_used_space,
+            Init::New,
+            true,
+            self.routing_node.clone(),
+        )?;
+        self.state = State::Elder {
+            client_handler,
+            data_handler,
+        };
+        Ok(())
     }
 
     /// Processes any outstanding network events and returns. Does not block.
@@ -273,6 +304,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn step_routing(&mut self, event: RoutingEvent) {
+        debug!("Received routing event: {:?}", event);
         let mut maybe_action = self.handle_routing_event(event);
         while let Some(action) = maybe_action {
             maybe_action = self.handle_action(action);
@@ -300,6 +332,16 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     }
                 }
             }
+            RoutingEvent::Promoted => self.promote_to_elder().map_or_else(
+                |err| {
+                    error!("Error when promoting Vault to Elder: {:?}", err);
+                    None
+                },
+                |()| {
+                    info!("Vault promoted to Elder");
+                    None
+                },
+            ),
             // Ignore all other events
             _ => None,
         }
@@ -343,8 +385,14 @@ impl<R: CryptoRng + Rng> Vault<R> {
     fn vote_for_action(&mut self, action: &ConsensusAction) -> Option<Action> {
         self.routing_node
             .borrow_mut()
-            .vote_for(utils::serialise(&action));
-        None
+            .vote_for_user_event(utils::serialise(&action))
+            .map_or_else(
+                |_err| {
+                    error!("Cannot vote. Vault is not an elder");
+                    None
+                },
+                |()| None,
+            )
     }
 
     fn handle_action(&mut self, action: Action) -> Option<Action> {
@@ -352,8 +400,8 @@ impl<R: CryptoRng + Rng> Vault<R> {
         use Action::*;
         match action {
             // Bypass client requests
-            // VoteFor(action) => self.vote_for_action(&action),
-            VoteFor(action) => self.client_handler_mut()?.handle_consensused_action(action),
+            VoteFor(action) => self.vote_for_action(&action),
+            // VoteFor(action) => self.client_handler_mut()?.handle_consensused_action(action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
             RespondToOurDataHandlers { sender, rpc } => {
@@ -513,7 +561,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             State::Elder {
                 ref client_handler, ..
             } => Some(client_handler),
-            State::Adult(_) => None,
+            State::Adult { .. } => None,
         }
     }
 
@@ -523,7 +571,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 ref mut client_handler,
                 ..
             } => Some(client_handler),
-            State::Adult(_) => None,
+            State::Adult { .. } => None,
         }
     }
 
@@ -534,7 +582,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             State::Elder {
                 ref data_handler, ..
             } => Some(data_handler),
-            State::Adult(_) => None,
+            State::Adult { ref data_handler } => Some(data_handler),
         }
     }
 
@@ -544,34 +592,15 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 ref mut data_handler,
                 ..
             } => Some(data_handler),
-            State::Adult(_) => None,
-        }
-    }
-
-    // TODO - remove this
-    #[allow(unused)]
-    fn adult(&self) -> Option<&Adult> {
-        match &self.state {
-            State::Elder { .. } => None,
-            State::Adult(ref adult) => Some(adult),
-        }
-    }
-
-    // TODO - remove this
-    #[allow(unused)]
-    fn adult_mut(&mut self) -> Option<&mut Adult> {
-        match &mut self.state {
-            State::Elder { .. } => None,
-            State::Adult(ref mut adult) => Some(adult),
+            State::Adult {
+                ref mut data_handler,
+            } => Some(data_handler),
         }
     }
 
     fn dump_state(&self) -> Result<()> {
         let path = self.root_dir.join(STATE_FILENAME);
-        let is_elder = match self.state {
-            State::Elder { .. } => true,
-            State::Adult(_) => false,
-        };
+        let is_elder = matches!(self.state, State::Elder { .. });
         Ok(fs::write(path, utils::serialise(&(is_elder, &self.id)))?)
     }
 

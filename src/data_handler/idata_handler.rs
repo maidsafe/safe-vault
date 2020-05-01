@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{IDataOp, IDataRequest, OpType};
-use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
+use crate::{action::Action, routing::Node, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
 use log::{trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
@@ -16,9 +16,11 @@ use safe_nd::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    cell::RefCell,
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     iter,
+    rc::Rc,
 };
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
@@ -37,10 +39,17 @@ pub(super) struct IDataHandler {
     metadata: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
+    #[allow(unused)]
+    routing_node: Rc<RefCell<Node>>,
 }
 
 impl IDataHandler {
-    pub(super) fn new(id: NodePublicId, config: &Config, init_mode: Init) -> Result<Self> {
+    pub(super) fn new(
+        id: NodePublicId,
+        config: &Config,
+        init_mode: Init,
+        routing_node: Rc<RefCell<Node>>,
+    ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
@@ -50,6 +59,7 @@ impl IDataHandler {
             idata_ops: Default::default(),
             metadata,
             full_adults,
+            routing_node,
         })
     }
 

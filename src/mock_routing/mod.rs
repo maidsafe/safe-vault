@@ -6,7 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use routing::{event, NetworkConfig, NetworkEvent, P2pNode, RoutingError};
+pub use routing::{
+    event,
+    rng::{self, MainRng},
+    FullId, P2pNode, RoutingError, SrcLocation, TransportConfig, TransportEvent,
+};
 
 use bytes::Bytes;
 use crossbeam_channel::{self as mpmc, Receiver, RecvError, Select, Sender};
@@ -51,21 +55,95 @@ impl ConsensusGroup {
             }
         }
     }
+
+    /// Promote the vaults in the concensus group to elders.
+    pub fn promote_all(&self) {
+        for channel in &self.event_channels {
+            unwrap!(channel.send(Event::Promoted));
+        }
+    }
+}
+
+/// Node configuration.
+pub struct NodeConfig {
+    /// If true, configures the node to start a new network instead of joining an existing one.
+    pub first: bool,
+    /// The ID of the node or `None` for randomly generated one.
+    pub full_id: Option<FullId>,
+    /// Configuration for the underlying network transport.
+    pub transport_config: TransportConfig,
+    /// Global network parameters. Must be identical for all nodes in the network.
+    pub network_params: NetworkParams,
+    /// Random number generator to be used by the node. Can be used to achieve repeatable tests by
+    /// providing a pre-seeded RNG. By default uses a random seed provided by the OS.
+    pub rng: MainRng,
+    /// Specifies if the node should be an elder or not
+    pub is_elder: bool,
+    /// Concensus group of the node
+    pub concensus_group: Option<ConsensusGroupRef>,
+}
+
+impl Default for NodeConfig {
+    fn default() -> Self {
+        Self {
+            first: false,
+            full_id: None,
+            transport_config: TransportConfig::default(),
+            network_params: NetworkParams::default(),
+            rng: rng::new(),
+            is_elder: false,
+            concensus_group: None,
+        }
+    }
+}
+
+/// Network parameters: number of elders, safe section size
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NetworkParams {
+    /// The number of elders per section
+    pub elder_size: usize,
+    /// Minimum number of nodes we consider safe in a section
+    pub safe_section_size: usize,
 }
 
 /// Interface for sending and receiving messages to and from other nodes, in the role of a full routing node.
 pub struct Node {
     events_tx: Sender<Event>,
     quic_p2p: QuicP2p,
-    network_node_rx: Receiver<NetworkEvent>,
+    network_node_rx: Receiver<TransportEvent>,
     network_node_rx_idx: usize,
     consensus_group: Option<Weak<RefCell<ConsensusGroup>>>,
+    is_elder: bool,
 }
 
 impl Node {
-    /// Creates a new builder to configure and create a `Node`.
-    pub fn builder() -> NodeBuilder {
-        NodeBuilder {}
+    /// Create a new routing Node with the specified configuration
+    pub fn new(config: NodeConfig) -> (Node, Receiver<Event>, Receiver<TransportEvent>) {
+        let (quic_p2p, network_node_rx, network_client_rx) =
+            unwrap!(setup_quic_p2p(&Default::default()));
+
+        let (events_tx, events_rx) = mpmc::unbounded();
+
+        let consensus_group = if let Some(group) = config.concensus_group {
+            group.borrow_mut().event_channels.push(events_tx.clone());
+
+            Some(Rc::downgrade(&group))
+        } else {
+            None
+        };
+
+        (
+            Node {
+                network_node_rx,
+                quic_p2p,
+                events_tx,
+                network_node_rx_idx: 0,
+                consensus_group,
+                is_elder: config.is_elder,
+            },
+            events_rx,
+            network_client_rx,
+        )
     }
 
     /// Initialise the routing node.
@@ -77,12 +155,15 @@ impl Node {
     }
 
     /// Returns the connection information of all the current section elders.
-    pub fn our_elders_info(&self) -> Option<impl Iterator<Item = &P2pNode>> {
-        Some(vec![].into_iter())
+    pub fn our_elders(&self) -> impl Iterator<Item = &P2pNode> {
+        vec![].into_iter()
     }
 
     /// Vote for an event.
-    pub fn vote_for(&mut self, event: Vec<u8>) {
+    pub fn vote_for_user_event(&mut self, event: Vec<u8>) -> Result<(), RoutingError> {
+        if !self.is_elder {
+            return Err(RoutingError::InvalidState);
+        }
         if let Some(ref consensus_group) = self.consensus_group {
             let _ = consensus_group
                 .upgrade()
@@ -90,6 +171,7 @@ impl Node {
         } else {
             unwrap!(self.events_tx.send(Event::Consensus(event)));
         }
+        Ok(())
     }
 
     /// Handle an event loop trigger with the mentioned operation
@@ -114,17 +196,19 @@ impl Node {
     ///
     /// Note that the Adults of a section only know about their section Elders. Hence they will
     /// always return the section Elders' info.
-    pub fn closest_known_elders_to(
-        &self,
-        _name: &XorName,
-    ) -> Result<impl Iterator<Item = &P2pNode>, RoutingError> {
+    pub fn closest_known_elders_to(&self, _name: &XorName) -> impl Iterator<Item = &P2pNode> {
         // Currently due to there being just one section, return our section eleders.
-        self.our_elders_info().ok_or(RoutingError::InvalidState)
+        self.our_elders()
     }
 
     /// Return the client connection info
     pub fn our_connection_info(&mut self) -> Result<SocketAddr, RoutingError> {
         Ok(unwrap!(self.quic_p2p.our_connection_info()))
+    }
+
+    /// Return if the Node is an elder or not.
+    pub fn is_elder(&self) -> bool {
+        self.is_elder
     }
 
     /// Send a message to a client peer
@@ -151,7 +235,7 @@ pub struct NodeBuilder {}
 
 impl NodeBuilder {
     /// Creates new `Node`.
-    pub fn create(self) -> (Node, Receiver<Event>, Receiver<NetworkEvent>) {
+    pub fn create(self) -> (Node, Receiver<Event>, Receiver<TransportEvent>) {
         let (quic_p2p, network_node_rx, network_client_rx) =
             unwrap!(setup_quic_p2p(&Default::default()));
         let (events_tx, events_rx) = mpmc::unbounded();
@@ -163,6 +247,7 @@ impl NodeBuilder {
                 events_tx,
                 network_node_rx_idx: 0,
                 consensus_group: None,
+                is_elder: false,
             },
             events_rx,
             network_client_rx,
@@ -173,7 +258,7 @@ impl NodeBuilder {
     pub fn create_within_group(
         self,
         consensus_group: ConsensusGroupRef,
-    ) -> (Node, Receiver<Event>, Receiver<NetworkEvent>) {
+    ) -> (Node, Receiver<Event>, Receiver<TransportEvent>) {
         let (quic_p2p, network_node_rx, network_client_rx) =
             unwrap!(setup_quic_p2p(&Default::default()));
         let (events_tx, events_rx) = mpmc::unbounded();
@@ -190,6 +275,7 @@ impl NodeBuilder {
                 events_tx,
                 network_node_rx_idx: 0,
                 consensus_group: Some(Rc::downgrade(&consensus_group)),
+                is_elder: false,
             },
             events_rx,
             network_client_rx,
@@ -198,8 +284,8 @@ impl NodeBuilder {
 }
 
 fn setup_quic_p2p(
-    config: &NetworkConfig,
-) -> Result<(QuicP2p, Receiver<NetworkEvent>, Receiver<NetworkEvent>), QuicP2pError> {
+    config: &TransportConfig,
+) -> Result<(QuicP2p, Receiver<TransportEvent>, Receiver<TransportEvent>), QuicP2pError> {
     let (event_senders, node_receiver, client_receiver) = {
         let (node_tx, node_rx) = crossbeam_channel::unbounded();
         let (client_tx, client_rx) = crossbeam_channel::unbounded();

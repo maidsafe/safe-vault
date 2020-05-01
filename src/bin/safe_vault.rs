@@ -35,7 +35,11 @@ fn main() {
 mod detail {
     use flexi_logger::{DeferredNow, Logger};
     use log::{self, Record};
-    use safe_vault::{self, routing::Node, write_connection_info, Command, Config, Vault};
+    use safe_vault::{
+        self,
+        routing::{Node, NodeConfig},
+        write_connection_info, Command, Config, Vault,
+    };
     use self_update::cargo_crate_version;
     use self_update::Status;
     use std::{io::Write, process};
@@ -125,10 +129,10 @@ mod detail {
             log::error!("Failed to set interrupt handler: {:?}", error)
         }
 
-        let (routing_node, routing_rx, client_rx) = Node::builder()
-            .first(config.is_first())
-            .network_config(config.network_config().clone())
-            .create();
+        let mut node_config = NodeConfig::default();
+        node_config.first = config.is_first();
+        node_config.transport_config = config.network_config().clone();
+        let (routing_node, routing_rx, client_rx) = Node::new(node_config);
 
         let is_first = config.is_first();
 

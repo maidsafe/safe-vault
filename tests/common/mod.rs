@@ -21,7 +21,7 @@ use fake_clock::FakeClock;
 use log::trace;
 use mock_quic_p2p::{self as quic_p2p, Builder, Event, Network, OurType, Peer, QuicP2p};
 #[cfg(feature = "mock_parsec")]
-use routing::{self, NetworkConfig, Node};
+use routing::{self, Node, NodeConfig, TransportConfig as NetworkConfig};
 use safe_nd::{
     AppFullId, AppPublicId, ClientFullId, ClientPublicId, Coins, Error, HandshakeRequest,
     HandshakeResponse, Message, MessageId, Notification, PublicId, PublicKey, Request, Response,
@@ -30,7 +30,7 @@ use safe_nd::{
 #[cfg(feature = "mock")]
 use safe_vault::{
     mock_routing::{ConsensusGroup, ConsensusGroupRef},
-    routing::Node,
+    routing::{Node, NodeConfig},
 };
 use safe_vault::{Command, Config, Vault};
 use serde::Serialize;
@@ -45,7 +45,7 @@ use tempdir::TempDir;
 use unwrap::unwrap;
 
 /// Default number of vaults to run the tests with.
-const DEFAULT_NUM_VAULTS: usize = 5;
+const DEFAULT_NUM_VAULTS: usize = 8;
 
 macro_rules! unexpected {
     ($e:expr) => {
@@ -77,16 +77,19 @@ impl Environment {
         let consensus_group = ConsensusGroup::new();
         let vaults = if num_vaults > 1 {
             let mut vaults = Vec::with_capacity(num_vaults);
-            for _ in 0..num_vaults {
+            for i in 0..num_vaults {
                 vaults.push(TestVault::new_with_mock_routing(
                     Some(consensus_group.clone()),
                     &mut rng,
+                    i < 7,
                 ));
             }
             vaults
         } else {
-            vec![TestVault::new_with_mock_routing(None, &mut rng)]
+            vec![TestVault::new_with_mock_routing(None, &mut rng, true)]
         };
+
+        consensus_group.borrow().promote_all();
 
         Self {
             rng,
@@ -130,7 +133,7 @@ impl Environment {
                 Some(config.clone()),
                 &mut env.rng,
             ));
-            while !env.vaults[i].is_elder() {
+            while !env.vaults[i].is_elder() && i != 7 {
                 env.poll()
             }
         }
@@ -189,12 +192,15 @@ impl Environment {
 
     /// Establish connection assuming we are already at the destination section.
     pub fn establish_connection<T: TestClientTrait>(&mut self, client: &mut T) {
-        let conn_infos: Vec<_> = self
+        let connections: Vec<_> = self
             .vaults
             .iter_mut()
-            .map(|vault| vault.connection_info())
+            .map(|vault| (vault.connection_info(), vault.is_elder()))
             .collect();
-        for conn_info in conn_infos {
+        for (conn_info, is_elder) in connections {
+            if cfg!(not(feature = "mock")) && !is_elder {
+                continue;
+            }
             client.quic_p2p().connect_to(conn_info.clone());
             self.poll();
 
@@ -230,6 +236,7 @@ impl TestVault {
     fn new_with_mock_routing(
         consensus_group: Option<ConsensusGroupRef>,
         rng: &mut TestRng,
+        is_elder: bool,
     ) -> Self {
         let root_dir = unwrap!(TempDir::new("safe_vault"));
         trace!("Creating a test vault at root_dir {:?}", root_dir);
@@ -240,9 +247,14 @@ impl TestVault {
         let (command_tx, command_rx) = crossbeam_channel::bounded(0);
 
         let (routing_node, routing_rx, client_rx) = if let Some(group) = consensus_group {
-            Node::builder().create_within_group(group)
+            let mut node_config = NodeConfig::default();
+            node_config.is_elder = is_elder;
+            node_config.concensus_group = Some(group);
+            Node::new(node_config)
         } else {
-            Node::builder().create()
+            let mut node_config = NodeConfig::default();
+            node_config.is_elder = is_elder;
+            Node::new(node_config)
         };
         let inner = unwrap!(Vault::new(
             routing_node,
@@ -271,12 +283,13 @@ impl TestVault {
         let (command_tx, command_rx) = crossbeam_channel::bounded(0);
 
         let (routing_node, routing_rx, client_rx) = if let Some(network_config) = network_config {
-            Node::builder()
-                .network_config(network_config)
-                .rng(rng)
-                .create()
+            let mut node_config = NodeConfig::default();
+            node_config.transport_config = network_config;
+            Node::new(node_config)
         } else {
-            Node::builder().first(true).rng(rng).create()
+            let mut node_config = NodeConfig::default();
+            node_config.first = true;
+            Node::new(node_config)
         };
 
         let inner = unwrap!(Vault::new(
@@ -299,7 +312,7 @@ impl TestVault {
         unwrap!(self.inner.our_connection_info())
     }
 
-    #[cfg(feature = "mock_parsec")]
+    #[cfg(any(feature = "mock_parsec", feature = "mock"))]
     fn is_elder(&mut self) -> bool {
         self.inner.is_elder()
     }

@@ -427,22 +427,15 @@ impl Messaging {
             .matches_our_prefix(&routing::XorName(client_id.name().0))
             .unwrap_or(false)
         {
-            let closest_known_elders = match self
+            let closest_known_elders = self
                 .routing_node
                 .borrow()
                 .closest_known_elders_to(&routing::XorName(client_id.name().0))
-            {
-                Ok(elders_iter) => elders_iter
-                    .map(|p2p_node| {
-                        let peer_addr = *p2p_node.peer_addr();
-                        (XorName(p2p_node.name().0), peer_addr)
-                    })
-                    .collect::<Vec<_>>(),
-                Err(e) => {
-                    info!("Could not handle bootstrap request: {:?}", e);
-                    return;
-                }
-            };
+                .map(|p2p_node| {
+                    let peer_addr = *p2p_node.peer_addr();
+                    (XorName(p2p_node.name().0), peer_addr)
+                })
+                .collect::<Vec<_>>();
 
             if closest_known_elders.is_empty() {
                 warn!(
@@ -456,20 +449,14 @@ impl Messaging {
             let elders = self
                 .routing_node
                 .borrow_mut()
-                .our_elders_info()
-                .map(|iter| {
-                    iter.map(|p2p_node| {
-                        let peer_addr = *p2p_node.peer_addr();
-                        (XorName(p2p_node.name().0), peer_addr)
-                    })
-                    .collect::<Vec<_>>()
-                });
+                .our_elders()
+                .map(|p2p_node| {
+                    let peer_addr = *p2p_node.peer_addr();
+                    (XorName(p2p_node.name().0), peer_addr)
+                })
+                .collect::<Vec<_>>();
 
-            if let Some(elders) = elders {
-                self.send(peer_addr, &HandshakeResponse::Join(elders));
-            } else {
-                warn!("{}: No other elders in our section found", self);
-            }
+            self.send(peer_addr, &HandshakeResponse::Join(elders));
         }
     }
 }

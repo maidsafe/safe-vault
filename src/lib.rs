@@ -30,7 +30,6 @@
 #![recursion_limit = "128"]
 
 mod action;
-mod adult;
 mod chunk_store;
 mod client_handler;
 mod config_handler;
