@@ -13,12 +13,12 @@ pub use self::auth_keys::AuthKeysDb;
 use crate::{
     action::{Action, ConsensusAction},
     rpc::Rpc,
-    utils::{self, AuthorisationKind},
+    utils,
 };
 use log::{error, warn};
 use safe_nd::{
-    AppPermissions, AppPublicId, Error as NdError, MessageId, NodePublicId, PublicId, PublicKey,
-    Request, Response, Signature,
+    ADataRequest, AppPermissions, AppPublicId, ClientRequest, Error as NdError, MessageId,
+    NodePublicId, PublicId, PublicKey, Request, RequestAuthKind, Response, Signature,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -37,6 +37,27 @@ impl Auth {
         Self { id, auth_keys }
     }
 
+    // on client request
+    pub fn process_client_request(
+        &mut self,
+        client: &ClientInfo,
+        request: ClientRequest,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use ClientRequest::*;
+        match request {
+            ListAuthKeysAndVersion => self.list_keys_and_version(client, message_id),
+            InsAuthKey {
+                key,
+                version,
+                permissions,
+            } => self.initiate_key_insertion(client, key, version, permissions, message_id),
+            DelAuthKey { key, version } => {
+                self.initiate_key_deletion(client, key, version, message_id)
+            }
+        }
+    }
+
     // If the client is app, check if it is authorised to perform the given request.
     pub fn authorise_app(
         &mut self,
@@ -49,22 +70,22 @@ impl Auth {
             _ => return None,
         };
 
-        let result = match utils::authorisation_kind(request) {
-            AuthorisationKind::GetPub => Ok(()),
-            AuthorisationKind::GetUnpub => self.check_app_permissions(app_id, |_| true),
-            AuthorisationKind::GetBalance => {
+        let result = match request.authorisation_kind() {
+            RequestAuthKind::GetPub => Ok(()),
+            RequestAuthKind::GetPriv => self.check_app_permissions(app_id, |_| true),
+            RequestAuthKind::GetBalance => {
                 self.check_app_permissions(app_id, |perms| perms.get_balance)
             }
-            AuthorisationKind::Mut => {
+            RequestAuthKind::Mutation => {
                 self.check_app_permissions(app_id, |perms| perms.perform_mutations)
             }
-            AuthorisationKind::TransferCoins => {
+            RequestAuthKind::TransferCoins => {
                 self.check_app_permissions(app_id, |perms| perms.transfer_coins)
             }
-            AuthorisationKind::MutAndTransferCoins => self.check_app_permissions(app_id, |perms| {
+            RequestAuthKind::MutAndTransferCoins => self.check_app_permissions(app_id, |perms| {
                 perms.transfer_coins && perms.perform_mutations
             }),
-            AuthorisationKind::ManageAppKeys => Err(NdError::AccessDenied),
+            RequestAuthKind::ManageAppKeys => Err(NdError::AccessDenied),
         };
 
         if let Err(error) = result {
@@ -78,7 +99,7 @@ impl Auth {
     }
 
     // client query
-    pub fn list_keys_and_version(
+    fn list_keys_and_version(
         &mut self,
         client: &ClientInfo,
         message_id: MessageId,
@@ -92,8 +113,35 @@ impl Auth {
         })
     }
 
+    // on consensus
+    pub(super) fn finalise_client_request(
+        &mut self,
+        requester: PublicId,
+        request: ClientRequest,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use ClientRequest::*;
+        match request {
+            InsAuthKey {
+                key,
+                version,
+                permissions,
+            } => self.finalise_key_insertion(requester, key, version, permissions, message_id),
+            DelAuthKey { key, version } => {
+                self.finalise_key_deletion(requester, key, version, message_id)
+            }
+            ListAuthKeysAndVersion => {
+                error!(
+                    "{}: Should not receive {:?} as a client handler.",
+                    self, request
+                );
+                None
+            }
+        }
+    }
+
     // on client request
-    pub fn initiate_key_insertion(
+    fn initiate_key_insertion(
         &self,
         client: &ClientInfo,
         key: PublicKey,
@@ -102,18 +150,18 @@ impl Auth {
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::InsAuthKey {
+            request: Request::Client(ClientRequest::InsAuthKey {
                 key,
                 version: new_version,
                 permissions,
-            },
+            }),
             client_public_id: client.public_id.clone(),
             message_id,
         }))
     }
 
     // on consensus
-    pub fn finalize_key_insertion(
+    fn finalise_key_insertion(
         &mut self,
         client: PublicId,
         key: PublicKey,
@@ -136,7 +184,7 @@ impl Auth {
     }
 
     // on client request
-    pub fn initiate_key_deletion(
+    fn initiate_key_deletion(
         &mut self,
         client: &ClientInfo,
         key: PublicKey,
@@ -144,17 +192,17 @@ impl Auth {
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::DelAuthKey {
+            request: Request::Client(ClientRequest::DelAuthKey {
                 key,
                 version: new_version,
-            },
+            }),
             client_public_id: client.public_id.clone(),
             message_id,
         }))
     }
 
     // on consensus
-    pub fn finalize_key_deletion(
+    pub fn finalise_key_deletion(
         &mut self,
         client: PublicId,
         key: PublicKey,
@@ -183,37 +231,28 @@ impl Auth {
         message_id: MessageId,
         signature: Option<Signature>,
     ) -> Option<Action> {
-        let signature_required = match utils::authorisation_kind(request) {
-            AuthorisationKind::GetUnpub
-            | AuthorisationKind::GetBalance
-            | AuthorisationKind::TransferCoins
-            | AuthorisationKind::Mut
-            | AuthorisationKind::MutAndTransferCoins
-            | AuthorisationKind::ManageAppKeys => true,
-            AuthorisationKind::GetPub => false,
-        };
+        match request.authorisation_kind() {
+            RequestAuthKind::GetPub => None,
+            _ => {
+                let valid = if let Some(signature) = signature {
+                    self.is_valid_client_signature(public_id, request, &message_id, &signature)
+                } else {
+                    warn!(
+                        "{}: ({:?}/{:?}) from {} is unsigned",
+                        self, request, message_id, public_id
+                    );
+                    false
+                };
 
-        if !signature_required {
-            return None;
-        }
-
-        let valid = if let Some(signature) = signature {
-            self.is_valid_client_signature(public_id, request, &message_id, &signature)
-        } else {
-            warn!(
-                "{}: ({:?}/{:?}) from {} is unsigned",
-                self, request, message_id, public_id
-            );
-            false
-        };
-
-        if valid {
-            None
-        } else {
-            Some(Action::RespondToClient {
-                message_id,
-                response: request.error_response(NdError::InvalidSignature),
-            })
+                if valid {
+                    None
+                } else {
+                    Some(Action::RespondToClient {
+                        message_id,
+                        response: request.error_response(NdError::InvalidSignature),
+                    })
+                }
+            }
         }
     }
 
@@ -224,8 +263,8 @@ impl Auth {
     ) -> Option<Action> {
         use Request::*;
         let consistent = match request {
-            AppendSeq { ref append, .. } => append.address.is_seq(),
-            AppendUnseq(ref append) => !&append.address.is_seq(),
+            AData(ADataRequest::AppendSeq { ref append, .. }) => append.address.is_seq(),
+            AData(ADataRequest::AppendUnseq(ref append)) => !&append.address.is_seq(),
             // TODO: any other requests for which this can happen?
             _ => true,
         };

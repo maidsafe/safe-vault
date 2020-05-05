@@ -23,9 +23,9 @@ use mock_quic_p2p::{self as quic_p2p, Builder, Event, Network, OurType, Peer, Qu
 #[cfg(feature = "mock_parsec")]
 use routing::{self, Node, NodeConfig, TransportConfig as NetworkConfig};
 use safe_nd::{
-    AppFullId, AppPublicId, ClientFullId, ClientPublicId, Coins, Error, HandshakeRequest,
-    HandshakeResponse, Message, MessageId, Notification, PublicId, PublicKey, Request, Response,
-    Signature, Transaction, TransactionId,
+    AppFullId, AppPublicId, ClientFullId, ClientPublicId, Coins, CoinsRequest, Error,
+    HandshakeRequest, HandshakeResponse, Message, MessageId, Notification, PublicId, PublicKey,
+    Request, Response, Signature, Transaction, TransactionId,
 };
 #[cfg(feature = "mock")]
 use safe_vault::{
@@ -806,11 +806,11 @@ pub fn create_balance(
     let amount = amount.into_coins();
     let transaction_id = 0;
 
-    let message_id = src_client.send_request(Request::CreateBalance {
+    let message_id = src_client.send_request(Request::Coins(CoinsRequest::CreateBalance {
         new_balance_owner,
         amount,
         transaction_id,
-    });
+    }));
     env.poll();
 
     let expected = Transaction {
@@ -841,11 +841,11 @@ pub fn transfer_coins(
 ) {
     let amount = amount.into_coins();
 
-    let message_id = src_client.send_request(Request::TransferCoins {
+    let message_id = src_client.send_request(Request::Coins(CoinsRequest::Transfer {
         destination: *dst_client.public_id().name(),
         amount,
         transaction_id,
-    });
+    }));
     env.poll();
 
     let expected = Transaction {

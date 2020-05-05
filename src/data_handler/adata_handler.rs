@@ -18,9 +18,9 @@ use log::error;
 
 use safe_nd::{
     AData, ADataAction, ADataAddress, ADataAppendOperation, ADataIndex, ADataOwner,
-    ADataPermissions, ADataPubPermissions, ADataUnpubPermissions, ADataUser, AppendOnlyData,
-    Error as NdError, MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult,
-    SeqAppendOnly, UnseqAppendOnly,
+    ADataPermissions, ADataPubPermissions, ADataRequest, ADataUnpubPermissions, ADataUser,
+    AppendOnlyData, Error as NdError, MessageId, NodePublicId, PublicId, PublicKey, Response,
+    Result as NdResult, SeqAppendOnly, UnseqAppendOnly,
 };
 
 use std::{
@@ -52,7 +52,111 @@ impl ADataHandler {
         Ok(Self { id, chunks })
     }
 
-    pub(super) fn handle_put_adata_req(
+    pub(super) fn handle_request(
+        &mut self,
+        requester: PublicId,
+        request: ADataRequest,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use ADataRequest::*;
+        match request {
+            Put(data) => self.handle_put_adata_req(requester, &data, message_id),
+            Get(address) => self.handle_get_adata_req(requester, address, message_id),
+            GetValue { address, key } => {
+                self.handle_get_adata_value_req(requester, address, &key, message_id)
+            }
+            GetShell {
+                address,
+                data_index,
+            } => self.handle_get_adata_shell_req(requester, address, data_index, message_id),
+            GetRange { address, range } => {
+                self.handle_get_adata_range_req(requester, address, range, message_id)
+            }
+            GetIndices(address) => {
+                self.handle_get_adata_indices_req(requester, address, message_id)
+            }
+            GetLastEntry(address) => {
+                self.handle_get_adata_last_entry_req(requester, address, message_id)
+            }
+            GetOwners {
+                address,
+                owners_index,
+            } => self.handle_get_adata_owners_req(requester, address, owners_index, message_id),
+            GetPubUserPermissions {
+                address,
+                permissions_index,
+                user,
+            } => self.handle_get_pub_adata_user_permissions_req(
+                requester,
+                address,
+                permissions_index,
+                user,
+                message_id,
+            ),
+            GetUnpubUserPermissions {
+                address,
+                permissions_index,
+                public_key,
+            } => self.handle_get_unpub_adata_user_permissions_req(
+                requester,
+                address,
+                permissions_index,
+                public_key,
+                message_id,
+            ),
+            GetPermissions {
+                address,
+                permissions_index,
+            } => self.handle_get_adata_permissions_req(
+                requester,
+                address,
+                permissions_index,
+                message_id,
+            ),
+            Delete(address) => self.handle_delete_adata_req(requester, address, message_id),
+            AddPubPermissions {
+                address,
+                permissions,
+                permissions_index,
+            } => self.handle_add_pub_adata_permissions_req(
+                &requester,
+                address,
+                permissions,
+                permissions_index,
+                message_id,
+            ),
+            AddUnpubPermissions {
+                address,
+                permissions,
+                permissions_index,
+            } => self.handle_add_unpub_adata_permissions_req(
+                &requester,
+                address,
+                permissions,
+                permissions_index,
+                message_id,
+            ),
+            SetOwner {
+                address,
+                owner,
+                owners_index,
+            } => self.handle_set_adata_owner_req(
+                &requester,
+                address,
+                owner,
+                owners_index,
+                message_id,
+            ),
+            AppendSeq { append, index } => {
+                self.handle_append_seq_req(&requester, append, index, message_id)
+            }
+            AppendUnseq(operation) => {
+                self.handle_append_unseq_req(&requester, operation, message_id)
+            }
+        }
+    }
+
+    fn handle_put_adata_req(
         &mut self,
         requester: PublicId,
         data: &AData,
@@ -77,7 +181,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_delete_adata_req(
+    fn handle_delete_adata_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -116,7 +220,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_adata_req(
+    fn handle_get_adata_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -135,7 +239,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_adata_shell_req(
+    fn handle_get_adata_shell_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -157,7 +261,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_adata_range_req(
+    fn handle_get_adata_range_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -179,7 +283,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_adata_indices_req(
+    fn handle_get_adata_indices_req(
         &mut self,
         requester: PublicId,
         address: ADataAddress,
@@ -200,7 +304,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_adata_last_entry_req(
+    fn handle_get_adata_last_entry_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -221,7 +325,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_adata_owners_req(
+    fn handle_get_adata_owners_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -248,7 +352,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_pub_adata_user_permissions_req(
+    fn handle_get_pub_adata_user_permissions_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -271,7 +375,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_unpub_adata_user_permissions_req(
+    fn handle_get_unpub_adata_user_permissions_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -294,7 +398,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_adata_permissions_req(
+    fn handle_get_adata_permissions_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -327,7 +431,7 @@ impl ADataHandler {
         })
     }
 
-    pub(super) fn handle_get_adata_value_req(
+    fn handle_get_adata_value_req(
         &self,
         requester: PublicId,
         address: ADataAddress,
@@ -365,7 +469,7 @@ impl ADataHandler {
         Ok(data)
     }
 
-    pub(super) fn handle_add_pub_adata_permissions_req(
+    fn handle_add_pub_adata_permissions_req(
         &mut self,
         requester: &PublicId,
         address: ADataAddress,
@@ -399,7 +503,7 @@ impl ADataHandler {
         )
     }
 
-    pub(super) fn handle_add_unpub_adata_permissions_req(
+    fn handle_add_unpub_adata_permissions_req(
         &mut self,
         requester: &PublicId,
         address: ADataAddress,
@@ -431,7 +535,7 @@ impl ADataHandler {
         )
     }
 
-    pub(super) fn handle_set_adata_owner_req(
+    fn handle_set_adata_owner_req(
         &mut self,
         requester: &PublicId,
         address: ADataAddress,
@@ -456,7 +560,7 @@ impl ADataHandler {
         )
     }
 
-    pub(super) fn handle_append_seq_req(
+    fn handle_append_seq_req(
         &mut self,
         requester: &PublicId,
         append: ADataAppendOperation,
@@ -484,7 +588,7 @@ impl ADataHandler {
         )
     }
 
-    pub(super) fn handle_append_unseq_req(
+    fn handle_append_unseq_req(
         &mut self,
         requester: &PublicId,
         operation: ADataAppendOperation,

@@ -31,10 +31,7 @@ use crate::{
 use bytes::Bytes;
 use log::{error, trace};
 use rand::{CryptoRng, Rng};
-use safe_nd::{
-    Coins, Error as NdError, MessageId, NodePublicId, PublicId, Request, Response, Signature,
-    XorName,
-};
+use safe_nd::{Coins, MessageId, NodePublicId, PublicId, Request, Response, Signature, XorName};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
@@ -110,7 +107,7 @@ impl ClientHandler {
                 request,
                 requester,
                 message_id,
-            } => self.finalize_client_request(src, requester, request, message_id),
+            } => self.finalise_client_request(src, requester, request, message_id),
             Rpc::Response {
                 response,
                 requester,
@@ -216,7 +213,6 @@ impl ClientHandler {
         }
     }
 
-    #[allow(clippy::cognitive_complexity)]
     // on client request
     fn process_client_request(
         &mut self,
@@ -251,164 +247,36 @@ impl ClientHandler {
         }
 
         match request {
-            //
-            // ===== Immutable Data =====
-            //
-            PutIData(chunk) => self
+            IData(idata_req) => self
                 .data
                 .immutable
-                .initiate_creation(client, chunk, message_id),
-            GetIData(address) => {
-                // TODO: We don't check for the existence of a valid signature for published data,
-                // since it's free for anyone to get.  However, as a means of spam prevention, we
-                // could change this so that signatures are required, and the signatures would need
-                // to match a pattern which becomes increasingly difficult as the client's
-                // behaviour is deemed to become more "spammy". (e.g. the get requests include a
-                // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
-                // by brute-force attempts with varying seeds)
-                self.data.immutable.get(client, address, message_id)
-            }
-            DeleteUnpubIData(address) => self
-                .data
-                .immutable
-                .initiate_deletion(client, address, message_id),
-            //
-            // ===== Mutable Data =====
-            //
-            PutMData(chunk) => self
+                .process_client_request(client, idata_req, message_id),
+            MData(mdata_req) => self
                 .data
                 .mutable
-                .initiate_creation(client, chunk, message_id),
-            MutateMDataEntries { .. }
-            | SetMDataUserPermissions { .. }
-            | DelMDataUserPermissions { .. } => self
-                .data
-                .mutable
-                .initiate_mutation(request, client, message_id),
-            DeleteMData(..) => self
-                .data
-                .mutable
-                .initiate_deletion(request, client, message_id),
-            GetMData(..)
-            | GetMDataVersion(..)
-            | GetMDataShell(..)
-            | GetMDataValue { .. }
-            | ListMDataPermissions(..)
-            | ListMDataUserPermissions { .. }
-            | ListMDataEntries(..)
-            | ListMDataKeys(..)
-            | ListMDataValues(..) => self.data.mutable.get(request, client, message_id),
-            //
-            // ===== Append Only Data =====
-            //
-            PutAData(chunk) => self
+                .process_client_request(client, mdata_req, message_id),
+            AData(adata_req) => self
                 .data
                 .appendonly
-                .initiate_creation(client, chunk, message_id),
-            GetAData(_)
-            | GetADataShell { .. }
-            | GetADataRange { .. }
-            | GetADataIndices(_)
-            | GetADataLastEntry(_)
-            | GetADataOwners { .. }
-            | GetADataPermissions { .. }
-            | GetPubADataUserPermissions { .. }
-            | GetUnpubADataUserPermissions { .. }
-            | GetADataValue { .. } => self.data.appendonly.get(client, request, message_id),
-            DeleteAData(address) => self
-                .data
-                .appendonly
-                .initiate_deletion(client, address, message_id),
-            AddPubADataPermissions { .. }
-            | AddUnpubADataPermissions { .. }
-            | SetADataOwner { .. }
-            | AppendSeq { .. }
-            | AppendUnseq(..) => self
-                .data
-                .appendonly
-                .initiate_mutation(client, request, message_id),
-            //
-            // ===== Coins =====
-            //
-            TransferCoins {
-                destination,
-                amount,
-                transaction_id,
-            } => self.balances.initiate_transfer(
-                &client.public_id,
-                destination,
-                amount,
-                transaction_id,
+                .process_client_request(client, adata_req, message_id),
+            Coins(coins_req) => self.balances.process_client_request(
+                client,
+                coins_req,
                 message_id,
+                &mut self.messaging,
             ),
-            GetBalance => {
-                let balance = self
-                    .balances
-                    .get(client.public_id.name())
-                    .ok_or(NdError::NoSuchBalance);
-                let response = Response::GetBalance(balance);
-                self.respond_to_client(message_id, response);
-                None
-            }
-            CreateBalance {
-                new_balance_owner,
-                amount,
-                transaction_id,
-            } => self.balances.initiate_creation(
-                &client.public_id,
-                new_balance_owner,
-                amount,
-                transaction_id,
-                message_id,
-            ),
-            //
-            // ===== Login packets =====
-            //
-            CreateLoginPacket(login_packet) => {
+            LoginPacket(login_packet_req) => {
                 self.login_packets
-                    .initiate_creation(&client.public_id, login_packet, message_id)
+                    .process_client_request(client, login_packet_req, message_id)
             }
-            CreateLoginPacketFor {
-                new_owner,
-                amount,
-                new_login_packet,
-                transaction_id,
-            } => self.login_packets.initiate_proxied_creation(
-                &client.public_id,
-                new_owner,
-                amount,
-                transaction_id,
-                new_login_packet,
-                message_id,
-            ),
-            UpdateLoginPacket(updated_login_packet) => self.login_packets.initiate_update(
-                client.public_id.clone(),
-                updated_login_packet,
-                message_id,
-            ),
-            GetLoginPacket(ref address) => {
-                self.login_packets
-                    .get(&client.public_id, address, message_id)
-            }
-            //
-            // ===== Client (Owner) to ClientHandlers =====
-            //
-            ListAuthKeysAndVersion => self.auth.list_keys_and_version(client, message_id),
-            InsAuthKey {
-                key,
-                version,
-                permissions,
-            } => self
+            Client(client_req) => self
                 .auth
-                .initiate_key_insertion(client, key, version, permissions, message_id),
-            DelAuthKey { key, version } => self
-                .auth
-                .initiate_key_deletion(client, key, version, message_id),
+                .process_client_request(client, client_req, message_id),
         }
     }
 
     // on consensus
-    fn finalize_client_request(
+    fn finalise_client_request(
         &mut self,
         src: XorName,
         requester: PublicId,
@@ -425,157 +293,23 @@ impl ClientHandler {
             requester
         );
         match request {
-            CreateLoginPacket(ref login_packet) => {
-                self.login_packets
-                    .finalize_creation(requester, login_packet, message_id)
-            }
-            CreateLoginPacketFor {
-                new_owner,
-                amount,
-                new_login_packet,
-                transaction_id,
-            } => {
-                if &src == requester.name() {
-                    // Step two - create balance and forward login_packet.
-                    if let Err(error) = self.balances.create(&requester, new_owner, amount) {
-                        // Refund amount (Including the cost of creating the balance)
-                        let refund = Some(amount.checked_add(COST_OF_PUT)?);
-
-                        Some(Action::RespondToClientHandlers {
-                            sender: XorName::from(new_owner),
-                            rpc: Rpc::Response {
-                                response: Response::Transaction(Err(error)),
-                                requester,
-                                message_id,
-                                refund,
-                            },
-                        })
-                    } else {
-                        Some(Action::ForwardClientRequest(Rpc::Request {
-                            request: CreateLoginPacketFor {
-                                new_owner,
-                                amount,
-                                new_login_packet,
-                                transaction_id,
-                            },
-                            requester,
-                            message_id,
-                        }))
-                    }
-                } else {
-                    self.login_packets.finalize_proxied_creation(
-                        requester,
-                        amount,
-                        transaction_id,
-                        new_login_packet,
-                        message_id,
-                    )
-                }
-            }
-            CreateBalance {
-                new_balance_owner,
-                amount,
-                transaction_id,
-            } => {
-                let action = self.balances.finalize_creation(
-                    requester,
-                    new_balance_owner,
-                    amount,
-                    transaction_id,
-                    message_id,
-                );
-                let destination = XorName::from(new_balance_owner);
-                if let Some(Action::RespondToClientHandlers {
-                    rpc:
-                        Rpc::Response {
-                            response: Response::Transaction(Ok(transaction)),
-                            ..
-                        },
-                    ..
-                }) = &action
-                {
-                    self.messaging
-                        .notify_destination_owners(&destination, *transaction);
-                }
-                action
-            }
-            TransferCoins {
-                destination,
-                amount,
-                transaction_id,
-            } => {
-                let action = self.balances.finalize_transfer(
-                    requester,
-                    destination,
-                    amount,
-                    transaction_id,
-                    message_id,
-                );
-                if let Some(Action::RespondToClientHandlers {
-                    rpc:
-                        Rpc::Response {
-                            response: Response::Transaction(Ok(transaction)),
-                            ..
-                        },
-                    ..
-                }) = &action
-                {
-                    self.messaging
-                        .notify_destination_owners(&destination, *transaction);
-                }
-                action
-            }
-            UpdateLoginPacket(updated_login_packet) => {
-                self.login_packets
-                    .finalize_update(requester, &updated_login_packet, message_id)
-            }
-            InsAuthKey {
-                key,
-                version,
-                permissions,
-            } => self
+            LoginPacket(req) => self.login_packets.finalise_client_request(
+                src,
+                requester,
+                req,
+                message_id,
+                &mut self.balances,
+            ),
+            Coins(req) => self.balances.finalise_client_request(
+                requester,
+                req,
+                message_id,
+                &mut self.messaging,
+            ),
+            Client(req) => self
                 .auth
-                .finalize_key_insertion(requester, key, version, permissions, message_id),
-            DelAuthKey { key, version } => self
-                .auth
-                .finalize_key_deletion(requester, key, version, message_id),
-            PutIData(_)
-            | GetIData(_)
-            | DeleteUnpubIData(_)
-            | PutMData(_)
-            | GetMData(_)
-            | GetMDataValue { .. }
-            | DeleteMData(_)
-            | GetMDataShell(_)
-            | GetMDataVersion(_)
-            | ListMDataEntries(_)
-            | ListMDataKeys(_)
-            | ListMDataValues(_)
-            | SetMDataUserPermissions { .. }
-            | DelMDataUserPermissions { .. }
-            | ListMDataPermissions(_)
-            | ListMDataUserPermissions { .. }
-            | MutateMDataEntries { .. }
-            | PutAData(_)
-            | GetAData(_)
-            | GetADataShell { .. }
-            | GetADataValue { .. }
-            | DeleteAData(_)
-            | GetADataRange { .. }
-            | GetADataIndices(_)
-            | GetADataLastEntry(_)
-            | GetADataPermissions { .. }
-            | GetPubADataUserPermissions { .. }
-            | GetUnpubADataUserPermissions { .. }
-            | GetADataOwners { .. }
-            | AddPubADataPermissions { .. }
-            | AddUnpubADataPermissions { .. }
-            | SetADataOwner { .. }
-            | AppendSeq { .. }
-            | AppendUnseq(_)
-            | GetBalance
-            | ListAuthKeysAndVersion
-            | GetLoginPacket(..) => {
+                .finalise_client_request(requester, req, message_id),
+            IData(_) | MData(_) | AData(_) => {
                 error!(
                     "{}: Should not receive {:?} as a client handler.",
                     self, request

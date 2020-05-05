@@ -18,7 +18,7 @@ use crossbeam_channel::{Receiver, Select};
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-use safe_nd::{NodeFullId, Request, XorName};
+use safe_nd::{ClientRequest, CoinsRequest, LoginPacketRequest, NodeFullId, Request, XorName};
 use std::borrow::Cow;
 use std::{
     cell::{Cell, RefCell},
@@ -454,7 +454,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     fn forward_client_request(&mut self, rpc: Rpc) -> Option<Action> {
         trace!("{} received a client request {:?}", self, rpc);
         let requester_name = if let Rpc::Request {
-            request: Request::CreateLoginPacketFor { ref new_owner, .. },
+            request: Request::LoginPacket(LoginPacketRequest::CreateFor { ref new_owner, .. }),
             ..
         } = rpc
         {
@@ -463,10 +463,12 @@ impl<R: CryptoRng + Rng> Vault<R> {
             *utils::requester_address(&rpc)
         };
         let dst_address = if let Rpc::Request { ref request, .. } = rpc {
-            match utils::destination_address(&request) {
+            match request.dest_address() {
                 Some(address) => address,
                 None => {
-                    if let Request::InsAuthKey { .. } | Request::DelAuthKey { .. } = request {
+                    if let Request::Client(ClientRequest::InsAuthKey { .. })
+                    | Request::Client(ClientRequest::DelAuthKey { .. }) = request
+                    {
                         Cow::Borrowed(self.id.public_id().name())
                     } else {
                         error!("{}: Logic error - no data handler address available.", self);
@@ -488,31 +490,31 @@ impl<R: CryptoRng + Rng> Vault<R> {
             //        message.
             return match rpc {
                 Rpc::Request {
-                    request: Request::CreateLoginPacket(_),
+                    request: Request::LoginPacket(LoginPacketRequest::Create(_)),
                     ..
                 }
                 | Rpc::Request {
-                    request: Request::CreateLoginPacketFor { .. },
+                    request: Request::LoginPacket(LoginPacketRequest::CreateFor { .. }),
                     ..
                 }
                 | Rpc::Request {
-                    request: Request::CreateBalance { .. },
+                    request: Request::Coins(CoinsRequest::CreateBalance { .. }),
                     ..
                 }
                 | Rpc::Request {
-                    request: Request::TransferCoins { .. },
+                    request: Request::Coins(CoinsRequest::Transfer { .. }),
                     ..
                 }
                 | Rpc::Request {
-                    request: Request::UpdateLoginPacket(..),
+                    request: Request::LoginPacket(LoginPacketRequest::Update(..)),
                     ..
                 }
                 | Rpc::Request {
-                    request: Request::InsAuthKey { .. },
+                    request: Request::Client(ClientRequest::InsAuthKey { .. }),
                     ..
                 }
                 | Rpc::Request {
-                    request: Request::DelAuthKey { .. },
+                    request: Request::Client(ClientRequest::DelAuthKey { .. }),
                     ..
                 } => self
                     .client_handler_mut()?
@@ -528,7 +530,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     fn proxy_client_request(&mut self, rpc: Rpc) -> Option<Action> {
         let requester_name = *utils::requester_address(&rpc);
         let dst_address = if let Rpc::Request {
-            request: Request::CreateLoginPacketFor { ref new_owner, .. },
+            request: Request::LoginPacket(LoginPacketRequest::CreateFor { ref new_owner, .. }),
             ..
         } = rpc
         {

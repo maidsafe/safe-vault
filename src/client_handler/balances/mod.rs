@@ -9,7 +9,7 @@
 mod db;
 
 pub use self::db::{Balance, BalancesDb};
-use super::COST_OF_PUT;
+use super::{auth::ClientInfo, messaging::Messaging, COST_OF_PUT};
 use crate::{
     action::{Action, ConsensusAction},
     rpc::Rpc,
@@ -17,8 +17,8 @@ use crate::{
 };
 use log::{error, info, trace};
 use safe_nd::{
-    Coins, Error as NdError, MessageId, NodePublicId, PublicId, PublicKey, Request, Response,
-    Transaction, TransactionId, XorName,
+    Coins, CoinsRequest, Error as NdError, MessageId, NodePublicId, PublicId, PublicKey, Request,
+    Response, Transaction, TransactionId, XorName,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -32,7 +32,50 @@ impl Balances {
         Self { id, db }
     }
 
-    pub(super) fn initiate_creation(
+    // on client request
+    pub(super) fn process_client_request(
+        &mut self,
+        client: &ClientInfo,
+        request: CoinsRequest,
+        message_id: MessageId,
+        messaging: &mut Messaging,
+    ) -> Option<Action> {
+        use CoinsRequest::*;
+        match request {
+            Transfer {
+                destination,
+                amount,
+                transaction_id,
+            } => self.initiate_transfer(
+                &client.public_id,
+                destination,
+                amount,
+                transaction_id,
+                message_id,
+            ),
+            GetBalance => {
+                let balance = self
+                    .get(client.public_id.name())
+                    .ok_or(NdError::NoSuchBalance);
+                let response = Response::GetBalance(balance);
+                messaging.respond_to_client(message_id, response);
+                None
+            }
+            CreateBalance {
+                new_balance_owner,
+                amount,
+                transaction_id,
+            } => self.initiate_creation(
+                &client.public_id,
+                new_balance_owner,
+                amount,
+                transaction_id,
+                message_id,
+            ),
+        }
+    }
+
+    fn initiate_creation(
         &mut self,
         requester: &PublicId,
         owner_key: PublicKey,
@@ -40,11 +83,11 @@ impl Balances {
         transaction_id: TransactionId,
         message_id: MessageId,
     ) -> Option<Action> {
-        let request = Request::CreateBalance {
+        let request = Request::Coins(CoinsRequest::CreateBalance {
             new_balance_owner: owner_key,
             amount,
             transaction_id,
-        };
+        });
         // For phases 1 & 2 we allow owners to create their own balance freely.
         let own_request = utils::own_key(requester)
             .map(|key| key == &owner_key)
@@ -67,7 +110,72 @@ impl Balances {
         }))
     }
 
-    pub(super) fn finalize_creation(
+    // on consensus
+    pub(super) fn finalise_client_request(
+        &mut self,
+        requester: PublicId,
+        request: CoinsRequest,
+        message_id: MessageId,
+        messaging: &mut Messaging,
+    ) -> Option<Action> {
+        use CoinsRequest::*;
+        let (action, dest) = match request {
+            CreateBalance {
+                new_balance_owner,
+                amount,
+                transaction_id,
+            } => {
+                let action = self.finalise_creation(
+                    requester,
+                    new_balance_owner,
+                    amount,
+                    transaction_id,
+                    message_id,
+                );
+                let destination = XorName::from(new_balance_owner);
+
+                (action, destination)
+            }
+            Transfer {
+                destination,
+                amount,
+                transaction_id,
+            } => {
+                let action = self.finalise_transfer(
+                    requester,
+                    destination,
+                    amount,
+                    transaction_id,
+                    message_id,
+                );
+
+                (action, destination)
+            }
+            GetBalance => {
+                error!(
+                    "{}: Should not receive {:?} as a client handler.",
+                    self, request
+                );
+                return None;
+            }
+        };
+
+        if let Some(Action::RespondToClientHandlers {
+            rpc:
+                Rpc::Response {
+                    response: Response::Transaction(Ok(transaction)),
+                    ..
+                },
+            ..
+        }) = &action
+        {
+            messaging.notify_destination_owners(&dest, *transaction);
+        }
+
+        action
+    }
+
+    fn finalise_creation(
         &mut self,
         requester: PublicId,
         owner_key: PublicKey,
@@ -101,7 +209,7 @@ impl Balances {
         })
     }
 
-    pub(super) fn initiate_transfer(
+    fn initiate_transfer(
         &mut self,
         requester: &PublicId,
         destination: XorName,
@@ -110,18 +218,18 @@ impl Balances {
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
-            request: Request::TransferCoins {
+            request: Request::Coins(CoinsRequest::Transfer {
                 destination,
                 amount,
                 transaction_id,
-            },
+            }),
             client_public_id: requester.clone(),
             message_id,
             cost: amount,
         }))
     }
 
-    pub(super) fn finalize_transfer(
+    fn finalise_transfer(
         &mut self,
         requester: PublicId,
         destination: XorName,
@@ -187,7 +295,7 @@ impl Balances {
         }
     }
 
-    pub(super) fn get<K: db::Key>(&self, key: &K) -> Option<Coins> {
+    fn get<K: db::Key>(&self, key: &K) -> Option<Coins> {
         self.db.get(key).map(|balance| balance.coins)
     }
 

@@ -14,8 +14,8 @@ use crate::{
 };
 use log::trace;
 use safe_nd::{
-    AData, ADataAddress, Error as NdError, IData, IDataAddress, IDataKind, MData, MessageId,
-    NodePublicId, Request, Response,
+    AData, ADataAddress, ADataRequest, Error as NdError, IData, IDataAddress, IDataKind,
+    IDataRequest, MData, MDataRequest, MessageId, NodePublicId, Request, Response,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -50,22 +50,51 @@ impl AppendOnly {
         Self { id }
     }
 
-    // client query
-    pub fn get(
+    // on client request
+    pub fn process_client_request(
         &mut self,
         client: &ClientInfo,
-        request: Request,
+        request: ADataRequest,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use ADataRequest::*;
+        match request {
+            Put(chunk) => self.initiate_creation(client, chunk, message_id),
+            Get(_)
+            | GetShell { .. }
+            | GetRange { .. }
+            | GetIndices(_)
+            | GetLastEntry(_)
+            | GetOwners { .. }
+            | GetPermissions { .. }
+            | GetPubUserPermissions { .. }
+            | GetUnpubUserPermissions { .. }
+            | GetValue { .. } => self.get(client, request, message_id),
+            Delete(address) => self.initiate_deletion(client, address, message_id),
+            AddPubPermissions { .. }
+            | AddUnpubPermissions { .. }
+            | SetOwner { .. }
+            | AppendSeq { .. }
+            | AppendUnseq(..) => self.initiate_mutation(client, request, message_id),
+        }
+    }
+
+    // client query
+    fn get(
+        &mut self,
+        client: &ClientInfo,
+        request: ADataRequest,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
-            request,
+            request: Request::AData(request),
             message_id,
         }))
     }
 
     // on client request
-    pub fn initiate_creation(
+    fn initiate_creation(
         &mut self,
         client: &ClientInfo,
         chunk: AData,
@@ -86,7 +115,7 @@ impl AppendOnly {
             });
         }
 
-        let request = Request::PutAData(chunk);
+        let request = Request::AData(ADataRequest::Put(chunk));
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
@@ -96,7 +125,7 @@ impl AppendOnly {
     }
 
     // on client request
-    pub fn initiate_deletion(
+    fn initiate_deletion(
         &mut self,
         client: &ClientInfo,
         address: ADataAddress,
@@ -110,21 +139,21 @@ impl AppendOnly {
         }
 
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::DeleteAData(address),
+            request: Request::AData(ADataRequest::Delete(address)),
             client_public_id: client.public_id.clone(),
             message_id,
         }))
     }
 
     // on client request
-    pub fn initiate_mutation(
+    fn initiate_mutation(
         &mut self,
         client: &ClientInfo,
-        request: Request,
+        request: ADataRequest,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
-            request,
+            request: Request::AData(request),
             client_public_id: client.public_id.clone(),
             message_id,
             cost: COST_OF_PUT,
@@ -152,8 +181,32 @@ impl Immutable {
         Self { id }
     }
 
+    // on client request
+    pub fn process_client_request(
+        &mut self,
+        client: &ClientInfo,
+        request: IDataRequest,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use IDataRequest::*;
+        match request {
+            Put(chunk) => self.initiate_creation(client, chunk, message_id),
+            Get(address) => {
+                // TODO: We don't check for the existence of a valid signature for published data,
+                // since it's free for anyone to get.  However, as a means of spam prevention, we
+                // could change this so that signatures are required, and the signatures would need
+                // to match a pattern which becomes increasingly difficult as the client's
+                // behaviour is deemed to become more "spammy". (e.g. the get requests include a
+                // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
+                // by brute-force attempts with varying seeds)
+                self.get(client, address, message_id)
+            }
+            DeleteUnpub(address) => self.initiate_deletion(client, address, message_id),
+        }
+    }
+
     // client query
-    pub fn get(
+    fn get(
         &mut self,
         client: &ClientInfo,
         address: IDataAddress,
@@ -161,13 +214,13 @@ impl Immutable {
     ) -> Option<Action> {
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
-            request: Request::GetIData(address),
+            request: Request::IData(IDataRequest::Get(address)),
             message_id,
         }))
     }
 
     // on client request
-    pub fn initiate_creation(
+    fn initiate_creation(
         &mut self,
         client: &ClientInfo,
         chunk: IData,
@@ -192,7 +245,7 @@ impl Immutable {
             }
         }
 
-        let request = Request::PutIData(chunk);
+        let request = Request::IData(IDataRequest::Put(chunk));
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,
             client_public_id: client.public_id.clone(),
@@ -202,7 +255,7 @@ impl Immutable {
     }
 
     // on client request
-    pub fn initiate_deletion(
+    fn initiate_deletion(
         &mut self,
         client: &ClientInfo,
         address: IDataAddress,
@@ -215,7 +268,7 @@ impl Immutable {
             });
         }
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::DeleteUnpubIData(address),
+            request: Request::IData(IDataRequest::DeleteUnpub(address)),
             client_public_id: client.public_id.clone(),
             message_id,
         }))
@@ -242,29 +295,55 @@ impl Mutable {
         Self { id }
     }
 
-    // client query
-    pub fn get(
+    // on client request
+    pub fn process_client_request(
         &mut self,
-        request: Request,
+        client: &ClientInfo,
+        request: MDataRequest,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use MDataRequest::*;
+        match request {
+            Put(chunk) => self.initiate_creation(client, chunk, message_id),
+            MutateEntries { .. } | SetUserPermissions { .. } | DelUserPermissions { .. } => {
+                self.initiate_mutation(request, client, message_id)
+            }
+            Delete(..) => self.initiate_deletion(request, client, message_id),
+            Get(..)
+            | GetVersion(..)
+            | GetShell(..)
+            | GetValue { .. }
+            | ListPermissions(..)
+            | ListUserPermissions { .. }
+            | ListEntries(..)
+            | ListKeys(..)
+            | ListValues(..) => self.get(request, client, message_id),
+        }
+    }
+
+    // client query
+    fn get(
+        &mut self,
+        request: MDataRequest,
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
-            request,
+            request: Request::MData(request),
             message_id,
         }))
     }
 
     // on client request
-    pub fn initiate_mutation(
+    fn initiate_mutation(
         &mut self,
-        request: Request,
+        request: MDataRequest,
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
-            request,
+            request: Request::MData(request),
             client_public_id: client.public_id.clone(),
             message_id,
             cost: COST_OF_PUT,
@@ -272,21 +351,21 @@ impl Mutable {
     }
 
     // on client request
-    pub fn initiate_deletion(
+    fn initiate_deletion(
         &mut self,
-        request: Request,
+        request: MDataRequest,
         client: &ClientInfo,
         message_id: MessageId,
     ) -> Option<Action> {
         Some(Action::VoteFor(ConsensusAction::Forward {
-            request,
+            request: Request::MData(request),
             client_public_id: client.public_id.clone(),
             message_id,
         }))
     }
 
     // on client request
-    pub fn initiate_creation(
+    fn initiate_creation(
         &mut self,
         client: &ClientInfo,
         chunk: MData,
@@ -308,7 +387,7 @@ impl Mutable {
             });
         }
 
-        let request = Request::PutMData(chunk);
+        let request = Request::MData(MDataRequest::Put(chunk));
 
         Some(Action::VoteFor(ConsensusAction::PayAndForward {
             request,

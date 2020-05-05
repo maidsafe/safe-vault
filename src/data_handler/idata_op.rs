@@ -9,7 +9,7 @@
 use crate::{action::Action, rpc::Rpc};
 use log::warn;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, MessageId, PublicId, Request, Response,
+    Error as NdError, IData, IDataAddress, IDataRequest, MessageId, PublicId, Response,
     Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
@@ -26,29 +26,6 @@ pub(crate) enum RpcState {
     HolderGone,
     /// Holder hasn't responded within the required time.
     TimedOut,
-}
-
-/// Request type where only ImmutableData requests are allowed.
-// TODO: move to safe-nd?
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
-#[allow(clippy::enum_variant_names)]
-pub(crate) enum IDataRequest {
-    /// Put ImmutableData.
-    PutIData(IData),
-    /// Get ImmutableData.
-    GetIData(IDataAddress),
-    /// Delete unpublished ImmutableData.
-    DeleteUnpubIData(IDataAddress),
-}
-
-impl Into<Request> for &IDataRequest {
-    fn into(self) -> Request {
-        match self {
-            IDataRequest::PutIData(ref data) => Request::PutIData(data.clone()),
-            IDataRequest::GetIData(ref address) => Request::GetIData(*address),
-            IDataRequest::DeleteUnpubIData(ref address) => Request::DeleteUnpubIData(*address),
-        }
-    }
 }
 
 /// The type of ImmutableData operation.
@@ -83,8 +60,8 @@ impl IDataOp {
         &self.client
     }
 
-    pub fn request(&self) -> Request {
-        (&self.request).into()
+    pub fn request(&self) -> &IDataRequest {
+        &self.request
     }
 
     pub fn is_any_actioned(&self) -> bool {
@@ -96,9 +73,9 @@ impl IDataOp {
 
     pub fn op_type(&self) -> OpType {
         match self.request {
-            IDataRequest::PutIData(_) => OpType::Put,
-            IDataRequest::GetIData(_) => OpType::Get,
-            IDataRequest::DeleteUnpubIData(_) => OpType::Delete,
+            IDataRequest::Put(_) => OpType::Put,
+            IDataRequest::Get(_) => OpType::Get,
+            IDataRequest::DeleteUnpub(_) => OpType::Delete,
         }
     }
 
@@ -127,7 +104,7 @@ impl IDataOp {
         own_id: &str,
         message_id: MessageId,
     ) -> Option<IDataAddress> {
-        if let IDataRequest::GetIData(_) = self.request {
+        if let IDataRequest::Get(_) = self.request {
             warn!(
                 "{}: Expected PutIData or DeleteUnpubIData for {:?}, but found GetIData",
                 own_id, message_id
@@ -138,9 +115,9 @@ impl IDataOp {
         self.set_to_actioned(&sender, result.err(), &own_id)?;
 
         match self.request {
-            IDataRequest::PutIData(ref data) => Some(*data.address()),
-            IDataRequest::DeleteUnpubIData(address) => Some(address),
-            IDataRequest::GetIData(_) => unreachable!(), // we checked above
+            IDataRequest::Put(ref data) => Some(*data.address()),
+            IDataRequest::DeleteUnpub(address) => Some(address),
+            IDataRequest::Get(_) => unreachable!(), // we checked above
         }
     }
 
@@ -152,7 +129,7 @@ impl IDataOp {
         message_id: MessageId,
     ) -> Option<Action> {
         let is_already_actioned = self.is_any_actioned();
-        let address = if let IDataRequest::GetIData(address) = self.request {
+        let address = if let IDataRequest::Get(address) = self.request {
             address
         } else {
             warn!(

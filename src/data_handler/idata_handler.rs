@@ -6,17 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{IDataOp, IDataRequest, OpType};
+use super::{idata_holder::IDataHolder, IDataOp, OpType};
 use crate::{action::Action, routing::Node, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
 use log::{trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Response,
-    Result as NdResult, XorName,
+    Error as NdError, IData, IDataAddress, IDataRequest, MessageId, NodePublicId, PublicId,
+    Request, Response, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     iter,
@@ -36,6 +36,7 @@ struct ChunkMetadata {
 pub(super) struct IDataHandler {
     id: NodePublicId,
     idata_ops: BTreeMap<MessageId, IDataOp>,
+    idata_holder: IDataHolder,
     metadata: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
@@ -47,23 +48,71 @@ impl IDataHandler {
     pub(super) fn new(
         id: NodePublicId,
         config: &Config,
+        total_used_space: &Rc<Cell<u64>>,
         init_mode: Init,
         routing_node: Rc<RefCell<Node>>,
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
+        let idata_holder = IDataHolder::new(id.clone(), config, total_used_space, init_mode)?;
         let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
 
         Ok(Self {
             id,
             idata_ops: Default::default(),
+            idata_holder,
             metadata,
             full_adults,
             routing_node,
         })
     }
 
-    pub(super) fn handle_put_idata_req(
+    pub(super) fn handle_request(
+        &mut self,
+        src: XorName,
+        requester: PublicId,
+        request: IDataRequest,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use IDataRequest::*;
+        match request {
+            Put(data) => {
+                if &src == data.name() {
+                    // Since the src is the chunk's name, this message was sent by the data handlers to us
+                    // as a single data handler, implying that we're a data handler chosen to store the
+                    // chunk.
+                    self.idata_holder.store_idata(&data, requester, message_id)
+                } else {
+                    self.handle_put_idata_req(requester, data, message_id)
+                }
+            }
+            Get(address) => {
+                if &src == address.name() {
+                    // The message was sent by the data handlers to us as the one who is supposed to store
+                    // the chunk. See the sent Get request below.
+                    let client = self.idata_op(&message_id).map(IDataOp::client)?.clone();
+                    self.idata_holder.get_idata(address, &client, message_id)
+                } else {
+                    self.handle_get_idata_req(requester, address, message_id)
+                }
+            }
+            DeleteUnpub(address) => {
+                if &src == address.name() {
+                    // Since the src is the chunk's name, this message was sent by the data handlers to us
+                    // as a single data handler, implying that we're a data handler where the chunk is
+                    // stored.
+                    let client = self.idata_op(&message_id).map(IDataOp::client)?.clone();
+                    self.idata_holder
+                        .delete_unpub_idata(address, &client, message_id)
+                } else {
+                    // We're acting as data handler, received request from client handlers
+                    self.handle_delete_unpub_idata_req(requester, address, message_id)
+                }
+            }
+        }
+    }
+
+    fn handle_put_idata_req(
         &mut self,
         requester: PublicId,
         data: IData,
@@ -111,7 +160,7 @@ impl IDataHandler {
         let data_name = *data.name();
         let idata_op = IDataOp::new(
             requester.clone(),
-            IDataRequest::PutIData(data),
+            IDataRequest::Put(data),
             target_holders.clone(),
         );
 
@@ -123,7 +172,7 @@ impl IDataHandler {
                     sender: data_name,
                     targets: target_holders,
                     rpc: Rpc::Request {
-                        request: idata_op.request(),
+                        request: Request::IData(idata_op.request().clone()),
                         requester,
                         message_id,
                     },
@@ -132,7 +181,7 @@ impl IDataHandler {
         }
     }
 
-    pub(super) fn handle_delete_unpub_idata_req(
+    fn handle_delete_unpub_idata_req(
         &mut self,
         requester: PublicId,
         address: IDataAddress,
@@ -159,7 +208,7 @@ impl IDataHandler {
 
         let idata_op = IDataOp::new(
             requester.clone(),
-            IDataRequest::DeleteUnpubIData(address),
+            IDataRequest::DeleteUnpub(address),
             metadata.holders.clone(),
         );
         match self.idata_ops.entry(message_id) {
@@ -170,7 +219,7 @@ impl IDataHandler {
                     sender: *address.name(),
                     targets: metadata.holders,
                     rpc: Rpc::Request {
-                        request: idata_op.request(),
+                        request: Request::IData(idata_op.request().clone()),
                         requester,
                         message_id,
                     },
@@ -179,7 +228,7 @@ impl IDataHandler {
         }
     }
 
-    pub(super) fn handle_get_idata_req(
+    fn handle_get_idata_req(
         &mut self,
         requester: PublicId,
         address: IDataAddress,
@@ -206,7 +255,7 @@ impl IDataHandler {
 
         let idata_op = IDataOp::new(
             requester.clone(),
-            IDataRequest::GetIData(address),
+            IDataRequest::Get(address),
             metadata.holders.clone(),
         );
         match self.idata_ops.entry(message_id) {
@@ -217,7 +266,7 @@ impl IDataHandler {
                     sender: *address.name(),
                     targets: metadata.holders,
                     rpc: Rpc::Request {
-                        request: idata_op.request(),
+                        request: Request::IData(idata_op.request().clone()),
                         requester,
                         message_id,
                     },

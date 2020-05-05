@@ -10,11 +10,9 @@ use crate::{rpc::Rpc, vault::Init, Result, COST_OF_PUT};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
-use safe_nd::{
-    ClientPublicId, Coins, IDataAddress, PublicId, PublicKey, Request, Result as NdResult, XorName,
-};
+use safe_nd::{ClientPublicId, Coins, PublicId, PublicKey, Result as NdResult, XorName};
 use serde::Serialize;
-use std::{borrow::Cow, fs, path::Path};
+use std::{fs, path::Path};
 use unwrap::unwrap;
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
@@ -82,144 +80,6 @@ pub(crate) fn requester_address(rpc: &Rpc) -> &XorName {
     match rpc {
         Rpc::Request { ref requester, .. } | Rpc::Response { ref requester, .. } => {
             requester.name()
-        }
-    }
-}
-
-/// Returns the address of the destination for `request`.
-pub(crate) fn destination_address(request: &Request) -> Option<Cow<XorName>> {
-    use Request::*;
-    match request {
-        PutIData(ref data) => Some(Cow::Borrowed(data.name())),
-        GetIData(ref address) => Some(Cow::Borrowed(address.name())),
-        DeleteUnpubIData(ref address) => Some(Cow::Borrowed(address.name())),
-        PutMData(ref data) => Some(Cow::Borrowed(data.name())),
-        GetMData(ref address)
-        | GetMDataValue { ref address, .. }
-        | DeleteMData(ref address)
-        | GetMDataShell(ref address)
-        | GetMDataVersion(ref address)
-        | ListMDataEntries(ref address)
-        | ListMDataKeys(ref address)
-        | ListMDataValues(ref address)
-        | SetMDataUserPermissions { ref address, .. }
-        | DelMDataUserPermissions { ref address, .. }
-        | ListMDataPermissions(ref address)
-        | ListMDataUserPermissions { ref address, .. }
-        | MutateMDataEntries { ref address, .. } => Some(Cow::Borrowed(address.name())),
-        PutAData(ref data) => Some(Cow::Borrowed(data.name())),
-        GetAData(ref address)
-        | GetADataValue { ref address, .. }
-        | GetADataShell { ref address, .. }
-        | DeleteAData(ref address)
-        | GetADataRange { ref address, .. }
-        | GetADataIndices(ref address)
-        | GetADataLastEntry(ref address)
-        | GetADataPermissions { ref address, .. }
-        | GetPubADataUserPermissions { ref address, .. }
-        | GetUnpubADataUserPermissions { ref address, .. }
-        | GetADataOwners { ref address, .. }
-        | AddPubADataPermissions { ref address, .. }
-        | AddUnpubADataPermissions { ref address, .. }
-        | SetADataOwner { ref address, .. } => Some(Cow::Borrowed(address.name())),
-        AppendSeq { ref append, .. } | AppendUnseq(ref append) => {
-            Some(Cow::Borrowed(append.address.name()))
-        }
-        TransferCoins {
-            ref destination, ..
-        } => Some(Cow::Borrowed(destination)),
-        CreateBalance {
-            ref new_balance_owner,
-            ..
-        } => Some(Cow::Owned(XorName::from(*new_balance_owner))),
-        CreateLoginPacket(login_packet) => Some(Cow::Borrowed(login_packet.destination())),
-        CreateLoginPacketFor {
-            new_login_packet, ..
-        } => Some(Cow::Borrowed(new_login_packet.destination())),
-        UpdateLoginPacket(login_packet) => Some(Cow::Borrowed(login_packet.destination())),
-        GetLoginPacket(ref name) => Some(Cow::Borrowed(name)),
-        GetBalance | ListAuthKeysAndVersion | InsAuthKey { .. } | DelAuthKey { .. } => None,
-    }
-}
-
-// The kind of authorisation needed for a reequest.
-pub(crate) enum AuthorisationKind {
-    // Get request against published data.
-    GetPub,
-    // Get request against unpublished data.
-    GetUnpub,
-    // Request to get balance.
-    GetBalance,
-    // Mutation request.
-    Mut,
-    // Request to manage app keys.
-    ManageAppKeys,
-    // Request to transfer coins
-    TransferCoins,
-    // Request to mutate and transfer coins
-    MutAndTransferCoins,
-}
-
-// Returns the type of authorisation needed for the given request.
-pub(crate) fn authorisation_kind(request: &Request) -> AuthorisationKind {
-    use Request::*;
-
-    match request {
-        PutIData(_)
-        | DeleteUnpubIData(_)
-        | PutMData(_)
-        | DeleteMData(_)
-        | SetMDataUserPermissions { .. }
-        | DelMDataUserPermissions { .. }
-        | MutateMDataEntries { .. }
-        | PutAData(_)
-        | DeleteAData(_)
-        | AddPubADataPermissions { .. }
-        | AddUnpubADataPermissions { .. }
-        | SetADataOwner { .. }
-        | AppendSeq { .. }
-        | AppendUnseq(_)
-        | CreateLoginPacket(_)
-        | UpdateLoginPacket(_) => AuthorisationKind::Mut,
-        CreateBalance { amount, .. } | CreateLoginPacketFor { amount, .. } => {
-            if amount.as_nano() == 0 {
-                AuthorisationKind::Mut
-            } else {
-                AuthorisationKind::MutAndTransferCoins
-            }
-        }
-        TransferCoins { .. } => AuthorisationKind::TransferCoins,
-        GetIData(IDataAddress::Pub(_)) => AuthorisationKind::GetPub,
-        GetIData(IDataAddress::Unpub(_))
-        | GetMData(_)
-        | GetMDataValue { .. }
-        | GetMDataShell(_)
-        | GetMDataVersion(_)
-        | ListMDataEntries(_)
-        | ListMDataKeys(_)
-        | ListMDataValues(_)
-        | ListMDataPermissions(_)
-        | ListMDataUserPermissions { .. }
-        | GetLoginPacket(_) => AuthorisationKind::GetUnpub,
-        GetAData(address)
-        | GetADataValue { address, .. }
-        | GetADataShell { address, .. }
-        | GetADataRange { address, .. }
-        | GetADataIndices(address)
-        | GetADataLastEntry(address)
-        | GetADataPermissions { address, .. }
-        | GetPubADataUserPermissions { address, .. }
-        | GetUnpubADataUserPermissions { address, .. }
-        | GetADataOwners { address, .. } => {
-            if address.is_pub() {
-                AuthorisationKind::GetPub
-            } else {
-                AuthorisationKind::GetUnpub
-            }
-        }
-        GetBalance => AuthorisationKind::GetBalance,
-        ListAuthKeysAndVersion | InsAuthKey { .. } | DelAuthKey { .. } => {
-            AuthorisationKind::ManageAppKeys
         }
     }
 }
