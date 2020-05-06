@@ -12,6 +12,7 @@ mod idata_holder;
 mod idata_op;
 mod mdata_handler;
 
+use crate::data_handler::idata_holder::IDataHolder;
 use crate::{action::Action, routing::Node, rpc::Rpc, vault::Init, Config, Result};
 use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
@@ -19,7 +20,7 @@ use idata_op::{IDataOp, OpType};
 use log::{error, trace};
 use mdata_handler::MDataHandler;
 
-use safe_nd::{MessageId, NodePublicId, PublicId, Request, Response, XorName};
+use safe_nd::{IDataRequest, MessageId, NodePublicId, PublicId, Request, Response, XorName};
 
 use std::{
     cell::{Cell, RefCell},
@@ -29,6 +30,7 @@ use std::{
 
 pub(crate) struct DataHandler {
     id: NodePublicId,
+    idata_holder: IDataHolder,
     idata_handler: Option<IDataHandler>,
     mdata_handler: Option<MDataHandler>,
     adata_handler: Option<ADataHandler>,
@@ -43,14 +45,9 @@ impl DataHandler {
         is_elder: bool,
         routing_node: Rc<RefCell<Node>>,
     ) -> Result<Self> {
+        let idata_holder = IDataHolder::new(id.clone(), config, total_used_space, init_mode)?;
         let (idata_handler, mdata_handler, adata_handler) = if is_elder {
-            let idata_handler = IDataHandler::new(
-                id.clone(),
-                config,
-                total_used_space,
-                init_mode,
-                routing_node,
-            )?;
+            let idata_handler = IDataHandler::new(id.clone(), config, init_mode, routing_node)?;
             let mdata_handler = MDataHandler::new(id.clone(), config, total_used_space, init_mode)?;
             let adata_handler = ADataHandler::new(id.clone(), config, total_used_space, init_mode)?;
             (
@@ -63,6 +60,7 @@ impl DataHandler {
         };
         Ok(Self {
             id,
+            idata_holder,
             idata_handler,
             mdata_handler,
             adata_handler,
@@ -101,13 +99,50 @@ impl DataHandler {
             requester
         );
         match request {
-            IData(idata_req) => self.idata_handler.as_mut().map_or_else(
-                || {
-                    trace!("Not applicable to Adults");
-                    None
-                },
-                |idata_handler| idata_handler.handle_request(src, requester, idata_req, message_id),
-            ),
+            IData(idata_req) => {
+                match idata_req {
+                    IDataRequest::Put(data) => {
+                        if &src == data.name() {
+                            // Since the src is the chunk's name, this message was sent by the data handlers to us
+                            // as a single data handler, implying that we're a data handler chosen to store the
+                            // chunk.
+                            self.idata_holder.store_idata(&data, requester, message_id)
+                        } else {
+                            self.handle_idata_request(|idata_handler| {
+                                idata_handler.handle_put_idata_req(requester, data, message_id)
+                            })
+                        }
+                    }
+                    IDataRequest::Get(address) => {
+                        if &src == address.name() {
+                            // The message was sent by the data handlers to us as the one who is supposed to store
+                            // the chunk. See the sent Get request below.
+                            let client = self.client_id(&message_id)?.clone();
+                            self.idata_holder.get_idata(address, &client, message_id)
+                        } else {
+                            self.handle_idata_request(|idata_handler| {
+                                idata_handler.handle_get_idata_req(requester, address, message_id)
+                            })
+                        }
+                    }
+                    IDataRequest::DeleteUnpub(address) => {
+                        if &src == address.name() {
+                            // Since the src is the chunk's name, this message was sent by the data handlers to us
+                            // as a single data handler, implying that we're a data handler where the chunk is
+                            // stored.
+                            let client = self.client_id(&message_id)?.clone();
+                            self.idata_holder
+                                .delete_unpub_idata(address, &client, message_id)
+                        } else {
+                            // We're acting as data handler, received request from client handlers
+                            self.handle_idata_request(|idata_handler| {
+                                idata_handler
+                                    .handle_delete_unpub_idata_req(requester, address, message_id)
+                            })
+                        }
+                    }
+                }
+            }
             MData(mdata_req) => self.mdata_handler.as_mut().map_or_else(
                 || {
                     trace!("Not applicable to Adults");
@@ -132,6 +167,29 @@ impl DataHandler {
         }
     }
 
+    fn handle_idata_request<F>(&mut self, operation: F) -> Option<Action>
+    where
+        F: FnOnce(&mut IDataHandler) -> Option<Action>,
+    {
+        self.idata_handler.as_mut().map_or_else(
+            || {
+                trace!("Not applicable to Adults");
+                None
+            },
+            |idata_handler| operation(idata_handler),
+        )
+    }
+
+    fn client_id(&self, message_id: &MessageId) -> Option<&PublicId> {
+        self.idata_handler.as_ref().map_or_else(
+            || {
+                trace!("Not applicable for adults");
+                None
+            },
+            |idata_handler| idata_handler.idata_op(message_id).map(IDataOp::client),
+        )
+    }
+
     fn handle_response(
         &mut self,
         src: XorName,
@@ -147,20 +205,12 @@ impl DataHandler {
             src
         );
         match response {
-            Mutation(result) => self.idata_handler.as_mut().map_or_else(
-                || {
-                    trace!("Not applicable to Adults");
-                    None
-                },
-                |idata_handler| idata_handler.handle_mutation_resp(src, result, message_id),
-            ),
-            GetIData(result) => self.idata_handler.as_mut().map_or_else(
-                || {
-                    trace!("Not applicable to Adults");
-                    None
-                },
-                |idata_handler| idata_handler.handle_get_idata_resp(src, result, message_id),
-            ),
+            Mutation(result) => self.handle_idata_request(|idata_handler| {
+                idata_handler.handle_mutation_resp(src, result, message_id)
+            }),
+            GetIData(result) => self.handle_idata_request(|idata_handler| {
+                idata_handler.handle_get_idata_resp(src, result, message_id)
+            }),
             //
             // ===== Invalid =====
             //
