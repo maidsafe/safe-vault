@@ -36,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 17] = [
+const ARGS: [&str; 18] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -54,6 +54,7 @@ const ARGS: [&str; 17] = [
     "log-dir",
     "update",
     "update-only",
+    "upnp-lease-duration"
 ];
 
 /// Vault configuration
@@ -198,36 +199,38 @@ impl Config {
 
     fn set_value(&mut self, arg: &str, value: &str) {
         if arg == ARGS[0] {
-            self.wallet_address = Some(unwrap!(value.parse()));
+            self.wallet_address = Some(value.parse().unwrap());
         } else if arg == ARGS[1] {
-            self.max_capacity = Some(unwrap!(value.parse()));
+            self.max_capacity = Some(value.parse().unwrap());
         } else if arg == ARGS[2] {
-            self.root_dir = Some(unwrap!(value.parse()));
+            self.root_dir = Some(value.parse().unwrap());
         } else if arg == ARGS[3] {
-            self.verbose = unwrap!(value.parse());
+            self.verbose = value.parse().unwrap();
         } else if arg == ARGS[4] {
             self.network_config.hard_coded_contacts = unwrap!(serde_json::from_str(value));
         } else if arg == ARGS[5] {
-            self.network_config.port = Some(unwrap!(value.parse()));
+            self.network_config.port = Some(value.parse().unwrap());
         } else if arg == ARGS[6] {
-            self.network_config.ip = Some(unwrap!(value.parse()));
+            self.network_config.ip = Some(value.parse().unwrap());
         } else if arg == ARGS[11] {
-            self.network_config.our_type = unwrap!(value.parse());
+            self.network_config.our_type = value.parse().unwrap();
         } else if arg == ARGS[13] {
-            self.completions = Some(unwrap!(value.parse()));
+            self.completions = Some(value.parse().unwrap());
         } else if arg == ARGS[14] {
-            self.log_dir = Some(unwrap!(value.parse()));
+            self.log_dir = Some(value.parse().unwrap());
         } else {
             #[cfg(not(feature = "mock_base"))]
             {
                 if arg == ARGS[7] {
-                    self.network_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
+                    self.network_config.max_msg_size_allowed = Some(value.parse().unwrap());
                 } else if arg == ARGS[8] {
-                    self.network_config.idle_timeout_msec = Some(unwrap!(value.parse()));
+                    self.network_config.idle_timeout_msec = Some(value.parse().unwrap());
                 } else if arg == ARGS[9] {
-                    self.network_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
+                    self.network_config.keep_alive_interval_msec = Some(value.parse().unwrap());
                 } else if arg == ARGS[10] {
-                    self.network_config.our_complete_cert = Some(unwrap!(value.parse()));
+                    self.network_config.our_complete_cert = Some(value.parse().unwrap());
+                } else if arg == ARGS[17] {
+                    self.network_config.upnp_lease_duration = Some(value.parse().unwrap());
                 } else {
                     println!("ERROR");
                 }
@@ -331,7 +334,7 @@ mod test {
     #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
-        let expected_size = 344;
+        let expected_size = 352;
         assert_eq!(
             expected_size,
             mem::size_of::<Config>(),

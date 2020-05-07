@@ -19,7 +19,7 @@ use crossbeam_channel::{Receiver, Sender};
 #[cfg(feature = "mock_parsec")]
 use fake_clock::FakeClock;
 use log::trace;
-use mock_quic_p2p::{self as quic_p2p, Builder, Event, Network, OurType, Peer, QuicP2p};
+use mock_quic_p2p::{self as quic_p2p, Event, Network, OurType, Peer, QuicP2p};
 #[cfg(feature = "mock_parsec")]
 use routing::{self, Node, NodeConfig, TransportConfig as NetworkConfig};
 use safe_nd::{
@@ -615,7 +615,7 @@ impl TestClient {
         let public_id = client_full_id.public_id().clone();
 
         Self {
-            quic_p2p: unwrap!(Builder::new(tx).with_config(config).build()),
+            quic_p2p: QuicP2p::with_config(tx, Some(config), Default::default(), false).unwrap(),
             node_rx,
             _client_rx: client_rx,
             full_id: FullId::Client(client_full_id),
@@ -693,7 +693,7 @@ impl TestApp {
         let public_id = app_full_id.public_id().clone();
 
         Self {
-            quic_p2p: unwrap!(Builder::new(tx).with_config(config).build()),
+            quic_p2p: unwrap!(QuicP2p::with_config(tx, Some(config), Default::default(), false)),
             node_rx,
             _client_rx: client_rx,
             full_id: FullId::App(app_full_id),
