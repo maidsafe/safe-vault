@@ -115,11 +115,11 @@ impl DataHandler {
                         }
                     }
                     IDataRequest::Get(address) => {
-                        if &src == address.name() {
+                        if matches!(requester, PublicId::Node(_)) {
                             // The message was sent by the data handlers to us as the one who is supposed to store
                             // the chunk. See the sent Get request below.
-                            let client = self.client_id(&message_id)?.clone();
-                            self.idata_holder.get_idata(address, &client, message_id)
+                            self.idata_holder
+                                .get_idata(address, requester, src, message_id)
                         } else {
                             self.handle_idata_request(|idata_handler| {
                                 idata_handler.handle_get_idata_req(requester, address, message_id)

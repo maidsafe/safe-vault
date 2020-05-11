@@ -80,29 +80,19 @@ impl IDataHolder {
     pub(crate) fn get_idata(
         &self,
         address: IDataAddress,
-        client: &PublicId,
+        requester: PublicId,
+        source: XorName,
         message_id: MessageId,
     ) -> Option<Action> {
-        let client_pk = utils::own_key(client)?;
         let result = self
             .chunks
             .get(&address)
-            .map_err(|error| error.to_string().into())
-            .and_then(|idata| match idata {
-                IData::Unpub(ref data) => {
-                    if data.owner() != client_pk {
-                        Err(NdError::AccessDenied)
-                    } else {
-                        Ok(idata)
-                    }
-                }
-                _ => Ok(idata),
-            });
+            .map_err(|error| error.to_string().into());
 
         Some(Action::RespondToOurDataHandlers {
-            sender: *self.id.name(),
+            sender: source,
             rpc: Rpc::Response {
-                requester: client.clone(),
+                requester: requester,
                 response: Response::GetIData(result),
                 message_id,
                 refund: None,
