@@ -32,6 +32,7 @@ pub(crate) enum RpcState {
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub(crate) enum OpType {
     Put,
+    GetHolders,
     Get,
     Delete,
 }
@@ -74,7 +75,8 @@ impl IDataOp {
     pub fn op_type(&self) -> OpType {
         match self.request {
             IDataRequest::Put(_) => OpType::Put,
-            IDataRequest::Get(_) => OpType::Get,
+            IDataRequest::GetHolders(_) => OpType::GetHolders,
+            IDataRequest::Get { .. } => OpType::Get,
             IDataRequest::DeleteUnpub(_) => OpType::Delete,
         }
     }
@@ -104,7 +106,7 @@ impl IDataOp {
         own_id: &str,
         message_id: MessageId,
     ) -> Option<IDataAddress> {
-        if let IDataRequest::Get(_) = self.request {
+        if let IDataRequest::Get { .. } = self.request {
             warn!(
                 "{}: Expected PutIData or DeleteUnpubIData for {:?}, but found GetIData",
                 own_id, message_id
@@ -117,7 +119,45 @@ impl IDataOp {
         match self.request {
             IDataRequest::Put(ref data) => Some(*data.address()),
             IDataRequest::DeleteUnpub(address) => Some(address),
-            IDataRequest::Get(_) => unreachable!(), // we checked above
+            IDataRequest::Get { .. } => unreachable!(), // we checked above
+            IDataRequest::GetHolders(_) => unreachable!(), // we checked above
+        }
+    }
+
+    pub fn handle_get_idata_holders_resp(
+        &mut self,
+        sender: XorName,
+        result: NdResult<Vec<XorName>>,
+        own_id: &str,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let is_already_actioned = self.is_any_actioned();
+        let address = if let IDataRequest::GetHolders(address) = self.request {
+            address
+        } else {
+            warn!(
+                "{}: Expected GetIData to correspond to GetIData from {}:",
+                own_id, sender,
+            );
+            // TODO - Instead of returning None here, take action by treating the vault as
+            //        failing.
+            return None;
+        };
+
+        let response = Response::GetIDataHolders(result.clone());
+        self.set_to_actioned(&sender, result.err(), &own_id)?;
+        if is_already_actioned {
+            None
+        } else {
+            Some(Action::RespondToClientHandlers {
+                sender: *address.name(),
+                rpc: Rpc::Response {
+                    requester: self.client().clone(),
+                    response,
+                    message_id,
+                    refund: None,
+                },
+            })
         }
     }
 
@@ -129,8 +169,12 @@ impl IDataOp {
         message_id: MessageId,
     ) -> Option<Action> {
         let is_already_actioned = self.is_any_actioned();
-        let address = if let IDataRequest::Get(address) = self.request {
-            address
+        let address = if let IDataRequest::Get {
+            idata_address,
+            holder_address: _,
+        } = self.request
+        {
+            idata_address
         } else {
             warn!(
                 "{}: Expected GetIData to correspond to GetIData from {}:",

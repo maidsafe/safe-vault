@@ -15,7 +15,7 @@ use crate::{
 use log::trace;
 use safe_nd::{
     AData, ADataAddress, ADataRequest, Error as NdError, IData, IDataAddress, IDataKind,
-    IDataRequest, MData, MDataRequest, MessageId, NodePublicId, Request, Response,
+    IDataRequest, MData, MDataRequest, MessageId, NodePublicId, Request, Response, XorName,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -191,7 +191,11 @@ impl Immutable {
         use IDataRequest::*;
         match request {
             Put(chunk) => self.initiate_creation(client, chunk, message_id),
-            Get(address) => {
+            GetHolders(address) => self.get_holders(client, address, message_id),
+            Get {
+                idata_address,
+                holder_address,
+            } => {
                 // TODO: We don't check for the existence of a valid signature for published data,
                 // since it's free for anyone to get.  However, as a means of spam prevention, we
                 // could change this so that signatures are required, and the signatures would need
@@ -199,14 +203,14 @@ impl Immutable {
                 // behaviour is deemed to become more "spammy". (e.g. the get requests include a
                 // `seed: [u8; 32]`, and the client needs to form a sig matching a required pattern
                 // by brute-force attempts with varying seeds)
-                self.get(client, address, message_id)
+                self.get(client, idata_address, holder_address, message_id)
             }
             DeleteUnpub(address) => self.initiate_deletion(client, address, message_id),
         }
     }
 
     // client query
-    fn get(
+    fn get_holders(
         &mut self,
         client: &ClientInfo,
         address: IDataAddress,
@@ -214,7 +218,25 @@ impl Immutable {
     ) -> Option<Action> {
         Some(Action::ForwardClientRequest(Rpc::Request {
             requester: client.public_id.clone(),
-            request: Request::IData(IDataRequest::Get(address)),
+            request: Request::IData(IDataRequest::GetHolders(address)),
+            message_id,
+        }))
+    }
+
+    // client query
+    fn get(
+        &mut self,
+        client: &ClientInfo,
+        idata_address: IDataAddress,
+        holder_address: XorName,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        Some(Action::ForwardClientRequest(Rpc::Request {
+            requester: client.public_id.clone(),
+            request: Request::IData(IDataRequest::Get {
+                idata_address,
+                holder_address,
+            }),
             message_id,
         }))
     }

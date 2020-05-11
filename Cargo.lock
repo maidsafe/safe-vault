@@ -2184,8 +2184,7 @@ checksum = "535622e6be132bccd223f4bb2b8ac8d53cda3c7a6394944d3b2b33fb974f9d76"
 [[package]]
 name = "safe-nd"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "900fe3baee261f7c9b1532c5f401c391e7445f444a5a4bccc032326052582030"
+source = "git+https://github.com/ravinderjangra/safe-nd.git#51b37187f93bfcd4777d3b443151be22bc0f4bba"
 dependencies = [
  "bincode 1.1.4",
  "ed25519-dalek",

@@ -114,17 +114,24 @@ impl DataHandler {
                             })
                         }
                     }
-                    IDataRequest::Get(address) => {
-                        if matches!(requester, PublicId::Node(_)) {
+                    IDataRequest::Get {
+                        idata_address,
+                        holder_address,
+                    } => {
+                        if holder_address == *self.id.name() {
                             // The message was sent by the data handlers to us as the one who is supposed to store
                             // the chunk. See the sent Get request below.
                             self.idata_holder
-                                .get_idata(address, requester, src, message_id)
+                                .get_idata(idata_address, requester, src, message_id)
                         } else {
-                            self.handle_idata_request(|idata_handler| {
-                                idata_handler.handle_get_idata_req(requester, address, message_id)
-                            })
+                            error!("XorName doesn't match with the current node.");
+                            None
                         }
+                    }
+                    IDataRequest::GetHolders(address) => {
+                        self.handle_idata_request(|idata_handler| {
+                            idata_handler.handle_get_idata_req(requester, address, message_id)
+                        })
                     }
                     IDataRequest::DeleteUnpub(address) => {
                         if matches!(requester, PublicId::Node(_)) {
@@ -200,6 +207,9 @@ impl DataHandler {
             }),
             GetIData(result) => self.handle_idata_request(|idata_handler| {
                 idata_handler.handle_get_idata_resp(src, result, message_id)
+            }),
+            GetIDataHolders(result) => self.handle_idata_request(|idata_handler| {
+                idata_handler.handle_get_idata_holder_resp(src, result, message_id)
             }),
             //
             // ===== Invalid =====

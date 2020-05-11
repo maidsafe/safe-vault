@@ -196,12 +196,12 @@ impl IDataHandler {
         let our_name = *self.id.name();
         let idata_handler_id = self.id.clone();
         let client_id = requester.clone();
-        let respond = |result: NdResult<IData>| {
+        let respond = |result: NdResult<Vec<XorName>>| {
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
                     requester: client_id,
-                    response: Response::GetIData(result),
+                    response: Response::GetIDataHolders(result),
                     message_id,
                     refund: None,
                 },
@@ -223,7 +223,7 @@ impl IDataHandler {
 
         let idata_op = IDataOp::new(
             requester,
-            IDataRequest::Get(address),
+            IDataRequest::GetHolders(address),
             metadata.holders.clone(),
         );
 
@@ -395,6 +395,20 @@ impl IDataHandler {
                     },
                 }
             })
+    }
+
+    pub(super) fn handle_get_idata_holder_resp(
+        &mut self,
+        sender: XorName,
+        result: NdResult<Vec<XorName>>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let own_id = format!("{}", self);
+        let action = self.idata_op_mut(&message_id).and_then(|idata_op| {
+            idata_op.handle_get_idata_holders_resp(sender, result, &own_id, message_id)
+        });
+        let _ = self.remove_idata_op_if_concluded(&message_id);
+        action
     }
 
     pub(super) fn handle_get_idata_resp(

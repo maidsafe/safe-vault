@@ -217,6 +217,7 @@ impl Messaging {
         match response {
             // Transfer the response from data handlers to clients
             GetIData(..)
+            | GetIDataHolders(..)
             | GetAData(..)
             | GetADataShell(..)
             | GetADataRange(..)
