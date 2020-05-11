@@ -172,15 +172,17 @@ impl Node {
         vec![].into_iter()
     }
 
+    /// Get PublicId for the current node.
     pub fn id(&self) -> &routing::PublicId {
         self.id.public_id()
     }
 
+    /// Send a msg to a node.
     pub fn send_message(
         &mut self,
-        src: SrcLocation,
-        dst: DstLocation,
-        contents: Vec<u8>,
+        _src: SrcLocation,
+        _dst: DstLocation,
+        _contents: Vec<u8>,
     ) -> Result<(), RoutingError> {
         Ok(())
     }
