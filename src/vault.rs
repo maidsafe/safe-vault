@@ -358,43 +358,41 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
     fn handle_routing_message(&mut self, src: SrcLocation, message: Vec<u8>) -> Option<Action> {
         match bincode::deserialize::<Rpc>(&message) {
-            Ok(rpc) => {
-                return match rpc {
-                    Rpc::Request {
-                        request: Request::LoginPacket(LoginPacketRequest::Create(_)),
-                        ..
-                    }
-                    | Rpc::Request {
-                        request: Request::LoginPacket(LoginPacketRequest::CreateFor { .. }),
-                        ..
-                    }
-                    | Rpc::Request {
-                        request: Request::Coins(CoinsRequest::CreateBalance { .. }),
-                        ..
-                    }
-                    | Rpc::Request {
-                        request: Request::Coins(CoinsRequest::Transfer { .. }),
-                        ..
-                    }
-                    | Rpc::Request {
-                        request: Request::LoginPacket(LoginPacketRequest::Update(..)),
-                        ..
-                    }
-                    | Rpc::Request {
-                        request: Request::Client(ClientRequest::InsAuthKey { .. }),
-                        ..
-                    }
-                    | Rpc::Request {
-                        request: Request::Client(ClientRequest::DelAuthKey { .. }),
-                        ..
-                    } => self
-                        .client_handler_mut()?
-                        .handle_vault_rpc(utils::get_source_name(src), rpc),
-                    _ => self
-                        .data_handler_mut()?
-                        .handle_vault_rpc(utils::get_source_name(src), rpc),
-                };
-            }
+            Ok(rpc) => match rpc {
+                Rpc::Request {
+                    request: Request::LoginPacket(LoginPacketRequest::Create(_)),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::LoginPacket(LoginPacketRequest::CreateFor { .. }),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::Coins(CoinsRequest::CreateBalance { .. }),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::Coins(CoinsRequest::Transfer { .. }),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::LoginPacket(LoginPacketRequest::Update(..)),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::Client(ClientRequest::InsAuthKey { .. }),
+                    ..
+                }
+                | Rpc::Request {
+                    request: Request::Client(ClientRequest::DelAuthKey { .. }),
+                    ..
+                } => self
+                    .client_handler_mut()?
+                    .handle_vault_rpc(utils::get_source_name(src), rpc),
+                _ => self
+                    .data_handler_mut()?
+                    .handle_vault_rpc(utils::get_source_name(src), rpc),
+            },
             Err(e) => {
                 error!("Error deserializing routing message into Rpc type: {:?}", e);
                 None
@@ -528,7 +526,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn send_message_to_peer(&self, target: XorName, rpc: Rpc) -> Option<Action> {
-        let id = self.routing_node.borrow().id().clone();
+        let id = *self.routing_node.borrow().id();
         self.routing_node
             .borrow_mut()
             .send_message(

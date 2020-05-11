@@ -111,11 +111,7 @@ impl IDataHandler {
             .cloned()
             .collect::<BTreeSet<_>>();
 
-        let idata_op = IDataOp::new(
-            requester.clone(),
-            IDataRequest::Put(data),
-            target_holders.clone(),
-        );
+        let idata_op = IDataOp::new(requester, IDataRequest::Put(data), target_holders.clone());
 
         match self.idata_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
@@ -169,7 +165,7 @@ impl IDataHandler {
         };
 
         let idata_op = IDataOp::new(
-            requester.clone(),
+            requester,
             IDataRequest::DeleteUnpub(address),
             metadata.holders.clone(),
         );
@@ -226,7 +222,7 @@ impl IDataHandler {
         };
 
         let idata_op = IDataOp::new(
-            requester.clone(),
+            requester,
             IDataRequest::Get(address),
             metadata.holders.clone(),
         );

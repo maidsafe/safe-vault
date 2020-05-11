@@ -92,7 +92,7 @@ impl IDataHolder {
         Some(Action::RespondToOurDataHandlers {
             sender: source,
             rpc: Rpc::Response {
-                requester: requester,
+                requester,
                 response: Response::GetIData(result),
                 message_id,
                 refund: None,
