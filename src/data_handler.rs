@@ -12,10 +12,10 @@ mod idata_holder;
 mod idata_op;
 mod mdata_handler;
 
-use crate::data_handler::idata_holder::IDataHolder;
 use crate::{action::Action, routing::Node, rpc::Rpc, vault::Init, Config, Result};
 use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
+use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
 use log::{error, trace};
 use mdata_handler::MDataHandler;
@@ -166,7 +166,6 @@ impl DataHandler {
             }
         }
     }
-
     fn handle_idata_request<F>(&mut self, operation: F) -> Option<Action>
     where
         F: FnOnce(&mut IDataHandler) -> Option<Action>,
