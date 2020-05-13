@@ -11,6 +11,22 @@
 
 An autonomous network capable of data storage/publishing/sharing as well as computation, value transfer (crypto currency support) and more. See the documentation for a more detailed description of the operations involved in data storage.
 
+## Crate Dependencies
+Crate dependencies graph:
+
+[[https://github.com/maidsafe/safe_vault/blob/png_generator/safe_vault_maidsafe_dependencies.png|alt=safe_vault MaidSafe dependencies]]
+
+<details>
+<summary> View all safe_vault dependencies</summary>
+<p>
+
+[[https://github.com/maidsafe/safe_vault/blob/png_generator/safe_vault_all_dependencies.png|alt=safe_vault all dependencies]]
+
+</p>
+</details>
+
+Click [here](https://maidsafe.github.io/interdependency-svg-generator/) for an overview of the interdependencies of all the main MaidSafe components.
+
 ## License
 
 This SAFE Network library is licensed under the General Public License (GPL), version 3 ([LICENSE](LICENSE) https://www.gnu.org/licenses/gpl-3.0.en.html).
