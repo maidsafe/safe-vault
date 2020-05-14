@@ -36,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 18] = [
+const ARGS: [&str; 19] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -54,7 +54,8 @@ const ARGS: [&str; 18] = [
     "log-dir",
     "update",
     "update-only",
-    "upnp-lease-duration"
+    "upnp-lease-duration",
+    "local",
 ];
 
 /// Vault configuration
@@ -80,6 +81,9 @@ pub struct Config {
     /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
     #[structopt(short, long, parse(from_occurrences))]
     verbose: u64,
+    /// Is the vault running for a local section?
+    #[structopt(short, long)]
+    local: bool,
     /// Is this the first node in a section?
     #[structopt(short, long)]
     first: bool,
@@ -129,6 +133,11 @@ impl Config {
     /// Is this the first node in a section?
     pub fn is_first(&self) -> bool {
         self.first
+    }
+
+    /// Is the vault running for a local section?
+    pub fn is_local(&self) -> bool {
+        self.local
     }
 
     /// Upper limit in bytes for allowed network storage on this vault.
@@ -227,8 +236,6 @@ impl Config {
                     self.network_config.idle_timeout_msec = Some(value.parse().unwrap());
                 } else if arg == ARGS[9] {
                     self.network_config.keep_alive_interval_msec = Some(value.parse().unwrap());
-                } else if arg == ARGS[10] {
-                    self.network_config.our_complete_cert = Some(value.parse().unwrap());
                 } else if arg == ARGS[17] {
                     self.network_config.upnp_lease_duration = Some(value.parse().unwrap());
                 } else {
@@ -250,6 +257,8 @@ impl Config {
             self.update = occurrences >= 1;
         } else if arg == ARGS[16] {
             self.update_only = occurrences >= 1;
+        } else if arg == ARGS[18] {
+            self.local = occurrences >= 1;
         } else {
             println!("ERROR");
         }

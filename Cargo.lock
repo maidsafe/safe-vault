@@ -1344,20 +1344,6 @@ dependencies = [
 [[package]]
 name = "mock-quic-p2p"
 version = "0.1.0"
-source = "git+https://github.com/nbaksalyar/quic-p2p?branch=igd-impl#2eb478a063cc8e09664b04f43df27e203a14671a"
-dependencies = [
- "bytes 0.5.4",
- "crossbeam-channel",
- "fxhash",
- "rand 0.7.3",
- "serde",
- "serde_json",
- "structopt",
-]
-
-[[package]]
-name = "mock-quic-p2p"
-version = "0.1.0"
 source = "git+https://github.com/maidsafe/quic-p2p#0ba76cfee98ad09c7190e5ee17bbb832479fc827"
 dependencies = [
  "bytes 0.5.4",
@@ -2122,7 +2108,7 @@ dependencies = [
  "lazy_static 1.4.0",
  "log 0.4.8",
  "lru_time_cache",
- "mock-quic-p2p 0.1.0 (git+https://github.com/maidsafe/quic-p2p)",
+ "mock-quic-p2p",
  "num-bigint",
  "parsec",
  "quic-p2p",
@@ -2241,7 +2227,7 @@ dependencies = [
  "lazy_static 1.4.0",
  "log 0.4.8",
  "maplit",
- "mock-quic-p2p 0.1.0 (git+https://github.com/nbaksalyar/quic-p2p?branch=igd-impl)",
+ "mock-quic-p2p",
  "pickledb",
  "quick-error",
  "rand 0.6.5",
