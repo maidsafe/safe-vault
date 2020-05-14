@@ -693,7 +693,12 @@ impl TestApp {
         let public_id = app_full_id.public_id().clone();
 
         Self {
-            quic_p2p: unwrap!(QuicP2p::with_config(tx, Some(config), Default::default(), false)),
+            quic_p2p: unwrap!(QuicP2p::with_config(
+                tx,
+                Some(config),
+                Default::default(),
+                false
+            )),
             node_rx,
             _client_rx: client_rx,
             full_id: FullId::App(app_full_id),

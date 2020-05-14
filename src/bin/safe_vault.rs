@@ -66,7 +66,7 @@ mod detail {
             return;
         }
 
-        if config.network_config().ip.is_none() {
+        if config.is_local() {
             config.listen_on_loopback();
         }
 

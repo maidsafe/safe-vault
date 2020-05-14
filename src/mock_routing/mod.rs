@@ -275,6 +275,11 @@ fn setup_quic_p2p(
             client_rx,
         )
     };
-    let quic_p2p = quic_p2p::QuicP2p::with_config(event_senders, Some(config.clone()), Default::default(), false)?;
+    let quic_p2p = quic_p2p::QuicP2p::with_config(
+        event_senders,
+        Some(config.clone()),
+        Default::default(),
+        false,
+    )?;
     Ok((quic_p2p, node_receiver, client_receiver))
 }
