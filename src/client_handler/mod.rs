@@ -259,6 +259,10 @@ impl ClientHandler {
                 .data
                 .appendonly
                 .process_client_request(client, adata_req, message_id),
+            SData(sdata_req) => self
+                .data
+                .sequence
+                .process_client_request(client, sdata_req, message_id),
             Coins(coins_req) => self.balances.process_client_request(
                 client,
                 coins_req,
@@ -309,7 +313,7 @@ impl ClientHandler {
             Client(req) => self
                 .auth
                 .finalise_client_request(requester, req, message_id),
-            IData(_) | MData(_) | AData(_) => {
+            IData(_) | MData(_) | AData(_) | SData(_) => {
                 error!(
                     "{}: Should not receive {:?} as a client handler.",
                     self, request
