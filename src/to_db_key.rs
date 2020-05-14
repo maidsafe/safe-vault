@@ -8,7 +8,8 @@
 
 use crate::utils;
 use safe_nd::{
-    ADataAddress, ClientPublicId, IDataAddress, MDataAddress, NodePublicId, PublicKey, XorName,
+    ADataAddress, ClientPublicId, IDataAddress, MDataAddress, NodePublicId, PublicKey,
+    SDataAddress, XorName,
 };
 use serde::Serialize;
 
@@ -22,6 +23,7 @@ pub(crate) trait ToDbKey: Serialize {
 }
 
 impl ToDbKey for ADataAddress {}
+impl ToDbKey for SDataAddress {}
 impl ToDbKey for ClientPublicId {}
 impl ToDbKey for IDataAddress {}
 impl ToDbKey for MDataAddress {}
