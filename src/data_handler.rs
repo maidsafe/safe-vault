@@ -236,6 +236,41 @@ impl DataHandler {
             }
         }
     }
+
+    pub fn handle_node_left_action(&mut self, node_left: XorName) -> Option<Vec<Action>> {
+        let idata_handler_id = self.id.clone();
+        let mut copy_actions = Vec::new();
+
+        let addresses = self.idata_handler.as_mut().map_or_else(
+            || {
+                trace!("Not applicable to Adults");
+                None
+            },
+            |idata_handler| idata_handler.check_idata_holders(node_left),
+        );
+
+        if let Some(holders) = addresses {
+            if !holders.is_empty() {
+                let requester = PublicId::Node(idata_handler_id);
+                for (address, holders) in holders {
+                    let message_id = MessageId::new();
+                    let copy_action = self.handle_idata_request(|idata_handler| {
+                        idata_handler.get_idata_copy(
+                            requester.clone(),
+                            address,
+                            holders,
+                            message_id,
+                        )
+                    });
+
+                    if let Some(action) = copy_action {
+                        copy_actions.push(action);
+                    };
+                }
+            };
+        };
+        Some(copy_actions)
+    }
 }
 
 impl Display for DataHandler {
