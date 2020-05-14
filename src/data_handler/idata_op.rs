@@ -34,6 +34,8 @@ pub(crate) enum OpType {
     Put,
     Get,
     Delete,
+    GetForCopy,
+    Copy,
 }
 
 // TODO: document this struct.

@@ -11,7 +11,9 @@ use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use routing::SrcLocation;
-use safe_nd::{ClientPublicId, Coins, PublicId, PublicKey, Result as NdResult, XorName};
+use safe_nd::{
+    ClientPublicId, Coins, IDataAddress, PublicId, PublicKey, Result as NdResult, XorName,
+};
 use serde::Serialize;
 use std::{fs, path::Path};
 use unwrap::unwrap;
@@ -45,6 +47,12 @@ pub(crate) fn random_vec<R: CryptoRng + Rng>(rng: &mut R, size: usize) -> Vec<u8
 
 pub(crate) fn serialise<T: Serialize>(data: &T) -> Vec<u8> {
     unwrap!(bincode::serialize(data))
+}
+
+pub(crate) fn db_key_to_idata_address(encoded_address: String) -> IDataAddress {
+    let decoded = unwrap!(base64::decode(&encoded_address));
+    let deserialized = unwrap!(bincode::deserialize::<IDataAddress>(&decoded));
+    deserialized
 }
 
 /// Returns the client's public ID, the owner's public ID, or None depending on whether `public_id`

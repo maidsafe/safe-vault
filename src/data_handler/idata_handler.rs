@@ -209,6 +209,47 @@ impl IDataHandler {
         }
     }
 
+    pub(super) fn get_idata_copy(
+        &mut self,
+        requester: PublicId,
+        address: IDataAddress,
+        holders: BTreeSet<XorName>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let our_name = *self.id.name();
+        let idata_handler_id = self.id.clone();
+        let out_id = requester.clone();
+        let respond = |result: NdResult<IData>| {
+            Some(Action::RespondToOurDataHandlers {
+                sender: our_name,
+                rpc: Rpc::Response {
+                    requester: out_id,
+                    response: Response::GetIData(result),
+                    message_id,
+                    refund: None,
+                },
+            })
+        };
+
+        let idata_op = IDataOp::new(requester, IDataRequest::Get(address), holders.clone());
+
+        match self.idata_ops.entry(message_id) {
+            Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
+            Entry::Vacant(vacant_entry) => {
+                let idata_op = vacant_entry.insert(idata_op);
+                Some(Action::SendToPeers {
+                    sender: our_name,
+                    targets: holders,
+                    rpc: Rpc::Request {
+                        request: Request::IData(idata_op.request().clone()),
+                        requester: PublicId::Node(idata_handler_id),
+                        message_id,
+                    },
+                })
+            }
+        }
+    }
+
     pub(super) fn handle_get_idata_req(
         &mut self,
         requester: PublicId,
@@ -263,6 +304,16 @@ impl IDataHandler {
                     },
                 })
             }
+        }
+    }
+
+    pub fn check_idata_holders(
+        &mut self,
+        holder: XorName,
+    ) -> Option<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
+        match self.get_metadata_for_all_chunks(holder) {
+            Ok(addresses) => Some(addresses),
+            Err(_error) => None,
         }
     }
 
@@ -430,6 +481,56 @@ impl IDataHandler {
         });
         let _ = self.remove_idata_op_if_concluded(&message_id);
         action
+    }
+
+    fn get_metadata_for_all_chunks(
+        &mut self,
+        holder: XorName,
+    ) -> NdResult<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
+        let mut idata_addresses: BTreeMap<IDataAddress, BTreeSet<XorName>> = BTreeMap::new();
+        // Get all idata addresses and holders when any holder left the network
+        for kv in self.metadata.iter() {
+            match kv.get_value::<ChunkMetadata>() {
+                None => {
+                    warn!("{}: is not responsible for this chunk", holder);
+                }
+                Some(metadata) => {
+                    if metadata.holders.contains(&holder) {
+                        let mut holders = metadata.holders.clone();
+                        let _ = holders.remove(&holder);
+                        let _ = idata_addresses.insert(
+                            utils::db_key_to_idata_address(kv.get_key().to_string()),
+                            holders,
+                        );
+                    }
+                }
+            }
+        }
+
+        // Update local db to remove the address from the holders list
+        for address in idata_addresses.keys() {
+            let db_key = address.to_db_key();
+            let metadata = self.metadata.get::<ChunkMetadata>(&db_key).or_else(|| {
+                warn!("{}: Failed to get metadata from DB: {:?}", self, db_key);
+                None
+            });
+
+            if let Some(mut metadata) = metadata {
+                if !metadata.holders.remove(&holder) {
+                    warn!("doesn't contain the holder",);
+                }
+
+                if metadata.holders.is_empty() {
+                    if let Err(error) = self.metadata.rem(&db_key) {
+                        warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+                    }
+                } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
+                    warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+                }
+            };
+        }
+
+        Ok(idata_addresses)
     }
 
     fn get_metadata_for(&self, address: IDataAddress) -> NdResult<ChunkMetadata> {
