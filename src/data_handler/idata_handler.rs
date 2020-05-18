@@ -35,6 +35,7 @@ struct ChunkMetadata {
 
 pub(super) struct IDataHandler {
     id: NodePublicId,
+    idata_copy_ops: BTreeSet<MessageId>,
     idata_ops: BTreeMap<MessageId, IDataOp>,
     metadata: PickleDb,
     #[allow(unused)]
@@ -56,6 +57,7 @@ impl IDataHandler {
 
         Ok(Self {
             id,
+            idata_copy_ops: Default::default(),
             idata_ops: Default::default(),
             metadata,
             full_adults,
@@ -218,12 +220,12 @@ impl IDataHandler {
     ) -> Option<Action> {
         let our_name = *self.id.name();
         let idata_handler_id = self.id.clone();
-        let out_id = requester.clone();
+        let our_id = requester.clone();
         let respond = |result: NdResult<IData>| {
             Some(Action::RespondToOurDataHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
-                    requester: out_id,
+                    requester: our_id.clone(),
                     response: Response::GetIData(result),
                     message_id,
                     refund: None,
@@ -233,19 +235,24 @@ impl IDataHandler {
 
         let idata_op = IDataOp::new(requester, IDataRequest::Get(address), holders.clone());
 
-        match self.idata_ops.entry(message_id) {
-            Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
-            Entry::Vacant(vacant_entry) => {
-                let idata_op = vacant_entry.insert(idata_op);
-                Some(Action::SendToPeers {
-                    sender: our_name,
-                    targets: holders,
-                    rpc: Rpc::Request {
-                        request: Request::IData(idata_op.request().clone()),
-                        requester: PublicId::Node(idata_handler_id),
-                        message_id,
-                    },
-                })
+        if self.idata_copy_ops.contains(&message_id) {
+            respond(Err(NdError::DuplicateMessageId))
+        } else {
+            let _ = self.idata_copy_ops.insert(message_id);
+            match self.idata_ops.entry(message_id) {
+                Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
+                Entry::Vacant(vacant_entry) => {
+                    let idata_op = vacant_entry.insert(idata_op);
+                    Some(Action::SendToPeers {
+                        sender: our_name,
+                        targets: holders,
+                        rpc: Rpc::Request {
+                            request: Request::IData(idata_op.request().clone()),
+                            requester: PublicId::Node(idata_handler_id),
+                            message_id,
+                        },
+                    })
+                }
             }
         }
     }
@@ -258,51 +265,94 @@ impl IDataHandler {
     ) -> Option<Action> {
         let our_name = *self.id.name();
         let idata_handler_id = self.id.clone();
-        let client_id = requester.clone();
-        let respond = |result: NdResult<IData>| {
-            Some(Action::RespondToClientHandlers {
-                sender: our_name,
-                rpc: Rpc::Response {
-                    requester: client_id,
-                    response: Response::GetIData(result),
-                    message_id,
-                    refund: None,
-                },
-            })
-        };
-
-        // We're acting as data handler, received request from client handlers
-        let metadata = match self.get_metadata_for(address) {
-            Ok(metadata) => metadata,
-            Err(error) => return respond(Err(error)),
-        };
-
-        if let Some(data_owner) = metadata.owner {
-            let request_key = utils::own_key(&requester)?;
-            if data_owner != *request_key {
-                return respond(Err(NdError::AccessDenied));
-            }
-        };
-
-        let idata_op = IDataOp::new(
-            requester,
-            IDataRequest::Get(address),
-            metadata.holders.clone(),
-        );
-
-        match self.idata_ops.entry(message_id) {
-            Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
-            Entry::Vacant(vacant_entry) => {
-                let idata_op = vacant_entry.insert(idata_op);
-                Some(Action::SendToPeers {
+        if matches!(requester, PublicId::Node(_)) {
+            let our_id = requester.clone();
+            let respond = |result: NdResult<IData>| {
+                Some(Action::RespondToOurDataHandlers {
                     sender: our_name,
-                    targets: metadata.holders,
-                    rpc: Rpc::Request {
-                        request: Request::IData(idata_op.request().clone()),
-                        requester: PublicId::Node(idata_handler_id),
+                    rpc: Rpc::Response {
+                        requester: our_id,
+                        response: Response::GetIData(result),
                         message_id,
+                        refund: None,
                     },
                 })
+            };
+
+            // We're acting as data handler, received request from client handlers
+            let metadata = match self.get_metadata_for(address) {
+                Ok(metadata) => metadata,
+                Err(error) => return respond(Err(error)),
+            };
+
+            let idata_op = IDataOp::new(
+                requester,
+                IDataRequest::Get(address),
+                metadata.holders.clone(),
+            );
+
+            match self.idata_ops.entry(message_id) {
+                Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
+                Entry::Vacant(vacant_entry) => {
+                    let idata_op = vacant_entry.insert(idata_op);
+                    Some(Action::SendToPeers {
+                        sender: our_name,
+                        targets: metadata.holders,
+                        rpc: Rpc::Request {
+                            request: Request::IData(idata_op.request().clone()),
+                            requester: PublicId::Node(idata_handler_id),
+                            message_id,
+                        },
+                    })
+                }
+            }
+        } else {
+            let client_id = requester.clone();
+            let respond = |result: NdResult<IData>| {
+                Some(Action::RespondToClientHandlers {
+                    sender: our_name,
+                    rpc: Rpc::Response {
+                        requester: client_id,
+                        response: Response::GetIData(result),
+                        message_id,
+                        refund: None,
+                    },
+                })
+            };
+
+            // We're acting as data handler, received request from client handlers
+            let metadata = match self.get_metadata_for(address) {
+                Ok(metadata) => metadata,
+                Err(error) => return respond(Err(error)),
+            };
+
+            if let Some(data_owner) = metadata.owner {
+                let request_key = utils::own_key(&requester)?;
+                if data_owner != *request_key {
+                    return respond(Err(NdError::AccessDenied));
+                }
+            };
+
+            let idata_op = IDataOp::new(
+                requester,
+                IDataRequest::Get(address),
+                metadata.holders.clone(),
+            );
+
+            match self.idata_ops.entry(message_id) {
+                Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
+                Entry::Vacant(vacant_entry) => {
+                    let idata_op = vacant_entry.insert(idata_op);
+                    Some(Action::SendToPeers {
+                        sender: our_name,
+                        targets: metadata.holders,
+                        rpc: Rpc::Request {
+                            request: Request::IData(idata_op.request().clone()),
+                            requester: PublicId::Node(idata_handler_id),
+                            message_id,
+                        },
+                    })
+                }
             }
         }
     }
@@ -476,9 +526,16 @@ impl IDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let own_id = format!("{}", self);
-        let action = self.idata_op_mut(&message_id).and_then(|idata_op| {
-            idata_op.handle_get_idata_resp(sender, result, &own_id, message_id)
-        });
+
+        let action = if self.idata_copy_ops.contains(&message_id) {
+            self.idata_op_mut(&message_id).and_then(|idata_op| {
+                idata_op.handle_get_copy_idata_resp(sender, result, &own_id, message_id)
+            })
+        } else {
+            self.idata_op_mut(&message_id).and_then(|idata_op| {
+                idata_op.handle_get_idata_resp(sender, result, &own_id, message_id)
+            })
+        };
         let _ = self.remove_idata_op_if_concluded(&message_id);
         action
     }
