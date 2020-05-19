@@ -1398,7 +1398,7 @@ checksum = "e63899ad0da84ce718c14936262a41cee2c79c981fc0a0e7c7beb47d5a07e8c1"
 dependencies = [
  "num-integer",
  "num-traits 0.2.11",
- "rand 0.3.23",
+ "rand 0.4.6",
  "rustc-serialize",
 ]
 
@@ -2081,7 +2081,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?branch=fleming#288275299158e833afe4f3f9ff41c5e6d461dd3d"
+source = "git+https://github.com/maidsafe/routing.git?branch=fleming#be2b2c44cdc121e4d6dedb0bf822436893aa6799"
 dependencies = [
  "bincode 1.1.4",
  "bytes 0.4.12",

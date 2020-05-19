@@ -104,10 +104,8 @@ impl IDataHandler {
         }
 
         let target_holders = self
-            .non_full_adults_sorted(data.name())
+            .make_holder_list_for_idata(data.name())
             .iter()
-            .chain(self.elders_sorted(data.name()).iter())
-            .take(IMMUTABLE_DATA_COPY_COUNT)
             .cloned()
             .collect::<BTreeSet<_>>();
 
@@ -463,17 +461,26 @@ impl IDataHandler {
 
     // Returns an iterator over all of our section's non-full adults' names, sorted by closest to
     // `target`.
-    fn non_full_adults_sorted(&self, _target: &XorName) -> Vec<XorName> {
-        self.routing_node
-            .borrow_mut()
-            .our_adults()
+    fn make_holder_list_for_idata(&self, target: &XorName) -> Vec<XorName> {
+        let routing_node = self.routing_node.borrow_mut();
+        let mut closest_adults = routing_node
+            .our_adults_sorted_by_distance_to(&routing::XorName(target.0))
+            .iter()
             .map(|p2p_node| XorName(p2p_node.name().0))
-            .collect::<Vec<_>>()
-    }
+            .collect::<Vec<_>>();
 
-    // Returns an iterator over all of our section's elders' names, sorted by closest to `target`.
-    fn elders_sorted(&self, _target: &XorName) -> Vec<XorName> {
-        Vec::new()
+        if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
+            let mut closest_elders = routing_node
+                .closest_known_elders_to(&routing::XorName(target.0))
+                .take(IMMUTABLE_DATA_COPY_COUNT - closest_adults.len())
+                .map(|p2p_node| XorName(p2p_node.name().0))
+                .collect::<Vec<_>>();
+
+            closest_adults.append(&mut closest_elders);
+            closest_adults
+        } else {
+            closest_adults
+        }
     }
 }
 
