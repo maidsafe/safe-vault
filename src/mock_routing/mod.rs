@@ -167,6 +167,11 @@ impl Node {
         vec![].into_iter()
     }
 
+    /// Return the list of our adults sorted by distance with the target name.
+    pub fn our_adults_sorted_by_distance_to(&self, _name: &XorName) -> Vec<&P2pNode> {
+        vec![]
+    }
+
     /// Returns the connection information of all the current section adults.
     pub fn our_adults(&self) -> impl Iterator<Item = &P2pNode> {
         vec![].into_iter()
