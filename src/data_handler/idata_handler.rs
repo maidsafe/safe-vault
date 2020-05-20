@@ -8,7 +8,7 @@
 
 use super::{IDataOp, OpType};
 use crate::{action::Action, routing::Node, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
-use log::{trace, warn};
+use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
     Error as NdError, IData, IDataAddress, IDataRequest, MessageId, NodePublicId, PublicId,
@@ -361,6 +361,7 @@ impl IDataHandler {
         &mut self,
         holder: XorName,
     ) -> Option<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
+        info!("Get all the IData address for this holder: {:?}", holder);
         match self.get_metadata_for_all_chunks(holder) {
             Ok(addresses) => Some(addresses),
             Err(_error) => None,
@@ -528,6 +529,7 @@ impl IDataHandler {
         let own_id = format!("{}", self);
 
         let action = if self.idata_copy_ops.contains(&message_id) {
+            info!("Got a copy action for IData");
             self.idata_op_mut(&message_id).and_then(|idata_op| {
                 idata_op.handle_get_copy_idata_resp(sender, result, &own_id, message_id)
             })

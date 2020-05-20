@@ -17,7 +17,7 @@ use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
-use log::{error, trace};
+use log::{error, info, trace};
 use mdata_handler::MDataHandler;
 
 use safe_nd::{IDataRequest, MessageId, NodePublicId, PublicId, Request, Response, XorName};
@@ -238,6 +238,10 @@ impl DataHandler {
     }
 
     pub fn handle_node_left_action(&mut self, node_left: XorName) -> Option<Vec<Action>> {
+        info!(
+            "Get the list of IData holder {:?} was resposible for",
+            node_left
+        );
         let idata_handler_id = self.id.clone();
         let mut copy_actions = Vec::new();
 
@@ -253,6 +257,7 @@ impl DataHandler {
             if !holders.is_empty() {
                 let requester = PublicId::Node(idata_handler_id);
                 for (address, holders) in holders {
+                    info!("{:?} was resposible for : {:?}", node_left, address);
                     let message_id = MessageId::new();
                     let copy_action = self.handle_idata_request(|idata_handler| {
                         idata_handler.get_idata_copy(
