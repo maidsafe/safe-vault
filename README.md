@@ -14,13 +14,24 @@ An autonomous network capable of data storage/publishing/sharing as well as comp
 ## Crate Dependencies
 Crate dependencies graph:
 
-[[https://github.com/maidsafe/safe_vault/blob/png_generator/safe_vault_maidsafe_dependencies.png|alt=safe_vault MaidSafe dependencies]]
+![safe_vault MaidSafe dependencies](https://github.com/maidsafe/safe_vault/blob/png_generator/safe_vault_maidsafe_dependencies.png)
+
+
+### Legend
+Dependencies are coloured depending on their kind:
+* **Black:** regular dependency
+* **Purple:** build dependency
+* **Blue:** dev dependency
+* **Red:** optional dependency
+
+A dependency can be of more than one kind. In such cases, it is coloured with the following priority:
+`Regular -> Build -> Dev -> Optional`
 
 <details>
 <summary> View all safe_vault dependencies</summary>
 <p>
 
-[[https://github.com/maidsafe/safe_vault/blob/png_generator/safe_vault_all_dependencies.png|alt=safe_vault all dependencies]]
+![safe_vault all dependencies](https://github.com/maidsafe/safe_vault/blob/png_generator/safe_vault_all_dependencies.png)
 
 </p>
 </details>
