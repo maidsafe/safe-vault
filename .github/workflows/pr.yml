@@ -28,10 +28,6 @@ jobs:
           override: true
           components: rustfmt, clippy
 
-      # Generate Cargo.lock, needed for the cache.
-      - name: Generate Cargo.lock
-        run: cargo generate-lockfile
-
       # Cache.
       - name: Cargo cache registry, index and build
         uses: actions/cache@v2
@@ -62,10 +58,6 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-
-      # Generate Cargo.lock, needed for the cache.
-      - name: Generate Cargo.lock
-        run: cargo generate-lockfile
 
       # Cache.
       - name: Cargo cache registry, index and build
@@ -109,10 +101,6 @@ jobs:
           toolchain: stable
           override: true
 
-      # Generate Cargo.lock, needed for the cache.
-      - name: Generate Cargo.lock
-        run: cargo generate-lockfile
-
       # Cache.
       - name: Cargo cache registry, index and build
         uses: actions/cache@v2
@@ -127,3 +115,19 @@ jobs:
       - name: Run tests
         shell: bash
         run: ./scripts/tests
+
+  # list all duplicate dependencies. Note that this does not error if duplicates found
+  dependencies:
+    name: List Duplicate Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Run list duplicate dependencies script
+      - shell: bash
+        run: ./scripts/duplicate_dependency_check
