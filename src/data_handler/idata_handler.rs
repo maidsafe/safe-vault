@@ -527,8 +527,9 @@ impl IDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let own_id = format!("{}", self);
+        let is_idata_copy_op = self.idata_copy_ops.contains(&message_id);
 
-        let action = if self.idata_copy_ops.contains(&message_id) {
+        let action = if is_idata_copy_op {
             info!("Got a copy action for IData");
             self.idata_op_mut(&message_id).and_then(|idata_op| {
                 idata_op.handle_get_copy_idata_resp(sender, result, &own_id, message_id)
@@ -538,6 +539,11 @@ impl IDataHandler {
                 idata_op.handle_get_idata_resp(sender, result, &own_id, message_id)
             })
         };
+
+        if is_idata_copy_op {
+            let _ = self.idata_copy_ops.remove(&message_id);
+        }
+        
         let _ = self.remove_idata_op_if_concluded(&message_id);
         action
     }
