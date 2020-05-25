@@ -20,16 +20,15 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
+        name: Install Rust & required components
         with:
           profile: minimal
           toolchain: stable
           override: true
           components: rustfmt, clippy
       # Check if the code is formatted correctly.
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
       # Cache.
       - name: Cache cargo registry
@@ -61,7 +60,8 @@ jobs:
           path-to-lcov: ./lcov.info
 
       # Run Clippy.
-      - shell: bash
+      - name: Clippy checks
+        shell: bash
         run: ./scripts/clippy
 
   test:
@@ -72,7 +72,8 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
@@ -96,7 +97,8 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       # Run tests.
-      - shell: bash
+      - name: Run tests
+        shell: bash
         run: ./scripts/tests
 
   coverage:

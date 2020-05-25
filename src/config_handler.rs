@@ -36,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 17] = [
+const ARGS: [&str; 18] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -47,13 +47,14 @@ const ARGS: [&str; 17] = [
     "max-msg-size-allowed",
     "idle-timeout-msec",
     "keep-alive-interval-msec",
-    "our-complete-cert",
     "our-type",
     "first",
     "completions",
     "log-dir",
     "update",
     "update-only",
+    "upnp-lease-duration",
+    "local",
 ];
 
 /// Vault configuration
@@ -79,6 +80,9 @@ pub struct Config {
     /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
     #[structopt(short, long, parse(from_occurrences))]
     verbose: u64,
+    /// Is the vault running for a local section?
+    #[structopt(short, long)]
+    local: bool,
     /// Is this the first node in a section?
     #[structopt(short, long)]
     first: bool,
@@ -128,6 +132,11 @@ impl Config {
     /// Is this the first node in a section?
     pub fn is_first(&self) -> bool {
         self.first
+    }
+
+    /// Is the vault running for a local section?
+    pub fn is_local(&self) -> bool {
+        self.local
     }
 
     /// Upper limit in bytes for allowed network storage on this vault.
@@ -198,36 +207,36 @@ impl Config {
 
     fn set_value(&mut self, arg: &str, value: &str) {
         if arg == ARGS[0] {
-            self.wallet_address = Some(unwrap!(value.parse()));
+            self.wallet_address = Some(value.parse().unwrap());
         } else if arg == ARGS[1] {
-            self.max_capacity = Some(unwrap!(value.parse()));
+            self.max_capacity = Some(value.parse().unwrap());
         } else if arg == ARGS[2] {
-            self.root_dir = Some(unwrap!(value.parse()));
+            self.root_dir = Some(value.parse().unwrap());
         } else if arg == ARGS[3] {
-            self.verbose = unwrap!(value.parse());
+            self.verbose = value.parse().unwrap();
         } else if arg == ARGS[4] {
             self.network_config.hard_coded_contacts = unwrap!(serde_json::from_str(value));
         } else if arg == ARGS[5] {
-            self.network_config.port = Some(unwrap!(value.parse()));
+            self.network_config.port = Some(value.parse().unwrap());
         } else if arg == ARGS[6] {
-            self.network_config.ip = Some(unwrap!(value.parse()));
-        } else if arg == ARGS[11] {
-            self.network_config.our_type = unwrap!(value.parse());
+            self.network_config.ip = Some(value.parse().unwrap());
+        } else if arg == ARGS[10] {
+            self.network_config.our_type = value.parse().unwrap();
+        } else if arg == ARGS[12] {
+            self.completions = Some(value.parse().unwrap());
         } else if arg == ARGS[13] {
-            self.completions = Some(unwrap!(value.parse()));
-        } else if arg == ARGS[14] {
-            self.log_dir = Some(unwrap!(value.parse()));
+            self.log_dir = Some(value.parse().unwrap());
         } else {
             #[cfg(not(feature = "mock_base"))]
             {
                 if arg == ARGS[7] {
-                    self.network_config.max_msg_size_allowed = Some(unwrap!(value.parse()));
+                    self.network_config.max_msg_size_allowed = Some(value.parse().unwrap());
                 } else if arg == ARGS[8] {
-                    self.network_config.idle_timeout_msec = Some(unwrap!(value.parse()));
+                    self.network_config.idle_timeout_msec = Some(value.parse().unwrap());
                 } else if arg == ARGS[9] {
-                    self.network_config.keep_alive_interval_msec = Some(unwrap!(value.parse()));
-                } else if arg == ARGS[10] {
-                    self.network_config.our_complete_cert = Some(unwrap!(value.parse()));
+                    self.network_config.keep_alive_interval_msec = Some(value.parse().unwrap());
+                } else if arg == ARGS[16] {
+                    self.network_config.upnp_lease_duration = Some(value.parse().unwrap());
                 } else {
                     println!("ERROR");
                 }
@@ -241,12 +250,14 @@ impl Config {
     fn set_flag(&mut self, arg: &str, occurrences: u64) {
         if arg == ARGS[3] {
             self.verbose = occurrences;
-        } else if arg == ARGS[12] {
+        } else if arg == ARGS[11] {
             self.first = occurrences >= 1;
-        } else if arg == ARGS[15] {
+        } else if arg == ARGS[14] {
             self.update = occurrences >= 1;
-        } else if arg == ARGS[16] {
+        } else if arg == ARGS[15] {
             self.update_only = occurrences >= 1;
+        } else if arg == ARGS[17] {
+            self.local = occurrences >= 1;
         } else {
             println!("ERROR");
         }
@@ -331,7 +342,7 @@ mod test {
     #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
-        let expected_size = 344;
+        let expected_size = 280;
         assert_eq!(
             expected_size,
             mem::size_of::<Config>(),
@@ -339,10 +350,6 @@ mod test {
         );
 
         let app_name = Config::clap().get_name().to_string();
-        let base64_certificate = std::iter::repeat("A")
-            .take(400)
-            .collect::<Vec<_>>()
-            .join("");
         let test_values = [
             ["wallet-address", "abc"],
             ["max-capacity", "1"],
@@ -354,18 +361,22 @@ mod test {
             ["max-msg-size-allowed", "1"],
             ["idle-timeout-msec", "1"],
             ["keep-alive-interval-msec", "1"],
-            ["our-complete-cert", &base64_certificate],
             ["our-type", "client"],
             ["first", "None"],
             ["completions", "bash"],
             ["log-dir", "log-dir-path"],
             ["update", "None"],
             ["update-only", "None"],
+            ["local", "None"],
+            ["upnp-lease-duration", "180"],
         ];
 
         for arg in &ARGS {
             let user_arg = format!("--{}", arg);
-            let value = unwrap!(test_values.iter().find(|elt| &elt[0] == arg))[1];
+            let value = test_values
+                .iter()
+                .find(|elt| &elt[0] == arg)
+                .unwrap_or_else(|| panic!("Missing arg: {:?}", &arg))[1];
             let matches = if value == "None" {
                 Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str()])
             } else {
@@ -375,6 +386,7 @@ mod test {
             assert_eq!(1, occurrences);
 
             let mut config = Config {
+                local: false,
                 wallet_address: None,
                 max_capacity: None,
                 root_dir: None,
