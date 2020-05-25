@@ -67,7 +67,7 @@ impl IDataHolder {
         let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToOurDataHandlers {
             // this is actually the target
-            sender: source,
+            target: source,
             rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
@@ -90,7 +90,7 @@ impl IDataHolder {
             .map_err(|error| error.to_string().into());
 
         Some(Action::RespondToOurDataHandlers {
-            sender: source,
+            target: source,
             rpc: Rpc::Response {
                 requester,
                 response: Response::GetIData(result),
@@ -132,7 +132,7 @@ impl IDataHolder {
         };
 
         Some(Action::RespondToOurDataHandlers {
-            sender: source,
+            target: source,
             rpc: Rpc::Response {
                 requester,
                 response: Response::Mutation(result),
