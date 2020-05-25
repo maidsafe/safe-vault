@@ -87,27 +87,51 @@ impl IDataHandler {
             })
         };
 
-        // Does the data already exist?
-        if self.metadata.exists(&(*data.address()).to_db_key()) {
-            return if data.is_pub() {
-                trace!(
-                    "{}: Replying success for Put {:?}, it already exists.",
-                    self,
-                    data
-                );
-                respond(Ok(()))
-            } else {
-                // Only for unpublished immutable data do we return `DataExists` when attempting to
-                // put data that already exists.
-                respond(Err(NdError::DataExists))
-            };
-        }
+        let mut target_holders = Default::default();
 
-        let target_holders = self
-            .make_holder_list_for_idata(data.name())
-            .iter()
-            .cloned()
-            .collect::<BTreeSet<_>>();
+        // If the data already exist, check the existing no of copies.
+        // If no of copies are less then required, then continue with the put request.
+        if self.metadata.exists(&(*data.address()).to_db_key()) {
+            let idata_metadata = self
+                .metadata
+                .get::<ChunkMetadata>(&*data.address().to_db_key());
+            if let Some(metadata) = idata_metadata {
+                if metadata.holders.len() == IMMUTABLE_DATA_COPY_COUNT {
+                    if data.is_pub() {
+                        trace!(
+                            "{}: Replying success for Put {:?}, it already exists.",
+                            self,
+                            data
+                        );
+                        return respond(Ok(()));
+                    } else {
+                        return respond(Err(NdError::DataExists));
+                    }
+                } else {
+                    let mut existing_holders = metadata.holders;
+                    let closest_holders = self
+                        .make_holder_list_for_idata(data.name())
+                        .iter()
+                        .cloned()
+                        .collect::<BTreeSet<_>>();
+
+                    for holder_xorname in closest_holders {
+                        if !existing_holders.contains(&holder_xorname)
+                            && existing_holders.len() < IMMUTABLE_DATA_COPY_COUNT
+                        {
+                            let _ = existing_holders.insert(holder_xorname);
+                        }
+                    }
+                    target_holders = existing_holders;
+                }
+            }
+        } else {
+            target_holders = self
+                .make_holder_list_for_idata(data.name())
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>();
+        };
 
         let idata_op = IDataOp::new(requester, IDataRequest::Put(data), target_holders.clone());
 
@@ -465,6 +489,7 @@ impl IDataHandler {
         let mut closest_adults = routing_node
             .our_adults_sorted_by_distance_to(&routing::XorName(target.0))
             .iter()
+            .take(IMMUTABLE_DATA_COPY_COUNT)
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>();
 
