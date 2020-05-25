@@ -223,7 +223,7 @@ impl IDataHandler {
         let our_id = requester.clone();
         let respond = |result: NdResult<IData>| {
             Some(Action::RespondToOurDataHandlers {
-                sender: our_name,
+                target: our_name,
                 rpc: Rpc::Response {
                     requester: our_id.clone(),
                     response: Response::GetIData(result),
@@ -269,7 +269,7 @@ impl IDataHandler {
             let our_id = requester.clone();
             let respond = |result: NdResult<IData>| {
                 Some(Action::RespondToOurDataHandlers {
-                    sender: our_name,
+                    target: our_name,
                     rpc: Rpc::Response {
                         requester: our_id,
                         response: Response::GetIData(result),
