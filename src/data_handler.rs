@@ -104,7 +104,7 @@ impl DataHandler {
                     IDataRequest::Put(data) => {
                         if matches!(requester, PublicId::Node(_)) {
                             // Since the requester is a node, this message was sent by the data handlers to us
-                            // as a single data handler, implying that we're a data handler chosen to store the
+                            // as a single data handler, implying that we're a data holder chosen to store the
                             // chunk.
                             self.idata_holder
                                 .store_idata(&data, requester, src, message_id)
@@ -116,8 +116,9 @@ impl DataHandler {
                     }
                     IDataRequest::Get(address) => {
                         if matches!(requester, PublicId::Node(_)) {
-                            // The message was sent by the data handlers to us as the one who is supposed to store
-                            // the chunk. See the sent Get request below.
+                            // Since the requester is a node, this message was sent by the data handlers to us
+                            // as a single data handler, implying that we're a data holder where the chunk is
+                            // stored.
                             self.idata_holder
                                 .get_idata(address, requester, src, message_id)
                         } else {
@@ -128,8 +129,8 @@ impl DataHandler {
                     }
                     IDataRequest::DeleteUnpub(address) => {
                         if matches!(requester, PublicId::Node(_)) {
-                            // Since the requester isa node, this message was sent by the data handlers to us
-                            // as a single data handler, implying that we're a data handler where the chunk is
+                            // Since the requester is a node, this message was sent by the data handlers to us
+                            // as a single data handler, implying that we're a data holder where the chunk is
                             // stored.
                             self.idata_holder
                                 .delete_unpub_idata(address, requester, src, message_id)
