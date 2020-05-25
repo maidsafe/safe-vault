@@ -3,5 +3,5 @@
 set -e -x
 
 cargo clippy "$@" --all-targets
-cargo clippy "$@" --all-targets --features=mock --no-default-features
+# cargo clippy "$@" --all-targets --features=mock --no-default-features
 cargo clippy "$@" --all-targets --features=mock_parsec --no-default-features
