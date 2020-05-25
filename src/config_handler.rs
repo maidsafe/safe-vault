@@ -368,12 +368,15 @@ mod test {
             ["update", "None"],
             ["update-only", "None"],
             ["local", "None"],
-            ["upnp-lease-duration", "180"]
+            ["upnp-lease-duration", "180"],
         ];
 
         for arg in &ARGS {
             let user_arg = format!("--{}", arg);
-            let value = test_values.iter().find(|elt| &elt[0] == arg).expect(&format!("Missing arg: {:?}", &arg))[1];
+            let value = test_values
+                .iter()
+                .find(|elt| &elt[0] == arg)
+                .unwrap_or_else(|| panic!("Missing arg: {:?}", &arg))[1];
             let matches = if value == "None" {
                 Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str()])
             } else {
