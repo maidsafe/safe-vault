@@ -457,12 +457,12 @@ impl<R: CryptoRng + Rng> Vault<R> {
             // VoteFor(action) => self.client_handler_mut()?.handle_consensused_action(action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
-            RespondToOurDataHandlers { sender, rpc } => {
+            RespondToOurDataHandlers { target, rpc } => {
                 // TODO - once Routing is integrated, we'll construct the full message to send
                 //        onwards, and then if we're also part of the data handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
-                self.respond_to_data_handlers(sender, rpc)
+                self.respond_to_data_handlers(target, rpc)
             }
             RespondToClientHandlers { sender, rpc } => {
                 let client_name = utils::requester_address(&rpc);
