@@ -36,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 19] = [
+const ARGS: [&str; 18] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -47,7 +47,6 @@ const ARGS: [&str; 19] = [
     "max-msg-size-allowed",
     "idle-timeout-msec",
     "keep-alive-interval-msec",
-    "our-complete-cert",
     "our-type",
     "first",
     "completions",
@@ -221,11 +220,11 @@ impl Config {
             self.network_config.port = Some(value.parse().unwrap());
         } else if arg == ARGS[6] {
             self.network_config.ip = Some(value.parse().unwrap());
-        } else if arg == ARGS[11] {
+        } else if arg == ARGS[10] {
             self.network_config.our_type = value.parse().unwrap();
-        } else if arg == ARGS[13] {
+        } else if arg == ARGS[12] {
             self.completions = Some(value.parse().unwrap());
-        } else if arg == ARGS[14] {
+        } else if arg == ARGS[13] {
             self.log_dir = Some(value.parse().unwrap());
         } else {
             #[cfg(not(feature = "mock_base"))]
@@ -236,7 +235,7 @@ impl Config {
                     self.network_config.idle_timeout_msec = Some(value.parse().unwrap());
                 } else if arg == ARGS[9] {
                     self.network_config.keep_alive_interval_msec = Some(value.parse().unwrap());
-                } else if arg == ARGS[17] {
+                } else if arg == ARGS[16] {
                     self.network_config.upnp_lease_duration = Some(value.parse().unwrap());
                 } else {
                     println!("ERROR");
@@ -251,13 +250,13 @@ impl Config {
     fn set_flag(&mut self, arg: &str, occurrences: u64) {
         if arg == ARGS[3] {
             self.verbose = occurrences;
-        } else if arg == ARGS[12] {
+        } else if arg == ARGS[11] {
             self.first = occurrences >= 1;
-        } else if arg == ARGS[15] {
+        } else if arg == ARGS[14] {
             self.update = occurrences >= 1;
-        } else if arg == ARGS[16] {
+        } else if arg == ARGS[15] {
             self.update_only = occurrences >= 1;
-        } else if arg == ARGS[18] {
+        } else if arg == ARGS[17] {
             self.local = occurrences >= 1;
         } else {
             println!("ERROR");
@@ -343,7 +342,7 @@ mod test {
     #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
-        let expected_size = 352;
+        let expected_size = 280;
         assert_eq!(
             expected_size,
             mem::size_of::<Config>(),
@@ -351,10 +350,6 @@ mod test {
         );
 
         let app_name = Config::clap().get_name().to_string();
-        let base64_certificate = std::iter::repeat("A")
-            .take(400)
-            .collect::<Vec<_>>()
-            .join("");
         let test_values = [
             ["wallet-address", "abc"],
             ["max-capacity", "1"],
@@ -366,18 +361,19 @@ mod test {
             ["max-msg-size-allowed", "1"],
             ["idle-timeout-msec", "1"],
             ["keep-alive-interval-msec", "1"],
-            ["our-complete-cert", &base64_certificate],
             ["our-type", "client"],
             ["first", "None"],
             ["completions", "bash"],
             ["log-dir", "log-dir-path"],
             ["update", "None"],
             ["update-only", "None"],
+            ["local", "None"],
+            ["upnp-lease-duration", "180"]
         ];
 
         for arg in &ARGS {
             let user_arg = format!("--{}", arg);
-            let value = unwrap!(test_values.iter().find(|elt| &elt[0] == arg))[1];
+            let value = test_values.iter().find(|elt| &elt[0] == arg).expect(&format!("Missing arg: {:?}", &arg))[1];
             let matches = if value == "None" {
                 Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str()])
             } else {
@@ -387,6 +383,7 @@ mod test {
             assert_eq!(1, occurrences);
 
             let mut config = Config {
+                local: false,
                 wallet_address: None,
                 max_capacity: None,
                 root_dir: None,
