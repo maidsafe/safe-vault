@@ -289,14 +289,13 @@ impl IDataHandler {
             .unwrap_or_default();
 
         let idata_op = self.idata_op(&message_id);
-        let idata_owner = match idata_op {
-            None => None,
-            Some(idataops) => Some(utils::own_key(idataops.client())?),
-        };
-
-        if let Some(public_key) = idata_owner {
-            metadata.owner = Some(*public_key);
-        };
+        if let Some(idata_put_op) = idata_op {
+            let request = idata_put_op.request();
+            metadata.owner = match request {
+                IDataRequest::Put(IData::Unpub(_)) => Some(*utils::own_key(idata_put_op.client())?),
+                _ => None,
+            }
+        }
 
         if !metadata.holders.insert(sender) {
             warn!(
