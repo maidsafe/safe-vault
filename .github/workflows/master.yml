@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - master
+      - phase-2b
 
 env:
   # Run all cargo commands with --verbose.
@@ -114,7 +115,7 @@ jobs:
       - name: rust-tarpaulin
         uses: actions-rs/tarpaulin@v0.1.0
         with:
-          args: '--features=mock --out Lcov -- --test-threads 1'
+          args: '--features=mock_parsec --out Lcov -- --test-threads 1'
       - name: Coveralls GitHub Action
         uses: coverallsapp/github-action@master
         with:
