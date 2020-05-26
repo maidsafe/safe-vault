@@ -543,7 +543,7 @@ impl IDataHandler {
         if is_idata_copy_op {
             let _ = self.idata_copy_ops.remove(&message_id);
         }
-        
+
         let _ = self.remove_idata_op_if_concluded(&message_id);
         action
     }

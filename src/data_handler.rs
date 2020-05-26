@@ -115,7 +115,7 @@ impl DataHandler {
                         }
                     }
                     IDataRequest::Get(address) => {
-                        if matches!(requester, PublicId::Node(_)) && self.idata_handler.is_none() {
+                        if matches!(requester, PublicId::Node(_)) {
                             // Since the requester is a node, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder where the chunk is
                             // stored.
