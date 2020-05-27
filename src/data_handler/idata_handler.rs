@@ -135,6 +135,8 @@ impl IDataHandler {
                 .collect::<BTreeSet<_>>();
         };
 
+        info!("Storing {} copies of the data", target_holders.len());
+
         let idata_op = IDataOp::new(requester, IDataRequest::Put(data), target_holders.clone());
 
         match self.idata_ops.entry(message_id) {
@@ -266,6 +268,7 @@ impl IDataHandler {
         let our_name = *self.id.name();
         let idata_handler_id = self.id.clone();
         if matches!(requester, PublicId::Node(_)) {
+            info!("Get Request from the node");
             let our_id = requester.clone();
             let respond = |result: NdResult<IData>| {
                 Some(Action::RespondToOurDataHandlers {
@@ -307,6 +310,7 @@ impl IDataHandler {
                 }
             }
         } else {
+            info!("Get Request from the client");
             let client_id = requester.clone();
             let respond = |result: NdResult<IData>| {
                 Some(Action::RespondToClientHandlers {
@@ -408,6 +412,7 @@ impl IDataHandler {
         // For phase 1, we can leave many of these unanswered.
 
         // TODO - we'll assume `result` is success for phase 1.
+        let is_idata_copy_op = self.idata_copy_ops.contains(&message_id);
         let db_key = idata_address.to_db_key();
         let mut metadata = self
             .metadata
@@ -415,11 +420,16 @@ impl IDataHandler {
             .unwrap_or_default();
 
         let idata_op = self.idata_op(&message_id);
-        if let Some(idata_put_op) = idata_op {
-            let request = idata_put_op.request();
-            metadata.owner = match request {
-                IDataRequest::Put(IData::Unpub(_)) => Some(*utils::own_key(idata_put_op.client())?),
-                _ => None,
+
+        if !is_idata_copy_op {
+            if let Some(idata_put_op) = idata_op {
+                let request = idata_put_op.request();
+                metadata.owner = match request {
+                    IDataRequest::Put(IData::Unpub(_)) => {
+                        Some(*utils::own_key(idata_put_op.client())?)
+                    }
+                    _ => None,
+                }
             }
         }
 
@@ -438,16 +448,32 @@ impl IDataHandler {
             //        maybe self-terminate if we can't fix this error?
         }
 
-        self.remove_idata_op_if_concluded(&message_id)
-            .map(|idata_op| Action::RespondToClientHandlers {
-                sender: *idata_address.name(),
-                rpc: Rpc::Response {
-                    requester: idata_op.client().clone(),
-                    response: Response::Mutation(Ok(())),
-                    message_id,
-                    refund: None,
-                },
-            })
+        if is_idata_copy_op {
+            info!("DataHandler: Forward PutIdata copy request");
+            let _ = self.idata_copy_ops.remove(&message_id);
+            self.remove_idata_op_if_concluded(&message_id)
+                .map(|idata_op| Action::RespondToOurDataHandlers {
+                    target: sender,
+                    rpc: Rpc::Response {
+                        requester: idata_op.client().clone(),
+                        response: Response::Mutation(Ok(())),
+                        message_id,
+                        refund: None,
+                    },
+                })
+        } else {
+            info!("ClientHandler: Forward PutIdata request");
+            self.remove_idata_op_if_concluded(&message_id)
+                .map(|idata_op| Action::RespondToClientHandlers {
+                    sender: *idata_address.name(),
+                    rpc: Rpc::Response {
+                        requester: idata_op.client().clone(),
+                        response: Response::Mutation(Ok(())),
+                        message_id,
+                        refund: None,
+                    },
+                })
+        }
     }
 
     pub(super) fn handle_delete_unpub_idata_resp(
@@ -531,18 +557,20 @@ impl IDataHandler {
 
         let action = if is_idata_copy_op {
             info!("Got a copy action for IData");
+            let our_public_id = self.id.clone();
             self.idata_op_mut(&message_id).and_then(|idata_op| {
-                idata_op.handle_get_copy_idata_resp(sender, result, &own_id, message_id)
+                idata_op.handle_get_copy_idata_resp(
+                    PublicId::Node(our_public_id),
+                    result,
+                    &own_id,
+                    message_id,
+                )
             })
         } else {
             self.idata_op_mut(&message_id).and_then(|idata_op| {
                 idata_op.handle_get_idata_resp(sender, result, &own_id, message_id)
             })
         };
-
-        if is_idata_copy_op {
-            let _ = self.idata_copy_ops.remove(&message_id);
-        }
 
         let _ = self.remove_idata_op_if_concluded(&message_id);
         action
