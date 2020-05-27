@@ -125,7 +125,7 @@ impl IDataOp {
 
     pub fn handle_get_copy_idata_resp(
         &mut self,
-        sender: XorName,
+        sender: PublicId,
         result: NdResult<IData>,
         own_id: &str,
         message_id: MessageId,
@@ -144,19 +144,27 @@ impl IDataOp {
         };
 
         let response = Response::GetIData(result.clone());
-        self.set_to_actioned(&sender, result.err(), &own_id)?;
+        let data = match response {
+            Response::GetIData(data) => Some(data.unwrap()),
+            _ => None,
+        };
+
+        // self.set_to_actioned(&sender, result.err(), &own_id)?;
         if is_already_actioned {
             None
         } else {
-            Some(Action::RespondToOurDataHandlers {
-                target: *address.name(),
-                rpc: Rpc::Response {
-                    requester: self.client().clone(),
-                    response,
-                    message_id,
-                    refund: None,
-                },
-            })
+            if data.is_some() {
+                Some(Action::RespondToOurDataHandlers {
+                    target: *address.name(),
+                    rpc: Rpc::Request {
+                        request: safe_nd::Request::IData(IDataRequest::Put(data.unwrap())),
+                        requester: sender,
+                        message_id,
+                    },
+                })
+            } else {
+                None
+            }
         }
     }
 
