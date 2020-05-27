@@ -102,6 +102,12 @@ impl DataHandler {
             IData(idata_req) => {
                 match idata_req {
                     IDataRequest::Put(data) => {
+                        match requester {
+                            PublicId::Node(_) => info!("Got a pub idata request from Node"),
+                            PublicId::Client(_) => info!("Got a pub idata request from Client"),
+                            PublicId::App(_) => info!("Got a pub idata request from App"),
+                        };
+
                         if matches!(requester, PublicId::Node(_)) {
                             // Since the requester is a node, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder chosen to store the

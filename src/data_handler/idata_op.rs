@@ -126,23 +126,11 @@ impl IDataOp {
     pub fn handle_get_copy_idata_resp(
         &mut self,
         sender: PublicId,
+        targets: BTreeSet<XorName>,
         result: NdResult<IData>,
-        own_id: &str,
         message_id: MessageId,
     ) -> Option<Action> {
         let is_already_actioned = self.is_any_actioned();
-        let address = if let IDataRequest::Get(address) = self.request {
-            address
-        } else {
-            warn!(
-                "{}: Expected GetIData to correspond to GetIData from {}:",
-                own_id, sender,
-            );
-            // TODO - Instead of returning None here, take action by treating the vault as
-            //        failing.
-            return None;
-        };
-
         let response = Response::GetIData(result);
         let data = match response {
             Response::GetIData(data) => Some(data.unwrap()),
@@ -152,8 +140,9 @@ impl IDataOp {
         // self.set_to_actioned(&sender, result.err(), &own_id)?;
         if !is_already_actioned {
             match data {
-                Some(idata) => Some(Action::RespondToOurDataHandlers {
-                    target: *address.name(),
+                Some(idata) => Some(Action::SendToPeers {
+                    sender: *sender.name(),
+                    targets,
                     rpc: Rpc::Request {
                         request: safe_nd::Request::IData(IDataRequest::Put(idata)),
                         requester: sender,
