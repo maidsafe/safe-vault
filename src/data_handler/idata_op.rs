@@ -143,28 +143,27 @@ impl IDataOp {
             return None;
         };
 
-        let response = Response::GetIData(result.clone());
+        let response = Response::GetIData(result);
         let data = match response {
             Response::GetIData(data) => Some(data.unwrap()),
             _ => None,
         };
 
         // self.set_to_actioned(&sender, result.err(), &own_id)?;
-        if is_already_actioned {
-            None
-        } else {
-            if data.is_some() {
-                Some(Action::RespondToOurDataHandlers {
+        if !is_already_actioned {
+            match data {
+                Some(idata) => Some(Action::RespondToOurDataHandlers {
                     target: *address.name(),
                     rpc: Rpc::Request {
-                        request: safe_nd::Request::IData(IDataRequest::Put(data.unwrap())),
+                        request: safe_nd::Request::IData(IDataRequest::Put(idata)),
                         requester: sender,
                         message_id,
                     },
-                })
-            } else {
-                None
+                }),
+                None => None,
             }
+        } else {
+            None
         }
     }
 
