@@ -500,11 +500,17 @@ impl IDataHandler {
         let action = if is_idata_copy_op {
             info!("Got a copy action for IData");
             let our_public_id = self.id.clone();
+            let elders: BTreeSet<XorName> = self
+                .routing_node
+                .borrow_mut()
+                .our_elders()
+                .map(|p2p_node| XorName(p2p_node.name().0))
+                .collect::<BTreeSet<_>>();
             self.idata_op_mut(&message_id).and_then(|idata_op| {
                 idata_op.handle_get_copy_idata_resp(
                     PublicId::Node(our_public_id),
+                    elders,
                     result,
-                    &own_id,
                     message_id,
                 )
             })
@@ -628,6 +634,11 @@ impl IDataHandler {
             .take(IMMUTABLE_DATA_COPY_COUNT)
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>();
+
+        info!(
+            "No of vaults choosen to store the data: {}",
+            closest_adults.len()
+        );
 
         if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
             let mut closest_elders = routing_node
