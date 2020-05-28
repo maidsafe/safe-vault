@@ -499,17 +499,41 @@ impl IDataHandler {
 
         let action = if is_idata_copy_op {
             info!("Got a copy action for IData");
+
             let our_public_id = self.id.clone();
             match result {
-                Ok(idata) => Some(Action::SendToPeers {
-                    sender: *self.id.name(),
-                    targets: self.make_holder_list_for_idata_copy(idata.address()),
-                    rpc: Rpc::Request {
-                        request: safe_nd::Request::IData(IDataRequest::Put(idata)),
-                        requester: PublicId::Node(our_public_id),
-                        message_id,
-                    },
-                }),
+                Ok(idata) => {
+                    let _ = self.idata_copy_ops.remove(&message_id);
+                    let _ = self.idata_ops.remove(&message_id);
+
+                    // do all new stuff here
+                    let new_msg_id = MessageId::new();
+                    let us_as_requester = PublicId::Node(our_public_id);
+                    let new_holders = self.make_holder_list_for_idata_copy(idata.address());
+
+                    let idata_op = IDataOp::new(
+                        us_as_requester.clone(),
+                        IDataRequest::Put(idata),
+                        new_holders.clone(),
+                    );
+
+                    match self.idata_ops.entry(new_msg_id) {
+                        Entry::Occupied(_) => None,
+                        Entry::Vacant(vacant_entry) => {
+                            let _ = self.idata_copy_ops.insert(new_msg_id);
+                            let idata_op = vacant_entry.insert(idata_op);
+                            Some(Action::SendToPeers {
+                                sender: *self.id.name(),
+                                targets: new_holders,
+                                rpc: Rpc::Request {
+                                    request: Request::IData(idata_op.request().clone()),
+                                    requester: us_as_requester,
+                                    message_id: new_msg_id,
+                                },
+                            })
+                        }
+                    }
+                }
                 Err(_) => None,
             }
         } else {
