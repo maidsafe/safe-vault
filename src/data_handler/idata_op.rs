@@ -34,8 +34,6 @@ pub(crate) enum OpType {
     Put,
     Get,
     Delete,
-    GetForCopy,
-    Copy,
 }
 
 // TODO: document this struct.
@@ -120,39 +118,6 @@ impl IDataOp {
             IDataRequest::Put(ref data) => Some(*data.address()),
             IDataRequest::DeleteUnpub(address) => Some(address),
             IDataRequest::Get(_) => unreachable!(), // we checked above
-        }
-    }
-
-    pub fn handle_get_copy_idata_resp(
-        &mut self,
-        sender: PublicId,
-        targets: BTreeSet<XorName>,
-        result: NdResult<IData>,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let is_already_actioned = self.is_any_actioned();
-        let response = Response::GetIData(result);
-        let data = match response {
-            Response::GetIData(data) => Some(data.unwrap()),
-            _ => None,
-        };
-
-        // self.set_to_actioned(&sender, result.err(), &own_id)?;
-        if !is_already_actioned {
-            match data {
-                Some(idata) => Some(Action::SendToPeers {
-                    sender: *sender.name(),
-                    targets,
-                    rpc: Rpc::Request {
-                        request: safe_nd::Request::IData(IDataRequest::Put(idata)),
-                        requester: sender,
-                        message_id,
-                    },
-                }),
-                None => None,
-            }
-        } else {
-            None
         }
     }
 

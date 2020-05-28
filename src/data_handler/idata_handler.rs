@@ -500,20 +500,18 @@ impl IDataHandler {
         let action = if is_idata_copy_op {
             info!("Got a copy action for IData");
             let our_public_id = self.id.clone();
-            let elders: BTreeSet<XorName> = self
-                .routing_node
-                .borrow_mut()
-                .our_elders()
-                .map(|p2p_node| XorName(p2p_node.name().0))
-                .collect::<BTreeSet<_>>();
-            self.idata_op_mut(&message_id).and_then(|idata_op| {
-                idata_op.handle_get_copy_idata_resp(
-                    PublicId::Node(our_public_id),
-                    elders,
-                    result,
-                    message_id,
-                )
-            })
+            match result {
+                Ok(idata) => Some(Action::SendToPeers {
+                    sender: *self.id.name(),
+                    targets: self.make_holder_list_for_idata_copy(idata.address()),
+                    rpc: Rpc::Request {
+                        request: safe_nd::Request::IData(IDataRequest::Put(idata)),
+                        requester: PublicId::Node(our_public_id),
+                        message_id,
+                    },
+                }),
+                Err(_) => None,
+            }
         } else {
             self.idata_op_mut(&message_id).and_then(|idata_op| {
                 idata_op.handle_get_idata_resp(sender, result, &own_id, message_id)
@@ -624,8 +622,7 @@ impl IDataHandler {
         None
     }
 
-    // Returns an iterator over all of our section's non-full adults' names, sorted by closest to
-    // `target`.
+    // Returns XorName's for the target holders for any idata chunck.
     fn make_holder_list_for_idata(&self, target: &XorName) -> Vec<XorName> {
         let routing_node = self.routing_node.borrow_mut();
         let mut closest_adults = routing_node
@@ -651,6 +648,30 @@ impl IDataHandler {
             closest_adults
         } else {
             closest_adults
+        }
+    }
+
+    // Returns XorName's for the target holders for any idata chunck copy.
+    fn make_holder_list_for_idata_copy(&self, target: &IDataAddress) -> BTreeSet<XorName> {
+        let closest_holders = self
+            .make_holder_list_for_idata(target.name())
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let metadata = self.get_metadata_for(*target);
+        match metadata {
+            Ok(metadata) => {
+                let mut existing_holders = metadata.holders;
+                for holder_xorname in closest_holders {
+                    if !existing_holders.contains(&holder_xorname)
+                        && existing_holders.len() < IMMUTABLE_DATA_COPY_COUNT
+                    {
+                        let _ = existing_holders.insert(holder_xorname);
+                    }
+                }
+                existing_holders
+            }
+            Err(_) => closest_holders,
         }
     }
 }
