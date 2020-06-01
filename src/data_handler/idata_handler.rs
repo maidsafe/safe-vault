@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{IDataOp, OpType};
-use crate::{action::Action, routing::Node, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
+use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
 use log::{info, trace, warn};
 use pickledb::PickleDb;
+use routing::Node;
 use safe_nd::{
     Error as NdError, IData, IDataAddress, IDataRequest, MessageId, NodePublicId, PublicId,
     PublicKey, Request, Response, Result as NdResult, XorName,

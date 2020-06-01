@@ -27,11 +27,6 @@ use safe_nd::{
     HandshakeRequest, HandshakeResponse, Message, MessageId, Notification, PublicId, PublicKey,
     Request, Response, Signature, Transaction, TransactionId,
 };
-#[cfg(feature = "mock")]
-use safe_vault::{
-    mock_routing::{ConsensusGroup, ConsensusGroupRef},
-    routing::{Node, NodeConfig},
-};
 use safe_vault::{Command, Config, Vault};
 use serde::Serialize;
 use std::{
@@ -58,48 +53,9 @@ pub struct Environment {
     _seed_printer: SeedPrinter,
     network: Network,
     vaults: Vec<TestVault>,
-    #[cfg(feature = "mock")]
-    _consensus_group: ConsensusGroupRef,
 }
 
 impl Environment {
-    #[cfg(feature = "mock")]
-    pub fn with_multiple_vaults(num_vaults: usize) -> Self {
-        assert!(num_vaults > 0);
-
-        logging::init();
-
-        let seed = rng::get_seed();
-        let mut rng = rng::from_seed(seed);
-
-        let network = Network::new();
-
-        let consensus_group = ConsensusGroup::new();
-        let vaults = if num_vaults > 1 {
-            let mut vaults = Vec::with_capacity(num_vaults);
-            for i in 0..num_vaults {
-                vaults.push(TestVault::new_with_mock_routing(
-                    Some(consensus_group.clone()),
-                    &mut rng,
-                    i < 7,
-                ));
-            }
-            vaults
-        } else {
-            vec![TestVault::new_with_mock_routing(None, &mut rng, true)]
-        };
-
-        consensus_group.borrow().promote_all();
-
-        Self {
-            rng,
-            _seed_printer: SeedPrinter::new(seed),
-            network,
-            vaults,
-            _consensus_group: consensus_group,
-        }
-    }
-
     #[cfg(feature = "mock_parsec")]
     pub fn with_multiple_vaults(num_vaults: usize) -> Self {
         assert!(num_vaults > 1);
@@ -198,7 +154,7 @@ impl Environment {
             .map(|vault| (vault.connection_info(), vault.is_elder()))
             .collect();
         for (conn_info, is_elder) in connections {
-            if cfg!(not(feature = "mock")) && !is_elder {
+            if !is_elder {
                 continue;
             }
             client.quic_p2p().connect_to(conn_info.clone());
@@ -231,47 +187,6 @@ struct TestVault {
 }
 
 impl TestVault {
-    /// Create a test Vault within a group.
-    #[cfg(feature = "mock")]
-    fn new_with_mock_routing(
-        consensus_group: Option<ConsensusGroupRef>,
-        rng: &mut TestRng,
-        is_elder: bool,
-    ) -> Self {
-        let root_dir = unwrap!(TempDir::new("safe_vault"));
-        trace!("Creating a test vault at root_dir {:?}", root_dir);
-
-        let mut config = Config::default();
-        config.set_root_dir(root_dir.path());
-
-        let (command_tx, command_rx) = crossbeam_channel::bounded(0);
-
-        let (routing_node, routing_rx, client_rx) = if let Some(group) = consensus_group {
-            let mut node_config = NodeConfig::default();
-            node_config.is_elder = is_elder;
-            node_config.concensus_group = Some(group);
-            Node::new(node_config)
-        } else {
-            let mut node_config = NodeConfig::default();
-            node_config.is_elder = is_elder;
-            Node::new(node_config)
-        };
-        let inner = unwrap!(Vault::new(
-            routing_node,
-            routing_rx,
-            client_rx,
-            &config,
-            command_rx,
-            rng::from_rng(rng),
-        ));
-
-        Self {
-            inner,
-            _root_dir: root_dir,
-            _command_tx: command_tx,
-        }
-    }
-
     #[cfg(feature = "mock_parsec")]
     fn new_with_real_routing(network_config: Option<NetworkConfig>, rng: &mut TestRng) -> Self {
         let root_dir = unwrap!(TempDir::new("safe_vault"));
@@ -312,7 +227,7 @@ impl TestVault {
         unwrap!(self.inner.our_connection_info())
     }
 
-    #[cfg(any(feature = "mock_parsec", feature = "mock"))]
+    #[cfg(feature = "mock_parsec")]
     fn is_elder(&mut self) -> bool {
         self.inner.is_elder()
     }
