@@ -17,7 +17,7 @@ use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
-use log::{error, info, trace};
+use log::{error, trace};
 use mdata_handler::MDataHandler;
 
 use safe_nd::{IDataRequest, MessageId, NodePublicId, PublicId, Request, Response, XorName};
@@ -102,12 +102,6 @@ impl DataHandler {
             IData(idata_req) => {
                 match idata_req {
                     IDataRequest::Put(data) => {
-                        match requester {
-                            PublicId::Node(_) => info!("Got a pub idata request from Node"),
-                            PublicId::Client(_) => info!("Got a pub idata request from Client"),
-                            PublicId::App(_) => info!("Got a pub idata request from App"),
-                        };
-
                         if matches!(requester, PublicId::Node(_)) {
                             // Since the requester is a node, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder chosen to store the
@@ -243,30 +237,29 @@ impl DataHandler {
         }
     }
 
-    pub fn handle_node_left_action(&mut self, node_left: XorName) -> Option<Vec<Action>> {
-        info!(
-            "Get the list of IData holder {:?} was resposible for",
-            node_left
-        );
-        let idata_handler_id = self.id.clone();
-        let mut copy_actions = Vec::new();
+    // Check metadata db for the stored chunks and see if the node was responsible for any chunk.
+    // If yes, the get the chunk from the remaning holders for duplication.
+    pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<Action>> {
+        trace!("Get the list of IData holder {:?} was resposible for", node);
+        let our_id = self.id.clone();
+        let mut actions = Vec::new();
 
         let addresses = self.idata_handler.as_mut().map_or_else(
             || {
                 trace!("Not applicable to Adults");
                 None
             },
-            |idata_handler| idata_handler.check_idata_holders(node_left),
+            |idata_handler| idata_handler.list_chunks_for_duplication(node),
         );
 
         if let Some(holders) = addresses {
             if !holders.is_empty() {
-                let requester = PublicId::Node(idata_handler_id);
+                let requester = PublicId::Node(our_id);
                 for (address, holders) in holders {
-                    info!("{:?} was resposible for : {:?}", node_left, address);
+                    trace!("{:?} was resposible for : {:?}", node, address);
                     let message_id = MessageId::new();
-                    let copy_action = self.handle_idata_request(|idata_handler| {
-                        idata_handler.get_idata_copy(
+                    let action = self.handle_idata_request(|idata_handler| {
+                        idata_handler.request_chunk_from_holders(
                             requester.clone(),
                             address,
                             holders,
@@ -274,13 +267,13 @@ impl DataHandler {
                         )
                     });
 
-                    if let Some(action) = copy_action {
-                        copy_actions.push(action);
+                    if let Some(action) = action {
+                        actions.push(action);
                     };
                 }
             };
         };
-        Some(copy_actions)
+        Some(actions)
     }
 }
 
