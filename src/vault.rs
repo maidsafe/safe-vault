@@ -352,10 +352,10 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 self.handle_routing_message(src, content)
             }
             RoutingEvent::MemberLeft { name, age: _u8 } => {
-                info!("A node has left the section. Node: {:?}", name);
+                trace!("A node has left the section. Node: {:?}", name);
                 let get_copy_actions = self
                     .data_handler_mut()?
-                    .handle_node_left_action(XorName(name.0));
+                    .trigger_chunk_duplication(XorName(name.0));
                 if let Some(copy_actions) = get_copy_actions {
                     for action in copy_actions {
                         let _ = self.handle_action(action);

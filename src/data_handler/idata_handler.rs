@@ -35,8 +35,8 @@ struct ChunkMetadata {
 
 pub(super) struct IDataHandler {
     id: NodePublicId,
-    idata_copy_ops: BTreeSet<MessageId>,
-    idata_ops: BTreeMap<MessageId, IDataOp>,
+    idata_elder_ops: BTreeSet<MessageId>,
+    idata_client_ops: BTreeMap<MessageId, IDataOp>,
     metadata: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
@@ -57,8 +57,8 @@ impl IDataHandler {
 
         Ok(Self {
             id,
-            idata_copy_ops: Default::default(),
-            idata_ops: Default::default(),
+            idata_elder_ops: Default::default(),
+            idata_client_ops: Default::default(),
             metadata,
             full_adults,
             routing_node,
@@ -112,7 +112,7 @@ impl IDataHandler {
                 } else {
                     let mut existing_holders = metadata.holders;
                     let closest_holders = self
-                        .make_holder_list_for_idata(data.name())
+                        .get_holders_for_chunk(data.name())
                         .iter()
                         .cloned()
                         .collect::<BTreeSet<_>>();
@@ -129,7 +129,7 @@ impl IDataHandler {
             }
         } else {
             target_holders = self
-                .make_holder_list_for_idata(data.name())
+                .get_holders_for_chunk(data.name())
                 .iter()
                 .cloned()
                 .collect::<BTreeSet<_>>();
@@ -139,7 +139,7 @@ impl IDataHandler {
 
         let idata_op = IDataOp::new(requester, IDataRequest::Put(data), target_holders.clone());
 
-        match self.idata_ops.entry(message_id) {
+        match self.idata_client_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
             Entry::Vacant(vacant_entry) => {
                 let idata_op = vacant_entry.insert(idata_op);
@@ -196,7 +196,7 @@ impl IDataHandler {
             metadata.holders.clone(),
         );
 
-        match self.idata_ops.entry(message_id) {
+        match self.idata_client_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
             Entry::Vacant(vacant_entry) => {
                 let idata_op = vacant_entry.insert(idata_op);
@@ -213,7 +213,7 @@ impl IDataHandler {
         }
     }
 
-    pub(super) fn get_idata_copy(
+    pub(super) fn request_chunk_from_holders(
         &mut self,
         requester: PublicId,
         address: IDataAddress,
@@ -223,9 +223,9 @@ impl IDataHandler {
         let our_name = *self.id.name();
         let idata_handler_id = self.id.clone();
         let idata_op = IDataOp::new(requester, IDataRequest::Get(address), holders.clone());
-        if !self.idata_copy_ops.contains(&message_id) {
-            let _ = self.idata_copy_ops.insert(message_id);
-            match self.idata_ops.entry(message_id) {
+        if !self.idata_elder_ops.contains(&message_id) {
+            let _ = self.idata_elder_ops.insert(message_id);
+            match self.idata_client_ops.entry(message_id) {
                 Entry::Occupied(_) => None,
                 Entry::Vacant(vacant_entry) => {
                     let idata_op = vacant_entry.insert(idata_op);
@@ -286,7 +286,7 @@ impl IDataHandler {
             metadata.holders.clone(),
         );
 
-        match self.idata_ops.entry(message_id) {
+        match self.idata_client_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
             Entry::Vacant(vacant_entry) => {
                 let idata_op = vacant_entry.insert(idata_op);
@@ -303,12 +303,12 @@ impl IDataHandler {
         }
     }
 
-    pub fn check_idata_holders(
+    pub fn list_chunks_for_duplication(
         &mut self,
         holder: XorName,
     ) -> Option<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
-        info!("Get all the IData address for this holder: {:?}", holder);
-        match self.get_metadata_for_all_chunks(holder) {
+        trace!("Get all the IData address for this holder: {:?}", holder);
+        match self.get_metadata_for_chunks_held_by(holder) {
             Ok(addresses) => Some(addresses),
             Err(_error) => None,
         }
@@ -354,7 +354,7 @@ impl IDataHandler {
         // For phase 1, we can leave many of these unanswered.
 
         // TODO - we'll assume `result` is success for phase 1.
-        let is_idata_copy_op = self.idata_copy_ops.contains(&message_id);
+        let is_idata_copy_op = self.idata_elder_ops.contains(&message_id);
         let db_key = idata_address.to_db_key();
         let mut metadata = self
             .metadata
@@ -391,20 +391,14 @@ impl IDataHandler {
         }
 
         if is_idata_copy_op {
-            info!("DataHandler: Forward PutIdata copy request");
-            let _ = self.idata_copy_ops.remove(&message_id);
-            self.remove_idata_op_if_concluded(&message_id)
-                .map(|idata_op| Action::RespondToOurDataHandlers {
-                    target: sender,
-                    rpc: Rpc::Response {
-                        requester: idata_op.client().clone(),
-                        response: Response::Mutation(Ok(())),
-                        message_id,
-                        refund: None,
-                    },
-                })
+            trace!(
+                "Deduplication operation completed for : {:?}",
+                idata_address
+            );
+            let _ = self.idata_elder_ops.remove(&message_id);
+            let _ = self.remove_idata_op_if_concluded(&message_id);
+            None
         } else {
-            info!("ClientHandler: Forward PutIdata request");
             self.remove_idata_op_if_concluded(&message_id)
                 .map(|idata_op| Action::RespondToClientHandlers {
                     sender: *idata_address.name(),
@@ -495,7 +489,7 @@ impl IDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let own_id = format!("{}", self);
-        let is_idata_copy_op = self.idata_copy_ops.contains(&message_id);
+        let is_idata_copy_op = self.idata_elder_ops.contains(&message_id);
 
         let action = if is_idata_copy_op {
             info!("Got a copy action for IData");
@@ -503,13 +497,13 @@ impl IDataHandler {
             let our_public_id = self.id.clone();
             match result {
                 Ok(idata) => {
-                    let _ = self.idata_copy_ops.remove(&message_id);
-                    let _ = self.idata_ops.remove(&message_id);
+                    let _ = self.idata_elder_ops.remove(&message_id);
+                    let _ = self.idata_client_ops.remove(&message_id);
 
                     // do all new stuff here
                     let new_msg_id = MessageId::new();
                     let us_as_requester = PublicId::Node(our_public_id);
-                    let new_holders = self.make_holder_list_for_idata_copy(idata.address());
+                    let new_holders = self.get_new_holders_for_chunk(idata.address());
 
                     let idata_op = IDataOp::new(
                         us_as_requester.clone(),
@@ -517,10 +511,10 @@ impl IDataHandler {
                         new_holders.clone(),
                     );
 
-                    match self.idata_ops.entry(new_msg_id) {
+                    match self.idata_client_ops.entry(new_msg_id) {
                         Entry::Occupied(_) => None,
                         Entry::Vacant(vacant_entry) => {
-                            let _ = self.idata_copy_ops.insert(new_msg_id);
+                            let _ = self.idata_elder_ops.insert(new_msg_id);
                             let idata_op = vacant_entry.insert(idata_op);
                             Some(Action::SendToPeers {
                                 sender: *self.id.name(),
@@ -546,7 +540,8 @@ impl IDataHandler {
         action
     }
 
-    fn get_metadata_for_all_chunks(
+    // Get the list of remaining holders for the chunks the node left/holder was for
+    fn get_metadata_for_chunks_held_by(
         &mut self,
         holder: XorName,
     ) -> NdResult<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
@@ -555,7 +550,7 @@ impl IDataHandler {
         for kv in self.metadata.iter() {
             match kv.get_value::<ChunkMetadata>() {
                 None => {
-                    warn!("{}: is not responsible for this chunk", holder);
+                    warn!("iterator return invalid chunkmetadata value");
                 }
                 Some(metadata) => {
                     if metadata.holders.contains(&holder) {
@@ -614,7 +609,7 @@ impl IDataHandler {
     }
 
     pub(super) fn idata_op(&self, message_id: &MessageId) -> Option<&IDataOp> {
-        self.idata_ops.get(message_id).or_else(|| {
+        self.idata_client_ops.get(message_id).or_else(|| {
             warn!(
                 "{}: No current ImmutableData operation for {:?}",
                 self, message_id
@@ -625,7 +620,7 @@ impl IDataHandler {
 
     pub(super) fn idata_op_mut(&mut self, message_id: &MessageId) -> Option<&mut IDataOp> {
         let own_id = format!("{}", self);
-        self.idata_ops.get_mut(message_id).or_else(|| {
+        self.idata_client_ops.get_mut(message_id).or_else(|| {
             warn!(
                 "{}: No current ImmutableData operation for {:?}",
                 own_id, message_id
@@ -641,13 +636,13 @@ impl IDataHandler {
             .map(IDataOp::concluded)
             .unwrap_or(false);
         if is_concluded {
-            return self.idata_ops.remove(message_id);
+            return self.idata_client_ops.remove(message_id);
         }
         None
     }
 
-    // Returns XorName's for the target holders for any idata chunck.
-    fn make_holder_list_for_idata(&self, target: &XorName) -> Vec<XorName> {
+    // Returns `XorName`s of the target holders for an idata chunck.
+    fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let routing_node = self.routing_node.borrow_mut();
         let mut closest_adults = routing_node
             .our_adults_sorted_by_distance_to(&routing::XorName(target.0))
@@ -676,9 +671,9 @@ impl IDataHandler {
     }
 
     // Returns XorName's for the target holders for any idata chunck copy.
-    fn make_holder_list_for_idata_copy(&self, target: &IDataAddress) -> BTreeSet<XorName> {
+    fn get_new_holders_for_chunk(&self, target: &IDataAddress) -> BTreeSet<XorName> {
         let closest_holders = self
-            .make_holder_list_for_idata(target.name())
+            .get_holders_for_chunk(target.name())
             .iter()
             .cloned()
             .collect::<BTreeSet<_>>();
