@@ -10,9 +10,6 @@ use crate::{
     action::{Action, ConsensusAction},
     client_handler::ClientHandler,
     data_handler::DataHandler,
-    routing::{
-        event::Event as RoutingEvent, DstLocation, Node, SrcLocation, TransportEvent as ClientEvent,
-    },
     rpc::Rpc,
     utils, Config, Result,
 };
@@ -20,7 +17,10 @@ use crossbeam_channel::{Receiver, Select};
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-use safe_nd::{ClientRequest, CoinsRequest, LoginPacketRequest, NodeFullId, Request, XorName};
+use routing::{
+    event::Event as RoutingEvent, DstLocation, Node, SrcLocation, TransportEvent as ClientEvent,
+};
+use safe_nd::{ClientRequest, LoginPacketRequest, NodeFullId, Request, Response, XorName};
 use std::borrow::Cow;
 use std::{
     cell::{Cell, RefCell},
@@ -159,15 +159,13 @@ impl<R: CryptoRng + Rng> Vault<R> {
             .map_err(From::from)
     }
 
-    #[cfg(any(feature = "mock_parsec", feature = "mock"))]
+    #[cfg(feature = "mock_parsec")]
     /// Returns whether routing node is in elder state.
     pub fn is_elder(&mut self) -> bool {
         self.routing_node.borrow().is_elder()
     }
 
     /// Runs the main event loop. Blocks until the vault is terminated.
-    // FIXME: remove when https://github.com/crossbeam-rs/crossbeam/issues/404 is resolved
-    #[allow(clippy::zero_ptr, clippy::drop_copy)]
     pub fn run(&mut self) {
         loop {
             let mut sel = Select::new();
@@ -370,40 +368,19 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
     fn handle_routing_message(&mut self, src: SrcLocation, message: Vec<u8>) -> Option<Action> {
         match bincode::deserialize::<Rpc>(&message) {
-            Ok(rpc) => match rpc {
-                Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::Create(_)),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::CreateFor { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Coins(CoinsRequest::CreateBalance { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Coins(CoinsRequest::Transfer { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::Update(..)),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Client(ClientRequest::InsAuthKey { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Client(ClientRequest::DelAuthKey { .. }),
-                    ..
-                } => self
-                    .client_handler_mut()?
-                    .handle_vault_rpc(utils::get_source_name(src), rpc),
-                _ => self
-                    .data_handler_mut()?
-                    .handle_vault_rpc(utils::get_source_name(src), rpc),
+            Ok(rpc) => match &rpc {
+                Rpc::Request { request, .. } => match request {
+                    Request::IData(_) => self
+                        .data_handler_mut()?
+                        .handle_vault_rpc(utils::get_source_name(src), rpc),
+                    other => unimplemented!("Should not receive: {:?}", other),
+                },
+                Rpc::Response { response, .. } => match response {
+                    Response::Mutation(_) | Response::GetIData(_) => self
+                        .data_handler_mut()?
+                        .handle_vault_rpc(utils::get_source_name(src), rpc),
+                    _ => unimplemented!("Should not receive: {:?}", response),
+                },
             },
             Err(e) => {
                 error!("Error deserializing routing message into Rpc type: {:?}", e);
@@ -595,43 +572,22 @@ impl<R: CryptoRng + Rng> Vault<R> {
         if self.self_is_handler_for(&dst_address) {
             // TODO - We need a better way for determining which handler should be given the
             //        message.
-            return match rpc {
-                Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::Create(_)),
-                    ..
+            if let Rpc::Request { request, .. } = &rpc {
+                match request {
+                    Request::LoginPacket(_) | Request::Coins(_) | Request::Client(_) => self
+                        .client_handler_mut()?
+                        .handle_vault_rpc(requester_name, rpc),
+                    _data_request => self
+                        .data_handler_mut()?
+                        .handle_vault_rpc(requester_name, rpc),
                 }
-                | Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::CreateFor { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Coins(CoinsRequest::CreateBalance { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Coins(CoinsRequest::Transfer { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::LoginPacket(LoginPacketRequest::Update(..)),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Client(ClientRequest::InsAuthKey { .. }),
-                    ..
-                }
-                | Rpc::Request {
-                    request: Request::Client(ClientRequest::DelAuthKey { .. }),
-                    ..
-                } => self
-                    .client_handler_mut()?
-                    .handle_vault_rpc(requester_name, rpc),
-                _ => self
-                    .data_handler_mut()?
-                    .handle_vault_rpc(requester_name, rpc),
-            };
+            } else {
+                error!("{}: Logic error - unexpected RPC.", self);
+                None
+            }
+        } else {
+            None
         }
-        None
     }
 
     fn proxy_client_request(&mut self, rpc: Rpc) -> Option<Action> {

@@ -12,13 +12,14 @@ mod idata_holder;
 mod idata_op;
 mod mdata_handler;
 
-use crate::{action::Action, routing::Node, rpc::Rpc, vault::Init, Config, Result};
+use crate::{action::Action, rpc::Rpc, vault::Init, Config, Result};
 use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
 use log::{error, trace};
 use mdata_handler::MDataHandler;
+use routing::Node;
 
 use safe_nd::{IDataRequest, MessageId, NodePublicId, PublicId, Request, Response, XorName};
 
@@ -205,29 +206,7 @@ impl DataHandler {
             //
             // ===== Invalid =====
             //
-            GetMData(_)
-            | GetMDataShell(_)
-            | GetMDataVersion(_)
-            | ListMDataEntries(_)
-            | ListMDataKeys(_)
-            | ListMDataValues(_)
-            | ListMDataUserPermissions(_)
-            | ListMDataPermissions(_)
-            | GetMDataValue(_)
-            | GetAData(_)
-            | GetADataValue(_)
-            | GetADataShell(_)
-            | GetADataOwners(_)
-            | GetADataRange(_)
-            | GetADataIndices(_)
-            | GetADataLastEntry(_)
-            | GetADataPermissions(_)
-            | GetPubADataUserPermissions(_)
-            | GetUnpubADataUserPermissions(_)
-            | Transaction(_)
-            | GetBalance(_)
-            | ListAuthKeysAndVersion(_)
-            | GetLoginPacket(_) => {
+            ref _other => {
                 error!(
                     "{}: Should not receive {:?} as a data handler.",
                     self, response

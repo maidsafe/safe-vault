@@ -50,5 +50,4 @@ doc = false
 
 [features]
 mock_base = ["routing/mock_base", "fxhash", "hex_fmt", "mock-quic-p2p"]
-mock = ["mock_base"]
 mock_parsec = ["routing/mock", "mock_base"]

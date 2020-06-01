@@ -22,7 +22,6 @@ use self::{
 use crate::{
     action::{Action, ConsensusAction},
     chunk_store::LoginPacketChunkStore,
-    routing::Node,
     rpc::Rpc,
     utils,
     vault::Init,
@@ -31,6 +30,7 @@ use crate::{
 use bytes::Bytes;
 use log::{error, trace};
 use rand::{CryptoRng, Rng};
+use routing::Node;
 use safe_nd::{Coins, MessageId, NodePublicId, PublicId, Request, Response, Signature, XorName};
 use std::{
     cell::{Cell, RefCell},

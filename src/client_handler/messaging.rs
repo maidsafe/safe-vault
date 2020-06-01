@@ -7,10 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::auth::ClientInfo;
-use crate::{action::Action, routing::Node, utils};
+use crate::{action::Action, utils};
 use bytes::Bytes;
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng};
+use routing::Node;
 use safe_nd::{
     HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId, Notification, PublicId,
     Request, Response, Signature, Transaction, XorName,

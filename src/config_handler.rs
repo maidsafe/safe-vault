@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::routing::TransportConfig as NetworkConfig;
 use crate::Result;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use log::Level;
+use routing::TransportConfig as NetworkConfig;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
