@@ -237,41 +237,40 @@ impl DataHandler {
         }
     }
 
-    // Check metadata db for the stored chunks and see if the node was responsible for any chunk.
-    // If yes, the get the chunk from the remaning holders for duplication.
+    // This should be called whenever a node leaves the section. It fetches the list of data that was
+    // previously held by the node and requests the other holders to store an additional copy.
+    // The list of holders is also updated by removing the node that left.
     pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<Action>> {
         trace!("Get the list of IData holder {:?} was resposible for", node);
         let our_id = self.id.clone();
         let mut actions = Vec::new();
 
-        let addresses = self.idata_handler.as_mut().map_or_else(
+        let data_holders = self.idata_handler.as_mut().map_or_else(
             || {
                 trace!("Not applicable to Adults");
                 None
             },
-            |idata_handler| idata_handler.list_chunks_for_duplication(node),
-        );
+            |idata_handler| idata_handler.update_chunk_metadata_on_node_left(node).ok(),
+        )?;
 
-        if let Some(holders) = addresses {
-            if !holders.is_empty() {
-                let requester = PublicId::Node(our_id);
-                for (address, holders) in holders {
-                    trace!("{:?} was resposible for : {:?}", node, address);
-                    let message_id = MessageId::new();
-                    let action = self.handle_idata_request(|idata_handler| {
-                        idata_handler.request_chunk_from_holders(
-                            requester.clone(),
-                            address,
-                            holders,
-                            message_id,
-                        )
-                    });
+        if !data_holders.is_empty() {
+            let requester = PublicId::Node(our_id);
+            for (address, holders) in data_holders {
+                trace!("{:?} was resposible for : {:?}", node, address);
+                let message_id = MessageId::new();
+                let action = self.handle_idata_request(|idata_handler| {
+                    idata_handler.request_chunk_from_holders(
+                        requester.clone(),
+                        address,
+                        holders,
+                        message_id,
+                    )
+                });
 
-                    if let Some(action) = action {
-                        actions.push(action);
-                    };
-                }
-            };
+                if let Some(action) = action {
+                    actions.push(action);
+                };
+            }
         };
         Some(actions)
     }

@@ -303,17 +303,6 @@ impl IDataHandler {
         }
     }
 
-    pub fn list_chunks_for_duplication(
-        &mut self,
-        holder: XorName,
-    ) -> Option<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
-        trace!("Get all the IData address for this holder: {:?}", holder);
-        match self.get_metadata_for_chunks_held_by(holder) {
-            Ok(addresses) => Some(addresses),
-            Err(_error) => None,
-        }
-    }
-
     pub(super) fn handle_mutation_resp(
         &mut self,
         sender: XorName,
@@ -391,10 +380,7 @@ impl IDataHandler {
         }
 
         if is_idata_copy_op {
-            trace!(
-                "Deduplication operation completed for : {:?}",
-                idata_address
-            );
+            trace!("Duplication operation completed for : {:?}", idata_address);
             let _ = self.idata_elder_ops.remove(&message_id);
             let _ = self.remove_idata_op_if_concluded(&message_id);
             None
@@ -500,7 +486,7 @@ impl IDataHandler {
                     let _ = self.idata_elder_ops.remove(&message_id);
                     let _ = self.idata_client_ops.remove(&message_id);
 
-                    // do all new stuff here
+                    // Send PUT requests to holders to store a new copy of the chunk.
                     let new_msg_id = MessageId::new();
                     let us_as_requester = PublicId::Node(our_public_id);
                     let new_holders = self.get_new_holders_for_chunk(idata.address());
@@ -540,22 +526,23 @@ impl IDataHandler {
         action
     }
 
-    // Get the list of remaining holders for the chunks the node left/holder was for
-    fn get_metadata_for_chunks_held_by(
+    // Updates the metadata of the chunks help by a node that left.
+    // Returns the list of chunks that were held along with the remaining holders.
+    pub fn update_chunk_metadata_on_node_left(
         &mut self,
-        holder: XorName,
+        node: XorName,
     ) -> NdResult<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
         let mut idata_addresses: BTreeMap<IDataAddress, BTreeSet<XorName>> = BTreeMap::new();
         // Get all idata addresses and holders when any holder left the network
         for kv in self.metadata.iter() {
             match kv.get_value::<ChunkMetadata>() {
                 None => {
-                    warn!("iterator return invalid chunkmetadata value");
+                    warn!("Value does not hold Valid `ChunkMetadata`");
                 }
                 Some(metadata) => {
-                    if metadata.holders.contains(&holder) {
+                    if metadata.holders.contains(&node) {
                         let mut holders = metadata.holders.clone();
-                        let _ = holders.remove(&holder);
+                        let _ = holders.remove(&node);
                         let _ = idata_addresses.insert(
                             utils::db_key_to_idata_address(kv.get_key().to_string()),
                             holders,
@@ -574,7 +561,7 @@ impl IDataHandler {
             });
 
             if let Some(mut metadata) = metadata {
-                if !metadata.holders.remove(&holder) {
+                if !metadata.holders.remove(&node) {
                     warn!("doesn't contain the holder",);
                 }
 
@@ -641,7 +628,8 @@ impl IDataHandler {
         None
     }
 
-    // Returns `XorName`s of the target holders for an idata chunck.
+    // Returns `XorName`s of the target holders for an idata chunk.
+    // Used to fetch the list of holders for a new chunk.
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let routing_node = self.routing_node.borrow_mut();
         let mut closest_adults = routing_node
@@ -670,7 +658,8 @@ impl IDataHandler {
         }
     }
 
-    // Returns XorName's for the target holders for any idata chunck copy.
+    // Returns `XorName`s of the new target holders for an idata chunk.
+    // Used to fetch the additional list of holders for existing chunks.
     fn get_new_holders_for_chunk(&self, target: &IDataAddress) -> BTreeSet<XorName> {
         let closest_holders = self
             .get_holders_for_chunk(target.name())
