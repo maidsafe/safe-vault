@@ -457,7 +457,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 // TODO - once Routing is integrated, we'll construct the full message to send
                 //        onwards, and then if we're also part of the client handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
-
+                debug!("Responded to client handlers with {:?}", &rpc);
                 if self.self_is_handler_for(client_name) {
                     return self.client_handler_mut()?.handle_vault_rpc(sender, rpc);
                 }

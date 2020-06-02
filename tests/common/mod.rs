@@ -40,7 +40,7 @@ use tempdir::TempDir;
 use unwrap::unwrap;
 
 /// Default number of vaults to run the tests with.
-const DEFAULT_NUM_VAULTS: usize = 8;
+const DEFAULT_NUM_VAULTS: usize = 10;
 
 macro_rules! unexpected {
     ($e:expr) => {
@@ -89,7 +89,7 @@ impl Environment {
                 Some(config.clone()),
                 &mut env.rng,
             ));
-            while !env.vaults[i].is_elder() && i != 7 {
+            while !env.vaults[i].is_elder() && i < 7 {
                 env.poll()
             }
         }
