@@ -8,7 +8,7 @@
 
 use super::{IDataOp, OpType};
 use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
-use log::{info, trace, warn};
+use log::{debug, info, trace, warn};
 use pickledb::PickleDb;
 use routing::Node;
 use safe_nd::{
@@ -38,6 +38,9 @@ pub(super) struct IDataHandler {
     id: NodePublicId,
     idata_elder_ops: BTreeSet<MessageId>,
     idata_client_ops: BTreeMap<MessageId, IDataOp>,
+    // Responses from IDataHolders might arrive before we send a request.
+    // This will hold the responses that are processed once the request arrives.
+    early_responses: BTreeMap<MessageId, (XorName, NdResult<()>)>,
     metadata: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
@@ -60,6 +63,7 @@ impl IDataHandler {
             id,
             idata_elder_ops: Default::default(),
             idata_client_ops: Default::default(),
+            early_responses: Default::default(),
             metadata,
             full_adults,
             routing_node,
@@ -74,7 +78,6 @@ impl IDataHandler {
     ) -> Option<Action> {
         // We're acting as data handler, received request from client handlers
         let our_name = *self.id.name();
-        let idata_handler_id = self.id.clone();
 
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
@@ -138,9 +141,12 @@ impl IDataHandler {
 
         info!("Storing {} copies of the data", target_holders.len());
 
-        let idata_op = IDataOp::new(requester, IDataRequest::Put(data), target_holders.clone());
-
-        match self.idata_client_ops.entry(message_id) {
+        let idata_op = IDataOp::new(
+            requester.clone(),
+            IDataRequest::Put(data),
+            target_holders.clone(),
+        );
+        let process_request_action = match self.idata_client_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
             Entry::Vacant(vacant_entry) => {
                 let idata_op = vacant_entry.insert(idata_op);
@@ -149,11 +155,45 @@ impl IDataHandler {
                     targets: target_holders,
                     rpc: Rpc::Request {
                         request: Request::IData(idata_op.request().clone()),
-                        requester: PublicId::Node(idata_handler_id),
+                        requester,
                         message_id,
                     },
                 })
             }
+        };
+
+        // Check if we really need to send the request
+        self.apply_early_responses(message_id)
+            .or(process_request_action)
+    }
+
+    // IData holders will process requests if quorum number of elders have sent the request.
+    // If were not a part of that quorum, we might've received the response before sending the request.
+    // This functions checks if a holder has already responded to a request, if so, it is applied and marked as actioned.
+    // If all the nodes holding the chunk have responded to the request this will return an `Action::RespondToClientHandlers`
+    // which can be directly sent back to the client handlers.
+    fn apply_early_responses(&mut self, message_id: MessageId) -> Option<Action> {
+        let own_id = format!("{}", &self);
+        if let Some((sender, result)) = self.early_responses.remove(&message_id) {
+            let idata_op = self.idata_op_mut(&message_id).unwrap();
+            let op_type = idata_op.op_type();
+            idata_op
+                .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
+                .map(|address| (address, op_type))
+                .and_then(|(idata_address, op_type)| {
+                    if op_type == OpType::Put {
+                        self.handle_put_idata_resp(idata_address, sender, &result, message_id)
+                    } else {
+                        self.handle_delete_unpub_idata_resp(
+                            idata_address,
+                            sender,
+                            result,
+                            message_id,
+                        )
+                    }
+                })
+        } else {
+            None
         }
     }
 
@@ -164,13 +204,12 @@ impl IDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let our_name = *self.id.name();
-        let idata_handler_id = self.id.clone();
         let client_id = requester.clone();
         let respond = |result: NdResult<()>| {
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
-                    requester: client_id,
+                    requester: client_id.clone(),
                     response: Response::Mutation(result),
                     message_id,
                     // Deletion is free so no refund
@@ -197,7 +236,7 @@ impl IDataHandler {
             metadata.holders.clone(),
         );
 
-        match self.idata_client_ops.entry(message_id) {
+        let process_request_action = match self.idata_client_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
             Entry::Vacant(vacant_entry) => {
                 let idata_op = vacant_entry.insert(idata_op);
@@ -206,12 +245,15 @@ impl IDataHandler {
                     targets: metadata.holders,
                     rpc: Rpc::Request {
                         request: Request::IData(idata_op.request().clone()),
-                        requester: PublicId::Node(idata_handler_id),
+                        requester: client_id,
                         message_id,
                     },
                 })
             }
-        }
+        };
+
+        self.apply_early_responses(message_id)
+            .or(process_request_action)
     }
 
     pub(super) fn request_chunk_from_holders(
@@ -253,14 +295,13 @@ impl IDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let our_name = *self.id.name();
-        let idata_handler_id = self.id.clone();
 
         let client_id = requester.clone();
         let respond = |result: NdResult<IData>| {
             Some(Action::RespondToClientHandlers {
                 sender: our_name,
                 rpc: Rpc::Response {
-                    requester: client_id,
+                    requester: client_id.clone(),
                     response: Response::GetIData(result),
                     message_id,
                     refund: None,
@@ -287,7 +328,7 @@ impl IDataHandler {
             metadata.holders.clone(),
         );
 
-        match self.idata_client_ops.entry(message_id) {
+        let process_request_action = match self.idata_client_ops.entry(message_id) {
             Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
             Entry::Vacant(vacant_entry) => {
                 let idata_op = vacant_entry.insert(idata_op);
@@ -296,12 +337,15 @@ impl IDataHandler {
                     targets: metadata.holders,
                     rpc: Rpc::Request {
                         request: Request::IData(idata_op.request().clone()),
-                        requester: PublicId::Node(idata_handler_id),
+                        requester: client_id,
                         message_id,
                     },
                 })
             }
-        }
+        };
+
+        self.apply_early_responses(message_id)
+            .or(process_request_action)
     }
 
     pub(super) fn handle_mutation_resp(
@@ -311,12 +355,21 @@ impl IDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let own_id = format!("{}", self);
-        let (idata_address, op_type) = self.idata_op_mut(&message_id).and_then(|idata_op| {
-            let op_type = idata_op.op_type();
-            idata_op
-                .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
-                .map(|address| (address, op_type))
-        })?;
+        let (idata_address, op_type) = self
+            .idata_op_mut(&message_id)
+            .and_then(|idata_op| {
+                let op_type = idata_op.op_type();
+                idata_op
+                    .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
+                    .map(|address| (address, op_type))
+            })
+            .or_else(|| {
+                // The response arrived before this particular vault processed the request
+                let _ = self
+                    .early_responses
+                    .insert(message_id, (sender, result.clone()));
+                None
+            })?;
 
         if op_type == OpType::Put {
             self.handle_put_idata_resp(idata_address, sender, &result, message_id)
@@ -379,6 +432,11 @@ impl IDataHandler {
             // TODO - send failure back to client handlers (hopefully won't accumulate), or
             //        maybe self-terminate if we can't fix this error?
         }
+        debug!(
+            "{:?}, Got reponse from {:?} holders",
+            self.id,
+            metadata.holders.len()
+        );
 
         if is_idata_copy_op {
             trace!("Duplication operation completed for : {:?}", idata_address);

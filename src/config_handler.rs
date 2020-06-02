@@ -94,7 +94,7 @@ pub struct Config {
     completions: Option<String>,
     /// Send logs to a file within the specified directory
     #[structopt(long)]
-    log_dir: Option<String>,
+    log_dir: Option<PathBuf>,
     /// Attempt to self-update?
     #[structopt(long)]
     update: bool,
@@ -159,6 +159,11 @@ impl Config {
         self.root_dir = Some(path.into())
     }
 
+    /// Set the directory to write the logs.
+    pub fn set_log_dir<P: Into<PathBuf>>(&mut self, path: P) {
+        self.log_dir = Some(path.into())
+    }
+
     /// Get the log level.
     pub fn verbose(&self) -> Level {
         match self.verbose {
@@ -186,7 +191,7 @@ impl Config {
     }
 
     /// Directory where to write log file/s if specified
-    pub fn log_dir(&self) -> &Option<String> {
+    pub fn log_dir(&self) -> &Option<PathBuf> {
         &self.log_dir
     }
 
