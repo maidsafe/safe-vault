@@ -51,7 +51,6 @@ pub(crate) enum Action {
     ProxyClientRequest(Rpc),
     /// Send a response as an adult or elder to own section's elders.
     RespondToOurDataHandlers {
-        target: XorName,
         rpc: Rpc,
     },
     RespondToClientHandlers {

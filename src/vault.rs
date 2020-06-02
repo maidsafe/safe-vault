@@ -370,15 +370,13 @@ impl<R: CryptoRng + Rng> Vault<R> {
         match bincode::deserialize::<Rpc>(&message) {
             Ok(rpc) => match &rpc {
                 Rpc::Request { request, .. } => match request {
-                    Request::IData(_) => self
-                        .data_handler_mut()?
-                        .handle_vault_rpc(utils::get_source_name(src), rpc),
+                    Request::IData(_) => self.data_handler_mut()?.handle_vault_rpc(src, rpc),
                     other => unimplemented!("Should not receive: {:?}", other),
                 },
                 Rpc::Response { response, .. } => match response {
-                    Response::Mutation(_) | Response::GetIData(_) => self
-                        .data_handler_mut()?
-                        .handle_vault_rpc(utils::get_source_name(src), rpc),
+                    Response::Mutation(_) | Response::GetIData(_) => {
+                        self.data_handler_mut()?.handle_vault_rpc(src, rpc)
+                    }
                     _ => unimplemented!("Should not receive: {:?}", response),
                 },
             },
@@ -446,12 +444,12 @@ impl<R: CryptoRng + Rng> Vault<R> {
             // VoteFor(action) => self.client_handler_mut()?.handle_consensused_action(action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
-            RespondToOurDataHandlers { target, rpc } => {
+            RespondToOurDataHandlers { rpc } => {
                 // TODO - once Routing is integrated, we'll construct the full message to send
                 //        onwards, and then if we're also part of the data handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
 
-                self.respond_to_data_handlers(target, rpc)
+                self.respond_to_data_handlers(rpc)
             }
             RespondToClientHandlers { sender, rpc } => {
                 let client_name = utils::requester_address(&rpc);
@@ -465,17 +463,14 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 }
                 None
             }
-            SendToPeers {
-                sender,
-                targets,
-                rpc,
-            } => {
+            SendToPeers { targets, rpc, .. } => {
+                let prefix = *self.routing_node.borrow().our_prefix().unwrap();
                 let mut next_action = None;
                 for target in targets {
                     if target == *self.id.public_id().name() {
                         next_action = self
                             .data_handler_mut()?
-                            .handle_vault_rpc(sender, rpc.clone());
+                            .handle_vault_rpc(SrcLocation::Section(prefix), rpc.clone());
                     } else {
                         next_action = self.send_message_to_peer(target, rpc.clone());
                     }
@@ -493,13 +488,13 @@ impl<R: CryptoRng + Rng> Vault<R> {
         }
     }
 
-    fn respond_to_data_handlers(&self, target: XorName, rpc: Rpc) -> Option<Action> {
+    fn respond_to_data_handlers(&self, rpc: Rpc) -> Option<Action> {
         let name = *self.routing_node.borrow().id().name();
         self.routing_node
             .borrow_mut()
             .send_message(
                 SrcLocation::Node(name),
-                DstLocation::Node(routing::XorName(target.0)),
+                DstLocation::Section(name),
                 utils::serialise(&rpc),
             )
             .map_or_else(
@@ -508,18 +503,18 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     None
                 },
                 |()| {
-                    info!("Responded to data handler at {:?} with: {:?}", target, &rpc);
+                    info!("Responded to our data handlers with: {:?}", &rpc);
                     None
                 },
             )
     }
 
     fn send_message_to_peer(&self, target: XorName, rpc: Rpc) -> Option<Action> {
-        let id = *self.routing_node.borrow().id();
+        let prefix = *self.routing_node.borrow().our_prefix().unwrap();
         self.routing_node
             .borrow_mut()
             .send_message(
-                SrcLocation::Node(*id.name()),
+                SrcLocation::Section(prefix),
                 DstLocation::Node(routing::XorName(target.0)),
                 utils::serialise(&rpc),
             )
@@ -529,7 +524,10 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     None
                 },
                 |()| {
-                    info!("Sent message to Peer: {:?}", target);
+                    info!(
+                        "Sent message to Peer {:?} from section with prefix {:?}",
+                        target, prefix
+                    );
                     None
                 },
             )
@@ -577,9 +575,10 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     Request::LoginPacket(_) | Request::Coins(_) | Request::Client(_) => self
                         .client_handler_mut()?
                         .handle_vault_rpc(requester_name, rpc),
-                    _data_request => self
-                        .data_handler_mut()?
-                        .handle_vault_rpc(requester_name, rpc),
+                    _data_request => self.data_handler_mut()?.handle_vault_rpc(
+                        SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
+                        rpc,
+                    ),
                 }
             } else {
                 error!("{}: Logic error - unexpected RPC.", self);
