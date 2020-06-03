@@ -8,7 +8,7 @@
 
 use super::{IDataOp, OpType};
 use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use pickledb::PickleDb;
 use routing::Node;
 use safe_nd::{
@@ -34,13 +34,19 @@ struct ChunkMetadata {
     owner: Option<PublicKey>,
 }
 
+#[derive(Debug)]
+enum IDataResult {
+    Mutation(NdResult<()>),
+    Get(NdResult<IData>),
+}
+
 pub(super) struct IDataHandler {
     id: NodePublicId,
     idata_elder_ops: BTreeSet<MessageId>,
     idata_client_ops: BTreeMap<MessageId, IDataOp>,
     // Responses from IDataHolders might arrive before we send a request.
     // This will hold the responses that are processed once the request arrives.
-    early_responses: BTreeMap<MessageId, (XorName, NdResult<()>)>,
+    early_responses: BTreeMap<MessageId, (XorName, IDataResult)>,
     metadata: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
@@ -174,24 +180,36 @@ impl IDataHandler {
     // which can be directly sent back to the client handlers.
     fn apply_early_responses(&mut self, message_id: MessageId) -> Option<Action> {
         let own_id = format!("{}", &self);
-        if let Some((sender, result)) = self.early_responses.remove(&message_id) {
-            let idata_op = self.idata_op_mut(&message_id).unwrap();
+        if let Some((sender, idata_result)) = self.early_responses.remove(&message_id) {
+            let idata_op = self.idata_op_mut(&message_id)?;
             let op_type = idata_op.op_type();
-            idata_op
-                .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
-                .map(|address| (address, op_type))
-                .and_then(|(idata_address, op_type)| {
-                    if op_type == OpType::Put {
-                        self.handle_put_idata_resp(idata_address, sender, &result, message_id)
-                    } else {
-                        self.handle_delete_unpub_idata_resp(
-                            idata_address,
-                            sender,
-                            result,
-                            message_id,
-                        )
-                    }
-                })
+            match (op_type, idata_result) {
+                (OpType::Get, IDataResult::Get(result)) => {
+                    let action =
+                        idata_op.handle_get_idata_resp(sender, result, &own_id, message_id);
+                    let _ = self.remove_idata_op_if_concluded(&message_id);
+                    action
+                }
+                (_, IDataResult::Mutation(result)) => idata_op
+                    .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
+                    .map(|address| (address, op_type))
+                    .and_then(|(idata_address, op_type)| {
+                        if op_type == OpType::Put {
+                            self.handle_put_idata_resp(idata_address, sender, &result, message_id)
+                        } else {
+                            self.handle_delete_unpub_idata_resp(
+                                idata_address,
+                                sender,
+                                result,
+                                message_id,
+                            )
+                        }
+                    }),
+                (op, result) => {
+                    error!("{:?} and {:?} are incompatible", &op, &result);
+                    None
+                }
+            }
         } else {
             None
         }
@@ -264,11 +282,14 @@ impl IDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let our_name = *self.id.name();
-        let idata_handler_id = self.id.clone();
-        let idata_op = IDataOp::new(requester, IDataRequest::Get(address), holders.clone());
+        let idata_op = IDataOp::new(
+            requester.clone(),
+            IDataRequest::Get(address),
+            holders.clone(),
+        );
         if !self.idata_elder_ops.contains(&message_id) {
             let _ = self.idata_elder_ops.insert(message_id);
-            match self.idata_client_ops.entry(message_id) {
+            let request_chunks_action = match self.idata_client_ops.entry(message_id) {
                 Entry::Occupied(_) => None,
                 Entry::Vacant(vacant_entry) => {
                     let idata_op = vacant_entry.insert(idata_op);
@@ -277,12 +298,14 @@ impl IDataHandler {
                         targets: holders,
                         rpc: Rpc::Request {
                             request: Request::IData(idata_op.request().clone()),
-                            requester: PublicId::Node(idata_handler_id),
+                            requester,
                             message_id,
                         },
                     })
                 }
-            }
+            };
+            self.apply_early_responses(message_id)
+                .or(request_chunks_action)
         } else {
             None
         }
@@ -367,7 +390,7 @@ impl IDataHandler {
                 // The response arrived before this particular vault processed the request
                 let _ = self
                     .early_responses
-                    .insert(message_id, (sender, result.clone()));
+                    .insert(message_id, (sender, IDataResult::Mutation(result.clone())));
                 None
             })?;
 
@@ -576,9 +599,17 @@ impl IDataHandler {
                 Err(_) => None,
             }
         } else {
-            self.idata_op_mut(&message_id).and_then(|idata_op| {
-                idata_op.handle_get_idata_resp(sender, result, &own_id, message_id)
-            })
+            self.idata_op_mut(&message_id)
+                .and_then(|idata_op| {
+                    idata_op.handle_get_idata_resp(sender, result.clone(), &own_id, message_id)
+                })
+                .or_else(|| {
+                    // The response arrived before this particular vault processed the request
+                    let _ = self
+                        .early_responses
+                        .insert(message_id, (sender, IDataResult::Get(result)));
+                    None
+                })
         };
 
         let _ = self.remove_idata_op_if_concluded(&message_id);
