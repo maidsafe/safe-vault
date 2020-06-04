@@ -10,10 +10,11 @@ use super::{IDataOp, OpType};
 use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
 use log::{debug, error, info, trace, warn};
 use pickledb::PickleDb;
+use rand::SeedableRng;
 use routing::Node;
 use safe_nd::{
-    Error as NdError, IData, IDataAddress, IDataRequest, MessageId, NodePublicId, PublicId,
-    PublicKey, Request, Response, Result as NdResult, XorName,
+    Error as NdError, IData, IDataAddress, IDataRequest, MessageId, NodeFullId, NodePublicId,
+    PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -22,6 +23,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use tiny_keccak::sha3_256;
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
@@ -46,7 +48,7 @@ pub(super) struct IDataHandler {
     idata_client_ops: BTreeMap<MessageId, IDataOp>,
     // Responses from IDataHolders might arrive before we send a request.
     // This will hold the responses that are processed once the request arrives.
-    early_responses: BTreeMap<MessageId, (XorName, IDataResult)>,
+    early_responses: BTreeMap<MessageId, Vec<(XorName, IDataResult)>>,
     metadata: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
@@ -180,36 +182,53 @@ impl IDataHandler {
     // which can be directly sent back to the client handlers.
     fn apply_early_responses(&mut self, message_id: MessageId) -> Option<Action> {
         let own_id = format!("{}", &self);
-        if let Some((sender, idata_result)) = self.early_responses.remove(&message_id) {
-            let idata_op = self.idata_op_mut(&message_id)?;
-            let op_type = idata_op.op_type();
-            match (op_type, idata_result) {
-                (OpType::Get, IDataResult::Get(result)) => {
-                    let action =
-                        idata_op.handle_get_idata_resp(sender, result, &own_id, message_id);
-                    let _ = self.remove_idata_op_if_concluded(&message_id);
-                    action
-                }
-                (_, IDataResult::Mutation(result)) => idata_op
-                    .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
-                    .map(|address| (address, op_type))
-                    .and_then(|(idata_address, op_type)| {
-                        if op_type == OpType::Put {
-                            self.handle_put_idata_resp(idata_address, sender, &result, message_id)
-                        } else {
-                            self.handle_delete_unpub_idata_resp(
-                                idata_address,
-                                sender,
-                                result,
-                                message_id,
-                            )
-                        }
-                    }),
-                (op, result) => {
-                    error!("{:?} and {:?} are incompatible", &op, &result);
-                    None
-                }
-            }
+        if let Some(responses) = self.early_responses.remove(&message_id) {
+            debug!(
+                "Applying {}, early resposes on operation with MessageID: {:?}",
+                responses.len(),
+                &message_id
+            );
+            let op_type = self.idata_op(&message_id)?.op_type();
+            let mut actions = responses
+                .into_iter()
+                .filter_map(|(sender, idata_result)| match (op_type, idata_result) {
+                    (OpType::Get, IDataResult::Get(result)) => {
+                        let action = self
+                            .idata_op_mut(&message_id)?
+                            .handle_get_idata_resp(sender, result, &own_id, message_id);
+                        let _ = self.remove_idata_op_if_concluded(&message_id);
+                        action
+                    }
+                    (_, IDataResult::Mutation(result)) => self
+                        .idata_op_mut(&message_id)?
+                        .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
+                        .map(|address| (address, op_type))
+                        .and_then(|(idata_address, op_type)| {
+                            if op_type == OpType::Put {
+                                self.handle_put_idata_resp(
+                                    idata_address,
+                                    sender,
+                                    &result,
+                                    message_id,
+                                )
+                            } else {
+                                self.handle_delete_unpub_idata_resp(
+                                    idata_address,
+                                    sender,
+                                    result,
+                                    message_id,
+                                )
+                            }
+                        }),
+                    (op, result) => {
+                        error!("{:?} and {:?} are incompatible", &op, &result);
+                        None
+                    }
+                })
+                .collect::<Vec<Action>>();
+            debug!("Resultant actions: {:?}", &actions);
+            // There will be only one action. Others will be None.
+            actions.pop()
         } else {
             None
         }
@@ -388,9 +407,19 @@ impl IDataHandler {
             })
             .or_else(|| {
                 // The response arrived before this particular vault processed the request
-                let _ = self
-                    .early_responses
-                    .insert(message_id, (sender, IDataResult::Mutation(result.clone())));
+                match self.early_responses.entry(message_id) {
+                    Entry::Vacant(vacant_entry) => {
+                        let _ = vacant_entry
+                            .insert(vec![(sender, IDataResult::Mutation(result.clone()))]);
+                    }
+                    Entry::Occupied(mut entry) => {
+                        entry
+                            .get_mut()
+                            .push((sender, IDataResult::Mutation(result.clone())));
+                    }
+                }
+                trace!("Added early response for message ID: {:?}", message_id);
+                trace!("Current: {:?}", self.early_responses.get(&message_id));
                 None
             })?;
 
@@ -562,19 +591,32 @@ impl IDataHandler {
         let action = if is_idata_copy_op {
             info!("Got a copy action for IData");
 
-            let our_public_id = self.id.clone();
             match result {
                 Ok(idata) => {
                     let _ = self.idata_elder_ops.remove(&message_id);
                     let _ = self.idata_client_ops.remove(&message_id);
 
                     // Send PUT requests to holders to store a new copy of the chunk.
-                    let new_msg_id = MessageId::new();
-                    let us_as_requester = PublicId::Node(our_public_id);
+                    // Use the address of the data as a seed to generate a unique ID on all data handlers.
+                    // This is only used for the requester field and it should not be used for encryption / signing.
+                    let mut rng = rand::rngs::StdRng::from_seed(idata.address().name().0);
+                    let node_id = NodeFullId::new(&mut rng);
+                    let requester = PublicId::Node(node_id.public_id().clone());
+                    trace!("Generated NodeID {:?} to get chunk copy", &requester);
+
+                    // Hash the old message ID with the IData address for a unique MessageID
+                    let mut hash_bytes = Vec::new();
+                    hash_bytes.extend_from_slice(&(message_id.0).0);
+                    hash_bytes.extend_from_slice(&idata.address().name().0);
+                    let new_msg_id = MessageId(XorName(sha3_256(&hash_bytes)));
+                    trace!(
+                        "Generated MsgID {:?} to store additional chunk copy",
+                        &message_id
+                    );
                     let new_holders = self.get_new_holders_for_chunk(idata.address());
 
                     let idata_op = IDataOp::new(
-                        us_as_requester.clone(),
+                        requester.clone(),
                         IDataRequest::Put(idata),
                         new_holders.clone(),
                     );
@@ -589,7 +631,7 @@ impl IDataHandler {
                                 targets: new_holders,
                                 rpc: Rpc::Request {
                                     request: Request::IData(idata_op.request().clone()),
-                                    requester: us_as_requester,
+                                    requester,
                                     message_id: new_msg_id,
                                 },
                             })
@@ -605,9 +647,13 @@ impl IDataHandler {
                 })
                 .or_else(|| {
                     // The response arrived before this particular vault processed the request
-                    let _ = self
-                        .early_responses
-                        .insert(message_id, (sender, IDataResult::Get(result)));
+                    // Note that for get responses we hold only one early response
+                    if let Entry::Vacant(vacant_entry) = self.early_responses.entry(message_id) {
+                        let _ =
+                            vacant_entry.insert(vec![(sender, IDataResult::Get(result.clone()))]);
+                    }
+                    trace!("Added early response for message ID: {:?}", message_id);
+                    trace!("Current: {:?}", self.early_responses.get(&message_id));
                     None
                 })
         };
@@ -756,21 +802,13 @@ impl IDataHandler {
             .iter()
             .cloned()
             .collect::<BTreeSet<_>>();
-        let metadata = self.get_metadata_for(*target);
-        match metadata {
-            Ok(metadata) => {
-                let mut existing_holders = metadata.holders;
-                for holder_xorname in closest_holders {
-                    if !existing_holders.contains(&holder_xorname)
-                        && existing_holders.len() < IMMUTABLE_DATA_COPY_COUNT
-                    {
-                        let _ = existing_holders.insert(holder_xorname);
-                    }
-                }
-                existing_holders
-            }
-            Err(_) => closest_holders,
+        if let Ok(metadata) = self.get_metadata_for(*target) {
+            return closest_holders
+                .difference(&metadata.holders)
+                .cloned()
+                .collect();
         }
+        closest_holders
     }
 }
 
