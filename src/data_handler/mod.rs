@@ -19,9 +19,13 @@ use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
 use log::{error, trace};
 use mdata_handler::MDataHandler;
+use rand::SeedableRng;
 use routing::{Node, SrcLocation};
+use tiny_keccak::sha3_256;
 
-use safe_nd::{IDataRequest, MessageId, NodePublicId, PublicId, Request, Response, XorName};
+use safe_nd::{
+    IDataRequest, MessageId, NodeFullId, NodePublicId, PublicId, Request, Response, XorName,
+};
 
 use std::{
     cell::{Cell, RefCell},
@@ -219,7 +223,6 @@ impl DataHandler {
     // The list of holders is also updated by removing the node that left.
     pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<Action>> {
         trace!("Get the list of IData holder {:?} was resposible for", node);
-        let our_id = self.id.clone();
         let mut actions = Vec::new();
 
         let data_holders = self.idata_handler.as_mut().map_or_else(
@@ -230,25 +233,33 @@ impl DataHandler {
             |idata_handler| idata_handler.update_chunk_metadata_on_node_left(node).ok(),
         )?;
 
-        if !data_holders.is_empty() {
-            let requester = PublicId::Node(our_id);
-            for (address, holders) in data_holders {
-                trace!("{:?} was resposible for : {:?}", node, address);
-                let message_id = MessageId::new();
-                let action = self.handle_idata_request(|idata_handler| {
-                    idata_handler.request_chunk_from_holders(
-                        requester.clone(),
-                        address,
-                        holders,
-                        message_id,
-                    )
-                });
+        // Use the address of the lost node as a seed to generate a unique ID on all data handlers.
+        // This is only used for the requester field and it should not be used for encryption / signing.
+        let mut rng = rand::rngs::StdRng::from_seed(node.0);
+        let node_id = NodeFullId::new(&mut rng);
+        let requester = PublicId::Node(node_id.public_id().clone());
+        trace!("Generated NodeID {:?} to get chunk copy", &requester);
 
-                if let Some(action) = action {
-                    actions.push(action);
-                };
-            }
-        };
+        for (address, holders) in data_holders {
+            trace!("{:?} was resposible for : {:?}", node, address);
+            let mut hash_bytes = Vec::new();
+            hash_bytes.extend_from_slice(&address.name().0);
+            hash_bytes.extend_from_slice(&node.0);
+            let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
+            trace!("Generated MsgID {:?} to get chunk copy", &message_id);
+            let action = self.handle_idata_request(|idata_handler| {
+                idata_handler.request_chunk_from_holders(
+                    requester.clone(),
+                    address,
+                    holders,
+                    message_id,
+                )
+            });
+
+            if let Some(action) = action {
+                actions.push(action);
+            };
+        }
         Some(actions)
     }
 }
