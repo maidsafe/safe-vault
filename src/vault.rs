@@ -14,6 +14,7 @@ use crate::{
     utils, Config, Result,
 };
 use crossbeam_channel::{Receiver, Select};
+use hex_fmt::HexFmt;
 use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
@@ -344,8 +345,10 @@ impl<R: CryptoRng + Rng> Vault<R> {
             ),
             RoutingEvent::MessageReceived { content, src, dst } => {
                 info!(
-                    "Received message: {:?}\n Sent from {:?} to {:?}",
-                    content, src, dst
+                    "Received message: {:8?}\n Sent from {:?} to {:?}",
+                    HexFmt(&content),
+                    src,
+                    dst
                 );
                 self.handle_routing_message(src, content)
             }
@@ -440,8 +443,8 @@ impl<R: CryptoRng + Rng> Vault<R> {
         use Action::*;
         match action {
             // Bypass client requests
-            VoteFor(action) => self.vote_for_action(&action),
-            // VoteFor(action) => self.client_handler_mut()?.handle_consensused_action(action),
+            // VoteFor(action) => self.vote_for_action(&action),
+            VoteFor(action) => self.client_handler_mut()?.handle_consensused_action(action),
             ForwardClientRequest(rpc) => self.forward_client_request(rpc),
             ProxyClientRequest(rpc) => self.proxy_client_request(rpc),
             RespondToOurDataHandlers { rpc } => {
