@@ -193,11 +193,7 @@ impl IDataHandler {
                 .into_iter()
                 .filter_map(|(sender, idata_result)| match (op_type, idata_result) {
                     (OpType::Get, IDataResult::Get(result)) => {
-                        let action = self
-                            .idata_op_mut(&message_id)?
-                            .handle_get_idata_resp(sender, result, &own_id, message_id);
-                        let _ = self.remove_idata_op_if_concluded(&message_id);
-                        action
+                        self.handle_get_idata_resp(sender, result, message_id)
                     }
                     (_, IDataResult::Mutation(result)) => self
                         .idata_op_mut(&message_id)?

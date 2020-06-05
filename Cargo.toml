@@ -22,7 +22,7 @@ fake_clock = "~0.3.0"
 flexi_logger = "0.14.8"
 fxhash = { version = "~0.2.1", optional = true }
 hex = "~0.3.2"
-hex_fmt = { version = "~0.3.0", optional = true }
+hex_fmt = "~0.3.0"
 lazy_static = "~1"
 log = "~0.4.7"
 mock-quic-p2p = { git = "https://github.com/maidsafe/quic-p2p", optional = true }
@@ -49,5 +49,5 @@ name = "safe_vault"
 doc = false
 
 [features]
-mock_base = ["routing/mock_base", "fxhash", "hex_fmt", "mock-quic-p2p"]
+mock_base = ["routing/mock_base", "fxhash", "mock-quic-p2p"]
 mock_parsec = ["routing/mock", "mock_base"]
