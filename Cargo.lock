@@ -1343,7 +1343,7 @@ dependencies = [
 [[package]]
 name = "mock-quic-p2p"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/quic-p2p#14e601daed8b80d3008352883d898fc75f93a5d7"
+source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6fd3fe2116031b365a1370785c54fa4dc559f04"
 dependencies = [
  "bytes 0.5.4",
  "crossbeam-channel",
@@ -1671,8 +1671,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e9a3d2dc326b4094f599118fdaa8565bd14204b685b91301c47db74c4a41ee7"
+source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6fd3fe2116031b365a1370785c54fa4dc559f04"
 dependencies = [
  "base64 0.10.1",
  "bincode 1.1.4",
@@ -2102,7 +2101,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?branch=fleming#88f3a5e35a5c6cf4d124118736ccecdf79ee0a0c"
+source = "git+https://github.com/maidsafe/routing.git?branch=igd-err#4a092f0bb57f0504b1ba553f159cde5265a0e4b2"
 dependencies = [
  "bincode 1.1.4",
  "bytes 0.5.4",
@@ -2133,7 +2132,6 @@ dependencies = [
  "threshold_crypto",
  "tiny-keccak",
  "tmp-ed25519",
- "unwrap",
 ]
 
 [[package]]

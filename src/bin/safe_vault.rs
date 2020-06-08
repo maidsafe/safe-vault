@@ -37,6 +37,9 @@ use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 use unwrap::unwrap;
 
+const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP is enabled in your router's settings and try again. \
+                                Note that not all routers are supported in this testnet. Visit https://safenetforum.org for more information.";
+
 /// Runs a SAFE Network vault.
 fn main() {
     let mut config = Config::new().expect("Error reading configuration file");
@@ -127,6 +130,12 @@ fn main() {
 
     let is_first = config.is_first();
 
+    if is_first && !routing_node.is_running() {
+        log::error!("{}", IGD_ERROR_MESSAGE);
+        println!("{}", IGD_ERROR_MESSAGE);
+        process::exit(1);
+    }
+
     let mut rng = rand::thread_rng();
 
     match Vault::new(
@@ -137,25 +146,35 @@ fn main() {
         command_rx,
         &mut rng,
     ) {
-        Ok(mut vault) => {
-            let our_conn_info = unwrap!(vault.our_connection_info());
-            println!(
-                "Vault connection info:\n{}",
-                unwrap!(serde_json::to_string(&our_conn_info))
-            );
-            log::info!(
-                "Vault connection info: {}",
-                unwrap!(serde_json::to_string(&our_conn_info))
-            );
+        Ok(mut vault) => match vault.our_connection_info() {
+            Ok(our_conn_info) => {
+                println!(
+                    "Vault connection info:\n{}",
+                    unwrap!(serde_json::to_string(&our_conn_info))
+                );
+                log::info!(
+                    "Vault connection info: {}",
+                    unwrap!(serde_json::to_string(&our_conn_info))
+                );
 
-            if is_first {
-                unwrap!(write_connection_info(&our_conn_info));
+                if is_first {
+                    unwrap!(write_connection_info(&our_conn_info));
+                }
+                vault.run();
+                process::exit(0);
             }
-            vault.run();
-        }
+            Err(e) => {
+                println!("Cannot start vault due to error: {:?}", e);
+                log::error!("Cannot start vault due to error: {:?}", e);
+                log::error!("{}", IGD_ERROR_MESSAGE);
+                println!("{}", IGD_ERROR_MESSAGE);
+                process::exit(1);
+            }
+        },
         Err(e) => {
             println!("Cannot start vault due to error: {:?}", e);
             log::error!("Cannot start vault due to error: {:?}", e);
+            process::exit(1);
         }
     }
 }
