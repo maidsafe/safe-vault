@@ -26,6 +26,7 @@ use std::{
 use tiny_keccak::sha3_256;
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
+const HOLDER_META_DB_NAME: &str = "holder_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 // The number of separate copies of an ImmutableData chunk which should be maintained.
 const IMMUTABLE_DATA_COPY_COUNT: usize = 3;
@@ -42,6 +43,11 @@ enum IDataResult {
     Get(NdResult<IData>),
 }
 
+#[derive(Default, Debug, Serialize, Deserialize)]
+struct HolderMetadata {
+    chunks: BTreeSet<IDataAddress>,
+}
+
 pub(super) struct IDataHandler {
     id: NodePublicId,
     idata_elder_ops: BTreeSet<MessageId>,
@@ -50,6 +56,7 @@ pub(super) struct IDataHandler {
     // This will hold the responses that are processed once the request arrives.
     early_responses: BTreeMap<MessageId, Vec<(XorName, IDataResult)>>,
     metadata: PickleDb,
+    holders: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
     #[allow(unused)]
@@ -65,6 +72,7 @@ impl IDataHandler {
     ) -> Result<Self> {
         let root_dir = config.root_dir()?;
         let metadata = utils::new_db(&root_dir, IMMUTABLE_META_DB_NAME, init_mode)?;
+        let holders = utils::new_db(&root_dir, HOLDER_META_DB_NAME, init_mode)?;
         let full_adults = utils::new_db(&root_dir, FULL_ADULTS_DB_NAME, init_mode)?;
 
         Ok(Self {
@@ -73,6 +81,7 @@ impl IDataHandler {
             idata_client_ops: Default::default(),
             early_responses: Default::default(),
             metadata,
+            holders,
             full_adults,
             routing_node,
         })
@@ -447,11 +456,7 @@ impl IDataHandler {
         // TODO - we'll assume `result` is success for phase 1.
         let is_idata_copy_op = self.idata_elder_ops.contains(&message_id);
         let db_key = idata_address.to_db_key();
-        let mut metadata = self
-            .metadata
-            .get::<ChunkMetadata>(&db_key)
-            .unwrap_or_default();
-
+        let mut metadata = self.get_metadata_for(idata_address).unwrap_or_default();
         let idata_op = self.idata_op(&message_id);
 
         if !is_idata_copy_op {
@@ -486,6 +491,25 @@ impl IDataHandler {
             metadata.holders.len()
         );
 
+        // We're acting as data handler, received request from client handlers
+        let mut holders_metadata = match self.get_holder(sender) {
+            Ok(holders) => holders,
+            Err(_) => HolderMetadata::default(),
+        };
+
+        if !holders_metadata.chunks.insert(idata_address) {
+            warn!(
+                "{}: {} already registered as a holder for {:?}",
+                self,
+                sender,
+                self.idata_op(&message_id)?
+            );
+        }
+
+        if let Err(error) = self.holders.set(&sender.to_db_key(), &holders_metadata) {
+            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+        }
+
         if is_idata_copy_op {
             trace!("Duplication operation completed for : {:?}", idata_address);
             let _ = self.idata_elder_ops.remove(&message_id);
@@ -518,15 +542,25 @@ impl IDataHandler {
             warn!("{}: Node reports error deleting: {}", self, err);
         } else {
             let db_key = idata_address.to_db_key();
-            let metadata = self.metadata.get::<ChunkMetadata>(&db_key).or_else(|| {
-                warn!(
-                    "{}: Failed to get metadata from DB: {:?}",
-                    self, idata_address
-                );
-                None
-            });
+            let metadata = self.get_metadata_for(idata_address);
 
-            if let Some(mut metadata) = metadata {
+            if let Ok(mut metadata) = metadata {
+                let holder = self.get_holder(sender);
+
+                // Remove the chunk from the holder metadata
+                if let Ok(mut holder) = holder {
+                    let _ = holder.chunks.remove(&idata_address);
+
+                    if holder.chunks.is_empty() {
+                        if let Err(error) = self.holders.rem(&sender.to_db_key()) {
+                            warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
+                        }
+                    } else if let Err(error) = self.holders.set(&sender.to_db_key(), &holder) {
+                        warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+                    }
+                }
+
+                // Remove the holder from the chunk metadata
                 if !metadata.holders.remove(&sender) {
                     warn!(
                         "{}: {} is not registered as a holder for {:?}",
@@ -665,49 +699,58 @@ impl IDataHandler {
         node: XorName,
     ) -> NdResult<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
         let mut idata_addresses: BTreeMap<IDataAddress, BTreeSet<XorName>> = BTreeMap::new();
-        // Get all idata addresses and holders when any holder left the network
-        for kv in self.metadata.iter() {
-            match kv.get_value::<ChunkMetadata>() {
-                None => {
-                    warn!("Value does not hold Valid `ChunkMetadata`");
-                }
-                Some(metadata) => {
-                    if metadata.holders.contains(&node) {
-                        let mut holders = metadata.holders.clone();
-                        let _ = holders.remove(&node);
-                        let _ = idata_addresses.insert(
-                            utils::db_key_to_idata_address(kv.get_key().to_string()),
-                            holders,
-                        );
+
+        let chunks = match self.get_holder(node) {
+            Ok(holders) => Some(holders),
+            Err(_) => None,
+        };
+
+        if let Some(holders) = chunks {
+            for chunk_address in holders.chunks {
+                let db_key = chunk_address.to_db_key();
+                let metadata = self.get_metadata_for(chunk_address);
+
+                if let Ok(mut metadata) = metadata {
+                    if !metadata.holders.remove(&node) {
+                        warn!("doesn't contain the holder",);
+                    }
+
+                    let _ = idata_addresses.insert(chunk_address, metadata.holders.clone());
+
+                    if metadata.holders.is_empty() {
+                        if let Err(error) = self.metadata.rem(&db_key) {
+                            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+                        }
+                    } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
+                        warn!("{}: Failed to write metadata to DB: {:?}", self, error);
                     }
                 }
             }
         }
 
-        // Update local db to remove the address from the holders list
-        for address in idata_addresses.keys() {
-            let db_key = address.to_db_key();
-            let metadata = self.metadata.get::<ChunkMetadata>(&db_key).or_else(|| {
-                warn!("{}: Failed to get metadata from DB: {:?}", self, db_key);
-                None
-            });
-
-            if let Some(mut metadata) = metadata {
-                if !metadata.holders.remove(&node) {
-                    warn!("doesn't contain the holder",);
-                }
-
-                if metadata.holders.is_empty() {
-                    if let Err(error) = self.metadata.rem(&db_key) {
-                        warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-                    }
-                } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
-                    warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-                }
-            };
-        }
+        if let Err(error) = self.holders.rem(&node.to_db_key()) {
+            warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
+            // TODO - Send failure back to client handlers?
+        };
 
         Ok(idata_addresses)
+    }
+
+    fn get_holder(&self, holder: XorName) -> NdResult<HolderMetadata> {
+        match self.holders.get::<HolderMetadata>(&holder.to_db_key()) {
+            Some(metadata) => {
+                if metadata.chunks.is_empty() {
+                    warn!("{}: is not responsible for any chunk", holder);
+                    Err(NdError::NoSuchData)
+                } else {
+                    Ok(metadata)
+                }
+            }
+            None => {
+                warn!("{}: Failed to get holders metadata from DB", holder);
+                Err(NdError::NoSuchData)
+            }
+        }
     }
 
     fn get_metadata_for(&self, address: IDataAddress) -> NdResult<ChunkMetadata> {
