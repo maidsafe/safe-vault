@@ -157,7 +157,7 @@ impl Environment {
             if !is_elder {
                 continue;
             }
-            client.quic_p2p().connect_to(conn_info.clone());
+            client.quic_p2p().connect_to(conn_info);
             self.poll();
 
             client.expect_connected_to(&conn_info);
@@ -293,7 +293,7 @@ pub trait TestClientTrait {
 
     fn send_bootstrap_request(&mut self, client_public_id: &PublicId, conn_info: &SocketAddr) {
         let bootstrap_request = HandshakeRequest::Bootstrap(client_public_id.clone());
-        self.send_to_target(&bootstrap_request, conn_info.clone());
+        self.send_to_target(&bootstrap_request, *conn_info);
     }
 
     fn handle_handshake_response_join_from(
@@ -315,7 +315,7 @@ pub trait TestClientTrait {
         // connect to the new set of elders if necessary.
 
         let request = HandshakeRequest::Join(client_public_id.clone());
-        self.send_to_target(&request, conn_info.clone());
+        self.send_to_target(&request, *conn_info);
     }
 
     fn expect_connected_to(&mut self, conn_info: &SocketAddr) {
@@ -328,7 +328,7 @@ pub trait TestClientTrait {
                 x => unexpected!(x),
             }
         }
-        self.set_connected_vault(conn_info.clone());
+        self.set_connected_vault(*conn_info);
     }
 
     fn handle_challenge_from(&mut self, conn_info: &SocketAddr, env: &mut Environment) {
@@ -344,7 +344,7 @@ pub trait TestClientTrait {
 
         let signature = self.full_id().sign(payload);
         let response = HandshakeRequest::ChallengeResult(signature);
-        self.send_to_target(&response, conn_info.clone());
+        self.send_to_target(&response, *conn_info);
     }
 
     fn expect_new_message(&self, env: &mut Environment) -> (SocketAddr, Bytes) {
