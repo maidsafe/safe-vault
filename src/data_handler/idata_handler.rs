@@ -492,10 +492,7 @@ impl IDataHandler {
         );
 
         // We're acting as data handler, received request from client handlers
-        let mut holders_metadata = match self.get_holder(sender) {
-            Ok(holders) => holders,
-            Err(_) => HolderMetadata::default(),
-        };
+        let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
 
         if !holders_metadata.chunks.insert(idata_address) {
             warn!(
@@ -699,18 +696,14 @@ impl IDataHandler {
         node: XorName,
     ) -> NdResult<BTreeMap<IDataAddress, BTreeSet<XorName>>> {
         let mut idata_addresses: BTreeMap<IDataAddress, BTreeSet<XorName>> = BTreeMap::new();
+        let chunk_holder = self.get_holder(node);
 
-        let chunks = match self.get_holder(node) {
-            Ok(holders) => Some(holders),
-            Err(_) => None,
-        };
-
-        if let Some(holders) = chunks {
-            for chunk_address in holders.chunks {
+        if let Ok(holder) = chunk_holder {
+            for chunk_address in holder.chunks {
                 let db_key = chunk_address.to_db_key();
-                let metadata = self.get_metadata_for(chunk_address);
+                let chunk_metadata = self.get_metadata_for(chunk_address);
 
-                if let Ok(mut metadata) = metadata {
+                if let Ok(mut metadata) = chunk_metadata {
                     if !metadata.holders.remove(&node) {
                         warn!("doesn't contain the holder",);
                     }
@@ -728,9 +721,9 @@ impl IDataHandler {
             }
         }
 
+        // Since the node has left the section, remove it from the holders DB
         if let Err(error) = self.holders.rem(&node.to_db_key()) {
             warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
-            // TODO - Send failure back to client handlers?
         };
 
         Ok(idata_addresses)
