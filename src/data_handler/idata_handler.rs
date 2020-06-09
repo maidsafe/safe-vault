@@ -29,7 +29,8 @@ const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const HOLDER_META_DB_NAME: &str = "holder_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 // The number of separate copies of an ImmutableData chunk which should be maintained.
-const IMMUTABLE_DATA_COPY_COUNT: usize = 3;
+const IMMUTABLE_DATA_COPY_COUNT: usize = 4;
+const IMMUTABLE_DATA_ADULT_COPY_COUNT: usize = 3;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 struct ChunkMetadata {
@@ -803,7 +804,7 @@ impl IDataHandler {
         let mut closest_adults = routing_node
             .our_adults_sorted_by_distance_to(&routing::XorName(target.0))
             .iter()
-            .take(IMMUTABLE_DATA_COPY_COUNT)
+            .take(IMMUTABLE_DATA_ADULT_COPY_COUNT)
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>();
 
