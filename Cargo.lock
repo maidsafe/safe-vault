@@ -1343,7 +1343,7 @@ dependencies = [
 [[package]]
 name = "mock-quic-p2p"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6fd3fe2116031b365a1370785c54fa4dc559f04"
+source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6ae0517d0dc51c5fcdb1d50f7243d0500292b0e"
 dependencies = [
  "bytes 0.5.4",
  "crossbeam-channel",
@@ -1671,7 +1671,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.6.2"
-source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6fd3fe2116031b365a1370785c54fa4dc559f04"
+source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6ae0517d0dc51c5fcdb1d50f7243d0500292b0e"
 dependencies = [
  "base64 0.10.1",
  "bincode 1.1.4",

@@ -364,6 +364,24 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 };
                 None
             }
+            RoutingEvent::MemberJoined { .. } => {
+                trace!("New member has joined the section");
+                let elder_count = self
+                    .routing_node
+                    .borrow()
+                    .our_elders()
+                    .collect::<Vec<_>>()
+                    .len();
+                let adult_count = self
+                    .routing_node
+                    .borrow()
+                    .our_adults()
+                    .collect::<Vec<_>>()
+                    .len();
+                info!("No. of Elders: {}", elder_count);
+                info!("No. of Adults: {}", adult_count);
+                None
+            }
             // Ignore all other events
             _ => None,
         }
