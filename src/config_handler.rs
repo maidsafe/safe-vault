@@ -9,7 +9,7 @@
 use crate::Result;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
-use log::Level;
+use log::{debug, Level};
 use routing::TransportConfig as NetworkConfig;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -106,8 +106,11 @@ pub struct Config {
 impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default vault config file location,
     /// and overrides values with any equivalent command line args.
-    pub fn new() -> Result<Self> {
-        let mut config = Self::read_from_file()?.unwrap_or_default();
+    pub fn new() -> Self {
+        let mut config = match Self::read_from_file() {
+            Ok(Some(config)) => config,
+            Ok(None) | Err(_) => Default::default(),
+        };
 
         let command_line_args = Config::clap().get_matches();
         for arg in &ARGS {
@@ -121,7 +124,7 @@ impl Config {
             }
         }
 
-        Ok(config)
+        config
     }
 
     /// The address to be credited when this vault farms SafeCoin.
@@ -274,14 +277,14 @@ impl Config {
 
         match File::open(&path) {
             Ok(file) => {
-                println!("Reading settings from {}", path.display());
+                debug!("Reading settings from {}", path.display());
                 let reader = BufReader::new(file);
                 let config = serde_json::from_reader(reader)?;
                 Ok(config)
             }
             Err(error) => {
                 if error.kind() == std::io::ErrorKind::NotFound {
-                    println!("No config file available at {}", path.display());
+                    debug!("No config file available at {}", path.display());
                     Ok(None)
                 } else {
                     Err(error.into())

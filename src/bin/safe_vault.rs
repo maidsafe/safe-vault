@@ -42,7 +42,7 @@ const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP
 
 /// Runs a SAFE Network vault.
 fn main() {
-    let mut config = Config::new().expect("Error reading configuration file");
+    let mut config = Config::new();
 
     if let Some(c) = &config.completions() {
         match c.parse::<clap::Shell>() {
@@ -182,12 +182,14 @@ fn main() {
 fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
     log::info!("Checking for updates...");
     let target = self_update::get_target();
+
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
         .repo_name("safe_vault")
         .with_target(&target)
         .build()?
         .fetch()?;
+
     if !releases.is_empty() {
         log::debug!("Target for update is {}", target);
         log::debug!("Found releases: {:#?}\n", releases);
@@ -206,14 +208,15 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
             .current_version(cargo_crate_version!())
             .build()?
             .update()?;
-        println!("Update status: `{}`!", status.version());
-        return Ok(status);
+        println!("Update status: '{}'!", status.version());
+        Ok(status)
+    } else {
+        println!("Current version is '{}'", cargo_crate_version!());
+        println!("No releases are available for updates");
+        Ok(Status::UpToDate(
+            "No releases are available for updates".to_string(),
+        ))
     }
-    log::info!("Current version is {}", cargo_crate_version!());
-    log::info!("No releases are available for updates");
-    Ok(Status::UpToDate(
-        "No releases are available for updates".to_string(),
-    ))
 }
 
 fn gen_completions_for_shell(shell: clap::Shell) -> Result<Vec<u8>, String> {
