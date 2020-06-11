@@ -126,6 +126,7 @@ fn main() {
     let mut node_config = NodeConfig::default();
     node_config.first = config.is_first();
     node_config.transport_config = config.network_config().clone();
+    node_config.network_params.recommended_section_size = 500;
     let (routing_node, routing_rx, client_rx) = Node::new(node_config);
 
     let is_first = config.is_first();
