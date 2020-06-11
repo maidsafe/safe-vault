@@ -1,5 +1,16 @@
 # Safe Vault - Change Log
 
+## [0.24.0]
+- When a Vault starts, start it as an Adult. Create the additional modules required only when it is promoted to an Elder.
+- Give Adults the responsibility of holding Immutable Data chunks.
+- Use routing's messaging API with signature accumulation for intra-section communication.
+- Implement chunk duplication if a node leaves the network. This will maintain the minimum number of copies required.
+- Update to the latest version of `quic-p2p` which enables automatic port forwarding using the IGD protocol.
+- Gracefully end the vault process on SIGINT.
+- Use the latest version of `routing`.
+- Update to safe-nd 0.9.0 with refactored `Request` and `Response` enums.
+- Separate the Client Handler into smaller sub-modules.
+
 ## [0.23.0]
 - Enable required features in self-update dependency to support untar and unzip for packages
 - Add tarpaulin to GHA and push result to coveralls
