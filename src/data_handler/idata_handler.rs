@@ -487,8 +487,9 @@ impl IDataHandler {
             //        maybe self-terminate if we can't fix this error?
         }
         debug!(
-            "{:?}, Got reponse from {:?} holders",
+            "{:?}, Entry {:?} has {:?} holders",
             self.id,
+            idata_address,
             metadata.holders.len()
         );
 
@@ -617,7 +618,7 @@ impl IDataHandler {
         let is_idata_copy_op = self.idata_elder_ops.contains(&message_id);
 
         let action = if is_idata_copy_op {
-            info!("Got a copy action for IData");
+            info!("Holder {:?} responded with chunk for duplication", sender);
 
             match result {
                 Ok(idata) => {
@@ -630,7 +631,6 @@ impl IDataHandler {
                     let mut rng = rand::rngs::StdRng::from_seed(idata.address().name().0);
                     let node_id = NodeFullId::new(&mut rng);
                     let requester = PublicId::Node(node_id.public_id().clone());
-                    trace!("Generated NodeID {:?} to get chunk copy", &requester);
 
                     // Hash the old message ID with the IData address for a unique MessageID
                     let mut hash_bytes = Vec::new();
@@ -638,8 +638,9 @@ impl IDataHandler {
                     hash_bytes.extend_from_slice(&idata.address().name().0);
                     let new_msg_id = MessageId(XorName(sha3_256(&hash_bytes)));
                     trace!(
-                        "Generated MsgID {:?} to store additional chunk copy",
-                        &message_id
+                        "Generated MsgID {:?} & NodeID {:?} to store additional chunk copy",
+                        &message_id,
+                        &requester
                     );
                     let new_holders = self.get_new_holders_for_chunk(idata.address());
 
@@ -741,7 +742,7 @@ impl IDataHandler {
                 }
             }
             None => {
-                warn!("{}: Failed to get holders metadata from DB", holder);
+                info!("{}: is not responsible for any chunk", holder);
                 Err(NdError::NoSuchData)
             }
         }
@@ -807,11 +808,6 @@ impl IDataHandler {
             .take(IMMUTABLE_DATA_ADULT_COPY_COUNT)
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>();
-
-        info!(
-            "No of vaults choosen to store the data: {}",
-            closest_adults.len()
-        );
 
         if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
             let mut closest_elders = routing_node
