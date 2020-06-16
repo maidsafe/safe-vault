@@ -201,9 +201,10 @@ impl Sequence {
             | GetPermissions { .. }
             | GetUserPermissions { .. } => self.get(client, request, message_id),
             Delete(address) => self.initiate_deletion(client, address, message_id),
-            SetPermissions { .. } | SetOwner { .. } | Append(..) => {
-                self.initiate_mutation(client, request, message_id)
-            }
+            MutatePubPermissions { .. }
+            | MutatePrivPermissions { .. }
+            | MutateOwner { .. }
+            | Mutate(..) => self.initiate_mutation(client, request, message_id),
         }
     }
 

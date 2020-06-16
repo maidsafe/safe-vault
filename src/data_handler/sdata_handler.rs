@@ -14,12 +14,11 @@ use crate::{
     vault::Init,
     Config, Result,
 };
-use log::info;
 
 use safe_nd::{
-    Error as NdError, MessageId, NodePublicId, PublicId, PublicKey, Response, Result as NdResult,
-    SData, SDataAction, SDataAddress, SDataAppendOperation, SDataIndex, SDataPermissions,
-    SDataRequest, SDataUser,
+    Error as NdError, MessageId, NodePublicId, PublicId, Response, Result as NdResult, SData,
+    SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataMutationOperation, SDataOwner,
+    SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataRequest, SDataUser,
 };
 
 use std::{
@@ -65,34 +64,24 @@ impl SDataHandler {
                 self.handle_get_range_req(requester, address, range, message_id)
             }
             GetLastEntry(address) => self.handle_get_last_entry_req(requester, address, message_id),
-            GetOwner {
-                address,
-                owners_index,
-            } => self.handle_get_owner_req(requester, address, owners_index, message_id),
-            GetUserPermissions {
-                address,
-                permissions_index,
-                user,
-            } => self.handle_get_user_permissions_req(
-                requester,
-                address,
-                permissions_index,
-                user,
-                message_id,
-            ),
-            GetPermissions {
-                address,
-                permissions_index,
-            } => self.handle_get_permissions_req(requester, address, permissions_index, message_id),
-            Delete(address) => self.handle_delete_req(requester, address, message_id),
-            SetPermissions {
-                address,
-                permissions,
-            } => self.handle_set_permissions_req(&requester, address, permissions, message_id),
-            SetOwner { address, owner } => {
-                self.handle_set_owner_req(&requester, address, owner, message_id)
+            GetOwner(address) => self.handle_get_owner_req(requester, address, message_id),
+            GetUserPermissions { address, user } => {
+                self.handle_get_user_permissions_req(requester, address, user, message_id)
             }
-            Append(operation) => self.handle_append_req(&requester, operation, message_id),
+            GetPermissions(address) => {
+                self.handle_get_permissions_req(requester, address, message_id)
+            }
+            Delete(address) => self.handle_delete_req(requester, address, message_id),
+            MutatePubPermissions(operation) => {
+                self.handle_mutate_pub_permissions_req(&requester, operation, message_id)
+            }
+            MutatePrivPermissions(operation) => {
+                self.handle_mutate_priv_permissions_req(&requester, operation, message_id)
+            }
+            MutateOwner(operation) => {
+                self.handle_mutate_owner_req(&requester, operation, message_id)
+            }
+            Mutate(operation) => self.handle_mutate_data_req(&requester, operation, message_id),
         }
     }
 
@@ -102,7 +91,6 @@ impl SDataHandler {
         data: &SData,
         message_id: MessageId,
     ) -> Option<Action> {
-        info!("STORE SDATA: {:?}", data);
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -110,7 +98,7 @@ impl SDataHandler {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-        info!("STORE SDATA RESULT: {:?}", result);
+
         let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *data.name(),
@@ -130,7 +118,6 @@ impl SDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self.get_sdata(&requester, address, SDataAction::Read);
-        info!("GET SDATA: {:?}", result);
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -174,7 +161,7 @@ impl SDataHandler {
                 error => error.to_string().into(),
             })
             .and_then(|sdata| {
-                // TODO - AData::check_permission() doesn't support Delete yet in safe-nd
+                // TODO - SData::check_permission() doesn't support Delete yet in safe-nd
                 if sdata.address().is_pub() {
                     Err(NdError::InvalidOperation)
                 } else {
@@ -249,16 +236,13 @@ impl SDataHandler {
         &self,
         requester: PublicId,
         address: SDataAddress,
-        owners_index: SDataIndex,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
             .get_sdata(&requester, address, SDataAction::Read)
             .and_then(|sdata| {
-                sdata
-                    .owner(owners_index)
-                    .cloned()
-                    .ok_or(NdError::InvalidOwners)
+                let index = sdata.owners_index() - 1;
+                sdata.owner(index).cloned().ok_or(NdError::InvalidOwners)
             });
 
         Some(Action::RespondToClientHandlers {
@@ -276,13 +260,15 @@ impl SDataHandler {
         &self,
         requester: PublicId,
         address: SDataAddress,
-        permissions_index: SDataIndex,
         user: SDataUser,
         message_id: MessageId,
     ) -> Option<Action> {
         let result = self
             .get_sdata(&requester, address, SDataAction::Read)
-            .and_then(|sdata| sdata.user_permissions(user, permissions_index));
+            .and_then(|sdata| {
+                let index = sdata.permissions_index() - 1;
+                sdata.user_permissions(user, index)
+            });
 
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),
@@ -299,17 +285,17 @@ impl SDataHandler {
         &self,
         requester: PublicId,
         address: SDataAddress,
-        permissions_index: SDataIndex,
         message_id: MessageId,
     ) -> Option<Action> {
         let response = {
             let result = self
                 .get_sdata(&requester, address, SDataAction::Read)
                 .and_then(|sdata| {
+                    let index = sdata.permissions_index() - 1;
                     let res = if sdata.is_pub() {
-                        SDataPermissions::from(sdata.pub_permissions(permissions_index)?.clone())
+                        SDataPermissions::from(sdata.pub_permissions(index)?.clone())
                     } else {
-                        SDataPermissions::from(sdata.priv_permissions(permissions_index)?.clone())
+                        SDataPermissions::from(sdata.priv_permissions(index)?.clone())
                     };
 
                     Ok(res)
@@ -328,59 +314,77 @@ impl SDataHandler {
         })
     }
 
-    fn handle_set_permissions_req(
+    fn handle_mutate_pub_permissions_req(
         &mut self,
         requester: &PublicId,
-        address: SDataAddress,
-        permissions: SDataPermissions,
+        mutation_op: SDataMutationOperation<SDataPubPermissions>,
         message_id: MessageId,
     ) -> Option<Action> {
+        let address = mutation_op.address;
         self.mutate_sdata_chunk(
             &requester,
             address,
             SDataAction::ManagePermissions,
             message_id,
             move |mut sdata| {
-                sdata.set_permissions(&permissions)?;
+                sdata.apply_crdt_pub_perms_op(mutation_op.crdt_op)?;
                 Ok(sdata)
             },
         )
     }
 
-    fn handle_set_owner_req(
+    fn handle_mutate_priv_permissions_req(
         &mut self,
         requester: &PublicId,
-        address: SDataAddress,
-        owner: PublicKey,
+        mutation_op: SDataMutationOperation<SDataPrivPermissions>,
         message_id: MessageId,
     ) -> Option<Action> {
+        let address = mutation_op.address;
         self.mutate_sdata_chunk(
             &requester,
             address,
             SDataAction::ManagePermissions,
             message_id,
             move |mut sdata| {
-                sdata.set_owner(owner);
+                sdata.apply_crdt_priv_perms_op(mutation_op.crdt_op)?;
                 Ok(sdata)
             },
         )
     }
 
-    fn handle_append_req(
+    fn handle_mutate_owner_req(
         &mut self,
         requester: &PublicId,
-        operation: SDataAppendOperation,
+        mutation_op: SDataMutationOperation<SDataOwner>,
         message_id: MessageId,
     ) -> Option<Action> {
-        let address = operation.address;
+        let address = mutation_op.address;
+        self.mutate_sdata_chunk(
+            &requester,
+            address,
+            SDataAction::ManagePermissions,
+            message_id,
+            move |mut sdata| {
+                sdata.apply_crdt_owner_op(mutation_op.crdt_op);
+                Ok(sdata)
+            },
+        )
+    }
+
+    fn handle_mutate_data_req(
+        &mut self,
+        requester: &PublicId,
+        mutation_op: SDataMutationOperation<SDataEntry>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let address = mutation_op.address;
         self.mutate_sdata_chunk(
             &requester,
             address,
             SDataAction::Append,
             message_id,
             move |mut sdata| {
-                info!("APPENDING TO SEQUENCE!");
-                sdata.append(operation.values)?;
+                sdata.apply_crdt_op(mutation_op.crdt_op);
                 Ok(sdata)
             },
         )
@@ -405,7 +409,7 @@ impl SDataHandler {
                     .put(&sdata)
                     .map_err(|error| error.to_string().into())
             });
-        info!("MUTATED SEQ: {:?}", result);
+
         let refund = utils::get_refund_for_put(&result);
         Some(Action::RespondToClientHandlers {
             sender: *address.name(),

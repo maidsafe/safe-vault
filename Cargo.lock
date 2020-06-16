@@ -365,8 +365,9 @@ dependencies = [
 
 [[package]]
 name = "crdts"
-version = "3.0.0"
-source = "git+https://github.com/bochaco/rust-crdt.git?branch=lseq-improvements#e31675b321e3e2bb514c1ce62f437d6e1470e1f2"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbe3a81de7c6d486b5087559d310092b053e7e9fddefe5257b745a233b2a66a7"
 dependencies = [
  "bitvec",
  "num-bigint 0.2.6",
@@ -1344,7 +1345,7 @@ dependencies = [
 [[package]]
 name = "mock-quic-p2p"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/quic-p2p#14e601daed8b80d3008352883d898fc75f93a5d7"
+source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6ae0517d0dc51c5fcdb1d50f7243d0500292b0e"
 dependencies = [
  "bytes 0.5.4",
  "crossbeam-channel",
@@ -1677,8 +1678,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e9a3d2dc326b4094f599118fdaa8565bd14204b685b91301c47db74c4a41ee7"
+source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6ae0517d0dc51c5fcdb1d50f7243d0500292b0e"
 dependencies = [
  "base64 0.10.1",
  "bincode 1.1.4",
@@ -2125,7 +2125,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?branch=fleming#4586f4b75a0c8c68923cd0c53f9a976512e9afac"
+source = "git+https://github.com/maidsafe/routing.git?branch=igd-err#ee8acb8f2ff894cd7a0f50f69fa8bdbec823d0d9"
 dependencies = [
  "bincode 1.1.4",
  "bytes 0.5.4",
@@ -2215,7 +2215,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.9.0"
-source = "git+https://github.com/bochaco/safe-nd.git?branch=sequence-on-lseq-crdt#0a2f5183273398daf84696f9275c5e3a38b06132"
+source = "git+https://github.com/maidsafe/safe-nd.git#d36e54dd72c1e6a89970508beee390ecca13a818"
 dependencies = [
  "bincode 1.1.4",
  "crdts",
@@ -2232,7 +2232,7 @@ dependencies = [
 
 [[package]]
 name = "safe_vault"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "base64 0.10.1",
  "bincode 1.1.4",
@@ -2283,21 +2283,22 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.13.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c505727b982d8c85ea1b3345a3a3c2712ba3d8417708ebacc960e4f8f84e3dbc"
+checksum = "6a3666182ee5fe97155008147fee49366a995e1fa30cfa78325c9dde2140b08e"
 dependencies = [
  "either",
  "flate2 1.0.14",
  "hyper-old-types",
  "indicatif",
+ "log 0.4.8",
  "quick-xml",
  "regex 1.3.9",
  "reqwest",
  "semver",
  "serde_json",
  "tar",
- "tempdir",
+ "tempfile",
  "zip",
 ]
 
@@ -2557,6 +2558,20 @@ checksum = "15f2b5fb00ccdf689e0149d1b1b3c03fead81c2b37735d812fa8bddbbf41b6d8"
 dependencies = [
  "rand 0.4.6",
  "remove_dir_all",
+]
+
+[[package]]
+name = "tempfile"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a6e24d9338a0a5be79593e2fa15a648add6138caa803e2d5bc782c371732ca9"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "rand 0.7.3",
+ "redox_syscall",
+ "remove_dir_all",
+ "winapi 0.3.8",
 ]
 
 [[package]]
