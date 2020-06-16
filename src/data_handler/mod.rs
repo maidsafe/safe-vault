@@ -224,17 +224,6 @@ impl DataHandler {
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
     pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<Action>> {
-        trace!("Get the list of IData holder {:?} was resposible for", node);
-        let mut actions = Vec::new();
-
-        let data_holders = self.idata_handler.as_mut().map_or_else(
-            || {
-                trace!("Not applicable to Adults");
-                None
-            },
-            |idata_handler| idata_handler.update_chunk_metadata_on_node_left(node).ok(),
-        )?;
-
         // Use the address of the lost node as a seed to generate a unique ID on all data handlers.
         // This is only used for the requester field and it should not be used for encryption / signing.
         let mut rng = rand::rngs::StdRng::from_seed(node.0);
@@ -242,27 +231,13 @@ impl DataHandler {
         let requester = PublicId::Node(node_id.public_id().clone());
         trace!("Generated NodeID {:?} to get chunk copy", &requester);
 
-        for (address, holders) in data_holders {
-            trace!("{:?} was resposible for : {:?}", node, address);
-            let mut hash_bytes = Vec::new();
-            hash_bytes.extend_from_slice(&address.name().0);
-            hash_bytes.extend_from_slice(&node.0);
-            let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
-            trace!("Generated MsgID {:?} to get chunk copy", &message_id);
-            let action = self.handle_idata_request(|idata_handler| {
-                idata_handler.request_chunk_from_holders(
-                    requester.clone(),
-                    address,
-                    holders,
-                    message_id,
-                )
-            });
-
-            if let Some(action) = action {
-                actions.push(action);
-            };
-        }
-        Some(actions)
+        self.idata_handler.as_mut().map_or_else(
+            || {
+                trace!("Not applicable to Adults");
+                None
+            },
+            |idata_handler| idata_handler.trigger_data_copy_process(requester.clone(), node),
+        )
     }
 }
 

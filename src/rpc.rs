@@ -8,8 +8,9 @@
 
 //! RPC messages internal to Vaults.
 
-use safe_nd::{Coins, MessageId, PublicId, Request, Response};
+use safe_nd::{Coins, IDataAddress, MessageId, PublicId, Request, Response, XorName};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 /// RPC messages exchanged between nodes.
 #[allow(clippy::large_enum_variant)]
@@ -27,5 +28,12 @@ pub(crate) enum Rpc {
         requester: PublicId,
         message_id: MessageId,
         refund: Option<Coins>,
+    },
+    /// Wrapper for a duplicate request, from elder to adults.
+    Duplicate {
+        requester: PublicId,
+        address: IDataAddress,
+        holders: BTreeSet<XorName>,
+        message_id: MessageId,
     },
 }

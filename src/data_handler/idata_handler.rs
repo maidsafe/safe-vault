@@ -299,38 +299,50 @@ impl IDataHandler {
             .or(process_request_action)
     }
 
-    pub(super) fn request_chunk_from_holders(
+    pub(super) fn trigger_data_copy_process(
         &mut self,
         requester: PublicId,
-        address: IDataAddress,
-        holders: BTreeSet<XorName>,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let our_name = *self.id.name();
-        let idata_op = IDataOp::new(
-            requester.clone(),
-            IDataRequest::Get(address),
-            holders.clone(),
+        node_left: XorName,
+    ) -> Option<Vec<Action>> {
+        trace!(
+            "Get the list of IData holder {:?} was resposible for",
+            node_left
         );
-        if !self.idata_elder_ops.contains(&message_id) {
-            let _ = self.idata_elder_ops.insert(message_id);
-            let request_chunks_action = match self.idata_client_ops.entry(message_id) {
-                Entry::Occupied(_) => None,
-                Entry::Vacant(vacant_entry) => {
-                    let idata_op = vacant_entry.insert(idata_op);
-                    Some(Action::SendToPeers {
+        let chunks_stored = self.update_chunk_metadata_on_node_left(node_left);
+
+        if let Ok(chunks_stored) = chunks_stored {
+            let our_name = *self.id.name();
+            let mut actions = Vec::new();
+
+            for (address, holders) in chunks_stored {
+                trace!("{:?} was resposible for : {:?}", node_left, address);
+
+                let mut hash_bytes = Vec::new();
+                hash_bytes.extend_from_slice(&address.name().0);
+                hash_bytes.extend_from_slice(&node_left.0);
+
+                let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
+                trace!("Generated MsgID {:?} to duplicate chunks", &message_id);
+
+                let new_holders = self.get_new_holders_for_chunk(&address);
+
+                if !self.idata_elder_ops.contains(&message_id) {
+                    let _ = self.idata_elder_ops.insert(message_id);
+
+                    let duplicate_chunk_action = Action::SendToPeers {
                         sender: our_name,
-                        targets: holders,
-                        rpc: Rpc::Request {
-                            request: Request::IData(idata_op.request().clone()),
-                            requester,
+                        targets: new_holders,
+                        rpc: Rpc::Duplicate {
+                            requester: requester.clone(),
+                            address,
+                            holders,
                             message_id,
                         },
-                    })
+                    };
+                    actions.push(duplicate_chunk_action);
                 }
-            };
-            self.apply_early_responses(message_id)
-                .or(request_chunks_action)
+            }
+            Some(actions)
         } else {
             None
         }
