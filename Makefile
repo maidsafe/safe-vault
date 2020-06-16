@@ -72,8 +72,8 @@ package-commit_hash-artifacts-for-deploy:
 
 	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
         -cvf safe_vault-${COMMIT_HASH}-x86_64-unknown-linux-musl.tar safe_vault
-	tar -C artifacts/prod/x86_64-pc-windows-gnu/release \
-        -cvf safe_vault-${COMMIT_HASH}-x86_64-pc-windows-gnu.tar safe_vault.exe
+	tar -C artifacts/prod/x86_64-pc-windows-msvc/release \
+        -cvf safe_vault-${COMMIT_HASH}-x86_64-pc-windows-msvc.tar safe_vault.exe
 	tar -C artifacts/prod/x86_64-apple-darwin/release \
         -cvf safe_vault-${COMMIT_HASH}-x86_64-apple-darwin.tar safe_vault
 
@@ -87,15 +87,15 @@ package-version-artifacts-for-deploy:
 
 	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.zip \
 		artifacts/prod/x86_64-unknown-linux-musl/release/safe_vault
-	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.zip \
-		artifacts/prod/x86_64-pc-windows-gnu/release/safe_vault.exe
+	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-msvc.zip \
+		artifacts/prod/x86_64-pc-windows-msvc/release/safe_vault.exe
 	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.zip \
 		artifacts/prod/x86_64-apple-darwin/release/safe_vault
 
 	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
 		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar.gz safe_vault
-	tar -C artifacts/prod/x86_64-pc-windows-gnu/release \
-		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-gnu.tar.gz safe_vault.exe
+	tar -C artifacts/prod/x86_64-pc-windows-msvc/release \
+		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-msvc.tar.gz safe_vault.exe
 	tar -C artifacts/prod/x86_64-apple-darwin/release \
 		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar.gz safe_vault
 

@@ -29,7 +29,7 @@ jobs:
         include:
           - os: windows-latest
             build-script: make build
-            target: x86_64-pc-windows-gnu
+            target: x86_64-pc-windows-msvc
           - os: macOS-latest
             build-script: make build
             target: x86_64-apple-darwin
@@ -145,8 +145,8 @@ jobs:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@master
         with:
-          name: safe_vault-x86_64-pc-windows-gnu-prod
-          path: artifacts/prod/x86_64-pc-windows-gnu/release
+          name: safe_vault-x86_64-pc-windows-msvc-prod
+          path: artifacts/prod/x86_64-pc-windows-msvc/release
       - uses: actions/download-artifact@master
         with:
           name: safe_vault-x86_64-unknown-linux-musl-prod
@@ -213,8 +213,8 @@ jobs:
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe_vault-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-gnu.zip
-          asset_name: safe_vault-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-gnu.zip
+          asset_path: deploy/prod/safe_vault-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-msvc.zip
+          asset_name: safe_vault-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-msvc.zip
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1
@@ -235,8 +235,8 @@ jobs:
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: deploy/prod/safe_vault-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-gnu.tar.gz
-          asset_name: safe_vault-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-gnu.tar.gz
+          asset_path: deploy/prod/safe_vault-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-msvc.tar.gz
+          asset_name: safe_vault-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-msvc.tar.gz
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
       - uses: actions/upload-release-asset@v1.0.1

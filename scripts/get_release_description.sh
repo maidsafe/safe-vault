@@ -37,7 +37,7 @@ zip_macos_checksum=$(sha256sum \
     "./deploy/prod/safe_vault-$version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 zip_win_checksum=$(sha256sum \
-    "./deploy/prod/safe_vault-$version-x86_64-pc-windows-gnu.zip" | \
+    "./deploy/prod/safe_vault-$version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 tar_linux_checksum=$(sha256sum \
     "./deploy/prod/safe_vault-$version-x86_64-unknown-linux-musl.tar.gz" | \
@@ -46,7 +46,7 @@ tar_macos_checksum=$(sha256sum \
     "./deploy/prod/safe_vault-$version-x86_64-apple-darwin.tar.gz" | \
     awk '{ print $1 }')
 tar_win_checksum=$(sha256sum \
-    "./deploy/prod/safe_vault-$version-x86_64-pc-windows-gnu.tar.gz" | \
+    "./deploy/prod/safe_vault-$version-x86_64-pc-windows-msvc.tar.gz" | \
     awk '{ print $1 }')
 
 release_description=$(sed "s/ZIP_LINUX_CHECKSUM/$zip_linux_checksum/g" <<< "$release_description")
