@@ -201,9 +201,10 @@ impl Sequence {
             | GetPermissions { .. }
             | GetUserPermissions { .. } => self.get(client, request, message_id),
             Delete(address) => self.initiate_deletion(client, address, message_id),
-            SetPermissions { .. } | SetOwner { .. } | Append(..) => {
-                self.initiate_mutation(client, request, message_id)
-            }
+            MutatePubPermissions { .. }
+            | MutatePrivPermissions { .. }
+            | MutateOwner { .. }
+            | Mutate(..) => self.initiate_mutation(client, request, message_id),
         }
     }
 
@@ -229,7 +230,7 @@ impl Sequence {
         message_id: MessageId,
     ) -> Option<Action> {
         let owner = utils::owner(&client.public_id)?;
-        // TODO - Should we replace this with a appendonly.check_permission call in data_handler.
+        // TODO - Should we replace this with a sequence.check_permission call in data_handler.
         // That would be more consistent, but on the other hand a check here stops spam earlier.
         if chunk.check_is_last_owner(*owner.public_key()).is_err() {
             trace!(
