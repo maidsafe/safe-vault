@@ -2101,7 +2101,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?branch=igd-err#4a092f0bb57f0504b1ba553f159cde5265a0e4b2"
+source = "git+https://github.com/maidsafe/routing.git?branch=igd-err#ee8acb8f2ff894cd7a0f50f69fa8bdbec823d0d9"
 dependencies = [
  "bincode 1.1.4",
  "bytes 0.5.4",

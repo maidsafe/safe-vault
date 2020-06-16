@@ -431,7 +431,8 @@ impl Messaging {
             let closest_known_elders = self
                 .routing_node
                 .borrow()
-                .closest_known_elders_to(&routing::XorName(client_id.name().0))
+                .our_elders_sorted_by_distance_to(&routing::XorName(client_id.name().0))
+                .into_iter()
                 .map(|p2p_node| {
                     let peer_addr = *p2p_node.peer_addr();
                     (XorName(p2p_node.name().0), peer_addr)

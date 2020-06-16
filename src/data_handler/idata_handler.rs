@@ -811,7 +811,8 @@ impl IDataHandler {
 
         if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
             let mut closest_elders = routing_node
-                .closest_known_elders_to(&routing::XorName(target.0))
+                .our_elders_sorted_by_distance_to(&routing::XorName(target.0))
+                .into_iter()
                 .take(IMMUTABLE_DATA_COPY_COUNT - closest_adults.len())
                 .map(|p2p_node| XorName(p2p_node.name().0))
                 .collect::<Vec<_>>();
