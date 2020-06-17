@@ -242,9 +242,6 @@ impl ClientHandler {
         {
             return Some(action);
         }
-        if let Some(action) = self.auth.verify_consistent_address(&request, message_id) {
-            return Some(action);
-        }
 
         match request {
             IData(idata_req) => self
@@ -255,10 +252,6 @@ impl ClientHandler {
                 .data
                 .mutable
                 .process_client_request(client, mdata_req, message_id),
-            AData(adata_req) => self
-                .data
-                .appendonly
-                .process_client_request(client, adata_req, message_id),
             SData(sdata_req) => self
                 .data
                 .sequence
@@ -313,7 +306,7 @@ impl ClientHandler {
             Client(req) => self
                 .auth
                 .finalise_client_request(requester, req, message_id),
-            IData(_) | MData(_) | AData(_) | SData(_) => {
+            IData(_) | MData(_) | SData(_) => {
                 error!(
                     "{}: Should not receive {:?} as a client handler.",
                     self, request

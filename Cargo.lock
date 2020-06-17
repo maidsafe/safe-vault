@@ -1408,7 +1408,7 @@ checksum = "e63899ad0da84ce718c14936262a41cee2c79c981fc0a0e7c7beb47d5a07e8c1"
 dependencies = [
  "num-integer",
  "num-traits 0.2.11",
- "rand 0.4.6",
+ "rand 0.3.23",
  "rustc-serialize",
 ]
 
@@ -2215,7 +2215,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.9.0"
-source = "git+https://github.com/maidsafe/safe-nd.git#d36e54dd72c1e6a89970508beee390ecca13a818"
+source = "git+https://github.com/maidsafe/safe-nd.git#368581b74a9de1d65adb1ddd709e7fd0ea437669"
 dependencies = [
  "bincode 1.1.4",
  "crdts",

@@ -8,7 +8,6 @@
 
 //! A simple, persistent, disk-based key-value store.
 
-mod append_only;
 mod chunk;
 pub(super) mod error;
 mod immutable;
@@ -23,7 +22,7 @@ use crate::{utils, vault::Init};
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
 use log::trace;
-use safe_nd::{AData, IData, LoginPacket, MData, SData};
+use safe_nd::{IData, LoginPacket, MData, SData};
 use std::{
     cell::Cell,
     fs::{self, DirEntry, File, Metadata},
@@ -41,7 +40,6 @@ const MAX_CHUNK_FILE_NAME_LENGTH: usize = 104;
 
 pub(crate) type ImmutableChunkStore = ChunkStore<IData>;
 pub(crate) type MutableChunkStore = ChunkStore<MData>;
-pub(crate) type AppendOnlyChunkStore = ChunkStore<AData>;
 pub(crate) type SequenceChunkStore = ChunkStore<SData>;
 pub(crate) type LoginPacketChunkStore = ChunkStore<LoginPacket>;
 
@@ -201,12 +199,6 @@ impl Subdir for ImmutableChunkStore {
 impl Subdir for MutableChunkStore {
     fn subdir() -> &'static Path {
         Path::new("mutable")
-    }
-}
-
-impl Subdir for AppendOnlyChunkStore {
-    fn subdir() -> &'static Path {
-        Path::new("append_only")
     }
 }
 

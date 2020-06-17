@@ -218,16 +218,6 @@ impl Messaging {
         match response {
             // Transfer the response from data handlers to clients
             GetIData(..)
-            | GetAData(..)
-            | GetADataShell(..)
-            | GetADataRange(..)
-            | GetADataIndices(..)
-            | GetADataLastEntry(..)
-            | GetADataOwners(..)
-            | GetPubADataUserPermissions(..)
-            | GetUnpubADataUserPermissions(..)
-            | GetADataPermissions(..)
-            | GetADataValue(..)
             | GetSData(..)
             | GetSDataRange(..)
             | GetSDataLastEntry(..)

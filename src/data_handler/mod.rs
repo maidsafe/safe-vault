@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod adata_handler;
 mod idata_handler;
 mod idata_holder;
 mod idata_op;
@@ -14,7 +13,6 @@ mod mdata_handler;
 mod sdata_handler;
 
 use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result};
-use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
@@ -40,7 +38,6 @@ pub(crate) struct DataHandler {
     idata_holder: IDataHolder,
     idata_handler: Option<IDataHandler>,
     mdata_handler: Option<MDataHandler>,
-    adata_handler: Option<ADataHandler>,
     sdata_handler: Option<SDataHandler>,
 }
 
@@ -54,19 +51,18 @@ impl DataHandler {
         routing_node: Rc<RefCell<Node>>,
     ) -> Result<Self> {
         let idata_holder = IDataHolder::new(id.clone(), config, total_used_space, init_mode)?;
-        let (idata_handler, mdata_handler, adata_handler, sdata_handler) = if is_elder {
+        let (idata_handler, mdata_handler, sdata_handler) = if is_elder {
             let idata_handler = IDataHandler::new(id.clone(), config, init_mode, routing_node)?;
             let mdata_handler = MDataHandler::new(id.clone(), config, total_used_space, init_mode)?;
-            let adata_handler = ADataHandler::new(id.clone(), config, total_used_space, init_mode)?;
             let sdata_handler = SDataHandler::new(id.clone(), config, total_used_space, init_mode)?;
+
             (
                 Some(idata_handler),
                 Some(mdata_handler),
-                Some(adata_handler),
                 Some(sdata_handler),
             )
         } else {
-            (None, None, None, None)
+            (None, None, None)
         };
 
         Ok(Self {
@@ -74,7 +70,6 @@ impl DataHandler {
             idata_holder,
             idata_handler,
             mdata_handler,
-            adata_handler,
             sdata_handler,
         })
     }
@@ -160,13 +155,6 @@ impl DataHandler {
                     None
                 },
                 |mdata_handler| mdata_handler.handle_request(requester, mdata_req, message_id),
-            ),
-            AData(adata_req) => self.adata_handler.as_mut().map_or_else(
-                || {
-                    trace!("Not applicable to Adults");
-                    None
-                },
-                |adata_handler| adata_handler.handle_request(requester, adata_req, message_id),
             ),
             SData(sdata_req) => self.sdata_handler.as_mut().map_or_else(
                 || {

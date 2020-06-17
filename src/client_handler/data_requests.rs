@@ -14,9 +14,8 @@ use crate::{
 };
 use log::trace;
 use safe_nd::{
-    AData, ADataAddress, ADataRequest, Error as NdError, IData, IDataAddress, IDataKind,
-    IDataRequest, MData, MDataRequest, MessageId, NodePublicId, Request, Response, SData,
-    SDataAddress, SDataRequest,
+    Error as NdError, IData, IDataAddress, IDataKind, IDataRequest, MData, MDataRequest, MessageId,
+    NodePublicId, Request, Response, SData, SDataAddress, SDataRequest,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -24,7 +23,6 @@ use std::fmt::{self, Display, Formatter};
 pub(crate) struct Evaluation {
     pub immutable: Immutable,
     pub mutable: Mutable,
-    pub appendonly: AppendOnly,
     pub sequence: Sequence,
 }
 
@@ -33,140 +31,8 @@ impl Evaluation {
         Self {
             immutable: Immutable::new(id.clone()),
             mutable: Mutable::new(id.clone()),
-            appendonly: AppendOnly::new(id.clone()),
             sequence: Sequence::new(id),
         }
-    }
-}
-
-// --------------------------------------------------------------------------------
-// --------------------------------------------------------------------------------
-// --------------------------------------------------------------------------------
-
-#[derive(Clone)]
-pub(crate) struct AppendOnly {
-    id: NodePublicId,
-}
-
-impl AppendOnly {
-    pub fn new(id: NodePublicId) -> Self {
-        Self { id }
-    }
-
-    // on client request
-    pub fn process_client_request(
-        &mut self,
-        client: &ClientInfo,
-        request: ADataRequest,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        use ADataRequest::*;
-        match request {
-            Put(chunk) => self.initiate_creation(client, chunk, message_id),
-            Get(_)
-            | GetShell { .. }
-            | GetRange { .. }
-            | GetIndices(_)
-            | GetLastEntry(_)
-            | GetOwners { .. }
-            | GetPermissions { .. }
-            | GetPubUserPermissions { .. }
-            | GetUnpubUserPermissions { .. }
-            | GetValue { .. } => self.get(client, request, message_id),
-            Delete(address) => self.initiate_deletion(client, address, message_id),
-            AddPubPermissions { .. }
-            | AddUnpubPermissions { .. }
-            | SetOwner { .. }
-            | AppendSeq { .. }
-            | AppendUnseq(..) => self.initiate_mutation(client, request, message_id),
-        }
-    }
-
-    // client query
-    fn get(
-        &mut self,
-        client: &ClientInfo,
-        request: ADataRequest,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::ForwardClientRequest(Rpc::Request {
-            requester: client.public_id.clone(),
-            request: Request::AData(request),
-            message_id,
-        }))
-    }
-
-    // on client request
-    fn initiate_creation(
-        &mut self,
-        client: &ClientInfo,
-        chunk: AData,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        let owner = utils::owner(&client.public_id)?;
-        // TODO - Should we replace this with a appendonly.check_permission call in data_handler.
-        // That would be more consistent, but on the other hand a check here stops spam earlier.
-        if chunk.check_is_last_owner(*owner.public_key()).is_err() {
-            trace!(
-                "{}: {} attempted Put AppendOnlyData with invalid owners.",
-                self,
-                client.public_id
-            );
-            return Some(Action::RespondToClient {
-                message_id,
-                response: Response::Mutation(Err(NdError::InvalidOwners)),
-            });
-        }
-
-        let request = Request::AData(ADataRequest::Put(chunk));
-        Some(Action::VoteFor(ConsensusAction::PayAndForward {
-            request,
-            client_public_id: client.public_id.clone(),
-            message_id,
-            cost: COST_OF_PUT,
-        }))
-    }
-
-    // on client request
-    fn initiate_deletion(
-        &mut self,
-        client: &ClientInfo,
-        address: ADataAddress,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        if address.is_pub() {
-            return Some(Action::RespondToClient {
-                message_id,
-                response: Response::Mutation(Err(NdError::InvalidOperation)),
-            });
-        }
-
-        Some(Action::VoteFor(ConsensusAction::Forward {
-            request: Request::AData(ADataRequest::Delete(address)),
-            client_public_id: client.public_id.clone(),
-            message_id,
-        }))
-    }
-
-    // on client request
-    fn initiate_mutation(
-        &mut self,
-        client: &ClientInfo,
-        request: ADataRequest,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        Some(Action::VoteFor(ConsensusAction::PayAndForward {
-            request: Request::AData(request),
-            client_public_id: client.public_id.clone(),
-            message_id,
-            cost: COST_OF_PUT,
-        }))
-    }
-}
-
-impl Display for AppendOnly {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
     }
 }
 

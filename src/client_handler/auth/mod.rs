@@ -17,8 +17,8 @@ use crate::{
 };
 use log::{error, warn};
 use safe_nd::{
-    ADataRequest, AppPermissions, AppPublicId, ClientRequest, Error as NdError, MessageId,
-    NodePublicId, PublicId, PublicKey, Request, RequestAuthKind, Response, Signature,
+    AppPermissions, AppPublicId, ClientRequest, Error as NdError, MessageId, NodePublicId,
+    PublicId, PublicKey, Request, RequestAuthKind, Response, Signature,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -253,28 +253,6 @@ impl Auth {
                     })
                 }
             }
-        }
-    }
-
-    pub fn verify_consistent_address(
-        &mut self,
-        request: &Request,
-        message_id: MessageId,
-    ) -> Option<Action> {
-        use Request::*;
-        let consistent = match request {
-            AData(ADataRequest::AppendSeq { ref append, .. }) => append.address.is_seq(),
-            AData(ADataRequest::AppendUnseq(ref append)) => !&append.address.is_seq(),
-            // TODO: any other requests for which this can happen?
-            _ => true,
-        };
-        if !consistent {
-            Some(Action::RespondToClient {
-                message_id,
-                response: Response::Mutation(Err(NdError::InvalidOperation)),
-            })
-        } else {
-            None
         }
     }
 
