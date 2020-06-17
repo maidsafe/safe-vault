@@ -17,19 +17,17 @@ use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
-use log::{error, trace};
+use log::{error, trace, debug};
 use mdata_handler::MDataHandler;
-use rand::SeedableRng;
 use routing::{Node, SrcLocation};
 
 use safe_nd::{
-    IDataAddress, IDataRequest, MessageId, NodeFullId, NodePublicId, PublicId, Request, Response,
-    XorName,
+    IDataAddress, IDataRequest, MessageId, NodePublicId, PublicId, Request, Response, XorName,
 };
 
 use std::{
     cell::{Cell, RefCell},
-    collections::{BTreeMap, BTreeSet},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -103,31 +101,33 @@ impl DataHandler {
         holders: BTreeSet<XorName>,
         message_id: MessageId,
     ) -> Option<Action> {
+        debug!("got the duplication rpc");
         trace!(
             "{}: Received duplication request from src {:?}",
             self,
             requester,
         );
-        if !self.idata_copy_op.contains_key(&message_id) {
-            trace!(
-                "Sending GetIData request for address: ({:?}) to {:?}",
-                address,
-                holders,
-            );
-            let our_name = self.id.name();
-            let our_id = self.id.clone();
-            let _ = self.idata_copy_op.insert(message_id, requester);
-            Some(Action::SendToPeers {
-                sender: *our_name,
-                targets: holders,
-                rpc: Rpc::Request {
-                    request: Request::IData(IDataRequest::Get(address)),
-                    requester: PublicId::Node(our_id),
-                    message_id,
-                },
-            })
-        } else {
-            None
+        match self.idata_copy_op.entry(message_id) {
+            Entry::Vacant(vacant_entry) => {
+                trace!(
+                    "Sending GetIData request for address: ({:?}) to {:?}",
+                    address,
+                    holders,
+                );
+                let our_name = self.id.name();
+                let our_id = self.id.clone();
+                let _ = vacant_entry.insert(requester);
+                Some(Action::SendToPeers {
+                    sender: *our_name,
+                    targets: holders,
+                    rpc: Rpc::Request {
+                        request: Request::IData(IDataRequest::Get(address)),
+                        requester: PublicId::Node(our_id),
+                        message_id,
+                    },
+                })
+            }
+            Entry::Occupied(_) => None,
         }
     }
 
@@ -248,9 +248,10 @@ impl DataHandler {
             }),
             GetIData(result) => {
                 if self.idata_copy_op.contains_key(&message_id) {
+                    debug!("got the duplication copy");
                     if let Ok(data) = result {
                         trace!(
-                            "Got GetIData copy resonse for address: ({:?})",
+                            "Got GetIData copy response for address: ({:?})",
                             data.address(),
                         );
                         let requester = self.idata_copy_op.get(&message_id).unwrap().clone();
@@ -281,19 +282,12 @@ impl DataHandler {
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
     pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<Action>> {
-        // Use the address of the lost node as a seed to generate a unique ID on all data handlers.
-        // This is only used for the requester field and it should not be used for encryption / signing.
-        let mut rng = rand::rngs::StdRng::from_seed(node.0);
-        let node_id = NodeFullId::new(&mut rng);
-        let requester = PublicId::Node(node_id.public_id().clone());
-        trace!("Generated NodeID {:?} to get chunk copy", &requester);
-
         self.idata_handler.as_mut().map_or_else(
             || {
                 trace!("Not applicable to Adults");
                 None
             },
-            |idata_handler| idata_handler.trigger_data_copy_process(requester.clone(), node),
+            |idata_handler| idata_handler.trigger_data_copy_process(node),
         )
     }
 }
