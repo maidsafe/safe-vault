@@ -16,19 +16,19 @@ use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result};
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
-use log::{error, trace};
+use log::{debug, error, trace};
 use mdata_handler::MDataHandler;
-use rand::SeedableRng;
 use routing::{Node, SrcLocation};
 use sdata_handler::SDataHandler;
 use tiny_keccak::sha3_256;
 
 use safe_nd::{
-    IDataRequest, MessageId, NodeFullId, NodePublicId, PublicId, Request, Response, XorName,
+    IDataAddress, IDataRequest, MessageId, NodePublicId, PublicId, Request, Response, XorName,
 };
 
 use std::{
     cell::{Cell, RefCell},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -39,6 +39,7 @@ pub(crate) struct DataHandler {
     idata_handler: Option<IDataHandler>,
     mdata_handler: Option<MDataHandler>,
     sdata_handler: Option<SDataHandler>,
+    idata_copy_op: BTreeMap<MessageId, PublicId>,
 }
 
 impl DataHandler {
@@ -71,6 +72,7 @@ impl DataHandler {
             idata_handler,
             mdata_handler,
             sdata_handler,
+            idata_copy_op: Default::default(),
         })
     }
 
@@ -86,6 +88,49 @@ impl DataHandler {
                 message_id,
                 ..
             } => self.handle_response(utils::get_source_name(src), response, message_id),
+            Rpc::Duplicate {
+                requester,
+                address,
+                holders,
+                message_id,
+            } => self.handle_duplicate_request(requester, address, holders, message_id),
+        }
+    }
+
+    fn handle_duplicate_request(
+        &mut self,
+        requester: PublicId,
+        address: IDataAddress,
+        holders: BTreeSet<XorName>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        debug!("got the duplication rpc");
+        trace!(
+            "{}: Received duplication request from src {:?}",
+            self,
+            requester,
+        );
+        match self.idata_copy_op.entry(message_id) {
+            Entry::Vacant(vacant_entry) => {
+                trace!(
+                    "Sending GetIData request for address: ({:?}) to {:?}",
+                    address,
+                    holders,
+                );
+                let our_name = self.id.name();
+                let our_id = self.id.clone();
+                let _ = vacant_entry.insert(requester);
+                Some(Action::SendToPeers {
+                    sender: *our_name,
+                    targets: holders,
+                    rpc: Rpc::Request {
+                        request: Request::IData(IDataRequest::Get(address)),
+                        requester: PublicId::Node(our_id),
+                        message_id,
+                    },
+                })
+            }
+            Entry::Occupied(_) => None,
         }
     }
 
@@ -204,9 +249,25 @@ impl DataHandler {
             Mutation(result) => self.handle_idata_request(|idata_handler| {
                 idata_handler.handle_mutation_resp(src, result, message_id)
             }),
-            GetIData(result) => self.handle_idata_request(|idata_handler| {
-                idata_handler.handle_get_idata_resp(src, result, message_id)
-            }),
+            GetIData(result) => {
+                if self.idata_copy_op.contains_key(&message_id) {
+                    debug!("got the duplication copy");
+                    if let Ok(data) = result {
+                        trace!(
+                            "Got GetIData copy response for address: ({:?})",
+                            data.address(),
+                        );
+                        let requester = self.idata_copy_op.get(&message_id).unwrap().clone();
+                        self.idata_holder.store_idata(&data, requester, message_id)
+                    } else {
+                        None
+                    }
+                } else {
+                    self.handle_idata_request(|idata_handler| {
+                        idata_handler.handle_get_idata_resp(src, result, message_id)
+                    })
+                }
+            }
             //
             // ===== Invalid =====
             //
@@ -224,19 +285,12 @@ impl DataHandler {
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
     pub fn trigger_chunk_duplication(&mut self, node: XorName) -> Option<Vec<Action>> {
-        // Use the address of the lost node as a seed to generate a unique ID on all data handlers.
-        // This is only used for the requester field and it should not be used for encryption / signing.
-        let mut rng = rand::rngs::StdRng::from_seed(node.0);
-        let node_id = NodeFullId::new(&mut rng);
-        let requester = PublicId::Node(node_id.public_id().clone());
-        trace!("Generated NodeID {:?} to get chunk copy", &requester);
-
         self.idata_handler.as_mut().map_or_else(
             || {
                 trace!("Not applicable to Adults");
                 None
             },
-            |idata_handler| idata_handler.trigger_data_copy_process(requester.clone(), node),
+            |idata_handler| idata_handler.trigger_data_copy_process(node),
         )
     }
 }

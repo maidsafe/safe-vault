@@ -299,15 +299,18 @@ impl IDataHandler {
             .or(process_request_action)
     }
 
-    pub(super) fn trigger_data_copy_process(
-        &mut self,
-        requester: PublicId,
-        node_left: XorName,
-    ) -> Option<Vec<Action>> {
+    pub(super) fn trigger_data_copy_process(&mut self, node_left: XorName) -> Option<Vec<Action>> {
         trace!(
             "Get the list of IData holder {:?} was resposible for",
             node_left
         );
+        // Use the address of the lost node as a seed to generate a unique ID on all data handlers.
+        // This is only used for the requester field and it should not be used for encryption / signing.
+        let mut rng = rand::rngs::StdRng::from_seed(node_left.0);
+        let node_id = NodeFullId::new(&mut rng);
+        let requester = PublicId::Node(node_id.public_id().clone());
+        trace!("Generated NodeID {:?} to get chunk copy", &requester);
+
         let chunks_stored = self.update_chunk_metadata_on_node_left(node_left);
 
         if let Ok(chunks_stored) = chunks_stored {
