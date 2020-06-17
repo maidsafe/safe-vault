@@ -17,7 +17,7 @@ use adata_handler::ADataHandler;
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use idata_op::{IDataOp, OpType};
-use log::{error, trace, debug};
+use log::{debug, error, trace};
 use mdata_handler::MDataHandler;
 use routing::{Node, SrcLocation};
 
