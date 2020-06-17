@@ -23,11 +23,13 @@ use rand::SeedableRng;
 use routing::{Node, SrcLocation};
 
 use safe_nd::{
-    IDataRequest, MessageId, NodeFullId, NodePublicId, PublicId, Request, Response, XorName,
+    IDataAddress, IDataRequest, MessageId, NodeFullId, NodePublicId, PublicId, Request, Response,
+    XorName,
 };
 
 use std::{
     cell::{Cell, RefCell},
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -38,6 +40,7 @@ pub(crate) struct DataHandler {
     idata_handler: Option<IDataHandler>,
     mdata_handler: Option<MDataHandler>,
     adata_handler: Option<ADataHandler>,
+    idata_copy_op: BTreeMap<MessageId, PublicId>,
 }
 
 impl DataHandler {
@@ -68,6 +71,7 @@ impl DataHandler {
             idata_handler,
             mdata_handler,
             adata_handler,
+            idata_copy_op: Default::default(),
         })
     }
 
@@ -83,6 +87,47 @@ impl DataHandler {
                 message_id,
                 ..
             } => self.handle_response(utils::get_source_name(src), response, message_id),
+            Rpc::Duplicate {
+                requester,
+                address,
+                holders,
+                message_id,
+            } => self.handle_duplicate_request(requester, address, holders, message_id),
+        }
+    }
+
+    fn handle_duplicate_request(
+        &mut self,
+        requester: PublicId,
+        address: IDataAddress,
+        holders: BTreeSet<XorName>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        trace!(
+            "{}: Received duplication request from src {:?}",
+            self,
+            requester,
+        );
+        if !self.idata_copy_op.contains_key(&message_id) {
+            trace!(
+                "Sending GetIData request for address: ({:?}) to {:?}",
+                address,
+                holders,
+            );
+            let our_name = self.id.name();
+            let our_id = self.id.clone();
+            let _ = self.idata_copy_op.insert(message_id, requester);
+            Some(Action::SendToPeers {
+                sender: *our_name,
+                targets: holders,
+                rpc: Rpc::Request {
+                    request: Request::IData(IDataRequest::Get(address)),
+                    requester: PublicId::Node(our_id),
+                    message_id,
+                },
+            })
+        } else {
+            None
         }
     }
 
@@ -201,9 +246,24 @@ impl DataHandler {
             Mutation(result) => self.handle_idata_request(|idata_handler| {
                 idata_handler.handle_mutation_resp(src, result, message_id)
             }),
-            GetIData(result) => self.handle_idata_request(|idata_handler| {
-                idata_handler.handle_get_idata_resp(src, result, message_id)
-            }),
+            GetIData(result) => {
+                if self.idata_copy_op.contains_key(&message_id) {
+                    if let Ok(data) = result {
+                        trace!(
+                            "Got GetIData copy resonse for address: ({:?})",
+                            data.address(),
+                        );
+                        let requester = self.idata_copy_op.get(&message_id).unwrap().clone();
+                        self.idata_holder.store_idata(&data, requester, message_id)
+                    } else {
+                        None
+                    }
+                } else {
+                    self.handle_idata_request(|idata_handler| {
+                        idata_handler.handle_get_idata_resp(src, result, message_id)
+                    })
+                }
+            }
             //
             // ===== Invalid =====
             //

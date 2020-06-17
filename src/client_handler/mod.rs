@@ -126,6 +126,7 @@ impl ClientHandler {
                 self.messaging
                     .relay_reponse_to_client(src, &requester, response, message_id)
             }
+            Rpc::Duplicate { .. } => None,
         }
     }
 
