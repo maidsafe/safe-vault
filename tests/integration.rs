@@ -35,10 +35,12 @@ use safe_nd::{
     MDataEntries, MDataKind, MDataPermissionSet, MDataRequest, MDataSeqEntryActions, MDataSeqValue,
     MDataUnseqEntryActions, MDataValue, MDataValues, Message, MessageId, PubImmutableData,
     PubSeqAppendOnlyData, PubUnseqAppendOnlyData, PublicKey, Request, Response, Result as NdResult,
-    SeqAppendOnly, SeqMutableData, Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData,
+    SData, SDataAddress, SDataIndex, SDataMutationOperation, SDataOwner, SDataPrivUserPermissions,
+    SDataPubUserPermissions, SDataRequest, SDataUser, SDataUserPermissions, SeqAppendOnly,
+    SeqMutableData, Transaction, UnpubImmutableData, UnpubSeqAppendOnlyData,
     UnpubUnseqAppendOnlyData, UnseqAppendOnly, UnseqMutableData, XorName,
 };
-use safe_vault::COST_OF_PUT;
+use safe_vault::{Result, COST_OF_PUT};
 use std::collections::{BTreeMap, BTreeSet};
 use unwrap::unwrap;
 
@@ -3228,4 +3230,859 @@ fn delete_mutable_data() {
         Request::MData(MDataRequest::Get(address)),
         NdError::NoSuchData,
     );
+}
+
+/// Sequence tests ///
+#[test]
+fn sequence_store_get_and_delete() {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    let owner_a = *client_a.public_id().public_key();
+
+    // Public Sequence
+    let pub_sdata_name: XorName = env.rng().gen();
+    let mut pub_sdata = SData::new_pub(owner_a, pub_sdata_name, 100);
+    let _op = pub_sdata.set_owner(owner_a);
+    let _op = pub_sdata.append(b"pub sequence first".to_vec());
+    let _op = pub_sdata.append(b"pub sequence second".to_vec());
+
+    // Private Sequence
+    let priv_sdata_name: XorName = env.rng().gen();
+    let mut priv_sdata = SData::new_priv(owner_a, priv_sdata_name, 100);
+    let _op = priv_sdata.set_owner(owner_a);
+    let _op = priv_sdata.append(b"priv sequence first".to_vec());
+    let _op = priv_sdata.append(b"priv sequence second".to_vec());
+
+    // First try to store some data without any associated balance.
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Store(pub_sdata.clone())),
+        NdError::NoSuchBalance,
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Store(priv_sdata.clone())),
+        NdError::NoSuchBalance,
+    );
+
+    let start_nano = 1_000_000_000_000;
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
+
+    // Check that client B cannot store A's data
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::Store(pub_sdata.clone())),
+        NdError::InvalidOwners,
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::Store(priv_sdata.clone())),
+        NdError::InvalidOwners,
+    );
+
+    // Store, this time with a balance and the correct owner
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Store(pub_sdata.clone())),
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Store(priv_sdata.clone())),
+    );
+
+    let balance_a = Coins::from_nano(start_nano - 2);
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_a,
+        Request::Coins(CoinsRequest::GetBalance),
+        balance_a,
+    );
+
+    // Get the data to verify
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::GetLastEntry(*pub_sdata.address())),
+        (/* index ==*/ 1, b"pub sequence second".to_vec()),
+    );
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::GetLastEntry(*priv_sdata.address())),
+        (/* index ==*/ 1, b"priv sequence second".to_vec()),
+    );
+
+    // Verify that B cannot delete A's data
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::Delete(*pub_sdata.address())),
+        NdError::InvalidOperation,
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::Delete(*priv_sdata.address())),
+        NdError::AccessDenied,
+    );
+
+    // Delete the data
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Delete(*pub_sdata.address())),
+        NdError::InvalidOperation,
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Delete(*priv_sdata.address())),
+    );
+
+    // Deletions are free so A's balance should remain the same.
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_a,
+        Request::Coins(CoinsRequest::GetBalance),
+        balance_a,
+    );
+
+    // Delete again to test if it's gone
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Delete(*priv_sdata.address())),
+        NdError::NoSuchData,
+    );
+
+    // The balance should remain the same when deletion fails
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_a,
+        Request::Coins(CoinsRequest::GetBalance),
+        balance_a,
+    );
+}
+
+#[test]
+fn sequence_delete_inexistent() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    let actor = *client.public_id().public_key();
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+
+    let start_nano = 1_000_000_000_000;
+    common::create_balance(&mut env, &mut client, None, start_nano);
+
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Delete(
+            *SData::new_pub(actor, name, tag).address(),
+        )),
+        NdError::InvalidOperation,
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Delete(
+            *SData::new_priv(actor, name, tag).address(),
+        )),
+        NdError::NoSuchData,
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::Coins(CoinsRequest::GetBalance),
+        Coins::from_nano(start_nano),
+    );
+}
+
+#[test]
+fn sequence_get_public_inexistent() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    // Failure - non-existing data
+    let invalid_name: XorName = env.rng().gen();
+    let invalid_address = SDataAddress::Public {
+        name: invalid_name,
+        tag: 100,
+    };
+
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Get(invalid_address)),
+        NdError::NoSuchData,
+    );
+}
+
+#[test]
+fn sequence_get_private_invalid_owner() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
+
+    let owner = *client.public_id().public_key();
+    let mut priv_sdata = SData::new_priv(owner, env.rng().gen(), 100);
+
+    let _op = priv_sdata.set_owner(owner);
+
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Store(priv_sdata.clone())),
+    );
+
+    let address = *priv_sdata.address();
+    // Failure - get by non-owner not allowed
+    let mut other_client = env.new_connected_client();
+    common::send_request_expect_err(
+        &mut env,
+        &mut other_client,
+        Request::SData(SDataRequest::Get(address)),
+        NdError::AccessDenied,
+    );
+
+    // Failure - non-existing priv_sdata
+    let invalid_name: XorName = env.rng().gen();
+    let invalid_address = SDataAddress::Private {
+        name: invalid_name,
+        tag: 100,
+    };
+
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Get(invalid_address)),
+        NdError::NoSuchData,
+    );
+}
+
+#[test]
+fn sequence_get_entries() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    common::create_balance(&mut env, &mut client, None, COST_OF_PUT);
+
+    let owner = *client.public_id().public_key();
+    let mut data = SData::new_pub(owner, env.rng().gen(), 100);
+
+    let _op = data.set_owner(owner);
+    let entry_one = b"one".to_vec();
+    let entry_two = b"two".to_vec();
+    let _op = data.append(entry_one.clone());
+    let _op = data.append(entry_two.clone());
+
+    let address = *data.address();
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::Coins(CoinsRequest::GetBalance),
+        COST_OF_PUT,
+    );
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Store(data.clone())),
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Store(data)),
+        NdError::InsufficientBalance,
+    );
+
+    // GetSDataRange
+    let mut range_scenario = |start, end, expected_result| {
+        common::send_request_expect_ok(
+            &mut env,
+            &mut client,
+            Request::SData(SDataRequest::GetRange {
+                address,
+                range: (start, end),
+            }),
+            expected_result,
+        )
+    };
+
+    //    range_scenario(SDataIndex::FromStart(0), SDataIndex::FromStart(0), vec![]);
+    range_scenario(
+        SDataIndex::FromStart(0),
+        SDataIndex::FromStart(1),
+        vec![entry_one.clone()],
+    );
+    range_scenario(
+        SDataIndex::FromStart(1),
+        SDataIndex::FromStart(2),
+        vec![entry_two.clone()],
+    );
+    range_scenario(
+        SDataIndex::FromEnd(1),
+        SDataIndex::FromEnd(0),
+        vec![entry_two.clone()],
+    );
+    range_scenario(
+        SDataIndex::FromStart(0),
+        SDataIndex::FromEnd(0),
+        vec![entry_one, entry_two.clone()],
+    );
+
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetRange {
+            address,
+            range: (SDataIndex::FromStart(0), SDataIndex::FromStart(3)),
+        }),
+        NdError::NoSuchEntry,
+    );
+
+    // GetSDataLastEntry
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetLastEntry(address)),
+        (/*index == */ 1, entry_two),
+    );
+}
+
+#[test]
+fn sequence_set_owner() {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+    common::create_balance(&mut env, &mut client, None, 1_000);
+
+    let owner = *client.public_id().public_key();
+    let owner_2 = common::gen_public_key(env.rng());
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut pub_sdata = SData::new_pub(owner, name, tag);
+
+    let entry = b"entry".to_vec();
+
+    let _op = pub_sdata.set_owner(owner);
+    let _op = pub_sdata.append(entry.clone());
+
+    let address = *pub_sdata.address();
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Store(pub_sdata.clone())),
+    );
+
+    // keep in mind that for all scenarios the data has no permissions set,
+    // so it's all about the owners being set
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetRange {
+            address,
+            range: (SDataIndex::FromStart(0), SDataIndex::FromStart(1)),
+        }),
+        vec![entry.clone()],
+    );
+
+    let owner_op = pub_sdata.set_owner(owner_2);
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::MutateOwner(SDataMutationOperation {
+            address,
+            crdt_op: owner_op.crdt_op,
+        })),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetRange {
+            address,
+            range: (SDataIndex::FromStart(0), SDataIndex::FromEnd(0)),
+        }),
+        vec![entry],
+    );
+}
+
+#[test]
+fn sequence_set_pub_permissions() -> Result<()> {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+    common::create_balance(&mut env, &mut client, None, 1_000);
+    let owner = *client.public_id().public_key();
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut pub_sdata = SData::new_pub(owner, name, tag);
+    let public_key = common::gen_public_key(env.rng());
+
+    let _op = pub_sdata.set_owner(owner);
+
+    let perms_0 = btreemap![SDataUser::Anyone => SDataPubUserPermissions::new(true, false)];
+    let _op = pub_sdata.set_pub_permissions(perms_0);
+
+    let address = *pub_sdata.address();
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Store(pub_sdata.clone())),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetUserPermissions {
+            address,
+            user: SDataUser::Anyone,
+        }),
+        SDataUserPermissions::Pub(SDataPubUserPermissions::new(true, false)),
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetUserPermissions {
+            address,
+            user: SDataUser::Key(public_key),
+        }),
+        NdError::NoSuchEntry,
+    );
+
+    let perms_1 = btreemap![
+        SDataUser::Anyone => SDataPubUserPermissions::new(false, false),
+        SDataUser::Key(public_key) => SDataPubUserPermissions::new(true, false)
+    ];
+    let perms_op = pub_sdata.set_pub_permissions(perms_1)?;
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::MutatePubPermissions(SDataMutationOperation {
+            address,
+            crdt_op: perms_op.crdt_op,
+        })),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetUserPermissions {
+            address,
+            user: SDataUser::Anyone,
+        }),
+        SDataUserPermissions::Pub(SDataPubUserPermissions::new(false, false)),
+    );
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetUserPermissions {
+            address,
+            user: SDataUser::Key(public_key),
+        }),
+        SDataUserPermissions::Pub(SDataPubUserPermissions::new(true, false)),
+    );
+
+    Ok(())
+}
+
+#[test]
+fn sequence_set_priv_permissions() -> Result<()> {
+    let mut env = Environment::new();
+    let mut client = env.new_connected_client();
+
+    let start_nano = 1_000;
+    common::create_balance(&mut env, &mut client, None, start_nano);
+    let owner = *client.public_id().public_key();
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut priv_sdata = SData::new_priv(owner, name, tag);
+
+    let _op = priv_sdata.set_owner(owner);
+
+    let public_key_0 = common::gen_public_key(env.rng());
+    let public_key_1 = common::gen_public_key(env.rng());
+
+    let perms_0 = btreemap![
+        public_key_0 => SDataPrivUserPermissions::new(true, true, false)
+    ];
+    let _op = priv_sdata.set_priv_permissions(perms_0)?;
+
+    let address = *priv_sdata.address();
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::Store(priv_sdata.clone())),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetUserPermissions {
+            address,
+            user: SDataUser::Key(public_key_0),
+        }),
+        SDataUserPermissions::Priv(SDataPrivUserPermissions::new(true, true, false)),
+    );
+    common::send_request_expect_err(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetUserPermissions {
+            address,
+            user: SDataUser::Key(public_key_1),
+        }),
+        NdError::NoSuchEntry,
+    );
+
+    let perms_1 = btreemap![
+        public_key_0 => SDataPrivUserPermissions::new(true, false, false),
+        public_key_1 => SDataPrivUserPermissions::new(true, true, true)
+    ];
+    let perms_op = priv_sdata.set_priv_permissions(perms_1)?;
+    common::perform_mutation(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::MutatePrivPermissions(
+            SDataMutationOperation {
+                address,
+                crdt_op: perms_op.crdt_op,
+            },
+        )),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetUserPermissions {
+            address,
+            user: SDataUser::Key(public_key_0),
+        }),
+        SDataUserPermissions::Priv(SDataPrivUserPermissions::new(true, false, false)),
+    );
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client,
+        Request::SData(SDataRequest::GetUserPermissions {
+            address,
+            user: SDataUser::Key(public_key_1),
+        }),
+        SDataUserPermissions::Priv(SDataPrivUserPermissions::new(true, true, true)),
+    );
+
+    Ok(())
+}
+
+#[test]
+fn sequence_set_owners() -> Result<()> {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+
+    let public_key_a = *client_a.public_id().public_key();
+    let public_key_b = *client_b.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
+    common::create_balance(&mut env, &mut client_b, None, start_nano);
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut pub_sdata = SData::new_pub(public_key_a, name, tag);
+
+    let perms_0 =
+        btreemap![SDataUser::Key(public_key_a) => SDataPubUserPermissions::new(true, true)];
+
+    let _op = pub_sdata.set_pub_permissions(perms_0)?;
+    let _op = pub_sdata.append(b"one".to_vec());
+    let _op = pub_sdata.append(b"two".to_vec());
+    let owner_a = public_key_a;
+    let _op = pub_sdata.set_owner(owner_a);
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Store(pub_sdata.clone())),
+    );
+
+    let address = *pub_sdata.address();
+    // Both A or B can get the owner
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::GetOwner(address)),
+        SDataOwner {
+            public_key: owner_a,
+            entries_index: 2,
+            permissions_index: 1,
+        },
+    );
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::GetOwner(address)),
+        SDataOwner {
+            public_key: owner_a,
+            entries_index: 2,
+            permissions_index: 1,
+        },
+    );
+
+    // Set the new owner, change from A -> B
+    let owner_b = public_key_b;
+
+    // B can't set the new owner, but A can
+    let owner_op = pub_sdata.set_owner(owner_b);
+    common::send_request_expect_err(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::MutateOwner(SDataMutationOperation {
+            address,
+            crdt_op: owner_op.crdt_op.clone(),
+        })),
+        NdError::AccessDenied,
+    );
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::MutateOwner(SDataMutationOperation {
+            address,
+            crdt_op: owner_op.crdt_op,
+        })),
+    );
+
+    // Both A or B can get the new owner
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::GetOwner(address)),
+        SDataOwner {
+            public_key: owner_b,
+            entries_index: 2,
+            permissions_index: 1,
+        },
+    );
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::GetOwner(address)),
+        SDataOwner {
+            public_key: owner_b,
+            entries_index: 2,
+            permissions_index: 1,
+        },
+    );
+    Ok(())
+}
+
+#[test]
+fn sequence_append_to_public() -> Result<()> {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+    let owner_a = *client_a.public_id().public_key();
+    let owner_b = *client_b.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut pub_sdata = SData::new_pub(owner_a, name, tag);
+
+    let _op = pub_sdata.set_owner(owner_a);
+
+    let perms_0 = btreemap![SDataUser::Key(owner_b) => SDataPubUserPermissions::new(true, true)];
+
+    let _op = pub_sdata.set_pub_permissions(perms_0)?;
+    let _op = pub_sdata.append(b"one".to_vec());
+    let _op = pub_sdata.append(b"two".to_vec());
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Store(pub_sdata.clone())),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::GetLastEntry(*pub_sdata.address())),
+        (/* index ==*/ 1, b"two".to_vec()),
+    );
+
+    let entries_op = pub_sdata.append(b"three".to_vec());
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+            address: *pub_sdata.address(),
+            crdt_op: entries_op.crdt_op,
+        })),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::GetLastEntry(*pub_sdata.address())),
+        (/* index ==*/ 2, b"three".to_vec()),
+    );
+
+    Ok(())
+}
+
+#[test]
+fn sequence_append_to_private() -> Result<()> {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+    let owner_a = *client_a.public_id().public_key();
+    let owner_b = *client_b.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut priv_sdata = SData::new_priv(owner_a, name, tag);
+
+    let _op = priv_sdata.set_owner(owner_a);
+
+    let perms_0 = btreemap![owner_b => SDataPrivUserPermissions::new(true, true, true)];
+
+    let _op = priv_sdata.set_priv_permissions(perms_0)?;
+    let _op = priv_sdata.append(b"one".to_vec());
+    let _op = priv_sdata.append(b"two".to_vec());
+
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Store(priv_sdata.clone())),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::GetLastEntry(*priv_sdata.address())),
+        (/* index ==*/ 1, b"two".to_vec()),
+    );
+
+    let entries_op = priv_sdata.append(b"three".to_vec());
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+            address: *priv_sdata.address(),
+            crdt_op: entries_op.crdt_op,
+        })),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::GetLastEntry(*priv_sdata.address())),
+        (/* index ==*/ 2, b"three".to_vec()),
+    );
+
+    Ok(())
+}
+
+#[test]
+fn sequence_append_concurrently_from_diff_clients() -> Result<()> {
+    let mut env = Environment::new();
+    let mut client_a = env.new_connected_client();
+    let mut client_b = env.new_connected_client();
+    let mut client_c = env.new_connected_client();
+    let owner_a = *client_a.public_id().public_key();
+    let owner_b = *client_b.public_id().public_key();
+
+    let start_nano = 1_000_000_000_000;
+    common::create_balance(&mut env, &mut client_a, None, start_nano);
+    common::create_balance(&mut env, &mut client_b, None, start_nano);
+
+    let name: XorName = env.rng().gen();
+    let tag = 100;
+    let mut pub_sdata = SData::new_pub(owner_a, name, tag);
+
+    let _op = pub_sdata.set_owner(owner_a);
+
+    // client_b can also append
+    let perms_0 = btreemap![SDataUser::Key(owner_b) => SDataPubUserPermissions::new(true, true)];
+
+    let _op = pub_sdata.set_pub_permissions(perms_0)?;
+    let _op = pub_sdata.append(b"one".to_vec());
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Store(pub_sdata.clone())),
+    );
+
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::GetLastEntry(*pub_sdata.address())),
+        (/* index ==*/ 0, b"one".to_vec()),
+    );
+
+    // now both clent_a and client_b append items to it
+    let entries_op = pub_sdata.append(b"two-from-b".to_vec());
+    common::perform_mutation(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+            address: *pub_sdata.address(),
+            crdt_op: entries_op.crdt_op,
+        })),
+    );
+
+    let entries_op = pub_sdata.append(b"two-from-a".to_vec());
+    common::perform_mutation(
+        &mut env,
+        &mut client_a,
+        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+            address: *pub_sdata.address(),
+            crdt_op: entries_op.crdt_op,
+        })),
+    );
+
+    let entries_op = pub_sdata.append(b"three-from-b".to_vec());
+    common::perform_mutation(
+        &mut env,
+        &mut client_b,
+        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+            address: *pub_sdata.address(),
+            crdt_op: entries_op.crdt_op,
+        })),
+    );
+
+    // now client_c reads and see the three items
+    common::send_request_expect_ok(
+        &mut env,
+        &mut client_c,
+        Request::SData(SDataRequest::GetRange {
+            address: *pub_sdata.address(),
+            range: (SDataIndex::FromStart(0), SDataIndex::FromEnd(0)),
+        }),
+        vec![
+            b"one".to_vec(),
+            b"two-from-b".to_vec(),
+            b"two-from-a".to_vec(),
+            b"three-from-b".to_vec(),
+        ],
+    );
+
+    Ok(())
 }
