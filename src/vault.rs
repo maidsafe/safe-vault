@@ -390,6 +390,9 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     _ => unimplemented!("Should not receive: {:?}", response),
                 },
                 Rpc::Duplicate { .. } => self.data_handler_mut()?.handle_vault_rpc(src, rpc),
+                Rpc::DuplicationComplete { .. } => {
+                    self.data_handler_mut()?.handle_vault_rpc(src, rpc)
+                }
             },
             Err(e) => {
                 error!("Error deserializing routing message into Rpc type: {:?}", e);

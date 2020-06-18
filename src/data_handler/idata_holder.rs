@@ -48,6 +48,7 @@ impl IDataHolder {
 
     pub(crate) fn store_idata(
         &mut self,
+        sender: SrcLocation,
         data: &IData,
         requester: PublicId,
         message_id: MessageId,
@@ -64,16 +65,29 @@ impl IDataHolder {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-
         let refund = utils::get_refund_for_put(&result);
-        Some(Action::RespondToOurDataHandlers {
-            rpc: Rpc::Response {
-                requester,
-                response: Response::Mutation(result),
-                message_id,
-                refund,
-            },
-        })
+
+        match sender {
+            SrcLocation::Node(xorname) => {
+                let mut targets: BTreeSet<XorName> = Default::default();
+                let _ = targets.insert(XorName(xorname.0));
+                Some(Action::RespondToOurDataHandlers {
+                    rpc: Rpc::DuplicationComplete {
+                        requester,
+                        response: Response::Mutation(result),
+                        message_id,
+                    },
+                })
+            }
+            SrcLocation::Section(_) => Some(Action::RespondToOurDataHandlers {
+                rpc: Rpc::Response {
+                    requester,
+                    response: Response::Mutation(result),
+                    message_id,
+                    refund,
+                },
+            }),
+        }
     }
 
     pub(crate) fn get_idata(

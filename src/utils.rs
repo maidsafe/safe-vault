@@ -81,7 +81,8 @@ pub(crate) fn requester_address(rpc: &Rpc) -> &XorName {
     match rpc {
         Rpc::Request { ref requester, .. }
         | Rpc::Response { ref requester, .. }
-        | Rpc::Duplicate { ref requester, .. } => requester.name(),
+        | Rpc::Duplicate { ref requester, .. }
+        | Rpc::DuplicationComplete { ref requester, .. } => requester.name(),
     }
 }
 

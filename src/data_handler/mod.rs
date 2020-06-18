@@ -84,13 +84,41 @@ impl DataHandler {
                 response,
                 message_id,
                 ..
-            } => self.handle_response(utils::get_source_name(src), response, message_id),
+            } => self.handle_response(src, response, message_id),
             Rpc::Duplicate {
                 requester,
                 address,
                 holders,
                 message_id,
             } => self.handle_duplicate_request(requester, address, holders, message_id),
+            Rpc::DuplicationComplete {
+                requester,
+                response,
+                message_id,
+            } => self.duplucation_process_completed(requester, response, message_id),
+        }
+    }
+
+    fn duplucation_process_completed(
+        &mut self,
+        requester: PublicId,
+        response: Response,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use Response::*;
+        debug!("duplication process completed");
+        match response {
+            Mutation(result) => self.handle_idata_request(|idata_handler| {
+                idata_handler.update_idata_holders(*requester.name(), result, message_id)
+            }),
+            // Duplication doesn't care about other type of responses
+            ref _other => {
+                error!(
+                    "{}: Should not receive {:?} as a data handler.",
+                    self, response
+                );
+                None
+            }
         }
     }
 
@@ -155,7 +183,8 @@ impl DataHandler {
                             // Since the requester is a section, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder chosen to store the
                             // chunk.
-                            self.idata_holder.store_idata(&data, requester, message_id)
+                            self.idata_holder
+                                .store_idata(src, &data, requester, message_id)
                         } else {
                             self.handle_idata_request(|idata_handler| {
                                 idata_handler.handle_put_idata_req(requester, data, message_id)
@@ -231,7 +260,7 @@ impl DataHandler {
 
     fn handle_response(
         &mut self,
-        src: XorName,
+        src: SrcLocation,
         response: Response,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -241,11 +270,11 @@ impl DataHandler {
             self,
             response,
             message_id,
-            src
+            utils::get_source_name(src),
         );
         match response {
             Mutation(result) => self.handle_idata_request(|idata_handler| {
-                idata_handler.handle_mutation_resp(src, result, message_id)
+                idata_handler.handle_mutation_resp(utils::get_source_name(src), result, message_id)
             }),
             GetIData(result) => {
                 if self.idata_copy_op.contains_key(&message_id) {
@@ -256,13 +285,19 @@ impl DataHandler {
                             data.address(),
                         );
                         let requester = self.idata_copy_op.get(&message_id).unwrap().clone();
-                        self.idata_holder.store_idata(&data, requester, message_id)
+                        let _ = self.idata_copy_op.remove(&message_id);
+                        self.idata_holder
+                            .store_idata(src, &data, requester, message_id)
                     } else {
                         None
                     }
                 } else {
                     self.handle_idata_request(|idata_handler| {
-                        idata_handler.handle_get_idata_resp(src, result, message_id)
+                        idata_handler.handle_get_idata_resp(
+                            utils::get_source_name(src),
+                            result,
+                            message_id,
+                        )
                     })
                 }
             }

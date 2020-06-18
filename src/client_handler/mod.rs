@@ -127,6 +127,7 @@ impl ClientHandler {
                     .relay_reponse_to_client(src, &requester, response, message_id)
             }
             Rpc::Duplicate { .. } => None,
+            Rpc::DuplicationComplete { .. } => None,
         }
     }
 
