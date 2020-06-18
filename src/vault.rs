@@ -160,7 +160,6 @@ impl<R: CryptoRng + Rng> Vault<R> {
             .map_err(From::from)
     }
 
-    #[cfg(feature = "mock_parsec")]
     /// Returns whether routing node is in elder state.
     pub fn is_elder(&mut self) -> bool {
         self.routing_node.borrow().is_elder()
@@ -476,8 +475,8 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 None
             }
             SendToPeers { targets, rpc, .. } => {
-                let prefix = *self.routing_node.borrow().our_prefix().unwrap();
                 let mut next_action = None;
+                let prefix = *self.routing_node.borrow().our_prefix().unwrap();
                 for target in targets {
                     if target == *self.id.public_id().name() {
                         next_action = self
@@ -486,6 +485,13 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     } else {
                         next_action = self.send_message_to_peer(target, rpc.clone());
                     }
+                }
+                next_action
+            }
+            SendMessage { targets, rpc, .. } => {
+                let mut next_action = None;
+                for target in targets {
+                    next_action = self.send_message_to_peer_as_node(target, rpc.clone());
                 }
                 next_action
             }
@@ -540,6 +546,27 @@ impl<R: CryptoRng + Rng> Vault<R> {
                         "Sent message to Peer {:?} from section with prefix {:?}",
                         target, prefix
                     );
+                    None
+                },
+            )
+    }
+
+    fn send_message_to_peer_as_node(&self, target: XorName, rpc: Rpc) -> Option<Action> {
+        let id = *self.routing_node.borrow().id();
+        self.routing_node
+            .borrow_mut()
+            .send_message(
+                SrcLocation::Node(*id.name()),
+                DstLocation::Node(routing::XorName(target.0)),
+                utils::serialise(&rpc),
+            )
+            .map_or_else(
+                |err| {
+                    error!("Unable to send message to Peer: {:?}", err);
+                    None
+                },
+                |()| {
+                    info!("Sent message to Peer: {:?}", target);
                     None
                 },
             )
