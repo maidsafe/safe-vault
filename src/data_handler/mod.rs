@@ -28,7 +28,7 @@ use safe_nd::{
 
 use std::{
     cell::{Cell, RefCell},
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
+    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -87,50 +87,73 @@ impl DataHandler {
                 response,
                 message_id,
                 ..
-            } => self.handle_response(utils::get_source_name(src), response, message_id),
+            } => self.handle_response(src, response, message_id),
             Rpc::Duplicate {
-                requester,
                 address,
                 holders,
                 message_id,
-            } => self.handle_duplicate_request(requester, address, holders, message_id),
+            } => self.handle_duplicate_request(address, holders, message_id),
+            Rpc::DuplicationComplete {
+                response,
+                message_id,
+            } => self.duplucation_process_completed(src, response, message_id),
+        }
+    }
+
+    fn duplucation_process_completed(
+        &mut self,
+        sender: SrcLocation,
+        response: Response,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        use Response::*;
+        debug!("duplication process completed");
+        match response {
+            Mutation(result) => self.handle_idata_request(|idata_handler| {
+                idata_handler.update_idata_holders(
+                    utils::get_source_name(sender),
+                    result,
+                    message_id,
+                )
+            }),
+            // Duplication doesn't care about other type of responses
+            ref _other => {
+                error!(
+                    "{}: Should not receive {:?} as a data handler.",
+                    self, response
+                );
+                None
+            }
         }
     }
 
     fn handle_duplicate_request(
         &mut self,
-        requester: PublicId,
         address: IDataAddress,
         holders: BTreeSet<XorName>,
         message_id: MessageId,
     ) -> Option<Action> {
         debug!("got the duplication rpc");
-        trace!(
-            "{}: Received duplication request from src {:?}",
-            self,
-            requester,
-        );
-        match self.idata_copy_op.entry(message_id) {
-            Entry::Vacant(vacant_entry) => {
-                trace!(
-                    "Sending GetIData request for address: ({:?}) to {:?}",
-                    address,
-                    holders,
-                );
-                let our_name = self.id.name();
-                let our_id = self.id.clone();
-                let _ = vacant_entry.insert(requester);
-                Some(Action::SendMessage {
-                    sender: *our_name,
-                    targets: holders,
-                    rpc: Rpc::Request {
-                        request: Request::IData(IDataRequest::Get(address)),
-                        requester: PublicId::Node(our_id),
-                        message_id,
-                    },
-                })
-            }
-            Entry::Occupied(_) => None,
+        if !self.idata_copy_op.contains(&message_id) {
+            let _ = self.idata_copy_op.insert(message_id);
+            trace!(
+                "Sending GetIData request for address: ({:?}) to {:?}",
+                address,
+                holders,
+            );
+            let our_name = self.id.name();
+            let our_id = self.id.clone();
+            Some(Action::SendMessage {
+                sender: *our_name,
+                targets: holders,
+                rpc: Rpc::Request {
+                    request: Request::IData(IDataRequest::Get(address)),
+                    requester: PublicId::Node(our_id),
+                    message_id,
+                },
+            })
+        } else {
+            None
         }
     }
 
@@ -158,7 +181,8 @@ impl DataHandler {
                             // Since the requester is a section, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder chosen to store the
                             // chunk.
-                            self.idata_holder.store_idata(&data, requester, message_id)
+                            self.idata_holder
+                                .store_idata(src, &data, requester, message_id)
                         } else {
                             self.handle_idata_request(|idata_handler| {
                                 idata_handler.handle_put_idata_req(requester, data, message_id)
@@ -166,7 +190,9 @@ impl DataHandler {
                         }
                     }
                     IDataRequest::Get(address) => {
-                        if src.is_section() || matches!(src, SrcLocation::Node(_)) {
+                        trace!("Got a get request");
+                        trace!("{:?}", src);
+                        if src.is_section() || matches!(requester, PublicId::Node(_)) {
                             // Since the requester is a node, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder where the chunk is
                             // stored.
@@ -234,7 +260,7 @@ impl DataHandler {
 
     fn handle_response(
         &mut self,
-        src: XorName,
+        src: SrcLocation,
         response: Response,
         message_id: MessageId,
     ) -> Option<Action> {
@@ -244,28 +270,37 @@ impl DataHandler {
             self,
             response,
             message_id,
-            src
+            utils::get_source_name(src),
         );
         match response {
             Mutation(result) => self.handle_idata_request(|idata_handler| {
-                idata_handler.handle_mutation_resp(src, result, message_id)
+                idata_handler.handle_mutation_resp(utils::get_source_name(src), result, message_id)
             }),
             GetIData(result) => {
-                if self.idata_copy_op.contains_key(&message_id) {
+                if self.idata_copy_op.contains(&message_id) {
                     debug!("got the duplication copy");
                     if let Ok(data) = result {
                         trace!(
                             "Got GetIData copy response for address: ({:?})",
                             data.address(),
                         );
-                        let requester = self.idata_copy_op.get(&message_id).unwrap().clone();
-                        self.idata_holder.store_idata(&data, requester, message_id)
+                        let _ = self.idata_copy_op.remove(&message_id);
+                        self.idata_holder.store_idata(
+                            src,
+                            &data,
+                            PublicId::Node(self.id.clone()),
+                            message_id,
+                        )
                     } else {
                         None
                     }
                 } else {
                     self.handle_idata_request(|idata_handler| {
-                        idata_handler.handle_get_idata_resp(src, result, message_id)
+                        idata_handler.handle_get_idata_resp(
+                            utils::get_source_name(src),
+                            result,
+                            message_id,
+                        )
                     })
                 }
             }

@@ -51,7 +51,7 @@ struct HolderMetadata {
 
 pub(super) struct IDataHandler {
     id: NodePublicId,
-    idata_elder_ops: BTreeSet<MessageId>,
+    idata_elder_ops: BTreeMap<MessageId, IDataAddress>,
     idata_client_ops: BTreeMap<MessageId, IDataOp>,
     // Responses from IDataHolders might arrive before we send a request.
     // This will hold the responses that are processed once the request arrives.
@@ -329,20 +329,21 @@ impl IDataHandler {
 
                 let new_holders = self.get_new_holders_for_chunk(&address);
 
-                if !self.idata_elder_ops.contains(&message_id) {
-                    let _ = self.idata_elder_ops.insert(message_id);
-
-                    let duplicate_chunk_action = Action::SendToPeers {
-                        sender: our_name,
-                        targets: new_holders,
-                        rpc: Rpc::Duplicate {
-                            requester: requester.clone(),
-                            address,
-                            holders,
-                            message_id,
-                        },
-                    };
-                    actions.push(duplicate_chunk_action);
+                match self.idata_elder_ops.entry(message_id) {
+                    Entry::Vacant(entry) => {
+                        let _ = entry.insert(address);
+                        let duplicate_chunk_action = Action::SendToPeers {
+                            sender: our_name,
+                            targets: new_holders,
+                            rpc: Rpc::Duplicate {
+                                address,
+                                holders,
+                                message_id,
+                            },
+                        };
+                        actions.push(duplicate_chunk_action);
+                    }
+                    Entry::Occupied(_) => {}
                 }
             }
             Some(actions)
@@ -411,6 +412,60 @@ impl IDataHandler {
             .or(process_request_action)
     }
 
+    pub(super) fn update_idata_holders(
+        &mut self,
+        sender: XorName,
+        result: NdResult<()>,
+        message_id: MessageId,
+    ) -> Option<Action> {
+        let is_copy_op = self.idata_elder_ops.contains_key(&message_id);
+        if is_copy_op {
+            let response = Response::Mutation(result);
+            match response {
+                Response::Mutation(idata_copy_response) => {
+                    match idata_copy_response {
+                        Ok(_) => {
+                            let idata_address = self.idata_elder_ops.get(&message_id);
+                            if let Some(address) = idata_address {
+                                let metadata = self.get_metadata_for(*address);
+                                if let Ok(mut metadata) = metadata {
+                                    if !metadata.holders.insert(sender) {
+                                        warn!(
+                                            "{}: {} already registered as a holder for {:?}",
+                                            self,
+                                            sender,
+                                            self.idata_op(&message_id)?
+                                        );
+                                    }
+
+                                    if let Err(error) =
+                                        self.metadata.set(&address.to_db_key(), &metadata)
+                                    {
+                                        warn!(
+                                            "{}: Failed to write metadata to DB: {:?}",
+                                            self, error
+                                        );
+                                    }
+                                }
+                            }
+                            let _ = self.idata_elder_ops.remove(&message_id);
+                            None
+                        }
+                        // Todo: take care of the mutation failure case
+                        Err(_) => None,
+                    }
+                }
+                // Duplication doesn't care about other type of responses
+                ref _other => {
+                    error!("Doesn't care to update db for other response types",);
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    }
+
     pub(super) fn handle_mutation_resp(
         &mut self,
         sender: XorName,
@@ -470,7 +525,7 @@ impl IDataHandler {
         // For phase 1, we can leave many of these unanswered.
 
         // TODO - we'll assume `result` is success for phase 1.
-        let is_idata_copy_op = self.idata_elder_ops.contains(&message_id);
+        let is_idata_copy_op = self.idata_elder_ops.contains_key(&message_id);
         let db_key = idata_address.to_db_key();
         let mut metadata = self.get_metadata_for(idata_address).unwrap_or_default();
         let idata_op = self.idata_op(&message_id);
@@ -630,7 +685,7 @@ impl IDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         let own_id = format!("{}", self);
-        let is_idata_copy_op = self.idata_elder_ops.contains(&message_id);
+        let is_idata_copy_op = self.idata_elder_ops.contains_key(&message_id);
 
         let action = if is_idata_copy_op {
             info!("Holder {:?} responded with chunk for duplication", sender);
@@ -661,14 +716,14 @@ impl IDataHandler {
 
                     let idata_op = IDataOp::new(
                         requester.clone(),
-                        IDataRequest::Put(idata),
+                        IDataRequest::Put(idata.clone()),
                         new_holders.clone(),
                     );
 
                     match self.idata_client_ops.entry(new_msg_id) {
                         Entry::Occupied(_) => None,
                         Entry::Vacant(vacant_entry) => {
-                            let _ = self.idata_elder_ops.insert(new_msg_id);
+                            let _ = self.idata_elder_ops.insert(new_msg_id, *idata.address());
                             let idata_op = vacant_entry.insert(idata_op);
                             Some(Action::SendToPeers {
                                 sender: *self.id.name(),

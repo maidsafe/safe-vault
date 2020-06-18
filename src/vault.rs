@@ -390,6 +390,9 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     _ => unimplemented!("Should not receive: {:?}", response),
                 },
                 Rpc::Duplicate { .. } => self.data_handler_mut()?.handle_vault_rpc(src, rpc),
+                Rpc::DuplicationComplete { .. } => {
+                    self.data_handler_mut()?.handle_vault_rpc(src, rpc)
+                }
             },
             Err(e) => {
                 error!("Error deserializing routing message into Rpc type: {:?}", e);
@@ -469,7 +472,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 //        onwards, and then if we're also part of the client handlers, we'll call that
                 //        same handler which Routing will call after receiving a message.
                 debug!("Responded to client handlers with {:?}", &rpc);
-                if self.self_is_handler_for(client_name) {
+                if self.self_is_handler_for(&client_name) {
                     return self.client_handler_mut()?.handle_vault_rpc(sender, rpc);
                 }
                 None
@@ -581,7 +584,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         {
             XorName::from(*new_owner)
         } else {
-            *utils::requester_address(&rpc)
+            utils::requester_address(&rpc)
         };
         let dst_address = if let Rpc::Request { ref request, .. } = rpc {
             match request.dest_address() {
@@ -629,7 +632,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn proxy_client_request(&mut self, rpc: Rpc) -> Option<Action> {
-        let requester_name = *utils::requester_address(&rpc);
+        let requester_name = utils::requester_address(&rpc);
         let dst_address = if let Rpc::Request {
             request: Request::LoginPacket(LoginPacketRequest::CreateFor { ref new_owner, .. }),
             ..

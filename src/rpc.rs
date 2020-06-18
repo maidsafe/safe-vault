@@ -29,11 +29,15 @@ pub(crate) enum Rpc {
         message_id: MessageId,
         refund: Option<Coins>,
     },
-    /// Wrapper for a duplicate request, from elder to adults.
+    /// Wrapper for a duplicate request, from elders to other nodes in the section.
     Duplicate {
-        requester: PublicId,
         address: IDataAddress,
         holders: BTreeSet<XorName>,
+        message_id: MessageId,
+    },
+    /// Wrapper for a duplicate completion response, from a node to elders.
+    DuplicationComplete {
+        response: Response,
         message_id: MessageId,
     },
 }
