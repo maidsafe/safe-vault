@@ -120,7 +120,7 @@ impl DataHandler {
                 let our_name = self.id.name();
                 let our_id = self.id.clone();
                 let _ = vacant_entry.insert(requester);
-                Some(Action::SendToPeers {
+                Some(Action::SendMessage {
                     sender: *our_name,
                     targets: holders,
                     rpc: Rpc::Request {
@@ -154,7 +154,7 @@ impl DataHandler {
             IData(idata_req) => {
                 match idata_req {
                     IDataRequest::Put(data) => {
-                        if matches!(src, SrcLocation::Section(_)) {
+                        if src.is_section() {
                             // Since the requester is a section, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder chosen to store the
                             // chunk.
@@ -166,11 +166,12 @@ impl DataHandler {
                         }
                     }
                     IDataRequest::Get(address) => {
-                        if matches!(src, SrcLocation::Section(_)) {
+                        if src.is_section() || matches!(src, SrcLocation::Node(_)) {
                             // Since the requester is a node, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder where the chunk is
                             // stored.
-                            self.idata_holder.get_idata(address, requester, message_id)
+                            self.idata_holder
+                                .get_idata(src, address, requester, message_id)
                         } else {
                             self.handle_idata_request(|idata_handler| {
                                 idata_handler.handle_get_idata_req(requester, address, message_id)
@@ -178,7 +179,7 @@ impl DataHandler {
                         }
                     }
                     IDataRequest::DeleteUnpub(address) => {
-                        if matches!(src, SrcLocation::Section(_)) {
+                        if src.is_section() {
                             // Since the requester is a node, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder where the chunk is
                             // stored.

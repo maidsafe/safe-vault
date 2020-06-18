@@ -63,6 +63,11 @@ pub(crate) enum Action {
         targets: BTreeSet<XorName>,
         rpc: Rpc,
     },
+    SendMessage {
+        sender: XorName,
+        targets: BTreeSet<XorName>,
+        rpc: Rpc,
+    },
     RespondToClient {
         message_id: MessageId,
         response: Response,

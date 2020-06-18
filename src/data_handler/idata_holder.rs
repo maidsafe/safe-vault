@@ -11,10 +11,14 @@ use crate::{
 };
 use log::{error, info};
 
-use safe_nd::{Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Response};
+use safe_nd::{
+    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Response, XorName,
+};
 
+use routing::SrcLocation;
 use std::{
     cell::Cell,
+    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -74,6 +78,7 @@ impl IDataHolder {
 
     pub(crate) fn get_idata(
         &self,
+        sender: SrcLocation,
         address: IDataAddress,
         requester: PublicId,
         message_id: MessageId,
@@ -83,14 +88,30 @@ impl IDataHolder {
             .get(&address)
             .map_err(|error| error.to_string().into());
 
-        Some(Action::RespondToOurDataHandlers {
-            rpc: Rpc::Response {
-                requester,
-                response: Response::GetIData(result),
-                message_id,
-                refund: None,
-            },
-        })
+        match sender {
+            SrcLocation::Node(xorname) => {
+                let mut targets: BTreeSet<XorName> = Default::default();
+                let _ = targets.insert(XorName(xorname.0));
+                Some(Action::SendMessage {
+                    sender: *self.id.name(),
+                    targets,
+                    rpc: Rpc::Response {
+                        requester,
+                        response: Response::GetIData(result),
+                        message_id,
+                        refund: None,
+                    },
+                })
+            }
+            SrcLocation::Section(_) => Some(Action::RespondToOurDataHandlers {
+                rpc: Rpc::Response {
+                    requester,
+                    response: Response::GetIData(result),
+                    message_id,
+                    refund: None,
+                },
+            }),
+        }
     }
 
     pub(crate) fn delete_unpub_idata(
