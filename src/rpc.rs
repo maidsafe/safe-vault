@@ -31,14 +31,12 @@ pub(crate) enum Rpc {
     },
     /// Wrapper for a duplicate request, from elders to other nodes in the section.
     Duplicate {
-        requester: PublicId,
         address: IDataAddress,
         holders: BTreeSet<XorName>,
         message_id: MessageId,
     },
     /// Wrapper for a duplicate completion response, from a node to elders.
     DuplicationComplete {
-        requester: PublicId,
         response: Response,
         message_id: MessageId,
     },

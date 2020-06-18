@@ -336,7 +336,6 @@ impl IDataHandler {
                             sender: our_name,
                             targets: new_holders,
                             rpc: Rpc::Duplicate {
-                                requester: requester.clone(),
                                 address,
                                 holders,
                                 message_id,
@@ -419,42 +418,51 @@ impl IDataHandler {
         result: NdResult<()>,
         message_id: MessageId,
     ) -> Option<Action> {
-        let response = Response::Mutation(result);
-        match response {
-            Response::Mutation(idata_copy_response) => {
-                match idata_copy_response {
-                    Ok(_) => {
-                        let idata_address = self.idata_elder_ops.get(&message_id);
-                        if let Some(address) = idata_address {
-                            let metadata = self.get_metadata_for(*address);
-                            if let Ok(mut metadata) = metadata {
-                                if !metadata.holders.insert(sender) {
-                                    warn!(
-                                        "{}: {} already registered as a holder for {:?}",
-                                        self,
-                                        sender,
-                                        self.idata_op(&message_id)?
-                                    );
-                                }
+        let is_copy_op = self.idata_elder_ops.contains_key(&message_id);
+        if is_copy_op {
+            let response = Response::Mutation(result);
+            match response {
+                Response::Mutation(idata_copy_response) => {
+                    match idata_copy_response {
+                        Ok(_) => {
+                            let idata_address = self.idata_elder_ops.get(&message_id);
+                            if let Some(address) = idata_address {
+                                let metadata = self.get_metadata_for(*address);
+                                if let Ok(mut metadata) = metadata {
+                                    if !metadata.holders.insert(sender) {
+                                        warn!(
+                                            "{}: {} already registered as a holder for {:?}",
+                                            self,
+                                            sender,
+                                            self.idata_op(&message_id)?
+                                        );
+                                    }
 
-                                if let Err(error) =
-                                    self.metadata.set(&address.to_db_key(), &metadata)
-                                {
-                                    warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+                                    if let Err(error) =
+                                        self.metadata.set(&address.to_db_key(), &metadata)
+                                    {
+                                        warn!(
+                                            "{}: Failed to write metadata to DB: {:?}",
+                                            self, error
+                                        );
+                                    }
                                 }
                             }
+                            let _ = self.idata_elder_ops.remove(&message_id);
+                            None
                         }
-                        None
+                        // Todo: take care of the mutation failure case
+                        Err(_) => None,
                     }
-                    // Todo: take care of the mutation failure case
-                    Err(_) => None,
+                }
+                // Duplication doesn't care about other type of responses
+                ref _other => {
+                    error!("Doesn't care to update db for other response types",);
+                    None
                 }
             }
-            // Duplication doesn't care about other type of responses
-            ref _other => {
-                error!("Doesn't care to update db for other response types",);
-                None
-            }
+        } else {
+            None
         }
     }
 

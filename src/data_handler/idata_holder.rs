@@ -68,17 +68,12 @@ impl IDataHolder {
         let refund = utils::get_refund_for_put(&result);
 
         match sender {
-            SrcLocation::Node(xorname) => {
-                let mut targets: BTreeSet<XorName> = Default::default();
-                let _ = targets.insert(XorName(xorname.0));
-                Some(Action::RespondToOurDataHandlers {
-                    rpc: Rpc::DuplicationComplete {
-                        requester,
-                        response: Response::Mutation(result),
-                        message_id,
-                    },
-                })
-            }
+            SrcLocation::Node(_) => Some(Action::RespondToOurDataHandlers {
+                rpc: Rpc::DuplicationComplete {
+                    response: Response::Mutation(result),
+                    message_id,
+                },
+            }),
             SrcLocation::Section(_) => Some(Action::RespondToOurDataHandlers {
                 rpc: Rpc::Response {
                     requester,
