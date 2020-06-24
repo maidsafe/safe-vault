@@ -8,22 +8,21 @@
 
 mod idata_handler;
 mod idata_holder;
-mod idata_op;
 mod mdata_handler;
 mod sdata_handler;
 
 use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result};
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
-use idata_op::{IDataOp, OpType};
-use log::{error, trace};
 use mdata_handler::MDataHandler;
 use routing::{Node, SrcLocation};
 use sdata_handler::SDataHandler;
 
+use log::{debug, error, trace};
 use safe_nd::{
     IDataAddress, IDataRequest, MessageId, NodePublicId, PublicId, Request, Response, XorName,
 };
+use threshold_crypto::{Signature, SignatureShare};
 
 use std::{
     cell::{Cell, RefCell},
@@ -38,7 +37,7 @@ pub(crate) struct DataHandler {
     idata_handler: Option<IDataHandler>,
     mdata_handler: Option<MDataHandler>,
     sdata_handler: Option<SDataHandler>,
-    idata_duplicate_op: BTreeSet<MessageId>,
+    routing_node: Rc<RefCell<Node>>,
 }
 
 impl DataHandler {
@@ -52,7 +51,8 @@ impl DataHandler {
     ) -> Result<Self> {
         let idata_holder = IDataHolder::new(id.clone(), config, total_used_space, init_mode)?;
         let (idata_handler, mdata_handler, sdata_handler) = if is_elder {
-            let idata_handler = IDataHandler::new(id.clone(), config, init_mode, routing_node)?;
+            let idata_handler =
+                IDataHandler::new(id.clone(), config, init_mode, routing_node.clone())?;
             let mdata_handler = MDataHandler::new(id.clone(), config, total_used_space, init_mode)?;
             let sdata_handler = SDataHandler::new(id.clone(), config, total_used_space, init_mode)?;
 
@@ -71,31 +71,48 @@ impl DataHandler {
             idata_handler,
             mdata_handler,
             sdata_handler,
-            idata_duplicate_op: Default::default(),
+            routing_node,
         })
     }
 
-    pub fn handle_vault_rpc(&mut self, src: SrcLocation, rpc: Rpc) -> Option<Action> {
+    pub fn handle_vault_rpc(
+        &mut self,
+        src: SrcLocation,
+        rpc: Rpc,
+        accumulated_signature: Option<Signature>,
+    ) -> Option<Action> {
         match rpc {
             Rpc::Request {
                 request,
                 requester,
                 message_id,
-            } => self.handle_request(src, requester, request, message_id),
+                ..
+            } => self.handle_request(src, requester, request, message_id, accumulated_signature),
             Rpc::Response {
                 response,
+                requester,
                 message_id,
+                proof,
                 ..
-            } => self.handle_response(src, response, message_id),
+            } => self.handle_response(src, response, requester, message_id, proof),
             Rpc::Duplicate {
                 address,
                 holders,
                 message_id,
-            } => self.handle_duplicate_request(address, holders, message_id),
+                ..
+            } => self.handle_duplicate_request(address, holders, message_id, accumulated_signature),
             Rpc::DuplicationComplete {
                 response,
                 message_id,
-            } => self.complete_duplication(src, response, message_id),
+                proof: Some((idata_address, signature)),
+            } => self.complete_duplication(
+                src,
+                response,
+                message_id,
+                idata_address,
+                signature,
+            ),
+            _ => None,
         }
     }
 
@@ -104,24 +121,40 @@ impl DataHandler {
         sender: SrcLocation,
         response: Response,
         message_id: MessageId,
+        idata_address: IDataAddress,
+        signature: Signature,
     ) -> Option<Action> {
         use Response::*;
-        match response {
-            Mutation(result) => self.handle_idata_request(|idata_handler| {
-                idata_handler.update_idata_holders(
-                    utils::get_source_name(sender),
-                    result,
-                    message_id,
-                )
-            }),
-            // Duplication doesn't care about other type of responses
-            ref _other => {
-                error!(
-                    "{}: Should not receive {:?} as a data handler.",
-                    self, response
-                );
-                None
+        debug!("duplication process completed");
+        if self
+            .routing_node
+            .borrow()
+            .public_key_set()
+            .ok()?
+            .public_key()
+            .verify(&signature, &utils::serialise(&idata_address))
+        {
+            match response {
+                Mutation(result) => self.handle_idata_request(|idata_handler| {
+                    idata_handler.update_idata_holders(
+                        idata_address,
+                        utils::get_source_name(sender),
+                        result,
+                        message_id,
+                    )
+                }),
+                // Duplication doesn't care about other type of responses
+                ref _other => {
+                    error!(
+                        "{}: Should not receive {:?} as a data handler.",
+                        self, response
+                    );
+                    None
+                }
             }
+        } else {
+            error!("Ignoring duplication response. Invalid Signature.");
+            None
         }
     }
 
@@ -130,25 +163,35 @@ impl DataHandler {
         address: IDataAddress,
         holders: BTreeSet<XorName>,
         message_id: MessageId,
+        accumulated_signature: Option<Signature>,
     ) -> Option<Action> {
-        if !self.idata_duplicate_op.contains(&message_id) {
-            let _ = self.idata_duplicate_op.insert(message_id);
-            trace!(
-                "Sending GetIData request for duplicating IData: ({:?}) to {:?}",
-                address,
-                holders,
-            );
-            let our_name = self.id.name();
-            let our_id = self.id.clone();
-            Some(Action::SendMessage {
-                sender: *our_name,
-                targets: holders,
-                rpc: Rpc::Request {
-                    request: Request::IData(IDataRequest::Get(address)),
-                    requester: PublicId::Node(our_id),
-                    message_id,
-                },
-            })
+        trace!(
+            "Sending GetIData request for address: ({:?}) to {:?}",
+            address,
+            holders,
+        );
+        let our_id = self.id.clone();
+        Some(Action::SendToPeers {
+            targets: holders,
+            rpc: Rpc::Request {
+                request: Request::IData(IDataRequest::Get(address)),
+                requester: PublicId::Node(our_id),
+                message_id,
+                signature: Some((0, SignatureShare(accumulated_signature?))),
+            },
+        })
+    }
+
+    fn validate_section_signature(&self, request: &Request, signature: &Signature) -> Option<()> {
+        if self
+            .routing_node
+            .borrow()
+            .public_key_set()
+            .ok()?
+            .public_key()
+            .verify(signature, &utils::serialise(request))
+        {
+            Some(())
         } else {
             None
         }
@@ -160,6 +203,7 @@ impl DataHandler {
         requester: PublicId,
         request: Request,
         message_id: MessageId,
+        accumulated_signature: Option<Signature>,
     ) -> Option<Action> {
         use Request::*;
         trace!(
@@ -170,7 +214,7 @@ impl DataHandler {
             src,
             requester
         );
-        match request {
+        match request.clone() {
             IData(idata_req) => {
                 match idata_req {
                     IDataRequest::Put(data) => {
@@ -178,11 +222,26 @@ impl DataHandler {
                             // Since the requester is a section, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder chosen to store the
                             // chunk.
-                            self.idata_holder
-                                .store_idata(src, &data, requester, message_id)
+                            if let Some(()) = self.validate_section_signature(
+                                &request,
+                                accumulated_signature.as_ref()?,
+                            ) {
+                                self.idata_holder.store_idata(
+                                    src,
+                                    &data,
+                                    requester,
+                                    message_id,
+                                    accumulated_signature,
+                                    request,
+                                )
+                            } else {
+                                error!("Accumulated signature for {:?} is invalid!", &message_id);
+                                None
+                            }
                         } else {
                             self.handle_idata_request(|idata_handler| {
-                                idata_handler.handle_put_idata_req(requester, data, message_id)
+                                idata_handler
+                                    .handle_put_idata_req(requester, data, message_id, request)
                             })
                         }
                     }
@@ -191,11 +250,26 @@ impl DataHandler {
                             // Since the requester is a node, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder where the chunk is
                             // stored.
-                            self.idata_holder
-                                .get_idata(src, address, requester, message_id)
+                            if let Some(()) = self.validate_section_signature(
+                                &request,
+                                accumulated_signature.as_ref()?,
+                            ) {
+                                self.idata_holder.get_idata(
+                                    src,
+                                    address,
+                                    requester,
+                                    message_id,
+                                    request,
+                                    accumulated_signature,
+                                )
+                            } else {
+                                error!("Accumulated signature is invalid!");
+                                None
+                            }
                         } else {
                             self.handle_idata_request(|idata_handler| {
-                                idata_handler.handle_get_idata_req(requester, address, message_id)
+                                idata_handler
+                                    .handle_get_idata_req(requester, address, message_id, request)
                             })
                         }
                     }
@@ -204,13 +278,27 @@ impl DataHandler {
                             // Since the requester is a node, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder where the chunk is
                             // stored.
-                            self.idata_holder
-                                .delete_unpub_idata(address, requester, message_id)
+                            if let Some(()) = self.validate_section_signature(
+                                &request,
+                                accumulated_signature.as_ref()?,
+                            ) {
+                                self.idata_holder.delete_unpub_idata(
+                                    address,
+                                    requester,
+                                    message_id,
+                                    request,
+                                    accumulated_signature,
+                                )
+                            } else {
+                                error!("Accumulated signature is invalid!");
+                                None
+                            }
                         } else {
                             // We're acting as data handler, received request from client handlers
                             self.handle_idata_request(|idata_handler| {
-                                idata_handler
-                                    .handle_delete_unpub_idata_req(requester, address, message_id)
+                                idata_handler.handle_delete_unpub_idata_req(
+                                    requester, address, message_id, request,
+                                )
                             })
                         }
                     }
@@ -257,7 +345,9 @@ impl DataHandler {
         &mut self,
         src: SrcLocation,
         response: Response,
+        requester: PublicId,
         message_id: MessageId,
+        proof: Option<(Request, Signature)>,
     ) -> Option<Action> {
         use Response::*;
         trace!(
@@ -267,47 +357,69 @@ impl DataHandler {
             message_id,
             utils::get_source_name(src),
         );
-        match response {
-            Mutation(result) => self.handle_idata_request(|idata_handler| {
-                idata_handler.handle_mutation_resp(utils::get_source_name(src), result, message_id)
-            }),
-            GetIData(result) => {
-                if self.idata_duplicate_op.contains(&message_id) {
-                    if let Ok(data) = result {
-                        trace!(
-                            "Got duplication GetIData response for address: ({:?})",
-                            data.address(),
-                        );
-                        let _ = self.idata_duplicate_op.remove(&message_id);
-                        self.idata_holder.store_idata(
-                            src,
-                            &data,
-                            PublicId::Node(self.id.clone()),
-                            message_id,
-                        )
+        if let Some((request, signature)) = proof {
+            if self
+                .validate_section_signature(&request, &signature)
+                .is_none()
+            {
+                error!("Invalid section signature");
+                return None;
+            }
+            match response {
+                Mutation(result) => self.handle_idata_request(move |idata_handler| {
+                    idata_handler.handle_mutation_resp(
+                        utils::get_source_name(src),
+                        requester,
+                        result,
+                        message_id,
+                        (request, signature),
+                    )
+                }),
+                GetIData(result) => {
+                    if matches!(requester, PublicId::Node(_)) {
+                        debug!("got the duplication copy");
+                        if let Ok(data) = result {
+                            trace!(
+                                "Got GetIData copy response for address: ({:?})",
+                                data.address(),
+                            );
+                            self.idata_holder.store_idata(
+                                src,
+                                &data,
+                                requester,
+                                message_id,
+                                Some(signature),
+                                request,
+                            )
+                        } else {
+                            None
+                        }
                     } else {
-                        None
+                        self.handle_idata_request(|idata_handler| {
+                            idata_handler.handle_get_idata_resp(
+                                utils::get_source_name(src),
+                                result,
+                                message_id,
+                                requester,
+                                (request, signature),
+                            )
+                        })
                     }
-                } else {
-                    self.handle_idata_request(|idata_handler| {
-                        idata_handler.handle_get_idata_resp(
-                            utils::get_source_name(src),
-                            result,
-                            message_id,
-                        )
-                    })
+                }
+                //
+                // ===== Invalid =====
+                //
+                ref _other => {
+                    error!(
+                        "{}: Should not receive {:?} as a data handler.",
+                        self, response
+                    );
+                    None
                 }
             }
-            //
-            // ===== Invalid =====
-            //
-            ref _other => {
-                error!(
-                    "{}: Should not receive {:?} as a data handler.",
-                    self, response
-                );
-                None
-            }
+        } else {
+            error!("Missing section signature");
+            None
         }
     }
 

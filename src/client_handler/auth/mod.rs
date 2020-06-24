@@ -179,6 +179,7 @@ impl Auth {
                 requester: client,
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -219,6 +220,7 @@ impl Auth {
                 requester: client,
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }

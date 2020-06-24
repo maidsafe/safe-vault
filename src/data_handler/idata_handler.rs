@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{IDataOp, OpType};
 use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
 use log::{debug, error, info, trace, warn};
 use pickledb::PickleDb;
@@ -23,6 +22,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use threshold_crypto::Signature;
 use tiny_keccak::sha3_256;
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
@@ -51,11 +51,11 @@ struct HolderMetadata {
 
 pub(super) struct IDataHandler {
     id: NodePublicId,
-    idata_elder_ops: BTreeMap<MessageId, IDataAddress>,
-    idata_client_ops: BTreeMap<MessageId, IDataOp>,
+    // idata_elder_ops: BTreeMap<MessageId, IDataAddress>,
+    // idata_client_ops: BTreeMap<MessageId, IDataOp>,
     // Responses from IDataHolders might arrive before we send a request.
     // This will hold the responses that are processed once the request arrives.
-    early_responses: BTreeMap<MessageId, Vec<(XorName, IDataResult)>>,
+    // early_responses: BTreeMap<MessageId, Vec<(XorName, IDataResult)>>,
     metadata: PickleDb,
     holders: PickleDb,
     #[allow(unused)]
@@ -78,9 +78,9 @@ impl IDataHandler {
 
         Ok(Self {
             id,
-            idata_elder_ops: Default::default(),
-            idata_client_ops: Default::default(),
-            early_responses: Default::default(),
+            // idata_elder_ops: Default::default(),
+            // idata_client_ops: Default::default(),
+            // early_responses: Default::default(),
             metadata,
             holders,
             full_adults,
@@ -93,6 +93,7 @@ impl IDataHandler {
         requester: PublicId,
         data: IData,
         message_id: MessageId,
+        request: Request,
     ) -> Option<Action> {
         // We're acting as data handler, received request from client handlers
         let our_name = *self.id.name();
@@ -107,6 +108,7 @@ impl IDataHandler {
                     response: Response::Mutation(result),
                     message_id,
                     refund,
+                    proof: None,
                 },
             })
         };
@@ -159,85 +161,22 @@ impl IDataHandler {
 
         info!("Storing {} copies of the data", target_holders.len());
 
-        let idata_op = IDataOp::new(
-            requester.clone(),
-            IDataRequest::Put(data),
-            target_holders.clone(),
-        );
-        let process_request_action = match self.idata_client_ops.entry(message_id) {
-            Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
-            Entry::Vacant(vacant_entry) => {
-                let idata_op = vacant_entry.insert(idata_op);
-                Some(Action::SendToPeers {
-                    sender: our_name,
-                    targets: target_holders,
-                    rpc: Rpc::Request {
-                        request: Request::IData(idata_op.request().clone()),
-                        requester,
-                        message_id,
-                    },
-                })
-            }
-        };
-
-        // Check if we really need to send the request
-        self.apply_early_responses(message_id)
-            .or(process_request_action)
-    }
-
-    // IData holders will process requests if quorum number of elders have sent the request.
-    // If were not a part of that quorum, we might've received the response before sending the request.
-    // This functions checks if a holder has already responded to a request, if so, it is applied and marked as actioned.
-    // If all the nodes holding the chunk have responded to the request this will return an `Action::RespondToClientHandlers`
-    // which can be directly sent back to the client handlers.
-    fn apply_early_responses(&mut self, message_id: MessageId) -> Option<Action> {
-        let own_id = format!("{}", &self);
-        if let Some(responses) = self.early_responses.remove(&message_id) {
-            debug!(
-                "Applying {}, early resposes on operation with MessageID: {:?}",
-                responses.len(),
-                &message_id
-            );
-            let op_type = self.idata_op(&message_id)?.op_type();
-            let mut actions = responses
-                .into_iter()
-                .filter_map(|(sender, idata_result)| match (op_type, idata_result) {
-                    (OpType::Get, IDataResult::Get(result)) => {
-                        self.handle_get_idata_resp(sender, result, message_id)
-                    }
-                    (_, IDataResult::Mutation(result)) => self
-                        .idata_op_mut(&message_id)?
-                        .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
-                        .map(|address| (address, op_type))
-                        .and_then(|(idata_address, op_type)| {
-                            if op_type == OpType::Put {
-                                self.handle_put_idata_resp(
-                                    idata_address,
-                                    sender,
-                                    &result,
-                                    message_id,
-                                )
-                            } else {
-                                self.handle_delete_unpub_idata_resp(
-                                    idata_address,
-                                    sender,
-                                    result,
-                                    message_id,
-                                )
-                            }
-                        }),
-                    (op, result) => {
-                        error!("{:?} and {:?} are incompatible", &op, &result);
-                        None
-                    }
-                })
-                .collect::<Vec<Action>>();
-            debug!("Resultant actions: {:?}", &actions);
-            // There will be only one action. Others will be None.
-            actions.pop()
-        } else {
-            None
-        }
+        let signature = self
+            .routing_node
+            .borrow()
+            .secret_key_share()
+            .map_or(None, |key| Some(key.sign(utils::serialise(&request))));
+        let signature =
+            signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig));
+        Some(Action::SendToPeers {
+            targets: target_holders,
+            rpc: Rpc::Request {
+                request,
+                requester,
+                message_id,
+                signature,
+            },
+        })
     }
 
     pub(super) fn handle_delete_unpub_idata_req(
@@ -245,6 +184,7 @@ impl IDataHandler {
         requester: PublicId,
         address: IDataAddress,
         message_id: MessageId,
+        request: Request,
     ) -> Option<Action> {
         let our_name = *self.id.name();
         let client_id = requester.clone();
@@ -257,6 +197,7 @@ impl IDataHandler {
                     message_id,
                     // Deletion is free so no refund
                     refund: None,
+                    proof: None,
                 },
             })
         };
@@ -273,30 +214,22 @@ impl IDataHandler {
             }
         };
 
-        let idata_op = IDataOp::new(
-            requester,
-            IDataRequest::DeleteUnpub(address),
-            metadata.holders.clone(),
-        );
-
-        let process_request_action = match self.idata_client_ops.entry(message_id) {
-            Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
-            Entry::Vacant(vacant_entry) => {
-                let idata_op = vacant_entry.insert(idata_op);
-                Some(Action::SendToPeers {
-                    sender: our_name,
-                    targets: metadata.holders,
-                    rpc: Rpc::Request {
-                        request: Request::IData(idata_op.request().clone()),
-                        requester: client_id,
-                        message_id,
-                    },
-                })
-            }
-        };
-
-        self.apply_early_responses(message_id)
-            .or(process_request_action)
+        let signature = self
+            .routing_node
+            .borrow()
+            .secret_key_share()
+            .map_or(None, |key| Some(key.sign(utils::serialise(&request))));
+        let signature =
+            signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig));
+        Some(Action::SendToPeers {
+            targets: metadata.holders,
+            rpc: Rpc::Request {
+                request,
+                requester,
+                message_id,
+                signature,
+            },
+        })
     }
 
     pub(super) fn trigger_data_copy_process(&mut self, node_left: XorName) -> Option<Vec<Action>> {
@@ -314,7 +247,6 @@ impl IDataHandler {
         let chunks_stored = self.update_chunk_metadata_on_node_left(node_left);
 
         if let Ok(chunks_stored) = chunks_stored {
-            let our_name = *self.id.name();
             let mut actions = Vec::new();
 
             for (address, holders) in chunks_stored {
@@ -329,22 +261,23 @@ impl IDataHandler {
 
                 let new_holders = self.get_new_holders_for_chunk(&address);
 
-                match self.idata_elder_ops.entry(message_id) {
-                    Entry::Vacant(entry) => {
-                        let _ = entry.insert(address);
-                        let duplicate_chunk_action = Action::SendToPeers {
-                            sender: our_name,
-                            targets: new_holders,
-                            rpc: Rpc::Duplicate {
-                                address,
-                                holders,
-                                message_id,
-                            },
-                        };
-                        actions.push(duplicate_chunk_action);
-                    }
-                    Entry::Occupied(_) => {}
-                }
+                let signature = self
+                    .routing_node
+                    .borrow()
+                    .secret_key_share()
+                    .map_or(None, |key| Some(key.sign(utils::serialise(&address))));
+                let signature =
+                    signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig));
+                let duplicate_chunk_action = Action::SendToPeers {
+                    targets: new_holders,
+                    rpc: Rpc::Duplicate {
+                        address,
+                        holders,
+                        message_id,
+                        signature,
+                    },
+                };
+                actions.push(duplicate_chunk_action);
             }
             Some(actions)
         } else {
@@ -357,6 +290,7 @@ impl IDataHandler {
         requester: PublicId,
         address: IDataAddress,
         message_id: MessageId,
+        request: Request,
     ) -> Option<Action> {
         let our_name = *self.id.name();
 
@@ -369,6 +303,7 @@ impl IDataHandler {
                     response: Response::GetIData(result),
                     message_id,
                     refund: None,
+                    proof: None,
                 },
             })
         };
@@ -385,125 +320,73 @@ impl IDataHandler {
                 return respond(Err(NdError::AccessDenied));
             }
         };
-
-        let idata_op = IDataOp::new(
-            requester,
-            IDataRequest::Get(address),
-            metadata.holders.clone(),
-        );
-
-        let process_request_action = match self.idata_client_ops.entry(message_id) {
-            Entry::Occupied(_) => respond(Err(NdError::DuplicateMessageId)),
-            Entry::Vacant(vacant_entry) => {
-                let idata_op = vacant_entry.insert(idata_op);
-                Some(Action::SendToPeers {
-                    sender: our_name,
-                    targets: metadata.holders,
-                    rpc: Rpc::Request {
-                        request: Request::IData(idata_op.request().clone()),
-                        requester: client_id,
-                        message_id,
-                    },
-                })
-            }
-        };
-
-        self.apply_early_responses(message_id)
-            .or(process_request_action)
+        let signature = self
+            .routing_node
+            .borrow()
+            .secret_key_share()
+            .map_or(None, |key| Some(key.sign(utils::serialise(&request))));
+        let signature =
+            signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig));
+        Some(Action::SendToPeers {
+            targets: metadata.holders,
+            rpc: Rpc::Request {
+                request,
+                requester: client_id,
+                message_id,
+                signature,
+            },
+        })
     }
 
     pub(super) fn update_idata_holders(
         &mut self,
+        address: IDataAddress,
         sender: XorName,
         result: NdResult<()>,
         message_id: MessageId,
     ) -> Option<Action> {
-        let is_copy_op = self.idata_elder_ops.contains_key(&message_id);
-        if is_copy_op {
-            let response = Response::Mutation(result);
-            match response {
-                Response::Mutation(idata_copy_response) => {
-                    match idata_copy_response {
-                        Ok(_) => {
-                            let idata_address = self.idata_elder_ops.get(&message_id);
-                            if let Some(address) = idata_address {
-                                trace!("Duplication process completed for {:?}", address);
-                                let metadata = self.get_metadata_for(*address);
-                                if let Ok(mut metadata) = metadata {
-                                    if !metadata.holders.insert(sender) {
-                                        warn!(
-                                            "{}: {} already registered as a holder for {:?}",
-                                            self,
-                                            sender,
-                                            self.idata_op(&message_id)?
-                                        );
-                                    }
-
-                                    if let Err(error) =
-                                        self.metadata.set(&address.to_db_key(), &metadata)
-                                    {
-                                        warn!(
-                                            "{}: Failed to write metadata to DB: {:?}",
-                                            self, error
-                                        );
-                                    }
-                                }
-                            }
-                            let _ = self.idata_elder_ops.remove(&message_id);
-                            None
-                        }
-                        // Todo: take care of the mutation failure case
-                        Err(_) => None,
-                    }
+        if result.is_ok() {
+            let metadata = self.get_metadata_for(address);
+            if let Ok(mut metadata) = metadata {
+                if !metadata.holders.insert(sender) {
+                    warn!(
+                        "{}: {} already registered as a holder for {:?}",
+                        self, sender, address
+                    );
                 }
-                // Duplication doesn't care about other type of responses
-                ref _other => {
-                    error!("Doesn't care to update db for other response types",);
-                    None
+
+                if let Err(error) = self.metadata.set(&address.to_db_key(), &metadata) {
+                    warn!("{}: Failed to write metadata to DB: {:?}", self, error);
                 }
             }
         } else {
-            None
+            // Todo: take care of the mutation failure case
         }
+        None
     }
 
     pub(super) fn handle_mutation_resp(
         &mut self,
         sender: XorName,
+        requester: PublicId,
         result: NdResult<()>,
         message_id: MessageId,
+        proof: (Request, Signature),
     ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        let (idata_address, op_type) = self
-            .idata_op_mut(&message_id)
-            .and_then(|idata_op| {
-                let op_type = idata_op.op_type();
-                idata_op
-                    .handle_mutation_resp(sender, result.clone(), &own_id, message_id)
-                    .map(|address| (address, op_type))
-            })
-            .or_else(|| {
-                // The response arrived before this particular vault processed the request
-                match self.early_responses.entry(message_id) {
-                    Entry::Vacant(vacant_entry) => {
-                        let _ = vacant_entry
-                            .insert(vec![(sender, IDataResult::Mutation(result.clone()))]);
-                    }
-                    Entry::Occupied(mut entry) => {
-                        entry
-                            .get_mut()
-                            .push((sender, IDataResult::Mutation(result.clone())));
-                    }
-                }
-                trace!("Added early response for message ID: {:?}", message_id);
-                trace!("Current: {:?}", self.early_responses.get(&message_id));
-                None
-            })?;
-
-        if op_type == OpType::Put {
-            self.handle_put_idata_resp(idata_address, sender, &result, message_id)
-        } else {
-            self.handle_delete_unpub_idata_resp(idata_address, sender, result, message_id)
+        let (request, signature) = proof;
+        match &request {
+            Request::IData(IDataRequest::Put(data)) => self.handle_put_idata_resp(
+                *data.address(),
+                sender,
+                &result,
+                message_id,
+                request,
+                requester,
+            ),
+            Request::IData(IDataRequest::DeleteUnpub(address)) => {
+                self.handle_delete_unpub_idata_resp(*address, sender, result, message_id, requester)
+            }
+            _ => None,
         }
     }
 
@@ -513,6 +396,8 @@ impl IDataHandler {
         sender: XorName,
         _result: &NdResult<()>,
         message_id: MessageId,
+        request: Request,
+        requester: PublicId,
     ) -> Option<Action> {
         // TODO -
         // - if Ok, and this is the final of the three responses send success back to client handlers and
@@ -528,22 +413,14 @@ impl IDataHandler {
         // TODO - we'll assume `result` is success for phase 1.
         let db_key = idata_address.to_db_key();
         let mut metadata = self.get_metadata_for(idata_address).unwrap_or_default();
-        let idata_op = self.idata_op(&message_id);
-
-        if let Some(idata_put_op) = idata_op {
-            let request = idata_put_op.request();
-            metadata.owner = match request {
-                IDataRequest::Put(IData::Unpub(_)) => Some(*utils::own_key(idata_put_op.client())?),
-                _ => None,
-            }
+        if idata_address.is_unpub() {
+            metadata.owner = Some(*utils::own_key(&requester)?);
         }
 
         if !metadata.holders.insert(sender) {
             warn!(
                 "{}: {} already registered as a holder for {:?}",
-                self,
-                sender,
-                self.idata_op(&message_id)?
+                self, sender, &idata_address
             );
         }
 
@@ -565,9 +442,7 @@ impl IDataHandler {
         if !holders_metadata.chunks.insert(idata_address) {
             warn!(
                 "{}: {} already registered as a holder for {:?}",
-                self,
-                sender,
-                self.idata_op(&message_id)?
+                self, sender, &idata_address
             );
         }
 
@@ -575,16 +450,17 @@ impl IDataHandler {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
         }
 
-        self.remove_idata_op_if_concluded(&message_id)
-            .map(|idata_op| Action::RespondToClientHandlers {
-                sender: *idata_address.name(),
-                rpc: Rpc::Response {
-                    requester: idata_op.client().clone(),
-                    response: Response::Mutation(Ok(())),
-                    message_id,
-                    refund: None,
-                },
-            })
+        // Should we wait for multiple responses
+        Some(Action::RespondToClientHandlers {
+            sender: *idata_address.name(),
+            rpc: Rpc::Response {
+                requester,
+                response: Response::Mutation(Ok(())),
+                message_id,
+                refund: None,
+                proof: None,
+            },
+        })
     }
 
     pub(super) fn handle_delete_unpub_idata_resp(
@@ -593,10 +469,9 @@ impl IDataHandler {
         sender: XorName,
         result: NdResult<()>,
         message_id: MessageId,
+        requester: PublicId,
     ) -> Option<Action> {
-        // TODO - Only rudimentary checks for if requests to Adult nodes were successful. These
-        // mostly assume we're in practice only delegating to a single Adult (ourself in phase 1).
-        if let Err(err) = result {
+        if let Err(err) = &result {
             warn!("{}: Node reports error deleting: {}", self, err);
         } else {
             let db_key = idata_address.to_db_key();
@@ -611,10 +486,16 @@ impl IDataHandler {
 
                     if holder.chunks.is_empty() {
                         if let Err(error) = self.holders.rem(&sender.to_db_key()) {
-                            warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
+                            warn!(
+                                "{}: Failed to delete holder metadata from DB: {:?}",
+                                self, error
+                            );
                         }
                     } else if let Err(error) = self.holders.set(&sender.to_db_key(), &holder) {
-                        warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+                        warn!(
+                            "{}: Failed to write holder metadata to DB: {:?}",
+                            self, error
+                        );
                     }
                 }
 
@@ -622,49 +503,40 @@ impl IDataHandler {
                 if !metadata.holders.remove(&sender) {
                     warn!(
                         "{}: {} is not registered as a holder for {:?}",
-                        self,
-                        sender,
-                        self.idata_op(&message_id)?
+                        self, sender, &idata_address
                     );
                 }
                 if metadata.holders.is_empty() {
                     if let Err(error) = self.metadata.rem(&db_key) {
-                        warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
+                        warn!(
+                            "{}: Failed to delete chunk metadata from DB: {:?}",
+                            self, error
+                        );
                         // TODO - Send failure back to client handlers?
                     }
                 } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
-                    warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+                    warn!(
+                        "{}: Failed to write chunk metadata to DB: {:?}",
+                        self, error
+                    );
                     // TODO - Send failure back to client handlers?
                 }
             };
         }
 
-        self.remove_idata_op_if_concluded(&message_id)
-            .map(|idata_op| {
-                let response = {
-                    let errors_for_req = idata_op.get_any_errors();
-                    assert!(
-                        errors_for_req.len() <= 1,
-                        "Handling more than one response is not implemented."
-                    );
-                    if let Some(response) = errors_for_req.values().next() {
-                        Err(response.clone())
-                    } else {
-                        Ok(())
-                    }
-                };
-                Action::RespondToClientHandlers {
-                    sender: *idata_address.name(),
-                    rpc: Rpc::Response {
-                        requester: idata_op.client().clone(),
-                        response: Response::Mutation(response),
-                        message_id,
-                        // Deleting data is free so, no refund
-                        // This field can be put to use when deletion is incentivised
-                        refund: None,
-                    },
-                }
-            })
+        // TODO: Different responses from adults?
+        Some(Action::RespondToClientHandlers {
+            sender: *idata_address.name(),
+            rpc: Rpc::Response {
+                requester,
+                response: Response::Mutation(result),
+                message_id,
+                // Deleting data is free so, no refund
+                // This field can be put to use when deletion is incentivised
+                refund: None,
+                proof: None,
+            },
+        })
     }
 
     pub(super) fn handle_get_idata_resp(
@@ -672,26 +544,21 @@ impl IDataHandler {
         sender: XorName,
         result: NdResult<IData>,
         message_id: MessageId,
+        requester: PublicId,
+        proof: (Request, Signature),
     ) -> Option<Action> {
         let own_id = format!("{}", self);
-        let action = self
-            .idata_op_mut(&message_id)
-            .and_then(|idata_op| {
-                idata_op.handle_get_idata_resp(sender, result.clone(), &own_id, message_id)
-            })
-            .or_else(|| {
-                // The response arrived before this particular vault processed the request
-                // Note that for get responses we hold only one early response
-                if let Entry::Vacant(vacant_entry) = self.early_responses.entry(message_id) {
-                    let _ = vacant_entry.insert(vec![(sender, IDataResult::Get(result.clone()))]);
-                }
-                trace!("Added early response for message ID: {:?}", message_id);
-                trace!("Current: {:?}", self.early_responses.get(&message_id));
-                None
-            });
-
-        let _ = self.remove_idata_op_if_concluded(&message_id);
-        action
+        let response = Response::GetIData(result.clone());
+        Some(Action::RespondToClientHandlers {
+            sender: *self.id.name(),
+            rpc: Rpc::Response {
+                requester,
+                response,
+                message_id,
+                refund: None,
+                proof: Some(proof),
+            },
+        })
     }
 
     // Updates the metadata of the chunks help by a node that left.
@@ -766,39 +633,6 @@ impl IDataHandler {
                 Err(NdError::NoSuchData)
             }
         }
-    }
-
-    pub(super) fn idata_op(&self, message_id: &MessageId) -> Option<&IDataOp> {
-        self.idata_client_ops.get(message_id).or_else(|| {
-            warn!(
-                "{}: No current ImmutableData operation for {:?}",
-                self, message_id
-            );
-            None
-        })
-    }
-
-    pub(super) fn idata_op_mut(&mut self, message_id: &MessageId) -> Option<&mut IDataOp> {
-        let own_id = format!("{}", self);
-        self.idata_client_ops.get_mut(message_id).or_else(|| {
-            warn!(
-                "{}: No current ImmutableData operation for {:?}",
-                own_id, message_id
-            );
-            None
-        })
-    }
-
-    /// Removes and returns the op if it has concluded.
-    fn remove_idata_op_if_concluded(&mut self, message_id: &MessageId) -> Option<IDataOp> {
-        let is_concluded = self
-            .idata_op(message_id)
-            .map(IDataOp::concluded)
-            .unwrap_or(false);
-        if is_concluded {
-            return self.idata_client_ops.remove(message_id);
-        }
-        None
     }
 
     // Returns `XorName`s of the target holders for an idata chunk.

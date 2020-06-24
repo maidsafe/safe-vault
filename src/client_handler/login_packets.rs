@@ -132,6 +132,7 @@ impl LoginPackets {
                             }),
                             requester,
                             message_id,
+                            signature: None,
                         })),
                         Err(error) => {
                             // Refund amount (Including the cost of creating the balance)
@@ -144,6 +145,7 @@ impl LoginPackets {
                                     requester,
                                     message_id,
                                     refund,
+                                    proof: None,
                                 },
                             })
                         }
@@ -193,6 +195,7 @@ impl LoginPackets {
                 requester,
                 message_id,
                 refund,
+                proof: None,
             },
         })
     }
@@ -261,6 +264,7 @@ impl LoginPackets {
                 // A new balance is already created as
                 // a part of the flow. So no refund is processed.
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -307,6 +311,7 @@ impl LoginPackets {
                 message_id,
                 // Updating the login packet is free
                 refund: None,
+                proof: None,
             },
         })
     }

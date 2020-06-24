@@ -107,12 +107,14 @@ impl ClientHandler {
                 request,
                 requester,
                 message_id,
+                ..
             } => self.finalise_client_request(src, requester, request, message_id),
             Rpc::Response {
                 response,
                 requester,
                 message_id,
                 refund,
+                ..
             } => {
                 if let Some(refund_amount) = refund {
                     if let Err(error) = self.balances.deposit(requester.name(), refund_amount) {
@@ -156,6 +158,7 @@ impl ClientHandler {
                     requester: client_public_id,
                     request,
                     message_id,
+                    signature: None,
                 }))
             }
             Forward {
@@ -166,6 +169,7 @@ impl ClientHandler {
                 requester: client_public_id,
                 request,
                 message_id,
+                signature: None,
             })),
             PayAndProxy {
                 request,
@@ -189,6 +193,7 @@ impl ClientHandler {
                     requester: client_public_id,
                     request,
                     message_id,
+                    signature: None,
                 }))
             }
         }

@@ -59,12 +59,6 @@ pub(crate) enum Action {
     },
     /// Send the same request to each individual peer (used to send IData requests to adults).
     SendToPeers {
-        sender: XorName,
-        targets: BTreeSet<XorName>,
-        rpc: Rpc,
-    },
-    SendMessage {
-        sender: XorName,
         targets: BTreeSet<XorName>,
         rpc: Rpc,
     },

@@ -172,6 +172,7 @@ impl MDataHandler {
                 response: Response::Mutation(result),
                 message_id,
                 refund,
+                proof: None,
             },
         })
     }
@@ -199,6 +200,7 @@ impl MDataHandler {
                 response: Response::Mutation(result),
                 message_id,
                 refund,
+                proof: None,
             },
         })
     }
@@ -234,6 +236,7 @@ impl MDataHandler {
                 message_id,
                 // Deletion is free so no refund
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -307,6 +310,7 @@ impl MDataHandler {
                 response: Response::GetMData(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -329,6 +333,7 @@ impl MDataHandler {
                 response: Response::GetMDataShell(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -351,6 +356,7 @@ impl MDataHandler {
                 response: Response::GetMDataVersion(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -387,6 +393,7 @@ impl MDataHandler {
                 response,
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -409,6 +416,7 @@ impl MDataHandler {
                 response: Response::ListMDataKeys(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -434,6 +442,7 @@ impl MDataHandler {
                 response,
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -459,6 +468,7 @@ impl MDataHandler {
                 response,
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -481,6 +491,7 @@ impl MDataHandler {
                 response: Response::ListMDataPermissions(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -504,6 +515,7 @@ impl MDataHandler {
                 response: Response::ListMDataUserPermissions(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }

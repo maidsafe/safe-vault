@@ -205,6 +205,7 @@ impl Balances {
                 requester,
                 message_id,
                 refund,
+                proof: None,
             },
         })
     }
@@ -256,6 +257,7 @@ impl Balances {
                 requester,
                 message_id,
                 refund,
+                proof: None,
             },
         })
     }

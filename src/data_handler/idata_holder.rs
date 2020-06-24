@@ -11,17 +11,18 @@ use crate::{
 };
 use log::{error, info};
 
-use safe_nd::{
-    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Response, XorName,
-};
-
 use routing::SrcLocation;
+use safe_nd::{
+    Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response,
+    XorName,
+};
 use std::{
     cell::Cell,
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use threshold_crypto::Signature;
 
 pub(crate) struct IDataHolder {
     id: NodePublicId,
@@ -52,6 +53,8 @@ impl IDataHolder {
         data: &IData,
         requester: PublicId,
         message_id: MessageId,
+        accumulated_signature: Option<Signature>,
+        request: Request,
     ) -> Option<Action> {
         let result = if self.chunks.has(data.address()) {
             info!(
@@ -72,6 +75,7 @@ impl IDataHolder {
                 rpc: Rpc::DuplicationComplete {
                     response: Response::Mutation(result),
                     message_id,
+                    proof: Some((*data.address(), accumulated_signature?)),
                 },
             }),
             SrcLocation::Section(_) => Some(Action::RespondToOurDataHandlers {
@@ -80,6 +84,7 @@ impl IDataHolder {
                     response: Response::Mutation(result),
                     message_id,
                     refund,
+                    proof: Some((request, accumulated_signature?)),
                 },
             }),
         }
@@ -91,6 +96,8 @@ impl IDataHolder {
         address: IDataAddress,
         requester: PublicId,
         message_id: MessageId,
+        request: Request,
+        accumulated_signature: Option<Signature>,
     ) -> Option<Action> {
         let result = self
             .chunks
@@ -101,14 +108,14 @@ impl IDataHolder {
             SrcLocation::Node(xorname) => {
                 let mut targets: BTreeSet<XorName> = Default::default();
                 let _ = targets.insert(XorName(xorname.0));
-                Some(Action::SendMessage {
-                    sender: *self.id.name(),
+                Some(Action::SendToPeers {
                     targets,
                     rpc: Rpc::Response {
                         requester,
                         response: Response::GetIData(result),
                         message_id,
                         refund: None,
+                        proof: Some((request, accumulated_signature?)),
                     },
                 })
             }
@@ -118,6 +125,7 @@ impl IDataHolder {
                     response: Response::GetIData(result),
                     message_id,
                     refund: None,
+                    proof: Some((request, accumulated_signature?)),
                 },
             }),
         }
@@ -128,6 +136,8 @@ impl IDataHolder {
         address: IDataAddress,
         requester: PublicId,
         message_id: MessageId,
+        request: Request,
+        accumulated_signature: Option<Signature>,
     ) -> Option<Action> {
         let result = if self.chunks.has(&address) {
             self.chunks
@@ -159,6 +169,7 @@ impl IDataHolder {
                 response: Response::Mutation(result),
                 message_id,
                 refund: None,
+                proof: Some((request, accumulated_signature?)),
             },
         })
     }

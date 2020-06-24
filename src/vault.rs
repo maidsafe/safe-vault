@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    accumulator::Accumulator,
     action::{Action, ConsensusAction},
     client_handler::ClientHandler,
     data_handler::DataHandler,
@@ -19,9 +20,12 @@ use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use routing::{
-    event::Event as RoutingEvent, DstLocation, Node, SrcLocation, TransportEvent as ClientEvent,
+    event::Event as RoutingEvent, DstLocation, Node, Prefix, SrcLocation,
+    TransportEvent as ClientEvent,
 };
-use safe_nd::{ClientRequest, LoginPacketRequest, NodeFullId, Request, Response, XorName};
+use safe_nd::{
+    ClientRequest, LoginPacketRequest, NodeFullId, PublicId, Request, Response, XorName,
+};
 use std::borrow::Cow;
 use std::{
     cell::{Cell, RefCell},
@@ -36,12 +40,15 @@ const STATE_FILENAME: &str = "state";
 
 #[allow(clippy::large_enum_variant)]
 enum State {
+    Infant,
+    Adult {
+        data_handler: DataHandler,
+        accumulator: Accumulator,
+    },
     Elder {
         client_handler: ClientHandler,
         data_handler: DataHandler,
-    },
-    Adult {
-        data_handler: DataHandler,
+        accumulator: Accumulator,
     },
 }
 
@@ -123,19 +130,11 @@ impl<R: CryptoRng + Rng> Vault<R> {
             State::Elder {
                 client_handler,
                 data_handler,
+                accumulator: Accumulator::new(routing_node.clone()),
             }
         } else {
-            info!("Initializing new Vault as Adult");
-            let total_used_space = Rc::new(Cell::new(0));
-            let data_handler = DataHandler::new(
-                id.public_id().clone(),
-                &config,
-                &total_used_space,
-                init_mode,
-                false,
-                routing_node.clone(),
-            )?;
-            State::Adult { data_handler }
+            info!("Initializing new Vault as Infant");
+            State::Infant
         };
 
         let vault = Self {
@@ -216,6 +215,25 @@ impl<R: CryptoRng + Rng> Vault<R> {
         }
     }
 
+    fn promote_to_adult(&mut self) -> Result<()> {
+        let mut config = Config::default();
+        config.set_root_dir(self.root_dir.clone());
+        let total_used_space = Rc::new(Cell::new(0));
+        let data_handler = DataHandler::new(
+            self.id.public_id().clone(),
+            &config,
+            &total_used_space,
+            Init::New,
+            false,
+            self.routing_node.clone(),
+        )?;
+        self.state = State::Adult {
+            data_handler,
+            accumulator: Accumulator::new(self.routing_node.clone()),
+        };
+        Ok(())
+    }
+
     fn promote_to_elder(&mut self) -> Result<()> {
         let mut config = Config::default();
         config.set_root_dir(self.root_dir.clone());
@@ -238,6 +256,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         self.state = State::Elder {
             client_handler,
             data_handler,
+            accumulator: Accumulator::new(self.routing_node.clone()),
         };
         Ok(())
     }
@@ -371,27 +390,95 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 info!("No. of Adults: {}", adult_count);
                 None
             }
+            RoutingEvent::Connected(_) => self.promote_to_adult().map_or_else(
+                |err| {
+                    error!("Error when promoting Vault to Adult: {:?}", err);
+                    None
+                },
+                |()| {
+                    info!("Vault promoted to Adult");
+                    None
+                },
+            ),
             // Ignore all other events
             _ => None,
         }
     }
 
     fn handle_routing_message(&mut self, src: SrcLocation, message: Vec<u8>) -> Option<Action> {
+        let id = *self.routing_node.borrow().id().name();
         match bincode::deserialize::<Rpc>(&message) {
             Ok(rpc) => match &rpc {
-                Rpc::Request { request, .. } => match request {
-                    Request::IData(_) => self.data_handler_mut()?.handle_vault_rpc(src, rpc),
-                    other => unimplemented!("Should not receive: {:?}", other),
-                },
+                Rpc::Request {
+                    request,
+                    requester,
+                    signature,
+                    ..
+                } => {
+                    if matches!(requester, PublicId::Node(_)) {
+                        if let Some((_, signature)) = signature.clone() {
+                            self.data_handler_mut()?
+                                .handle_vault_rpc(src, rpc, Some(signature.0))
+                        } else {
+                            error!("Signature missing from duplication GET request");
+                            None
+                        }
+                    } else {
+                        match request {
+                            Request::IData(_) => {
+                                info!("{}: Accumulating sigs for {:?}", &id, &request);
+                                if let Some((accumulated_request, signature)) =
+                                    self.accumulator_mut()?.accumulate_request(rpc)
+                                {
+                                    info!("Got enough sigs");
+                                    let prefix = match src {
+                                        SrcLocation::Node(name) => {
+                                            Prefix::<routing::XorName>::new(32, name)
+                                        }
+                                        SrcLocation::Section(prefix) => prefix,
+                                    };
+                                    self.data_handler_mut()?.handle_vault_rpc(
+                                        SrcLocation::Section(prefix),
+                                        accumulated_request,
+                                        Some(signature),
+                                    )
+                                } else {
+                                    info!("Insufficient sigs");
+                                    None
+                                }
+                            }
+                            other => unimplemented!("Should not receive: {:?}", other),
+                        }
+                    }
+                }
                 Rpc::Response { response, .. } => match response {
                     Response::Mutation(_) | Response::GetIData(_) => {
-                        self.data_handler_mut()?.handle_vault_rpc(src, rpc)
+                        self.data_handler_mut()?.handle_vault_rpc(src, rpc, None)
                     }
                     _ => unimplemented!("Should not receive: {:?}", response),
                 },
-                Rpc::Duplicate { .. } => self.data_handler_mut()?.handle_vault_rpc(src, rpc),
+                Rpc::Duplicate { .. } => {
+                    info!("{}: Accumulating sigs for {:?}", &id, &rpc);
+                    if let Some((accumulated_request, signature)) =
+                        self.accumulator_mut()?.accumulate_request(rpc)
+                    {
+                        info!("Got enough sigs");
+                        let prefix = match src {
+                            SrcLocation::Node(name) => Prefix::<routing::XorName>::new(32, name),
+                            SrcLocation::Section(prefix) => prefix,
+                        };
+                        self.data_handler_mut()?.handle_vault_rpc(
+                            SrcLocation::Section(prefix),
+                            accumulated_request,
+                            Some(signature),
+                        )
+                    } else {
+                        info!("Insufficient sigs");
+                        None
+                    }
+                }
                 Rpc::DuplicationComplete { .. } => {
-                    self.data_handler_mut()?.handle_vault_rpc(src, rpc)
+                    self.data_handler_mut()?.handle_vault_rpc(src, rpc, None)
                 }
             },
             Err(e) => {
@@ -477,24 +564,27 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 }
                 None
             }
-            SendToPeers { targets, rpc, .. } => {
+            SendToPeers { targets, rpc } => {
                 let mut next_action = None;
-                let prefix = *self.routing_node.borrow().our_prefix().unwrap();
                 for target in targets {
                     if target == *self.id.public_id().name() {
-                        next_action = self
-                            .data_handler_mut()?
-                            .handle_vault_rpc(SrcLocation::Section(prefix), rpc.clone());
+                        info!("Vault is one of the targets. Accumulating message locally");
+                        if let Some((accumulated_request, signature)) =
+                            self.accumulator_mut()?.accumulate_request(rpc.clone())
+                        {
+                            let prefix = *self.routing_node.borrow().our_prefix()?;
+                            next_action = self.data_handler_mut()?.handle_vault_rpc(
+                                SrcLocation::Section(prefix),
+                                accumulated_request,
+                                Some(signature),
+                            );
+                        } else {
+                            info!("Insufficient sigs");
+                        }
                     } else {
-                        next_action = self.send_message_to_peer(target, rpc.clone());
+                        // Always None
+                        let _ = self.send_message_to_peer(target, rpc.clone());
                     }
-                }
-                next_action
-            }
-            SendMessage { targets, rpc, .. } => {
-                let mut next_action = None;
-                for target in targets {
-                    next_action = self.send_message_to_peer_as_node(target, rpc.clone());
                 }
                 next_action
             }
@@ -531,11 +621,11 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     fn send_message_to_peer(&self, target: XorName, rpc: Rpc) -> Option<Action> {
-        let prefix = *self.routing_node.borrow().our_prefix().unwrap();
+        let name = *self.routing_node.borrow().id().name();
         self.routing_node
             .borrow_mut()
             .send_message(
-                SrcLocation::Section(prefix),
+                SrcLocation::Node(name),
                 DstLocation::Node(routing::XorName(target.0)),
                 utils::serialise(&rpc),
             )
@@ -545,31 +635,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     None
                 },
                 |()| {
-                    info!(
-                        "Sent message to Peer {:?} from section with prefix {:?}",
-                        target, prefix
-                    );
-                    None
-                },
-            )
-    }
-
-    fn send_message_to_peer_as_node(&self, target: XorName, rpc: Rpc) -> Option<Action> {
-        let id = *self.routing_node.borrow().id();
-        self.routing_node
-            .borrow_mut()
-            .send_message(
-                SrcLocation::Node(*id.name()),
-                DstLocation::Node(routing::XorName(target.0)),
-                utils::serialise(&rpc),
-            )
-            .map_or_else(
-                |err| {
-                    error!("Unable to send message to Peer: {:?}", err);
-                    None
-                },
-                |()| {
-                    info!("Sent message to Peer: {:?}", target);
+                    info!("Sent message to Peer {:?} from node {:?}", target, name);
                     None
                 },
             )
@@ -620,6 +686,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     _data_request => self.data_handler_mut()?.handle_vault_rpc(
                         SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
                         rpc,
+                        None,
                     ),
                 }
             } else {
@@ -664,6 +731,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     #[allow(unused)]
     fn client_handler(&self) -> Option<&ClientHandler> {
         match &self.state {
+            State::Infant => None,
             State::Elder {
                 ref client_handler, ..
             } => Some(client_handler),
@@ -673,6 +741,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
     fn client_handler_mut(&mut self) -> Option<&mut ClientHandler> {
         match &mut self.state {
+            State::Infant => None,
             State::Elder {
                 ref mut client_handler,
                 ..
@@ -681,25 +750,57 @@ impl<R: CryptoRng + Rng> Vault<R> {
         }
     }
 
+    #[allow(unused)]
+    fn accumulator(&self) -> Option<&Accumulator> {
+        match &self.state {
+            State::Infant => None,
+            State::Elder {
+                ref accumulator, ..
+            } => Some(accumulator),
+            State::Adult {
+                ref accumulator, ..
+            } => Some(accumulator),
+        }
+    }
+
+    fn accumulator_mut(&mut self) -> Option<&mut Accumulator> {
+        match &mut self.state {
+            State::Infant => None,
+            State::Elder {
+                ref mut accumulator,
+                ..
+            } => Some(accumulator),
+            State::Adult {
+                ref mut accumulator,
+                ..
+            } => Some(accumulator),
+        }
+    }
+
     // TODO - remove this
     #[allow(unused)]
     fn data_handler(&self) -> Option<&DataHandler> {
         match &self.state {
+            State::Infant => None,
             State::Elder {
                 ref data_handler, ..
             } => Some(data_handler),
-            State::Adult { ref data_handler } => Some(data_handler),
+            State::Adult {
+                ref data_handler, ..
+            } => Some(data_handler),
         }
     }
 
     fn data_handler_mut(&mut self) -> Option<&mut DataHandler> {
         match &mut self.state {
+            State::Infant => None,
             State::Elder {
                 ref mut data_handler,
                 ..
             } => Some(data_handler),
             State::Adult {
                 ref mut data_handler,
+                ..
             } => Some(data_handler),
         }
     }
