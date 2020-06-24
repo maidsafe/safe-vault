@@ -427,6 +427,7 @@ impl IDataHandler {
                         Ok(_) => {
                             let idata_address = self.idata_elder_ops.get(&message_id);
                             if let Some(address) = idata_address {
+                                trace!("Duplication process completed for {:?}", address);
                                 let metadata = self.get_metadata_for(*address);
                                 if let Ok(mut metadata) = metadata {
                                     if !metadata.holders.insert(sender) {
