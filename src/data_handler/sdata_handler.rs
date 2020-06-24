@@ -107,6 +107,7 @@ impl SDataHandler {
                 response: Response::Mutation(result),
                 message_id,
                 refund,
+                proof: None,
             },
         })
     }
@@ -126,6 +127,7 @@ impl SDataHandler {
                 response: Response::GetSData(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -182,6 +184,7 @@ impl SDataHandler {
                 message_id,
                 // Deletion is free so no refund
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -204,6 +207,7 @@ impl SDataHandler {
                 response: Response::GetSDataRange(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -228,6 +232,7 @@ impl SDataHandler {
                 response: Response::GetSDataLastEntry(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -252,6 +257,7 @@ impl SDataHandler {
                 response: Response::GetSDataOwner(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -277,6 +283,7 @@ impl SDataHandler {
                 response: Response::GetSDataUserPermissions(result),
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -310,6 +317,7 @@ impl SDataHandler {
                 response,
                 message_id,
                 refund: None,
+                proof: None,
             },
         })
     }
@@ -418,6 +426,7 @@ impl SDataHandler {
                 response: Response::Mutation(result),
                 message_id,
                 refund,
+                proof: None,
             },
         })
     }

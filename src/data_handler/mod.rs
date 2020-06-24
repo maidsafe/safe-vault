@@ -105,13 +105,7 @@ impl DataHandler {
                 response,
                 message_id,
                 proof: Some((idata_address, signature)),
-            } => self.complete_duplication(
-                src,
-                response,
-                message_id,
-                idata_address,
-                signature,
-            ),
+            } => self.complete_duplication(src, response, message_id, idata_address, signature),
             _ => None,
         }
     }
@@ -246,7 +240,7 @@ impl DataHandler {
                         }
                     }
                     IDataRequest::Get(address) => {
-                        if src.is_section() || matches!(requester, PublicId::Node(_)) {
+                        if src.is_section() {
                             // Since the requester is a node, this message was sent by the data handlers to us
                             // as a single data handler, implying that we're a data holder where the chunk is
                             // stored.
@@ -254,6 +248,27 @@ impl DataHandler {
                                 &request,
                                 accumulated_signature.as_ref()?,
                             ) {
+                                self.idata_holder.get_idata(
+                                    src,
+                                    address,
+                                    requester,
+                                    message_id,
+                                    request,
+                                    accumulated_signature,
+                                )
+                            } else {
+                                error!("Accumulated signature is invalid!");
+                                None
+                            }
+                        } else if matches!(requester, PublicId::Node(_)) {
+                            if self
+                                .routing_node
+                                .borrow()
+                                .public_key_set()
+                                .ok()?
+                                .public_key()
+                                .verify(accumulated_signature.as_ref()?, utils::serialise(&address))
+                            {
                                 self.idata_holder.get_idata(
                                     src,
                                     address,
@@ -358,9 +373,10 @@ impl DataHandler {
             utils::get_source_name(src),
         );
         if let Some((request, signature)) = proof {
-            if self
-                .validate_section_signature(&request, &signature)
-                .is_none()
+            if !matches!(requester, PublicId::Node(_))
+                && self
+                    .validate_section_signature(&request, &signature)
+                    .is_none()
             {
                 error!("Invalid section signature");
                 return None;
@@ -372,7 +388,7 @@ impl DataHandler {
                         requester,
                         result,
                         message_id,
-                        (request, signature),
+                        request,
                     )
                 }),
                 GetIData(result) => {
@@ -397,7 +413,6 @@ impl DataHandler {
                     } else {
                         self.handle_idata_request(|idata_handler| {
                             idata_handler.handle_get_idata_resp(
-                                utils::get_source_name(src),
                                 result,
                                 message_id,
                                 requester,

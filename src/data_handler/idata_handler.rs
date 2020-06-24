@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKey};
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace, warn};
 use pickledb::PickleDb;
 use rand::SeedableRng;
 use routing::Node;
@@ -18,7 +18,7 @@ use safe_nd::{
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -36,12 +36,6 @@ const IMMUTABLE_DATA_ADULT_COPY_COUNT: usize = 3;
 struct ChunkMetadata {
     holders: BTreeSet<XorName>,
     owner: Option<PublicKey>,
-}
-
-#[derive(Debug)]
-enum IDataResult {
-    Mutation(NdResult<()>),
-    Get(NdResult<IData>),
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -358,6 +352,7 @@ impl IDataHandler {
                 if let Err(error) = self.metadata.set(&address.to_db_key(), &metadata) {
                     warn!("{}: Failed to write metadata to DB: {:?}", self, error);
                 }
+                info!("Duplication process completed for: {:?}", message_id);
             }
         } else {
             // Todo: take care of the mutation failure case
@@ -371,18 +366,12 @@ impl IDataHandler {
         requester: PublicId,
         result: NdResult<()>,
         message_id: MessageId,
-        proof: (Request, Signature),
+        request: Request,
     ) -> Option<Action> {
-        let (request, signature) = proof;
         match &request {
-            Request::IData(IDataRequest::Put(data)) => self.handle_put_idata_resp(
-                *data.address(),
-                sender,
-                &result,
-                message_id,
-                request,
-                requester,
-            ),
+            Request::IData(IDataRequest::Put(data)) => {
+                self.handle_put_idata_resp(*data.address(), sender, &result, message_id, requester)
+            }
             Request::IData(IDataRequest::DeleteUnpub(address)) => {
                 self.handle_delete_unpub_idata_resp(*address, sender, result, message_id, requester)
             }
@@ -396,7 +385,6 @@ impl IDataHandler {
         sender: XorName,
         _result: &NdResult<()>,
         message_id: MessageId,
-        request: Request,
         requester: PublicId,
     ) -> Option<Action> {
         // TODO -
@@ -541,14 +529,12 @@ impl IDataHandler {
 
     pub(super) fn handle_get_idata_resp(
         &mut self,
-        sender: XorName,
         result: NdResult<IData>,
         message_id: MessageId,
         requester: PublicId,
         proof: (Request, Signature),
     ) -> Option<Action> {
-        let own_id = format!("{}", self);
-        let response = Response::GetIData(result.clone());
+        let response = Response::GetIData(result);
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
