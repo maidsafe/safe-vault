@@ -22,7 +22,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
-use threshold_crypto::Signature;
+use threshold_crypto::{Signature, SignatureShare};
 use tiny_keccak::sha3_256;
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
@@ -154,14 +154,7 @@ impl IDataHandler {
         };
 
         info!("Storing {} copies of the data", target_holders.len());
-
-        let signature = self
-            .routing_node
-            .borrow()
-            .secret_key_share()
-            .map_or(None, |key| Some(key.sign(utils::serialise(&request))));
-        let signature =
-            signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig));
+        let signature = self.sign_with_signature_share(&utils::serialise(&request));
         Some(Action::SendToPeers {
             targets: target_holders,
             rpc: Rpc::Request {
@@ -207,14 +200,7 @@ impl IDataHandler {
                 return respond(Err(NdError::AccessDenied));
             }
         };
-
-        let signature = self
-            .routing_node
-            .borrow()
-            .secret_key_share()
-            .map_or(None, |key| Some(key.sign(utils::serialise(&request))));
-        let signature =
-            signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig));
+        let signature = self.sign_with_signature_share(&utils::serialise(&request));
         Some(Action::SendToPeers {
             targets: metadata.holders,
             rpc: Rpc::Request {
@@ -254,14 +240,7 @@ impl IDataHandler {
                 trace!("Generated MsgID {:?} to duplicate chunks", &message_id);
 
                 let new_holders = self.get_new_holders_for_chunk(&address);
-
-                let signature = self
-                    .routing_node
-                    .borrow()
-                    .secret_key_share()
-                    .map_or(None, |key| Some(key.sign(utils::serialise(&address))));
-                let signature =
-                    signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig));
+                let signature = self.sign_with_signature_share(&utils::serialise(&address));
                 let duplicate_chunk_action = Action::SendToPeers {
                     targets: new_holders,
                     rpc: Rpc::Duplicate {
@@ -314,13 +293,7 @@ impl IDataHandler {
                 return respond(Err(NdError::AccessDenied));
             }
         };
-        let signature = self
-            .routing_node
-            .borrow()
-            .secret_key_share()
-            .map_or(None, |key| Some(key.sign(utils::serialise(&request))));
-        let signature =
-            signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig));
+        let signature = self.sign_with_signature_share(&utils::serialise(&request));
         Some(Action::SendToPeers {
             targets: metadata.holders,
             rpc: Rpc::Request {
@@ -340,20 +313,33 @@ impl IDataHandler {
         message_id: MessageId,
     ) -> Option<Action> {
         if result.is_ok() {
-            let metadata = self.get_metadata_for(address);
-            if let Ok(mut metadata) = metadata {
-                if !metadata.holders.insert(sender) {
-                    warn!(
-                        "{}: {} already registered as a holder for {:?}",
-                        self, sender, address
-                    );
-                }
-
-                if let Err(error) = self.metadata.set(&address.to_db_key(), &metadata) {
-                    warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-                }
-                info!("Duplication process completed for: {:?}", message_id);
+            let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
+            if !chunk_metadata.holders.insert(sender) {
+                warn!(
+                    "{}: {} already registered as a holder for {:?}",
+                    self, sender, address
+                );
             }
+
+            if let Err(error) = self.metadata.set(&address.to_db_key(), &chunk_metadata) {
+                warn!("{}: Failed to write metadata to DB: {:?}", self, error);
+            }
+
+            let mut holders_metadata = self.get_holder(sender).unwrap_or_default();
+            if !holders_metadata.chunks.insert(address) {
+                warn!(
+                    "{}: {} already registered as a holder for {:?}",
+                    self, sender, &address
+                );
+            }
+
+            if let Err(error) = self.holders.set(&sender.to_db_key(), &holders_metadata) {
+                warn!(
+                    "{}: Failed to write holder metadata to DB: {:?}",
+                    self, error
+                );
+            }
+            info!("Duplication process completed for: {:?}", message_id);
         } else {
             // Todo: take care of the mutation failure case
         }
@@ -662,6 +648,15 @@ impl IDataHandler {
                 .collect();
         }
         closest_holders
+    }
+
+    fn sign_with_signature_share(&self, data: &[u8]) -> Option<(usize, SignatureShare)> {
+        let signature = self
+            .routing_node
+            .borrow()
+            .secret_key_share()
+            .map_or(None, |key| Some(key.sign(data)));
+        signature.map(|sig| (self.routing_node.borrow().our_index().unwrap_or(0), sig))
     }
 }
 

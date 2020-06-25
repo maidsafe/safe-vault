@@ -405,8 +405,34 @@ impl<R: CryptoRng + Rng> Vault<R> {
         }
     }
 
-    fn handle_routing_message(&mut self, src: SrcLocation, message: Vec<u8>) -> Option<Action> {
+    fn accumulate_rpc(&mut self, src: SrcLocation, rpc: Rpc) -> Option<Action> {
         let id = *self.routing_node.borrow().id().name();
+        info!(
+            "{}: Accumulating signatures for {:?}",
+            &id,
+            rpc.message_id()
+        );
+        if let Some((accumulated_rpc, signature)) = self.accumulator_mut()?.accumulate_request(rpc)
+        {
+            info!(
+                "Got enough signatures for {:?}",
+                accumulated_rpc.message_id()
+            );
+            let prefix = match src {
+                SrcLocation::Node(name) => Prefix::<routing::XorName>::new(32, name),
+                SrcLocation::Section(prefix) => prefix,
+            };
+            self.data_handler_mut()?.handle_vault_rpc(
+                SrcLocation::Section(prefix),
+                accumulated_rpc,
+                Some(signature),
+            )
+        } else {
+            None
+        }
+    }
+
+    fn handle_routing_message(&mut self, src: SrcLocation, message: Vec<u8>) -> Option<Action> {
         match bincode::deserialize::<Rpc>(&message) {
             Ok(rpc) => match &rpc {
                 Rpc::Request {
@@ -425,28 +451,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                         }
                     } else {
                         match request {
-                            Request::IData(_) => {
-                                info!("{}: Accumulating sigs for {:?}", &id, &request);
-                                if let Some((accumulated_request, signature)) =
-                                    self.accumulator_mut()?.accumulate_request(rpc)
-                                {
-                                    info!("Got enough sigs");
-                                    let prefix = match src {
-                                        SrcLocation::Node(name) => {
-                                            Prefix::<routing::XorName>::new(32, name)
-                                        }
-                                        SrcLocation::Section(prefix) => prefix,
-                                    };
-                                    self.data_handler_mut()?.handle_vault_rpc(
-                                        SrcLocation::Section(prefix),
-                                        accumulated_request,
-                                        Some(signature),
-                                    )
-                                } else {
-                                    info!("Insufficient sigs");
-                                    None
-                                }
-                            }
+                            Request::IData(_) => self.accumulate_rpc(src, rpc),
                             other => unimplemented!("Should not receive: {:?}", other),
                         }
                     }
@@ -457,26 +462,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     }
                     _ => unimplemented!("Should not receive: {:?}", response),
                 },
-                Rpc::Duplicate { .. } => {
-                    info!("{}: Accumulating sigs for {:?}", &id, &rpc);
-                    if let Some((accumulated_request, signature)) =
-                        self.accumulator_mut()?.accumulate_request(rpc)
-                    {
-                        info!("Got enough sigs");
-                        let prefix = match src {
-                            SrcLocation::Node(name) => Prefix::<routing::XorName>::new(32, name),
-                            SrcLocation::Section(prefix) => prefix,
-                        };
-                        self.data_handler_mut()?.handle_vault_rpc(
-                            SrcLocation::Section(prefix),
-                            accumulated_request,
-                            Some(signature),
-                        )
-                    } else {
-                        info!("Insufficient sigs");
-                        None
-                    }
-                }
+                Rpc::Duplicate { .. } => self.accumulate_rpc(src, rpc),
                 Rpc::DuplicationComplete { .. } => {
                     self.data_handler_mut()?.handle_vault_rpc(src, rpc, None)
                 }
@@ -569,18 +555,10 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 for target in targets {
                     if target == *self.id.public_id().name() {
                         info!("Vault is one of the targets. Accumulating message locally");
-                        if let Some((accumulated_request, signature)) =
-                            self.accumulator_mut()?.accumulate_request(rpc.clone())
-                        {
-                            let prefix = *self.routing_node.borrow().our_prefix()?;
-                            next_action = self.data_handler_mut()?.handle_vault_rpc(
-                                SrcLocation::Section(prefix),
-                                accumulated_request,
-                                Some(signature),
-                            );
-                        } else {
-                            info!("Insufficient sigs");
-                        }
+                        next_action = self.accumulate_rpc(
+                            SrcLocation::Node(routing::XorName(target.0)),
+                            rpc.clone(),
+                        );
                     } else {
                         // Always None
                         let _ = self.send_message_to_peer(target, rpc.clone());
@@ -610,7 +588,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             )
             .map_or_else(
                 |err| {
-                    error!("Unable to respond to data handler: {:?}", err);
+                    error!("Unable to respond to our data handlers: {:?}", err);
                     None
                 },
                 |()| {

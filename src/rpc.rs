@@ -46,3 +46,16 @@ pub(crate) enum Rpc {
         proof: Option<(IDataAddress, Signature)>,
     },
 }
+
+impl Rpc {
+    /// Returns the message ID
+    pub(crate) fn message_id(&self) -> &MessageId {
+        use Rpc::*;
+        match self {
+            Request { message_id, .. }
+            | Duplicate { message_id, .. }
+            | Response { message_id, .. }
+            | DuplicationComplete { message_id, .. } => message_id,
+        }
+    }
+}

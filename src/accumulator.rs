@@ -32,6 +32,10 @@ impl Accumulator {
     }
 
     pub(crate) fn accumulate_request(&mut self, rpc: Rpc) -> Option<(Rpc, Signature)> {
+        if self.completed.contains(rpc.message_id()) {
+            info!("RPC already processed.");
+            return None;
+        }
         match rpc {
             Rpc::Request {
                 request,
@@ -39,9 +43,6 @@ impl Accumulator {
                 message_id,
                 signature,
             } => {
-                if self.completed.contains(&message_id) {
-                    return None;
-                }
                 if let Some(signature) = signature {
                     // If the request comes from a node, the signatures have already
                     // been accumulated at the Adult before the data is requested for duplication.
@@ -119,9 +120,6 @@ impl Accumulator {
                 message_id,
                 signature,
             } => {
-                if self.completed.contains(&message_id) {
-                    return None;
-                }
                 if let Some(signature) = signature {
                     match self.duplications.entry(message_id) {
                         Entry::Vacant(entry) => {
@@ -139,7 +137,7 @@ impl Accumulator {
                 info!(
                     "Got {} signatures. We need {}",
                     signatures.len(),
-                    public_key_set.threshold()
+                    public_key_set.threshold() + 1
                 );
                 if signatures.len() > public_key_set.threshold() {
                     let (address, holders, signatures) = self.duplications.remove(&message_id)?;

@@ -119,7 +119,6 @@ impl DataHandler {
         signature: Signature,
     ) -> Option<Action> {
         use Response::*;
-        debug!("duplication process completed");
         if self
             .routing_node
             .borrow()
