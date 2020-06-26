@@ -66,4 +66,9 @@ pub(crate) enum Action {
         message_id: MessageId,
         response: Response,
     },
+    /// Send the request to another section.
+    SendToSection {
+        target: XorName,
+        rpc: Rpc,
+    },
 }

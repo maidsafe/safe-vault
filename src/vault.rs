@@ -574,6 +574,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     .respond_to_client(message_id, response);
                 None
             }
+            SendToSection { target, rpc } => self.send_message_to_section(target, rpc),
         }
     }
 
@@ -593,6 +594,31 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 },
                 |()| {
                     info!("Responded to our data handlers with: {:?}", &rpc);
+                    None
+                },
+            )
+    }
+
+    fn send_message_to_section(&self, target: XorName, rpc: Rpc) -> Option<Action> {
+        let name = *self.routing_node.borrow().id().name();
+        let sender_prefix = *self.routing_node.borrow().our_prefix().unwrap();
+        self.routing_node
+            .borrow_mut()
+            .send_message(
+                SrcLocation::Section(sender_prefix),
+                DstLocation::Section(routing::XorName(target.0)),
+                utils::serialise(&rpc),
+            )
+            .map_or_else(
+                |err| {
+                    error!("Unable to send message to section: {:?}", err);
+                    None
+                },
+                |()| {
+                    info!(
+                        "Sent message to section {:?} from section {:?}",
+                        target, name
+                    );
                     None
                 },
             )
@@ -653,25 +679,31 @@ impl<R: CryptoRng + Rng> Vault<R> {
         //        onwards, and then if we're also part of the data handlers, we'll call that
         //        same handler which Routing will call after receiving a message.
 
-        if self.self_is_handler_for(&dst_address) {
-            // TODO - We need a better way for determining which handler should be given the
-            //        message.
-            if let Rpc::Request { request, .. } = &rpc {
-                match request {
-                    Request::LoginPacket(_) | Request::Coins(_) | Request::Client(_) => self
-                        .client_handler_mut()?
-                        .handle_vault_rpc(requester_name, rpc),
-                    _data_request => self.data_handler_mut()?.handle_vault_rpc(
-                        SrcLocation::Node(routing::XorName(rand::random())), // dummy xorname
-                        rpc,
-                        None,
-                    ),
+        // TODO - We need a better way for determining which handler should be given the
+        //        message.
+        if let Rpc::Request { request, .. } = &rpc {
+            match request {
+                Request::LoginPacket(_) | Request::Coins(_) | Request::Client(_) => self
+                    .client_handler_mut()?
+                    .handle_vault_rpc(requester_name, rpc),
+                _data_request => {
+                    if self.self_is_handler_for(&dst_address) {
+                        let our_name = *self.routing_node.borrow().name();
+                        self.data_handler_mut()?.handle_vault_rpc(
+                            SrcLocation::Node(our_name),
+                            rpc,
+                            None,
+                        )
+                    } else {
+                        Some(Action::SendToSection {
+                            target: *dst_address,
+                            rpc,
+                        })
+                    }
                 }
-            } else {
-                error!("{}: Logic error - unexpected RPC.", self);
-                None
             }
         } else {
+            error!("{}: Logic error - unexpected RPC.", self);
             None
         }
     }
@@ -701,8 +733,11 @@ impl<R: CryptoRng + Rng> Vault<R> {
         None
     }
 
-    fn self_is_handler_for(&self, _address: &XorName) -> bool {
-        true
+    fn self_is_handler_for(&self, address: &XorName) -> bool {
+        self.routing_node
+            .borrow()
+            .matches_our_prefix(&routing::XorName(address.0))
+            .unwrap_or(false)
     }
 
     // TODO - remove this
