@@ -539,16 +539,13 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 self.respond_to_data_handlers(rpc)
             }
             RespondToClientHandlers { sender, rpc } => {
-                let client_name = utils::requester_address(&rpc);
-
-                // TODO - once Routing is integrated, we'll construct the full message to send
-                //        onwards, and then if we're also part of the client handlers, we'll call that
-                //        same handler which Routing will call after receiving a message.
                 debug!("Responded to client handlers with {:?}", &rpc);
+                let client_name = utils::requester_address(&rpc);
                 if self.self_is_handler_for(&client_name) {
-                    return self.client_handler_mut()?.handle_vault_rpc(sender, rpc);
+                    self.client_handler_mut()?.handle_vault_rpc(sender, rpc)
+                } else {
+                    self.send_message_to_section(client_name, rpc)
                 }
-                None
             }
             SendToPeers { targets, rpc } => {
                 let mut next_action = None;
