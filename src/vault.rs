@@ -458,9 +458,22 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 }
                 Rpc::Response { response, .. } => match response {
                     Response::Mutation(_) | Response::GetIData(_) => {
-                        self.data_handler_mut()?.handle_vault_rpc(src, rpc, None)
+                        let src_xorname = utils::get_source_name(src);
+                        if self.self_is_handler_for(&src_xorname) {
+                            self.data_handler_mut()?.handle_vault_rpc(src, rpc, None)
+                        } else {
+                            self.client_handler_mut()?
+                                .handle_vault_rpc(src_xorname, rpc)
+                        }
                     }
-                    _ => unimplemented!("Should not receive: {:?}", response),
+                    _ => {
+                        if self.self_is_handler_for(&utils::get_source_name(src)) {
+                            self.client_handler_mut()?
+                                .handle_vault_rpc(utils::get_source_name(src), rpc)
+                        } else {
+                            unimplemented!("Should not receive: {:?}", response)
+                        }
+                    }
                 },
                 Rpc::Duplicate { .. } => self.accumulate_rpc(src, rpc),
                 Rpc::DuplicationComplete { .. } => {
@@ -722,11 +735,14 @@ impl<R: CryptoRng + Rng> Vault<R> {
         //        same handler which Routing will call after receiving a message.
 
         if self.self_is_handler_for(&dst_address) {
-            return self
-                .client_handler_mut()?
-                .handle_vault_rpc(requester_name, rpc);
+            self.client_handler_mut()?
+                .handle_vault_rpc(requester_name, rpc)
+        } else {
+            Some(Action::SendToSection {
+                target: dst_address,
+                rpc,
+            })
         }
-        None
     }
 
     fn self_is_handler_for(&self, address: &XorName) -> bool {
