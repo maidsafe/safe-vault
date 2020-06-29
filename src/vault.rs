@@ -598,11 +598,10 @@ impl<R: CryptoRng + Rng> Vault<R> {
 
     fn send_message_to_section(&self, target: XorName, rpc: Rpc) -> Option<Action> {
         let name = *self.routing_node.borrow().id().name();
-        let sender_prefix = *self.routing_node.borrow().our_prefix().unwrap();
         self.routing_node
             .borrow_mut()
             .send_message(
-                SrcLocation::Section(sender_prefix),
+                SrcLocation::Node(name),
                 DstLocation::Section(routing::XorName(target.0)),
                 utils::serialise(&rpc),
             )
