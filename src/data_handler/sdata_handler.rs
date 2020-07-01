@@ -17,8 +17,8 @@ use crate::{
 
 use safe_nd::{
     Error as NdError, MessageId, NodePublicId, PublicId, Response, Result as NdResult, SData,
-    SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataMutationOperation, SDataOwner,
-    SDataPermissions, SDataPrivPermissions, SDataPubPermissions, SDataRequest, SDataUser,
+    SDataAction, SDataAddress, SDataEntry, SDataIndex, SDataOwner, SDataPermissions,
+    SDataPrivPermissions, SDataPubPermissions, SDataRequest, SDataUser, SDataWriteOp,
 };
 
 use std::{
@@ -72,16 +72,14 @@ impl SDataHandler {
                 self.handle_get_permissions_req(requester, address, message_id)
             }
             Delete(address) => self.handle_delete_req(requester, address, message_id),
-            MutatePubPermissions(operation) => {
+            SetPubPermissions(operation) => {
                 self.handle_mutate_pub_permissions_req(&requester, operation, message_id)
             }
-            MutatePrivPermissions(operation) => {
+            SetPrivPermissions(operation) => {
                 self.handle_mutate_priv_permissions_req(&requester, operation, message_id)
             }
-            MutateOwner(operation) => {
-                self.handle_mutate_owner_req(&requester, operation, message_id)
-            }
-            Mutate(operation) => self.handle_mutate_data_req(&requester, operation, message_id),
+            SetOwner(operation) => self.handle_mutate_owner_req(&requester, operation, message_id),
+            Edit(operation) => self.handle_mutate_data_req(&requester, operation, message_id),
         }
     }
 
@@ -104,7 +102,7 @@ impl SDataHandler {
             sender: *data.name(),
             rpc: Rpc::Response {
                 requester,
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 message_id,
                 refund,
                 proof: None,
@@ -180,7 +178,7 @@ impl SDataHandler {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester,
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 message_id,
                 // Deletion is free so no refund
                 refund: None,
@@ -325,7 +323,7 @@ impl SDataHandler {
     fn handle_mutate_pub_permissions_req(
         &mut self,
         requester: &PublicId,
-        mutation_op: SDataMutationOperation<SDataPubPermissions>,
+        mutation_op: SDataWriteOp<SDataPubPermissions>,
         message_id: MessageId,
     ) -> Option<Action> {
         let address = mutation_op.address;
@@ -344,7 +342,7 @@ impl SDataHandler {
     fn handle_mutate_priv_permissions_req(
         &mut self,
         requester: &PublicId,
-        mutation_op: SDataMutationOperation<SDataPrivPermissions>,
+        mutation_op: SDataWriteOp<SDataPrivPermissions>,
         message_id: MessageId,
     ) -> Option<Action> {
         let address = mutation_op.address;
@@ -363,7 +361,7 @@ impl SDataHandler {
     fn handle_mutate_owner_req(
         &mut self,
         requester: &PublicId,
-        mutation_op: SDataMutationOperation<SDataOwner>,
+        mutation_op: SDataWriteOp<SDataOwner>,
         message_id: MessageId,
     ) -> Option<Action> {
         let address = mutation_op.address;
@@ -382,7 +380,7 @@ impl SDataHandler {
     fn handle_mutate_data_req(
         &mut self,
         requester: &PublicId,
-        mutation_op: SDataMutationOperation<SDataEntry>,
+        mutation_op: SDataWriteOp<SDataEntry>,
         message_id: MessageId,
     ) -> Option<Action> {
         let address = mutation_op.address;
@@ -423,7 +421,7 @@ impl SDataHandler {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester: requester.clone(),
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 message_id,
                 refund,
                 proof: None,

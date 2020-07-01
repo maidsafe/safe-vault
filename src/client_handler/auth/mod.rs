@@ -71,18 +71,18 @@ impl Auth {
         };
 
         let result = match request.authorisation_kind() {
-            RequestAuthKind::GetPub => Ok(()),
-            RequestAuthKind::GetPriv => self.check_app_permissions(app_id, |_| true),
-            RequestAuthKind::GetBalance => {
+            RequestAuthKind::PublicRead => Ok(()),
+            RequestAuthKind::PrivateRead => self.check_app_permissions(app_id, |_| true),
+            RequestAuthKind::ReadBalance => {
                 self.check_app_permissions(app_id, |perms| perms.get_balance)
             }
-            RequestAuthKind::Mutation => {
+            RequestAuthKind::Write => {
                 self.check_app_permissions(app_id, |perms| perms.perform_mutations)
             }
-            RequestAuthKind::TransferCoins => {
+            RequestAuthKind::Transfer => {
                 self.check_app_permissions(app_id, |perms| perms.transfer_coins)
             }
-            RequestAuthKind::MutAndTransferCoins => self.check_app_permissions(app_id, |perms| {
+            RequestAuthKind::WriteAndTransfer => self.check_app_permissions(app_id, |perms| {
                 perms.transfer_coins && perms.perform_mutations
             }),
             RequestAuthKind::ManageAppKeys => Err(NdError::AccessDenied),
@@ -175,7 +175,7 @@ impl Auth {
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 requester: client,
                 message_id,
                 refund: None,
@@ -216,7 +216,7 @@ impl Auth {
         Some(Action::RespondToClientHandlers {
             sender: *self.id.name(),
             rpc: Rpc::Response {
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 requester: client,
                 message_id,
                 refund: None,
@@ -234,7 +234,7 @@ impl Auth {
         signature: Option<Signature>,
     ) -> Option<Action> {
         match request.authorisation_kind() {
-            RequestAuthKind::GetPub => None,
+            RequestAuthKind::PublicRead => None,
             _ => {
                 let valid = if let Some(signature) = signature {
                     self.is_valid_client_signature(public_id, request, &message_id, &signature)

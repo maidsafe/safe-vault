@@ -457,7 +457,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     }
                 }
                 Rpc::Response { response, .. } => match response {
-                    Response::Mutation(_) | Response::GetIData(_) => {
+                    Response::Write(_) | Response::GetIData(_) => {
                         self.data_handler_mut()?.handle_vault_rpc(src, rpc, None)
                     }
                     _ => unimplemented!("Should not receive: {:?}", response),

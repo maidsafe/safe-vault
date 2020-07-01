@@ -32,9 +32,9 @@ use safe_nd::{
     MDataAddress, MDataEntries, MDataKind, MDataPermissionSet, MDataRequest, MDataSeqEntryActions,
     MDataSeqValue, MDataUnseqEntryActions, MDataValue, MDataValues, Message, MessageId,
     PubImmutableData, PublicKey, Request, Response, Result as NdResult, SData, SDataAddress,
-    SDataIndex, SDataMutationOperation, SDataOwner, SDataPrivUserPermissions,
-    SDataPubUserPermissions, SDataRequest, SDataUser, SDataUserPermissions, SeqMutableData,
-    Transaction, UnpubImmutableData, UnseqMutableData, XorName,
+    SDataIndex, SDataOwner, SDataPrivUserPermissions, SDataPubUserPermissions, SDataRequest,
+    SDataUser, SDataUserPermissions, SDataWriteOp, SeqMutableData, Transaction, UnpubImmutableData,
+    UnseqMutableData, XorName,
 };
 use safe_vault::{Result, COST_OF_PUT};
 use std::collections::{BTreeMap, BTreeSet};
@@ -1258,7 +1258,7 @@ fn app_permissions() -> Result<()> {
         common::send_request_expect_ok(
             &mut env,
             &mut app_0,
-            Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+            Request::SData(SDataRequest::Mutate(SDataWriteOp {
                 address,
                 crdt_op: entries_op.crdt_op.clone(),
             })),
@@ -1268,7 +1268,7 @@ fn app_permissions() -> Result<()> {
         common::send_request_expect_err(
             &mut env,
             &mut app_1,
-            Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+            Request::SData(SDataRequest::Mutate(SDataWriteOp {
                 address,
                 crdt_op: entries_op.crdt_op.clone(),
             })),
@@ -1277,7 +1277,7 @@ fn app_permissions() -> Result<()> {
         common::send_request_expect_err(
             &mut env,
             &mut app_2,
-            Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+            Request::SData(SDataRequest::Mutate(SDataWriteOp {
                 address,
                 crdt_op: entries_op.crdt_op,
             })),
@@ -2210,7 +2210,7 @@ fn sequence_set_owner() {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::SData(SDataRequest::MutateOwner(SDataMutationOperation {
+        Request::SData(SDataRequest::SetOwner(SDataWriteOp {
             address,
             crdt_op: owner_op.crdt_op,
         })),
@@ -2278,7 +2278,7 @@ fn sequence_set_pub_permissions() -> Result<()> {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::SData(SDataRequest::MutatePubPermissions(SDataMutationOperation {
+        Request::SData(SDataRequest::SetPubPermissions(SDataWriteOp {
             address,
             crdt_op: perms_op.crdt_op,
         })),
@@ -2363,12 +2363,10 @@ fn sequence_set_priv_permissions() -> Result<()> {
     common::perform_mutation(
         &mut env,
         &mut client,
-        Request::SData(SDataRequest::MutatePrivPermissions(
-            SDataMutationOperation {
-                address,
-                crdt_op: perms_op.crdt_op,
-            },
-        )),
+        Request::SData(SDataRequest::SetPrivPermissions(SDataWriteOp {
+            address,
+            crdt_op: perms_op.crdt_op,
+        })),
     );
 
     common::send_request_expect_ok(
@@ -2456,7 +2454,7 @@ fn sequence_set_owners() -> Result<()> {
     common::send_request_expect_err(
         &mut env,
         &mut client_b,
-        Request::SData(SDataRequest::MutateOwner(SDataMutationOperation {
+        Request::SData(SDataRequest::SetOwner(SDataWriteOp {
             address,
             crdt_op: owner_op.crdt_op.clone(),
         })),
@@ -2466,7 +2464,7 @@ fn sequence_set_owners() -> Result<()> {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::SData(SDataRequest::MutateOwner(SDataMutationOperation {
+        Request::SData(SDataRequest::SetOwner(SDataWriteOp {
             address,
             crdt_op: owner_op.crdt_op,
         })),
@@ -2536,7 +2534,7 @@ fn sequence_append_to_public() -> Result<()> {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+        Request::SData(SDataRequest::Mutate(SDataWriteOp {
             address: *pub_sdata.address(),
             crdt_op: entries_op.crdt_op,
         })),
@@ -2592,7 +2590,7 @@ fn sequence_append_to_private() -> Result<()> {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+        Request::SData(SDataRequest::Mutate(SDataWriteOp {
             address: *priv_sdata.address(),
             crdt_op: entries_op.crdt_op,
         })),
@@ -2650,7 +2648,7 @@ fn sequence_append_concurrently_from_diff_clients() -> Result<()> {
     common::perform_mutation(
         &mut env,
         &mut client_b,
-        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+        Request::SData(SDataRequest::Mutate(SDataWriteOp {
             address: *pub_sdata.address(),
             crdt_op: entries_op.crdt_op,
         })),
@@ -2660,7 +2658,7 @@ fn sequence_append_concurrently_from_diff_clients() -> Result<()> {
     common::perform_mutation(
         &mut env,
         &mut client_a,
-        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+        Request::SData(SDataRequest::Mutate(SDataWriteOp {
             address: *pub_sdata.address(),
             crdt_op: entries_op.crdt_op,
         })),
@@ -2670,7 +2668,7 @@ fn sequence_append_concurrently_from_diff_clients() -> Result<()> {
     common::perform_mutation(
         &mut env,
         &mut client_b,
-        Request::SData(SDataRequest::Mutate(SDataMutationOperation {
+        Request::SData(SDataRequest::Mutate(SDataWriteOp {
             address: *pub_sdata.address(),
             crdt_op: entries_op.crdt_op,
         })),

@@ -99,7 +99,7 @@ impl IDataHandler {
                 sender: our_name,
                 rpc: Rpc::Response {
                     requester: client_id,
-                    response: Response::Mutation(result),
+                    response: Response::Write(result),
                     message_id,
                     refund,
                     proof: None,
@@ -180,7 +180,7 @@ impl IDataHandler {
                 sender: our_name,
                 rpc: Rpc::Response {
                     requester: client_id.clone(),
-                    response: Response::Mutation(result),
+                    response: Response::Write(result),
                     message_id,
                     // Deletion is free so no refund
                     refund: None,
@@ -429,7 +429,7 @@ impl IDataHandler {
             sender: *idata_address.name(),
             rpc: Rpc::Response {
                 requester,
-                response: Response::Mutation(Ok(())),
+                response: Response::Write(Ok(())),
                 message_id,
                 refund: None,
                 proof: None,
@@ -503,7 +503,7 @@ impl IDataHandler {
             sender: *idata_address.name(),
             rpc: Rpc::Response {
                 requester,
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 message_id,
                 // Deleting data is free so, no refund
                 // This field can be put to use when deletion is incentivised

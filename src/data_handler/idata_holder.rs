@@ -73,7 +73,7 @@ impl IDataHolder {
         match sender {
             SrcLocation::Node(_) => Some(Action::RespondToOurDataHandlers {
                 rpc: Rpc::DuplicationComplete {
-                    response: Response::Mutation(result),
+                    response: Response::Write(result),
                     message_id,
                     proof: Some((*data.address(), accumulated_signature?)),
                 },
@@ -81,7 +81,7 @@ impl IDataHolder {
             SrcLocation::Section(_) => Some(Action::RespondToOurDataHandlers {
                 rpc: Rpc::Response {
                     requester,
-                    response: Response::Mutation(result),
+                    response: Response::Write(result),
                     message_id,
                     refund,
                     proof: Some((request, accumulated_signature?)),
@@ -166,7 +166,7 @@ impl IDataHolder {
         Some(Action::RespondToOurDataHandlers {
             rpc: Rpc::Response {
                 requester,
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 message_id,
                 refund: None,
                 proof: Some((request, accumulated_signature?)),

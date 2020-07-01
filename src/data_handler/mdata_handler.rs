@@ -169,7 +169,7 @@ impl MDataHandler {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester,
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 message_id,
                 refund,
                 proof: None,
@@ -197,7 +197,7 @@ impl MDataHandler {
             sender: *data.name(),
             rpc: Rpc::Response {
                 requester,
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 message_id,
                 refund,
                 proof: None,
@@ -232,7 +232,7 @@ impl MDataHandler {
             sender: *address.name(),
             rpc: Rpc::Response {
                 requester,
-                response: Response::Mutation(result),
+                response: Response::Write(result),
                 message_id,
                 // Deletion is free so no refund
                 refund: None,

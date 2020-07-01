@@ -128,7 +128,7 @@ impl DataHandler {
             .verify(&signature, &utils::serialise(&idata_address))
         {
             match response {
-                Mutation(result) => self.handle_idata_request(|idata_handler| {
+                Write(result) => self.handle_idata_request(|idata_handler| {
                     idata_handler.update_idata_holders(
                         idata_address,
                         utils::get_source_name(sender),
@@ -381,7 +381,7 @@ impl DataHandler {
                 return None;
             }
             match response {
-                Mutation(result) => self.handle_idata_request(move |idata_handler| {
+                Write(result) => self.handle_idata_request(move |idata_handler| {
                     idata_handler.handle_mutation_resp(
                         utils::get_source_name(src),
                         requester,

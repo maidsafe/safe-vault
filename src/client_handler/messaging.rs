@@ -233,7 +233,7 @@ impl Messaging {
             | ListMDataUserPermissions(..)
             | ListMDataPermissions(..)
             | GetMDataValue(..)
-            | Mutation(..)
+            | Write(..)
             | Transaction(..) => {
                 self.respond_to_client(message_id, response);
                 None
