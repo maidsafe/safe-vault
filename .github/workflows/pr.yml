@@ -62,7 +62,7 @@ jobs:
       # Run Clippy.
       - name: Clippy checks
         shell: bash
-        run: ./scripts/clippy
+        run: cargo clippy --all-targets
 
   test:
     name: Test
@@ -99,7 +99,7 @@ jobs:
       # Run tests.
       - name: Run tests
         shell: bash
-        run: ./scripts/tests
+        run: cargo test --release
 
   coverage:
     needs: [clippy, test]

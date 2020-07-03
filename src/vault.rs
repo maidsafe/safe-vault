@@ -84,7 +84,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         routing_node: Node,
         event_receiver: Receiver<RoutingEvent>,
         client_receiver: Receiver<ClientEvent>,
-        config: &Config,
+        config: &mut Config,
         command_receiver: Receiver<Command>,
         mut rng: R,
     ) -> Result<Self> {
@@ -96,13 +96,16 @@ impl<R: CryptoRng + Rng> Vault<R> {
             (false, id)
         });
 
-        #[cfg(feature = "mock_parsec")]
         {
             trace!(
                 "creating vault {:?} with routing_id {:?}",
                 id.public_id().name(),
                 routing_node.id()
             );
+        }
+
+        if config.is_local() {
+            config.listen_on_loopback();
         }
 
         let root_dir = config.root_dir()?;
@@ -162,6 +165,11 @@ impl<R: CryptoRng + Rng> Vault<R> {
     /// Returns whether routing node is in elder state.
     pub fn is_elder(&mut self) -> bool {
         self.routing_node.borrow().is_elder()
+    }
+
+    /// Returns whether routing node is in connected state
+    pub fn is_connected(&mut self) -> bool {
+        self.routing_node.borrow().our_prefix().is_some()
     }
 
     /// Runs the main event loop. Blocks until the vault is terminated.
@@ -264,7 +272,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     /// Processes any outstanding network events and returns. Does not block.
     /// Returns whether at least one event was processed.
     pub fn poll(&mut self) -> bool {
-        let mut _processed = false;
+        let mut processed = false;
         loop {
             let mut sel = Select::new();
             let mut r_node = self.routing_node.borrow_mut();
@@ -283,7 +291,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                             Err(e) => panic!("FIXME: {:?}", e),
                         };
                         self.step_client(event);
-                        _processed = true;
+                        processed = true;
                     }
                     idx if idx == routing_event_rx_idx => {
                         let event = match self.event_receiver.recv() {
@@ -291,7 +299,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                             Err(e) => panic!("FIXME: {:?}", e),
                         };
                         self.step_routing(event);
-                        _processed = true;
+                        processed = true;
                     }
                     idx if idx == command_rx_idx => {
                         let command = match self.command_receiver.recv() {
@@ -301,7 +309,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                         match command {
                             Command::Shutdown => (),
                         }
-                        _processed = true;
+                        processed = true;
                     }
                     idx => {
                         if let Err(err) = self
@@ -318,8 +326,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 break;
             }
         }
-
-        _processed
+        processed
     }
 
     fn step_routing(&mut self, event: RoutingEvent) {
@@ -419,7 +426,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 accumulated_rpc.message_id()
             );
             let prefix = match src {
-                SrcLocation::Node(name) => Prefix::<routing::XorName>::new(32, name),
+                SrcLocation::Node(name) => Prefix::new(32, name),
                 SrcLocation::Section(prefix) => prefix,
             };
             self.data_handler_mut()?.handle_vault_rpc(

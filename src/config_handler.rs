@@ -213,6 +213,11 @@ impl Config {
         self.network_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
+    /// Set the `local` flag.
+    pub fn set_local(&mut self, local: bool) {
+        self.local = local;
+    }
+
     fn set_value(&mut self, arg: &str, value: &str) {
         if arg == ARGS[0] {
             self.wallet_address = Some(value.parse().unwrap());
@@ -235,7 +240,6 @@ impl Config {
         } else if arg == ARGS[13] {
             self.log_dir = Some(value.parse().unwrap());
         } else {
-            #[cfg(not(feature = "mock_base"))]
             {
                 if arg == ARGS[7] {
                     self.network_config.max_msg_size_allowed = Some(value.parse().unwrap());
@@ -249,9 +253,6 @@ impl Config {
                     println!("ERROR");
                 }
             }
-
-            #[cfg(feature = "mock_base")]
-            println!("ERROR");
         }
     }
 
@@ -338,16 +339,12 @@ fn project_dirs() -> Result<&'static ProjectDirs> {
 #[cfg(test)]
 mod test {
     use super::Config;
-    #[cfg(not(feature = "mock_base"))]
     use super::ARGS;
-    #[cfg(not(feature = "mock_base"))]
     use std::mem;
     use std::{fs::File, io::Read, path::Path};
-    #[cfg(not(feature = "mock_base"))]
     use structopt::StructOpt;
     use unwrap::unwrap;
 
-    #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
         let expected_size = 280;

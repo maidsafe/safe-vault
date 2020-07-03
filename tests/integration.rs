@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#![cfg(feature = "mock_base")]
 // For explanation of lint checks, run `rustc -W help`.
 #![forbid(unsafe_code)]
 #![warn(

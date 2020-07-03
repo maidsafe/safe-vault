@@ -143,7 +143,7 @@ fn main() {
         routing_node,
         routing_rx,
         client_rx,
-        &config,
+        &mut config,
         command_rx,
         &mut rng,
     ) {
