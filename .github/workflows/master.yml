@@ -4,7 +4,6 @@
 #
 # 1. Generates a release build.
 # 2. If the last commit is a version change, publish.
-# 3. Gather coverage stats and push to coveralls.io
 
 name: Master
 
@@ -34,33 +33,32 @@ jobs:
             build-script: make build
             target: x86_64-apple-darwin
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
+      # Install Rust and required components
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
 
+      # Generate Cargo.lock, needed for the cache.
+      - name: Generate Cargo.lock
+        run: cargo generate-lockfile
+
       # Cache.
-      - name: Cache cargo registry
-        uses: actions/cache@v1
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-      - name: Cache cargo index
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-      - name: Cache cargo build
-        uses: actions/cache@v1
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       # Run build.
       - shell: bash
         run: ${{ matrix.build-script }}
+
       # Upload artifacts.
       - uses: actions/upload-artifact@master
         with:
@@ -78,55 +76,36 @@ jobs:
             build-script: make musl
             target: x86_64-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
 
+      # Generate Cargo.lock, needed for the cache.
+      - name: Generate Cargo.lock
+        run: cargo generate-lockfile
+
       # Cache.
-      - name: Cache cargo registry
-        uses: actions/cache@v1
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-      - name: Cache cargo index
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-      - name: Cache cargo build
-        uses: actions/cache@v1
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       # Run build.
       - shell: bash
         run: ${{ matrix.build-script }}
+
       # Upload artifacts.
       - uses: actions/upload-artifact@master
         with:
           name: safe_vault-${{ matrix.target }}-prod
           path: artifacts
-
-      # Run cargo tarpaulin & push result to coveralls.io
-      - name: rust-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1.0
-        with:
-          args: '--features=mock_parsec --out Lcov -- --test-threads 1'
-      - name: Coveralls GitHub Action
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel: true
-          path-to-lcov: ./lcov.info
-      - name: Coveralls Finished
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel-finished: true
 
   # Unfortunately, for artifact retrieval, there's not really a way to avoid having this huge list of
   # 'download-artifact' actions. We could perhaps implement our own 'retrieve all build artifacts'
@@ -142,7 +121,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       # Checkout and get all the artifacts built in the previous jobs.
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - uses: actions/download-artifact@master
         with:
           name: safe_vault-x86_64-pc-windows-msvc-prod
@@ -253,7 +232,10 @@ jobs:
   #   needs: deploy
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v1
+  #     - uses: actions/checkout@v2
+  #       # checkout with fetch-depth: '0' to be sure to retrieve all commits to look for the semver commit message
+  #       with:
+  #         fetch-depth: '0'
   #     # Is this a version change commit?
   #     - shell: bash
   #       id: commit_message
