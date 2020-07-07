@@ -643,6 +643,7 @@ fn balances_by_app_with_insufficient_permissions() {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[test]
+#[ignore]
 fn put_immutable_data() {
     let mut env = Environment::new();
 
