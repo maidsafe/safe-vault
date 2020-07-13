@@ -391,11 +391,14 @@ impl<R: CryptoRng + Rng> Vault<R> {
             }
             RoutingEvent::Connected(_) => self.promote_to_adult().map_or_else(
                 |err| {
-                    error!("Error when promoting Vault to Adult: {:?}", err);
+                    error!(
+                        "Error creating required components for an Adult vault: {:?}",
+                        err
+                    );
                     None
                 },
                 |()| {
-                    info!("Vault promoted to Adult");
+                    info!("Section has accepted the vault.");
                     None
                 },
             ),
