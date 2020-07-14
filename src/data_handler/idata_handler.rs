@@ -424,17 +424,22 @@ impl IDataHandler {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
         }
 
-        // Should we wait for multiple responses
-        Some(Action::RespondToClientHandlers {
-            sender: *idata_address.name(),
-            rpc: Rpc::Response {
-                requester,
-                response: Response::Mutation(Ok(())),
-                message_id,
-                refund: None,
-                proof: None,
-            },
-        })
+        // Check if all holders have responded
+        if metadata.holders.len() == IMMUTABLE_DATA_COPY_COUNT {
+            // Should we wait for multiple responses
+            Some(Action::RespondToClientHandlers {
+                sender: *idata_address.name(),
+                rpc: Rpc::Response {
+                    requester,
+                    response: Response::Mutation(Ok(())),
+                    message_id,
+                    refund: None,
+                    proof: None,
+                },
+            })
+        } else {
+            None
+        }
     }
 
     pub(super) fn handle_delete_unpub_idata_resp(
@@ -447,6 +452,7 @@ impl IDataHandler {
     ) -> Option<Action> {
         if let Err(err) = &result {
             warn!("{}: Node reports error deleting: {}", self, err);
+            None
         } else {
             let db_key = idata_address.to_db_key();
             let metadata = self.get_metadata_for(idata_address);
@@ -488,29 +494,32 @@ impl IDataHandler {
                         );
                         // TODO - Send failure back to client handlers?
                     }
+                    Some(Action::RespondToClientHandlers {
+                        sender: *idata_address.name(),
+                        rpc: Rpc::Response {
+                            requester,
+                            response: Response::Mutation(result),
+                            message_id,
+                            // Deleting data is free so, no refund
+                            // This field can be put to use when deletion is incentivised
+                            refund: None,
+                            proof: None,
+                        },
+                    })
                 } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
                     warn!(
                         "{}: Failed to write chunk metadata to DB: {:?}",
                         self, error
                     );
-                    // TODO - Send failure back to client handlers?
+                    None
+                // TODO - Send failure back to client handlers?
+                } else {
+                    None
                 }
-            };
+            } else {
+                None
+            }
         }
-
-        // TODO: Different responses from adults?
-        Some(Action::RespondToClientHandlers {
-            sender: *idata_address.name(),
-            rpc: Rpc::Response {
-                requester,
-                response: Response::Mutation(result),
-                message_id,
-                // Deleting data is free so, no refund
-                // This field can be put to use when deletion is incentivised
-                refund: None,
-                proof: None,
-            },
-        })
     }
 
     pub(super) fn handle_get_idata_resp(
