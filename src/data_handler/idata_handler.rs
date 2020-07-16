@@ -424,9 +424,11 @@ impl IDataHandler {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
         }
 
-        // Check if all holders have responded
-        if metadata.holders.len() == IMMUTABLE_DATA_COPY_COUNT {
-            // Should we wait for multiple responses
+        // if metadata.holders.len() == IMMUTABLE_DATA_COPY_COUNT {
+
+        // Return Ok once we get a single response.
+        // This is sufficient to respond back to the client
+        if true {
             Some(Action::RespondToClientHandlers {
                 sender: *idata_address.name(),
                 rpc: Rpc::Response {
