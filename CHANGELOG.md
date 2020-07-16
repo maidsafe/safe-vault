@@ -1,5 +1,14 @@
 # Safe Vault - Change Log
 
+## [0.25.0]
+- Update routing dependency to use newer API.
+- Replace AppendOnly data with Sequence CRDT.
+- Standarize cargo dependency versioning.
+- Make the new chunk holders responsible for fetching and storing a copy of the data.
+- Use signature accumulator from routing to accumulate signatures before processing data.
+- Remove `IDataOp` and replace it with the validation of the aggregated signature.
+- Make log messages more meaningful.
+
 ## [0.24.0]
 - When a Vault starts, start it as an Adult. Create the additional modules required only when it is promoted to an Elder.
 - Give Adults the responsibility of holding Immutable Data chunks.
