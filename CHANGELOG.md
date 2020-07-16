@@ -1,5 +1,8 @@
 # Safe Vault - Change Log
 
+## [0.25.1]
+- Make PUT IData requests processing faster by responding to the client after the first success.
+
 ## [0.25.0]
 - Update routing dependency to use newer API.
 - Replace AppendOnly data with Sequence CRDT.
