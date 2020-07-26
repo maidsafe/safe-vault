@@ -55,11 +55,13 @@ impl Economy {
         let section_balance = self.replica.borrow().balance(&section_account)?.as_nano() as f64;
 
         let section_portion = (u32::MAX as u64 * NANOS / total_sections) as f64;
-        let farmed_percent = 1.0 - (section_balance / section_portion);
+        let unfarmed_percent = section_balance / section_portion;
+        let farmed_percent = 1.0 - unfarmed_percent;
         // This is the basis for store cost during the period.
-        let period_cost_base = Money::from_nano(section_balance as u64 / (total_nodes * total_nodes) / NANOS);
+        let period_cost_base =
+            Money::from_nano(section_balance as u64 / (total_nodes * total_nodes) / NANOS);
         // This is the factor that determines how fast new money should be minted.
-        let minting_velocity = (1.0 / farmed_percent) as u8;
+        let minting_velocity = (unfarmed_percent / farmed_percent) as u8;
 
         self.indicator = Indicator {
             period_key: section_account,
