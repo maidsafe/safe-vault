@@ -57,7 +57,7 @@ impl Economy {
         let section_portion = (u32::MAX as u64 * NANOS / total_sections) as f64;
         let farmed_percent = 1.0 - (section_balance / section_portion);
         // This is the basis for store cost during the period.
-        let period_cost_base = Money::from_nano(section_balance as u64 / total_nodes / NANOS);
+        let period_cost_base = Money::from_nano(section_balance as u64 / (total_nodes * total_nodes) / NANOS);
         // This is the factor that determines how fast new money should be minted.
         let minting_velocity = (1.0 / farmed_percent) as u8;
 
