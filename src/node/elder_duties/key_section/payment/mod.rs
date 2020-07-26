@@ -14,11 +14,13 @@ use crate::{
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeOperation, PaymentDuty, RewardDuty},
+    utils,
 };
 use calc::Economy;
 use routing::Node as Routing;
 use safe_nd::{
-    Cmd, CmdError, ElderDuties, Error, Message, Money, PublicKey, Result, TransferError,
+    Address, Cmd, CmdError, ElderDuties, Error, Message, MessageId, Money, MsgEnvelope,
+    PaymentQuery, PublicKey, QueryResponse, Result, TransferError,
 };
 use std::{
     cell::{RefCell, RefMut},
@@ -38,9 +40,7 @@ pub struct Payments {
 
 /// An Elder in S(R) is responsible for
 /// data payment, and will receive write
-/// requests from S(G) (Gateway nodes).
-/// These will simply be forwarded requests
-/// from clients.
+/// requests from clients.
 /// At Payments, a local request to Transfers module
 /// will clear the payment, and thereafter the node forwards
 /// the actual write request (without payment info) to data section (S(D), i.e. elders with Metadata duties).
@@ -84,14 +84,42 @@ impl Payments {
 
     // The code in this method is a bit messy, needs to be cleaned up.
     pub fn process(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
-        let PaymentDuty::ProcessPayment(msg) = duty;
-        let payment = match &msg.message {
+        use PaymentDuty::*;
+        match duty {
+            ProcessPayment(msg) => self.process_payment(msg),
+            ProcessQuery {
+                query,
+                msg_id,
+                origin,
+            } => match query {
+                PaymentQuery::GetStoreCost(_) => self.store_cost(msg_id, origin),
+            },
+        }
+    }
+
+    fn store_cost(&self, msg_id: &MessageId, origin: &Address) -> Option<NodeOperation> {
+        let public_key = PublicKey::Bls(self.replica.borrow().replicas_pk_set()?.public_key());
+        Some(
+            self.wrapping
+                .send(Message::QueryResponse {
+                    response: QueryResponse::GetStoreCost(Ok((public_key, self.store_cost))),
+                    id: MessageId::new(),
+                    correlation_id: *msg_id,
+                    query_origin: origin.clone(),
+                })?
+                .into(),
+        )
+    }
+
+    fn process_payment(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+        let (payment, num_bytes) = match &msg.message {
             Message::Cmd {
-                cmd: Cmd::Data { payment, .. },
+                cmd: Cmd::Data { payment, cmd },
                 ..
-            } => payment,
+            } => (payment, utils::serialise(cmd).len() as u64),
             _ => return None,
         };
+
         // Make sure we are actually at the correct replicas,
         // before executing the debit.
         // (We could also add a method that executes both
@@ -121,7 +149,8 @@ impl Payments {
                 // Paying too little will see the amount be forfeited.
                 // This is because it is easy to know the cost by querying,
                 // so you are forced to do the job properly, instead of burdoning the network.
-                if self.store_cost > payment.amount() {
+                let store_cost = Money::from_nano(num_bytes + self.store_cost.as_nano());
+                if store_cost > payment.amount() {
                     let error =
                         CmdError::Transfer(TransferRegistration(Error::InsufficientBalance)); // todo, better error, like `TooLowPayment`
                     let result = self.wrapping.error(error, msg.id(), &msg.origin.address());

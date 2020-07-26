@@ -13,7 +13,8 @@ use crate::node::economy::MintingMetrics;
 use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
 use safe_nd::{
     AccountId, Address, AuthCmd, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope,
-    MsgSender, PublicId, PublicKey, RewardCounter, SignedTransfer, TransferValidated, XorName,
+    MsgSender, PaymentQuery, PublicId, PublicKey, RewardCounter, SignedTransfer, TransferValidated,
+    XorName,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, net::SocketAddr};
@@ -311,6 +312,14 @@ impl Into<NodeOperation> for GatewayDuty {
 pub enum PaymentDuty {
     ///
     ProcessPayment(MsgEnvelope),
+    ///
+    ProcessQuery {
+        query: PaymentQuery,
+        ///
+        msg_id: MessageId,
+        ///
+        origin: Address,
+    },
 }
 
 impl Into<NodeOperation> for PaymentDuty {
