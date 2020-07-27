@@ -1807,7 +1807,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "556d3a1ca6600bfcbab7c7c91ccb085ac7fbbcd70e008a98742e7847f4f7bcef"
 dependencies = [
  "autocfg 0.1.7",
- "rand_core 0.3.1",
+ "rand_core 0.2.2",
 ]
 
 [[package]]
@@ -1859,7 +1859,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b40677c7be09ae76218dc623efbf7b18e34bced3f38883af07bb75630a21bc4"
 dependencies = [
- "rand_core 0.3.1",
+ "rand_core 0.2.2",
 ]
 
 [[package]]
@@ -1931,7 +1931,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbf7e9e623549b0e21f6e97cf8ecf247c1a8fd2e8a992ae265314300b2455d5c"
 dependencies = [
- "rand_core 0.3.1",
+ "rand_core 0.2.2",
 ]
 
 [[package]]
@@ -2178,7 +2178,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-farming"
 version = "0.1.0"
-source = "git+https://github.com/oetyng/safe-farming.git#c761720250b1744d6a0ba6622805a129d599380c"
+source = "git+https://github.com/oetyng/safe-farming.git#90ef8cb314255474953f027aa90a9d22972dcfa2"
 dependencies = [
  "bincode",
  "crdts",

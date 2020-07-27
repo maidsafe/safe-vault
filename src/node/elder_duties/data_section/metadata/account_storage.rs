@@ -167,6 +167,6 @@ impl AccountStorage {
 
 impl Display for AccountStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", "AccountStorage")
+        write!(formatter, "AccountStorage")
     }
 }

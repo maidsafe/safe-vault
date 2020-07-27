@@ -415,6 +415,6 @@ impl MapStorage {
 
 impl Display for MapStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", "MapStorage")
+        write!(formatter, "MapStorage")
     }
 }

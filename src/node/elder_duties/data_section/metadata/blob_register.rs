@@ -463,6 +463,6 @@ impl BlobRegister {
 
 impl Display for BlobRegister {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", "BlobRegister")
+        write!(formatter, "BlobRegister")
     }
 }

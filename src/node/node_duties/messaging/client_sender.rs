@@ -79,6 +79,6 @@ impl ClientSender {
 
 impl Display for ClientSender {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", "ClientSender")
+        write!(formatter, "ClientSender")
     }
 }
