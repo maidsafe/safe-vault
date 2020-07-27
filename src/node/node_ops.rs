@@ -92,6 +92,7 @@ pub enum GroupDecision {
 // --------------- Node ---------------
 
 /// Common duties run by all nodes.
+#[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
     ///
     BecomeAdult,
@@ -157,6 +158,7 @@ impl Into<NodeOperation> for MessagingDuty {
 // --------------- Elder ---------------
 
 /// Duties only run as an Elder.
+#[allow(clippy::large_enum_variant)]
 pub enum ElderDuty {
     ProcessLostMember {
         name: XorName,
@@ -448,6 +450,7 @@ impl Into<NodeOperation> for RewardDuty {
 // --------------- Transfers ---------------
 
 ///
+#[allow(clippy::large_enum_variant)]
 pub enum TransferDuty {
     ///
     ProcessQuery {

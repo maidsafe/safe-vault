@@ -25,7 +25,7 @@ pub struct Messaging {
 impl Messaging {
     pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
         let client_sender = ClientSender::new(routing.clone());
-        let network_sender = NetworkSender::new(routing.clone());
+        let network_sender = NetworkSender::new(routing);
         Self {
             client_sender,
             network_sender,

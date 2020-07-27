@@ -97,7 +97,7 @@ impl Accumulation {
 
             let proof = BlsProof {
                 public_key: public_key_set.public_key(),
-                signature: signature,
+                signature,
             };
 
             // upgrade sender to Section, since it accumulated
@@ -108,7 +108,7 @@ impl Accumulation {
             // Replace the Node with the Section.
             let mut msg = msg;
             let _ = msg.proxies.pop();
-            return Some(msg.with_proxy(sender));
+            Some(msg.with_proxy(sender))
         // beware that we might have to forgo the proxies vector
         // and instead just have a most recent proxy, if we are seeing
         // different order on the proxies on the msgs to be accumulated

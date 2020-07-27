@@ -128,11 +128,11 @@ impl BlobRegister {
         info!("Storing {} copies of the data", target_holders.len());
 
         let results: Vec<_> = (&target_holders)
-            .into_iter()
+            .iter()
             .map(|holder| self.set_chunk_holder(*data.address(), *holder, msg.origin.id()))
             .filter(|res| res.is_err())
             .collect();
-        if results.len() > 0 {}
+        if !results.is_empty() {}
 
         self.wrapping.send_to_adults(target_holders, msg)
     }
@@ -159,10 +159,10 @@ impl BlobRegister {
         };
 
         let results: Vec<_> = (&metadata.holders)
-            .into_iter()
+            .iter()
             .map(|holder_name| self.remove_chunk_holder(address, *holder_name))
             .collect();
-        if results.len() > 0 {}
+        if !results.is_empty() {}
 
         self.wrapping.send_to_adults(metadata.holders, msg)
     }

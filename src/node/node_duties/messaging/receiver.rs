@@ -47,7 +47,7 @@ impl Receiver {
     }
 
     /// Picks up next incoming event.
-    pub fn next(&mut self) -> Received {
+    pub fn next_event(&mut self) -> Received {
         let mut sel = Select::new();
 
         let mut r_node = self.routing.borrow_mut();

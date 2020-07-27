@@ -48,7 +48,6 @@ impl SectionQuerying {
         self.routing
             .borrow_mut()
             .our_elders()
-            .into_iter()
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>()
     }
@@ -57,7 +56,6 @@ impl SectionQuerying {
         self.routing
             .borrow_mut()
             .our_elders()
-            .into_iter()
             .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
             .collect::<Vec<_>>()
     }

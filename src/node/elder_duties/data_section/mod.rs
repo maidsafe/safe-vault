@@ -54,7 +54,7 @@ impl DataSection {
         let keypair = utils::key_pair(routing.clone())?;
         let public_key_set = routing.borrow().public_key_set()?.clone();
         let actor = TransferActor::new(keypair, public_key_set, Validator {});
-        let rewards = Rewards::new(info.keys.clone(), actor);
+        let rewards = Rewards::new(info.keys, actor);
 
         Ok(Self {
             metadata,

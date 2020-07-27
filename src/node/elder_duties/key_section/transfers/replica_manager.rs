@@ -218,7 +218,7 @@ impl ReplicaManager {
         };
         self.store
             .try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
-                debit_proof: debit_proof.clone(),
+                debit_proof,
                 debiting_replicas: PublicKey::from(pub_key),
                 crediting_replica_sig: SignatureShare {
                     index: 0,

@@ -39,7 +39,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         rng: R,
     ) -> Result<Self> {
         let key_section = KeySection::new(info.clone(), routing.clone(), rng)?;
-        let data_section = DataSection::new(info.clone(), total_used_space, routing.clone())?;
+        let data_section = DataSection::new(info.clone(), total_used_space, routing)?;
 
         Ok(Self {
             keys: info.keys,

@@ -22,7 +22,8 @@ impl<A: RewardAlgo> FarmingSystem<A> {
     /// the owner on the network.
     pub fn add_account(&mut self, id: AccountId, work: Work) -> Result<()> {
         let e = self.accumulation.add_account(id, work)?;
-        Ok(self.accumulation.apply(AccumulationEvent::AccountAdded(e)))
+        self.accumulation.apply(AccumulationEvent::AccountAdded(e));
+        Ok(())
     }
 
     pub fn set_base_cost(&mut self, base_cost: Money) {

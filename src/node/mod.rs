@@ -113,7 +113,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         use GatewayDuty::*;
         use NodeDuty::*;
         loop {
-            let result = match self.receiver.next() {
+            let result = match self.receiver.next_event() {
                 Received::Client(event) => ProcessClientEvent(event).into(),
                 Received::Network(event) => ProcessNetworkEvent(event).into(),
                 Received::Unknown(channel) => {

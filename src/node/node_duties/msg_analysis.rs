@@ -285,7 +285,7 @@ impl NetworkMsgAnalysis {
         } else {
             return None;
         };
-        return Some(duty);
+        Some(duty)
     }
 
     fn try_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {

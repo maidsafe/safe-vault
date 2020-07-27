@@ -21,7 +21,7 @@ pub struct ClientMsgAnalysis {
 
 impl ClientMsgAnalysis {
     pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
-        let section = SectionQuerying::new(routing.clone());
+        let section = SectionQuerying::new(routing);
         Self { section }
     }
 

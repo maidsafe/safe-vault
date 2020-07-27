@@ -40,8 +40,8 @@ pub struct ClientGateway<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> ClientGateway<R> {
     pub fn new(info: NodeInfo, section: SectionQuerying, rng: R) -> Result<Self> {
-        let onboarding = Onboarding::new(info.public_id().clone(), section.clone());
-        let client_msg_tracking = ClientMsgTracking::new(info.public_id().clone(), onboarding);
+        let onboarding = Onboarding::new(info.public_id(), section.clone());
+        let client_msg_tracking = ClientMsgTracking::new(info.public_id(), onboarding);
 
         let gateway = Self {
             keys: info.keys,

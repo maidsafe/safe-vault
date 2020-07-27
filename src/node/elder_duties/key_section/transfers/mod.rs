@@ -272,7 +272,7 @@ impl Transfers {
         use NodeTransferCmd::*;
 
         match self.replica.borrow_mut().register(proof) {
-            Ok(None) => return None,
+            Ok(None) => None,
             Ok(Some(event)) => self.wrapping.send(Message::NodeCmd {
                 cmd: Transfers(PropagateTransfer(event.debit_proof)),
                 id: MessageId::new(),

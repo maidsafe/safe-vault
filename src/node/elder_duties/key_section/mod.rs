@@ -60,7 +60,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let payments = Payments::new(info.keys.clone(), routing.clone(), replica_manager.clone());
 
         // Transfers
-        let transfers = Transfers::new(info.keys.clone(), replica_manager);
+        let transfers = Transfers::new(info.keys, replica_manager);
 
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
 
@@ -124,7 +124,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let sec_key_share = self.routing.borrow().secret_key_share().ok()?.clone();
         let proof_chain = self.routing.borrow().our_history()?.clone();
         let our_index = self.routing.borrow().our_index().ok()?;
-        if let Err(_) = self.transfers.update_replica_on_churn(
+        if let Err(error) = self.transfers.update_replica_on_churn(
             pub_key_set,
             sec_key_share,
             our_index,
@@ -132,6 +132,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         ) {
             // we must crash if we can't update the replica
             // the node can't work correctly without it..
+            panic!(error)
         }
         // update payment costs
         self.payments.update_costs()
