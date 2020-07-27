@@ -19,6 +19,7 @@ use crate::node::{
     section_querying::SectionQuerying,
     state_db::NodeInfo,
 };
+use log::info;
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
@@ -94,6 +95,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
 
     pub fn process(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
+        info!("Processing NodeDuty: {:?}", duty);
         match duty {
             BecomeAdult => self.become_adult(),
             BecomeElder => self.become_elder(),
@@ -118,6 +120,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
     fn become_elder(&mut self) -> Option<NodeOperation> {
         use DutyLevel::*;
         let total_used_space = Rc::new(Cell::new(0));
+        info!("Getting Promoted To Elder");
         if matches!(self.duty_level, Elder(_)) {
             return None;
         }
@@ -129,6 +132,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         ) {
             self.duty_level = Elder(duties);
             let node = self.routing.borrow();
+            info!("Updating BLS Keys");
             let index = node.our_index().ok()?;
             let bls_secret_key = node.secret_key_share().ok()?;
             let public_key_set = node.public_key_set().ok()?.clone();
@@ -140,6 +144,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             // Also, "Error-to-Unit" is not a good conversion..
             //dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
         }
+        info!("Promoted To Elder!");
         None
     }
 }

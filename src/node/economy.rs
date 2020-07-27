@@ -32,7 +32,7 @@ pub struct Indicator {
 /// At every Elder membership change
 /// there is a new public key, and a new
 /// calculation of store cost and minting velocity.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MintingMetrics {
     /// The current BLS key of the section.
     pub key: PublicKey,

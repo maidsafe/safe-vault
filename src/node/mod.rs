@@ -28,7 +28,7 @@ use crate::{
     },
     Config, Result,
 };
-use log::warn;
+use log::{info, warn};
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
 use safe_nd::NodeKeypairs;
@@ -114,8 +114,14 @@ impl<R: CryptoRng + Rng> Node<R> {
         use NodeDuty::*;
         loop {
             let result = match self.receiver.next_event() {
-                Received::Client(event) => ProcessClientEvent(event).into(),
-                Received::Network(event) => ProcessNetworkEvent(event).into(),
+                Received::Client(event) => {
+                    info!("Received a Client Event from quic-p2p: {:?}", event);
+                    ProcessClientEvent(event).into()
+                }
+                Received::Network(event) => {
+                    info!("Received a Network Event from routing: {:?}", event);
+                    ProcessNetworkEvent(event).into()
+                }
                 Received::Unknown(channel) => {
                     if let Err(err) = self
                         .routing
@@ -152,9 +158,18 @@ impl<R: CryptoRng + Rng> Node<R> {
     fn process(&mut self, duty: NetworkDuty) -> Option<NodeOperation> {
         use NetworkDuty::*;
         match duty {
-            RunAsAdult(duty) => self.duties.adult_duties()?.process(&duty),
-            RunAsElder(duty) => self.duties.elder_duties()?.process(duty),
-            RunAsNode(duty) => self.duties.process(duty),
+            RunAsAdult(duty) => {
+                info!("Handling Adult duty: {:?}", duty);
+                self.duties.adult_duties()?.process(&duty)
+            }
+            RunAsElder(duty) => {
+                info!("Handling Elder duty: {:?}", duty);
+                self.duties.elder_duties()?.process(duty)
+            }
+            RunAsNode(duty) => {
+                info!("Handling Node duty: {:?}", duty);
+                self.duties.process(duty)
+            }
         }
     }
 }

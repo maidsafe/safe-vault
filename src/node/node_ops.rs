@@ -16,7 +16,9 @@ use safe_nd::{
     MsgSender, PaymentQuery, PublicId, PublicKey, RewardCounter, SignedTransfer, TransferValidated,
     XorName,
 };
+use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::{collections::BTreeSet, net::SocketAddr};
 
 /// Internal messages are what is passed along
@@ -72,6 +74,7 @@ impl Into<NodeOperation> for Vec<Option<NodeOperation>> {
 
 /// All duties carried out by
 /// a node in the network.
+#[derive(Debug)]
 pub enum NetworkDuty {
     RunAsAdult(AdultDuty),
     RunAsElder(ElderDuty),
@@ -115,6 +118,17 @@ impl Into<NodeOperation> for NodeDuty {
         use NetworkDuty::*;
         use NodeOperation::*;
         Single(RunAsNode(self))
+    }
+}
+
+impl Debug for NodeDuty {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BecomeAdult => write!(f, "BecomeAdult"),
+            Self::BecomeElder => write!(f, "BecomeElder"),
+            Self::ProcessMessaging(duty) => duty.fmt(f),
+            Self::ProcessNetworkEvent(event) => event.fmt(f),
+        }
     }
 }
 
@@ -162,10 +176,33 @@ impl Into<NodeOperation> for MessagingDuty {
     }
 }
 
+impl Debug for MessagingDuty {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SendToClient { address, msg } => {
+                write!(f, "SendToClient [ address: {:?}, msg: {:?} ]", address, msg)
+            }
+            Self::SendHandshake { address, .. } => write!(
+                f,
+                "SendHandshake [ address: {:?}, response: (...) ]",
+                address
+            ),
+            Self::SendToAdults { targets, msg } => {
+                write!(f, "SendToAdults [ target: {:?}, msg: {:?} ]", targets, msg)
+            }
+            Self::SendToNode(msg) => write!(f, "SendToNode [ msg: {:?} ]", msg),
+            Self::SendToSection(msg) => write!(f, "SendToSection [ msg: {:?} ]", msg),
+            Self::VoteFor(decision) => write!(f, "VoteFor(Decision: {:?})", decision),
+            Self::DisconnectClient(addr) => write!(f, "Disconnection(Address: {:?})", addr),
+        }
+    }
+}
+
 // --------------- Elder ---------------
 
 /// Duties only run as an Elder.
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 pub enum ElderDuty {
     /// As members are lost for various reasons
     /// there are certain things the Elders need
@@ -204,6 +241,7 @@ impl Into<NodeOperation> for ElderDuty {
 // --------------- Adult ---------------
 
 /// Duties only run as an Adult.
+#[derive(Debug)]
 pub enum AdultDuty {
     /// The main duty of an Adult is
     /// storage and retrieval of data chunks.
@@ -221,6 +259,7 @@ impl Into<NodeOperation> for AdultDuty {
 // --------------- KeySection ---------------
 
 /// Duties only run as a Key section.
+#[derive(Debug)]
 pub enum KeySectionDuty {
     /// Incoming client msgs
     /// are to be evaluated and
@@ -258,6 +297,7 @@ impl Into<NodeOperation> for KeySectionDuty {
 // --------------- DataSection ---------------
 
 /// Duties only run as a Data section.
+#[derive(Debug)]
 pub enum DataSectionDuty {
     /// Metadata is the info about
     /// data types structures, ownership
@@ -275,6 +315,7 @@ pub enum DataSectionDuty {
 
 /// These things will be handled client
 /// side instead, in the Authenticator app.
+#[derive(Debug)]
 pub enum AuthDuty {
     ///
     Process {
@@ -309,6 +350,7 @@ impl Into<NodeOperation> for AuthDuty {
 // --------------- Gateway ---------------
 
 /// Gateway duties imply interfacing with clients.
+#[derive(Debug)]
 pub enum GatewayDuty {
     /// Messages from network to client
     /// such as query responses, events and errors,
@@ -333,6 +375,7 @@ impl Into<NodeOperation> for GatewayDuty {
 // --------------- Payment ---------------
 
 /// Payment for data.
+#[derive(Debug)]
 pub enum PaymentDuty {
     /// Makes sure the payment contained
     /// within a data write, is credited
@@ -367,6 +410,7 @@ impl Into<NodeOperation> for PaymentDuty {
 /// metadata only, but could include
 /// chunks, and are then relayed to
 /// Adults (i.e. chunk holders).
+#[derive(Debug)]
 pub enum MetadataDuty {
     /// Reads.
     ProcessRead(MsgEnvelope),
@@ -387,6 +431,7 @@ impl Into<NodeOperation> for MetadataDuty {
 // --------------- Chunks ---------------
 
 /// Chunk storage and retrieval is done at Adults.
+#[derive(Debug)]
 pub enum ChunkDuty {
     /// Reads.
     ReadChunk(MsgEnvelope),
@@ -401,6 +446,7 @@ pub enum ChunkDuty {
 /// Elders are responsible for the duties of
 /// keeping track of rewards, and issuing
 /// payouts from the section account.
+#[derive(Debug)]
 pub enum RewardDuty {
     /// Whenever there has been write
     /// operations on the network, we
@@ -485,6 +531,7 @@ impl Into<NodeOperation> for RewardDuty {
 /// Transfers of money on the network
 /// and querying of balances and history.
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 pub enum TransferDuty {
     ///
     ProcessQuery {
@@ -516,6 +563,7 @@ impl Into<NodeOperation> for TransferDuty {
 
 /// Queries for information on accounts,
 /// handled by AT2 Replicas.
+#[derive(Debug)]
 pub enum TransferQuery {
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(AccountId),
@@ -531,6 +579,7 @@ pub enum TransferQuery {
 }
 
 /// Cmds carried out on AT2 Replicas.
+#[derive(Debug)]
 pub enum TransferCmd {
     #[cfg(feature = "simulated-payouts")]
     /// Cmd to simulate a farming payout

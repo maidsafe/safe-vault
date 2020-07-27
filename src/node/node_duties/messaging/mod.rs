@@ -12,6 +12,7 @@ pub mod receiver;
 
 use crate::node::node_ops::{MessagingDuty, NodeOperation};
 use client_sender::ClientSender;
+use log::info;
 use network_sender::NetworkSender;
 pub use receiver::{Received, Receiver};
 use routing::Node as Routing;
@@ -36,7 +37,7 @@ impl Messaging {
 
     pub fn process(&mut self, duty: MessagingDuty) -> Option<NodeOperation> {
         use MessagingDuty::*;
-
+        info!("Sending message: {:?}", duty);
         let result = match duty {
             SendToClient { address, msg } => self.client_sender.send(address, &msg),
             SendToNode(msg) => self.network_sender.send_to_node(msg),

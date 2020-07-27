@@ -83,7 +83,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         Some(
             vec![
                 self.key_section.elders_changed(),
-                self.data_section.elders_changed(),
+                // self.data_section.elders_changed(),
             ]
             .into(),
         )
