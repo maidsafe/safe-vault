@@ -17,6 +17,7 @@ use std::{
 
 const STATE_FILENAME: &str = "state";
 
+/// Writes the info to disk.
 pub fn dump_state(age_group: AgeGroup, root_dir: &Path, id: &NodeKeypairs) -> Result<()> {
     let path = root_dir.join(STATE_FILENAME);
     Ok(fs::write(path, utils::serialise(&(age_group, id)))?)
@@ -32,6 +33,8 @@ pub fn read_state(root_dir: &Path) -> Result<Option<(AgeGroup, NodeKeypairs)>> {
     Ok(Some(bincode::deserialize(&contents)?))
 }
 
+/// A node is withing one
+/// out of three age groups.
 #[derive(Serialize, Deserialize)]
 pub enum AgeGroup {
     Infant,
@@ -53,7 +56,9 @@ pub enum Command {
     Shutdown,
 }
 
-/// Command that the user can send to a running node to control its execution.
+/// Info about the node used
+/// to inits its various dbs,
+/// among things.
 #[derive(Clone)]
 pub struct NodeInfo {
     pub keys: NodeKeys,
@@ -78,14 +83,3 @@ impl NodeInfo {
         self.keys.clone()
     }
 }
-
-// pub struct AdultInfo {
-//     pub node_info: NodeInfo,
-//     /// Upper limit in bytes for allowed network storage on this node.
-//     pub max_storage_capacity: u64,
-// }
-
-// pub struct ElderInfo<R: CryptoRng + Rng> {
-//     pub node_info: NodeInfo,
-//     pub rng: R,
-// }

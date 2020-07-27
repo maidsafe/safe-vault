@@ -8,8 +8,8 @@
 
 use crate::node::node_duties::accumulation::Accumulation;
 use crate::node::node_ops::{
-    AdultDuty, ChunkDuty, GatewayDuty, MessagingDuty, MetadataDuty, NetworkDuty, NodeOperation,
-    RewardDuty, TransferCmd, TransferDuty,
+    AdultDuty, ChunkDuty, GatewayDuty, MessagingDuty, MetadataDuty, NodeOperation, RewardDuty,
+    TransferCmd, TransferDuty,
 };
 use crate::node::section_querying::SectionQuerying;
 use log::error;
@@ -20,10 +20,8 @@ use safe_nd::{
 
 // NB: This approach is not entirely good, so will be improved.
 
-/// Currently, this is only evaluating
-/// remote msgs from the network, i.e.
-/// it is not evaluating msgs sent
-/// directly from the client.
+/// Evaluates remote msgs from the network,
+/// i.e. not msgs sent directly from a client.
 pub struct NetworkMsgAnalysis {
     accumulation: Accumulation,
     section: SectionQuerying,
@@ -41,12 +39,7 @@ impl NetworkMsgAnalysis {
         self.self_is_handler_for(&msg.destination().xorname())
     }
 
-    /// Currently, this is only evaluating
-    /// remote msgs from the network, i.e.
-    /// it is not evaluating msgs sent
-    /// directly from the client.
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-        use NodeOperation::*;
         let result = if self.should_accumulate(msg) {
             let msg = self.accumulation.process(msg)?;
             self.evaluate(&msg)?
@@ -71,7 +64,7 @@ impl NetworkMsgAnalysis {
             duty.into()
         } else {
             error!("Unknown message destination: {:?}", msg.id());
-            Single(NetworkDuty::Unknown)
+            return None;
         };
         Some(result)
     }

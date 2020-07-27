@@ -15,16 +15,22 @@ use safe_nd::{
 use serde::Serialize;
 use std::collections::BTreeSet;
 
+/// Wrapping of msgs sent by Elders.
 #[derive(Clone)]
 pub struct ElderMsgWrapping {
     inner: MsgWrapping,
 }
 
+/// Wrapping of msgs sent by Adults.
 #[derive(Clone)]
 pub struct AdultMsgWrapping {
     inner: MsgWrapping,
 }
 
+/// Msg wrapping simplifies
+/// the signing and stamping of
+/// a sender duty onto remote msgs
+/// to be sent on the wire.
 #[derive(Clone)]
 struct MsgWrapping {
     keys: NodeKeys,

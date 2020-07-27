@@ -11,12 +11,13 @@ use routing::Node as Routing;
 use safe_nd::XorName;
 use std::{cell::RefCell, net::SocketAddr, rc::Rc};
 
+/// Querying of our section's member
+/// composition, and other section related things.
 #[derive(Clone)]
 pub struct SectionQuerying {
     routing: Rc<RefCell<Routing>>,
 }
 
-/// Querying of our section's member composition.
 impl SectionQuerying {
     pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
         Self { routing }

@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -29,14 +29,17 @@ use std::{collections::BTreeSet, net::SocketAddr};
 /// at the node. At a node module, the result of such a call
 /// is also an internal message.
 /// Finally, an internal message might be destined for Messaging
-/// module, by which it leaves the physical boundary of this node
+/// module, by which it leaves the process boundary of this node
 /// and is sent on the wire to some other destination(s) on the network.
-///
-// #[derive(Debug)]
-// #[allow(clippy::large_enum_variant)]
 
+/// The main operation type
+/// which encompasses all duties
+/// carried out by the node in the network.
 pub enum NodeOperation {
+    /// A single operation.
     Single(NetworkDuty),
+    /// Multiple operations, that will
+    /// be carried out sequentially.
     Multiple(Vec<NetworkDuty>),
 }
 
@@ -67,17 +70,20 @@ impl Into<NodeOperation> for Vec<Option<NodeOperation>> {
     }
 }
 
+/// All duties carried out by
+/// a node in the network.
 pub enum NetworkDuty {
     RunAsAdult(AdultDuty),
     RunAsElder(ElderDuty),
     RunAsNode(NodeDuty),
-    Unknown,
 }
 
-// Need to Serialize/Deserialize to go through the consensus process.
 /// A GroupDecision is something only
-/// taking place at the network Gateways.
-#[derive(Debug, Clone, Serialize, Deserialize)] // Debug,
+/// taking place at key sections, for
+/// requests from clients which they need to agree on.
+/// Currently there is only one such group of
+/// requests: AuthCmds. These will be deprecated.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GroupDecision {
     /// When Gateway nodes consider a request
     /// valid, they will vote for it to be forwarded.
@@ -94,13 +100,13 @@ pub enum GroupDecision {
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
-    ///
+    /// On being promoted, an Infant node becomes an Adult.
     BecomeAdult,
-    ///
+    /// On being promoted, an Adult node becomes an Elder.
     BecomeElder,
-    ///
+    /// Sending messages on to the network.
     ProcessMessaging(MessagingDuty),
-    ///
+    /// Receiving and processing events from the network.
     ProcessNetworkEvent(NetworkEvent),
 }
 
@@ -117,7 +123,6 @@ impl Into<NodeOperation> for NodeDuty {
 /// This duty is at the border of infrastructural
 /// and domain duties. Messaging is such a fundamental
 /// part of the system, that it can be considered domain.
-//#[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum MessagingDuty {
     /// Send to a client.
@@ -137,12 +142,14 @@ pub enum MessagingDuty {
     /// Vote for a cmd so we can process the deferred action on consensus.
     /// (Currently immediately.)
     VoteFor(GroupDecision),
-    ///
+    /// At a key section, connecting clients start the
+    /// interchange of handshakes. The network returns
+    /// handshake responses to the client.
     SendHandshake {
         address: SocketAddr,
         response: HandshakeResponse,
     },
-    ///
+    /// The key section might also disonnect a client.
     DisconnectClient(SocketAddr),
 }
 
@@ -160,10 +167,13 @@ impl Into<NodeOperation> for MessagingDuty {
 /// Duties only run as an Elder.
 #[allow(clippy::large_enum_variant)]
 pub enum ElderDuty {
-    ProcessLostMember {
-        name: XorName,
-        age: u8,
-    },
+    /// As members are lost for various reasons
+    /// there are certain things the Elders need
+    /// to do, to update for that.
+    ProcessLostMember { name: XorName, age: u8 },
+    /// Elder changes means the section public key
+    /// changes as well, which leads to necessary updates
+    /// of various places using the multisig of the section.
     ProcessElderChange {
         // /// The prefix of our section.
         // prefix: Prefix,
@@ -176,7 +186,10 @@ pub enum ElderDuty {
         old_node_id: XorName,
         new_node_id: XorName,
     },
+    /// A key section interfaces with clients.
     RunAsKeySection(KeySectionDuty),
+    /// A data section receives requests relayed
+    /// via key sections.
     RunAsDataSection(DataSectionDuty),
 }
 
@@ -192,7 +205,8 @@ impl Into<NodeOperation> for ElderDuty {
 
 /// Duties only run as an Adult.
 pub enum AdultDuty {
-    ///
+    /// The main duty of an Adult is
+    /// storage and retrieval of data chunks.
     RunAsChunks(ChunkDuty),
 }
 
@@ -204,29 +218,31 @@ impl Into<NodeOperation> for AdultDuty {
     }
 }
 
-// -- All duties below solely process and produce internal msgs
-// -- for further handling locally - of which MessagingDuty is the
-// -- most common next local step. From there, it is sent out on the network.
-// -- It is important to stress that _only_ MessagingDuty does sending on to the network.
-
 // --------------- KeySection ---------------
 
 /// Duties only run as a Key section.
 pub enum KeySectionDuty {
-    ///
+    /// Incoming client msgs
+    /// are to be evaluated and
+    /// sent to their respective module.
     EvaluateClientMsg {
         public_id: PublicId,
         msg: MsgEnvelope,
     },
-    ///
+    /// Group decisions are to be carried out.
     ProcessGroupDecision(GroupDecision),
-    ///
+    /// Auth duties is soon to be deprecated
+    /// to instead be handled clientside at the Authenticator.
     RunAsAuth(AuthDuty),
-    ///
+    /// As a Gateway, the node interfaces with
+    /// clients, interpreting handshakes and msgs,
+    /// and also relating network msgs (such as cmd errors
+    /// and query responses, with earlier client
+    /// msgs) as to route them to the correct client.
     RunAsGateway(GatewayDuty),
-    ///
+    /// Payment for data writes.
     RunAsPayment(PaymentDuty),
-    ///
+    /// Transfers of money between accounts.
     RunAsTransfers(TransferDuty),
 }
 
@@ -243,9 +259,15 @@ impl Into<NodeOperation> for KeySectionDuty {
 
 /// Duties only run as a Data section.
 pub enum DataSectionDuty {
-    ///
+    /// Metadata is the info about
+    /// data types structures, ownership
+    /// and permissions. This is distinct
+    /// from the actual data, that is in chunks.
+    /// NB: Full separation between metadata and chunks is not yet implemented.
     RunAsMetadata(MetadataDuty),
-    ///
+    /// Dealing out rewards for contributing to
+    /// the network by storing metadata / data, and
+    /// carrying out operations on those.
     RunAsRewards(RewardDuty),
 }
 
@@ -312,9 +334,13 @@ impl Into<NodeOperation> for GatewayDuty {
 
 /// Payment for data.
 pub enum PaymentDuty {
-    ///
+    /// Makes sure the payment contained
+    /// within a data write, is credited
+    /// to the section funds.
     ProcessPayment(MsgEnvelope),
-    ///
+    /// Clients need to query for the
+    /// current store cost, as to be able
+    /// to make correct payments for their data.
     ProcessQuery {
         query: PaymentQuery,
         ///
@@ -336,11 +362,15 @@ impl Into<NodeOperation> for PaymentDuty {
 
 // --------------- Metadata ---------------
 
-///
+/// Reading and writing data.
+/// The reads/writes potentially concerns
+/// metadata only, but could include
+/// chunks, and are then relayed to
+/// Adults (i.e. chunk holders).
 pub enum MetadataDuty {
-    ///
+    /// Reads.
     ProcessRead(MsgEnvelope),
-    ///
+    /// Writes.
     ProcessWrite(MsgEnvelope),
 }
 
@@ -358,9 +388,9 @@ impl Into<NodeOperation> for MetadataDuty {
 
 /// Chunk storage and retrieval is done at Adults.
 pub enum ChunkDuty {
-    ///
+    /// Reads.
     ReadChunk(MsgEnvelope),
-    ///
+    /// Writes.
     WriteChunk(MsgEnvelope),
 }
 
@@ -387,43 +417,46 @@ pub enum RewardDuty {
         /// only lead to a farming reward once.
         msg_id: MessageId,
     },
-    ///
+    /// TODO: Evaluate the need for this one.
+    /// When adding an account before relocation
+    /// (does this even happen?)
     AddNewAccount {
-        ///
+        /// The account id for reward payouts.
         id: AccountId,
-        ///
+        /// The node id.
         node_id: XorName,
     },
     /// We add relocated nodes to our rewards
     /// system, so that they can participate
     /// in the farming rewards.
     AddRelocatedAccount {
-        ///
+        /// The id of the node at the previous section.
         old_node_id: XorName,
-        ///
+        /// The id of the node at its new section (i.e. this one).
         new_node_id: XorName,
     },
     /// When a node is relocated from us, the other
     /// section will claim the reward counter, so that
     /// they can pay it out to their new node.
     ClaimRewardCounter {
-        ///
+        /// The id of the node at the previous section.
         old_node_id: XorName,
-        ///
+        /// The id of the node at its new section (i.e. this one).
         new_node_id: XorName,
-        ///
+        /// The id of the remote msg.
         msg_id: MessageId,
-        ///
+        /// The origin of the remote msg.
         origin: Address,
     },
     /// When a node has been relocated to our section
     /// we receive the reward counter from the other section.
     ReceiveClaimedRewards {
-        ///
+        /// The account to which the claimed
+        /// rewards should be paid out.
         id: AccountId,
-        ///
+        /// The node which accumulated the rewards.
         node_id: XorName,
-        ///
+        /// The accumulated rewards and work.
         counter: RewardCounter,
     },
     /// When a node has left for some reason,
@@ -449,7 +482,8 @@ impl Into<NodeOperation> for RewardDuty {
 
 // --------------- Transfers ---------------
 
-///
+/// Transfers of money on the network
+/// and querying of balances and history.
 #[allow(clippy::large_enum_variant)]
 pub enum TransferDuty {
     ///
@@ -480,6 +514,8 @@ impl Into<NodeOperation> for TransferDuty {
     }
 }
 
+/// Queries for information on accounts,
+/// handled by AT2 Replicas.
 pub enum TransferQuery {
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(AccountId),
@@ -494,6 +530,7 @@ pub enum TransferQuery {
     },
 }
 
+/// Cmds carried out on AT2 Replicas.
 pub enum TransferCmd {
     #[cfg(feature = "simulated-payouts")]
     /// Cmd to simulate a farming payout
@@ -502,11 +539,12 @@ pub enum TransferCmd {
     ValidateTransfer(SignedTransfer),
     /// The cmd to register the consensused transfer.
     RegisterTransfer(DebitAgreementProof),
-    ///
+    /// As a transfer has been propagated to the
+    /// crediting section, it is applied there.
     PropagateTransfer(DebitAgreementProof),
-    ///
+    /// The validation of a section transfer.
     ValidateSectionPayout(SignedTransfer),
-    ///
+    /// The registration of a section transfer.
     RegisterSectionPayout(DebitAgreementProof),
 }
 
