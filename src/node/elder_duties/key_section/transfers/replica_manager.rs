@@ -201,13 +201,12 @@ impl ReplicaManager {
     }
 
     fn persist(&mut self, event: ReplicaEvent) -> NdResult<()> {
-        match self.store.try_append(event.clone()) {
-            Ok(_) => {
+        self.store
+            .try_append(event.clone())
+            .map(|_| {
                 self.replica.apply(event);
-                Ok(())
-            }
-            Err(error) => Err(NdError::NetworkOther("todo..".to_string())),
-        }
+            })
+            .map_err(|e| NdError::NetworkOther(e.to_string()))
     }
 
     /// Get the replica's PK set
