@@ -97,38 +97,34 @@ impl NetworkMsgAnalysis {
     /// The individual Payment Elder nodes send their msgs
     /// to Metadata section, where it is accumulated.
     fn should_accumulate_for_metadata_write(&self, msg: &MsgEnvelope) -> bool {
-        let from_single_payment_elder = || match msg.most_recent_sender() {
-            MsgSender::Node {
+        let from_single_payment_elder = || {
+            matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Payment),
                 ..
-            } => true,
-            _ => false,
+            })
         };
-        let is_data_cmd = || match msg.message {
-            Message::Cmd {
+        let is_data_cmd = || {
+            matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
         is_data_cmd() && from_single_payment_elder() && self.is_dst_for(msg) && self.is_elder()
     }
 
     fn should_accumulate_for_rewards(&self, msg: &MsgEnvelope) -> bool {
-        let from_single_rewards_elder = || match msg.most_recent_sender() {
-            MsgSender::Node {
+        let from_single_rewards_elder = || {
+            matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Rewards),
                 ..
-            } => true,
-            _ => false,
+            })
         };
-        let is_accumulating_reward_cmd = || match msg.message {
-            Message::NodeCmd {
+        let is_accumulating_reward_cmd = || {
+            matches!(msg.message, Message::NodeCmd {
                 cmd: NodeCmd::Rewards(NodeRewardCmd::ClaimRewardCounter { .. }),
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
         is_accumulating_reward_cmd()
@@ -139,14 +135,14 @@ impl NetworkMsgAnalysis {
 
     /// Adults accumulate the write requests from Elders.
     fn should_accumulate_for_adult(&self, msg: &MsgEnvelope) -> bool {
-        let from_single_metadata_elder = || match msg.most_recent_sender() {
-            MsgSender::Node {
+        let from_single_metadata_elder = || {
+            matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Metadata),
                 ..
-            } => true,
-            _ => false,
+            })
         };
-        let is_chunk_msg = || match msg.message {
+        let is_chunk_msg = || {
+            matches!(msg.message,
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -158,8 +154,7 @@ impl NetworkMsgAnalysis {
             | Message::Query {
                 query: Query::Data(DataQuery::Blob(_)),
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
         is_chunk_msg() && from_single_metadata_elder() && self.is_dst_for(msg) && self.is_adult()
@@ -187,36 +182,30 @@ impl NetworkMsgAnalysis {
     /// accumulated (can be seen since the sender is `Section`),
     /// it is time to actually carry out the write operation.
     fn try_metadata(&self, msg: &MsgEnvelope) -> Option<MetadataDuty> {
-        // Is it a data cmd?
-        let is_data_cmd = || match msg.message {
-            Message::Cmd {
+        let is_data_cmd = || {
+            matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
                 ..
-            } => true,
-            _ => false,
+            })
         };
-        let from_payment_section = || match msg.most_recent_sender() {
-            MsgSender::Section {
+        let from_payment_section = || {
+            matches!(msg.most_recent_sender(), MsgSender::Section {
                 duty: Duty::Elder(ElderDuties::Payment),
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
-        // Is it a data query?
-        let is_data_query = || match msg.message {
-            Message::Query {
+        let is_data_query = || {
+            matches!(msg.message, Message::Query {
                 query: Query::Data(_),
                 ..
-            } => true,
-            _ => false,
+            })
         };
-        let from_single_gateway_elder = || match msg.most_recent_sender() {
-            MsgSender::Node {
+        let from_single_gateway_elder = || {
+            matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Gateway),
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
         let is_correct_dst = |msg| self.is_dst_for(msg) && self.is_elder();
@@ -234,23 +223,22 @@ impl NetworkMsgAnalysis {
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
     fn try_adult(&self, msg: &MsgEnvelope) -> Option<AdultDuty> {
-        let from_metadata_section = || match msg.most_recent_sender() {
-            MsgSender::Section {
+        let from_metadata_section = || {
+            matches!(msg.most_recent_sender(), MsgSender::Section {
                 duty: Duty::Elder(ElderDuties::Metadata),
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
-        let is_chunk_query = || match msg.message {
-            Message::Query {
+        let is_chunk_query = || {
+            matches!(msg.message, Message::Query {
                 query: Query::Data(DataQuery::Blob(_)),
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
-        let is_chunk_cmd = || match msg.message {
+        let is_chunk_cmd = || {
+            matches!(msg.message,
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -258,8 +246,7 @@ impl NetworkMsgAnalysis {
                         ..
                     },
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
         let shall_process =
@@ -291,12 +278,11 @@ impl NetworkMsgAnalysis {
 
     // Check non-accumulated reward msgs.
     fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
-        let from_rewards_elder = || match msg.most_recent_sender() {
-            MsgSender::Node {
+        let from_rewards_elder = || {
+            matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Rewards),
                 ..
-            } => true,
-            _ => false,
+            })
         };
         let shall_process = |msg| from_rewards_elder() && self.is_dst_for(msg) && self.is_elder();
 
@@ -330,12 +316,11 @@ impl NetworkMsgAnalysis {
 
     // Check accumulated reward msgs.
     fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
-        let from_rewards_section = || match msg.most_recent_sender() {
-            MsgSender::Section {
+        let from_rewards_section = || {
+            matches!(msg.most_recent_sender(), MsgSender::Section {
                 duty: Duty::Elder(ElderDuties::Rewards),
                 ..
-            } => true,
-            _ => false,
+            })
         };
         let shall_process_accumulated =
             |msg| from_rewards_section() && self.is_dst_for(msg) && self.is_elder();
@@ -369,12 +354,11 @@ impl NetworkMsgAnalysis {
 
         // From Transfer module we get `PropagateTransfer`.
 
-        let from_transfer_elder = || match msg.most_recent_sender() {
-            MsgSender::Node {
+        let from_transfer_elder = || {
+            matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Transfer),
                 ..
-            } => true,
-            _ => false,
+            })
         };
         let shall_process = |msg| from_transfer_elder() && self.is_dst_for(msg) && self.is_elder();
 
@@ -395,12 +379,11 @@ impl NetworkMsgAnalysis {
         // From Rewards module, we get
         // `ValidateSectionPayout` and `RegisterSectionPayout`.
 
-        let from_rewards_elder = || match msg.most_recent_sender() {
-            MsgSender::Node {
+        let from_rewards_elder = || {
+            matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Rewards),
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
         let shall_process = |msg| from_rewards_elder() && self.is_dst_for(msg) && self.is_elder();

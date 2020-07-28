@@ -61,17 +61,13 @@ impl ClientMsgAnalysis {
     /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
     fn try_data_payment(&self, msg: &MsgEnvelope) -> Option<PaymentDuty> {
-        let from_client = || match msg.origin {
-            MsgSender::Client { .. } => true,
-            _ => false,
-        };
+        let from_client = || matches!(msg.origin, MsgSender::Client { .. });
 
-        let is_data_write = || match msg.message {
-            Message::Cmd {
+        let is_data_write = || {
+            matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
                 ..
-            } => true,
-            _ => false,
+            })
         };
 
         let shall_process =
@@ -85,10 +81,7 @@ impl ClientMsgAnalysis {
     }
 
     fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
-        let from_client = || match msg.origin {
-            MsgSender::Client { .. } => true,
-            _ => false,
-        };
+        let from_client = || matches!(msg.origin, MsgSender::Client { .. });
 
         let shall_process = |msg| from_client() && self.is_dst_for(msg) && self.is_elder();
 

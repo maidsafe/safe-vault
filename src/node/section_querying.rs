@@ -99,19 +99,11 @@ impl SectionQuerying {
     }
 
     pub fn is_elder(&self) -> bool {
-        if let AgeGroup::Elder = self.our_duties() {
-            true
-        } else {
-            false
-        }
+        matches!(self.our_duties(), AgeGroup::Elder)
     }
 
     pub fn is_adult(&self) -> bool {
-        if let AgeGroup::Adult = self.our_duties() {
-            true
-        } else {
-            false
-        }
+        matches!(self.our_duties(), AgeGroup::Adult)
     }
 
     fn our_duties(&self) -> AgeGroup {
