@@ -16,7 +16,8 @@ use bincode::serialize;
 use idata_handler::IDataHandler;
 use idata_holder::IDataHolder;
 use mdata_handler::MDataHandler;
-use routing::{Node, Proof, ProofShare, SrcLocation};
+use routing::{Node, SrcLocation};
+use safe_network_signature_aggregator::{Proof, ProofShare};
 use sdata_handler::SDataHandler;
 
 use log::{debug, error, trace};

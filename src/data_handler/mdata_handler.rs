@@ -430,9 +430,9 @@ impl MDataHandler {
     ) -> Option<Action> {
         let res = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
 
-        let response = Response::ListMDataValues(res.and_then(|data| match data {
-            MData::Seq(md) => Ok(md.values().into()),
-            MData::Unseq(md) => Ok(md.values().into()),
+        let response = Response::ListMDataValues(res.map(|data| match data {
+            MData::Seq(md) => md.values().into(),
+            MData::Unseq(md) => md.values().into(),
         }));
 
         Some(Action::RespondToClientHandlers {
@@ -456,9 +456,9 @@ impl MDataHandler {
     ) -> Option<Action> {
         let res = self.get_mdata_chunk(&address, &requester, MDataAction::Read)?;
 
-        let response = Response::ListMDataEntries(res.and_then(|data| match data {
-            MData::Seq(md) => Ok(md.entries().clone().into()),
-            MData::Unseq(md) => Ok(md.entries().clone().into()),
+        let response = Response::ListMDataEntries(res.map(|data| match data {
+            MData::Seq(md) => md.entries().clone().into(),
+            MData::Unseq(md) => md.entries().clone().into(),
         }));
 
         Some(Action::RespondToClientHandlers {

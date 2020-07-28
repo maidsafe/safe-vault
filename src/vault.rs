@@ -19,11 +19,13 @@ use log::{debug, error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use routing::{
-    event::Event as RoutingEvent, AccumulationError, DstLocation, Node, Proof, ProofShare,
-    SignatureAccumulator, SrcLocation, TransportEvent as ClientEvent,
+    event::Event as RoutingEvent, DstLocation, Node, SrcLocation, TransportEvent as ClientEvent,
 };
 use safe_nd::{
     ClientRequest, LoginPacketRequest, MessageId, NodeFullId, PublicId, Request, Response, XorName,
+};
+use safe_network_signature_aggregator::{
+    AccumulationError, Proof, ProofShare, SignatureAggregator,
 };
 use std::borrow::Cow;
 use std::{
@@ -42,12 +44,12 @@ enum State {
     Infant,
     Adult {
         data_handler: DataHandler,
-        accumulator: SignatureAccumulator<(Request, MessageId)>,
+        accumulator: SignatureAggregator<(Request, MessageId)>,
     },
     Elder {
         client_handler: ClientHandler,
         data_handler: DataHandler,
-        accumulator: SignatureAccumulator<(Request, MessageId)>,
+        accumulator: SignatureAggregator<(Request, MessageId)>,
     },
 }
 
@@ -129,7 +131,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             State::Elder {
                 client_handler,
                 data_handler,
-                accumulator: SignatureAccumulator::new(),
+                accumulator: SignatureAggregator::new(),
             }
         } else {
             info!("Initializing new Vault as Infant");
@@ -228,7 +230,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         )?;
         self.state = State::Adult {
             data_handler,
-            accumulator: SignatureAccumulator::new(),
+            accumulator: SignatureAggregator::new(),
         };
         Ok(())
     }
@@ -255,7 +257,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         self.state = State::Elder {
             client_handler,
             data_handler,
-            accumulator: SignatureAccumulator::new(),
+            accumulator: SignatureAggregator::new(),
         };
         Ok(())
     }
@@ -833,7 +835,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
     }
 
     #[allow(unused)]
-    fn accumulator(&self) -> Option<&SignatureAccumulator<(Request, MessageId)>> {
+    fn accumulator(&self) -> Option<&SignatureAggregator<(Request, MessageId)>> {
         match &self.state {
             State::Infant => None,
             State::Elder {
@@ -845,7 +847,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
         }
     }
 
-    fn accumulator_mut(&mut self) -> Option<&mut SignatureAccumulator<(Request, MessageId)>> {
+    fn accumulator_mut(&mut self) -> Option<&mut SignatureAggregator<(Request, MessageId)>> {
         match &mut self.state {
             State::Infant => None,
             State::Elder {

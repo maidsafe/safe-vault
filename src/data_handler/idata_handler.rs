@@ -10,11 +10,12 @@ use crate::{action::Action, rpc::Rpc, utils, vault::Init, Config, Result, ToDbKe
 use log::{debug, info, trace, warn};
 use pickledb::PickleDb;
 use rand::SeedableRng;
-use routing::{Node, ProofShare};
+use routing::Node;
 use safe_nd::{
     Error as NdError, IData, IDataAddress, IDataRequest, MessageId, NodeFullId, NodePublicId,
     PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
 };
+use safe_network_signature_aggregator::ProofShare;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
