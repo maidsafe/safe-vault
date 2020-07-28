@@ -38,7 +38,11 @@ impl NetworkEvents {
                     }
                 }
             }
-            RoutingEvent::Promoted => {
+            RoutingEvent::PromotedToAdult => {
+                info!("Node promoted to Adult");
+                Some(BecomeAdult.into())
+            }
+            RoutingEvent::PromotedToElder => {
                 info!("Node promoted to Elder");
                 Some(BecomeElder.into())
             }
@@ -69,8 +73,8 @@ impl NetworkEvents {
                 )
             }
             RoutingEvent::Connected(_) => {
-                info!("Node promoted to Adult");
-                Some(BecomeAdult.into())
+                info!("Node connected.");
+                None
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
                 info!(
