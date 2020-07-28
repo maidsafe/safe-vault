@@ -2002,7 +2002,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/routing.git?rev=97cc0cdb#97cc0cdb6acf073fb53b9f679181176005db1f2b"
+source = "git+https://github.com/maidsafe/routing.git?branch=fleming#f9bbd451fbc7e08b70e084263c2d01132e54a67e"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2027,6 +2027,7 @@ dependencies = [
  "rand_core 0.5.1",
  "rand_os 0.2.2",
  "rand_xorshift 0.2.0",
+ "safe-network-signature-aggregator",
  "serde",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
@@ -2107,6 +2108,21 @@ dependencies = [
  "threshold_crypto",
  "tiny-keccak 1.5.0",
  "unwrap",
+]
+
+[[package]]
+name = "safe-network-signature-aggregator"
+version = "0.1.0"
+source = "git+https://github.com/maidsafe/safe-network-signature-aggregator#fc462f7b959c98930ca79f9b101abfffc859378a"
+dependencies = [
+ "bincode",
+ "err-derive",
+ "fake_clock",
+ "log 0.4.8",
+ "rand 0.6.5",
+ "serde",
+ "threshold_crypto",
+ "tiny-keccak 2.0.2",
 ]
 
 [[package]]

@@ -350,7 +350,17 @@ impl<R: CryptoRng + Rng> Vault<R> {
                     }
                 }
             }
-            RoutingEvent::Promoted => self.promote_to_elder().map_or_else(
+            RoutingEvent::PromotedToAdult => self.promote_to_adult().map_or_else(
+                |err| {
+                    error!("Error when promoting Vault to Adult: {:?}", err);
+                    None
+                },
+                |()| {
+                    info!("Vault promoted to Adult");
+                    None
+                },
+            ),
+            RoutingEvent::PromotedToElder => self.promote_to_elder().map_or_else(
                 |err| {
                     error!("Error when promoting Vault to Elder: {:?}", err);
                     None
@@ -389,19 +399,10 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 info!("No. of Adults: {}", adult_count);
                 None
             }
-            RoutingEvent::Connected(_) => self.promote_to_adult().map_or_else(
-                |err| {
-                    error!(
-                        "Error creating required components for an Adult vault: {:?}",
-                        err
-                    );
-                    None
-                },
-                |()| {
-                    info!("Section has accepted the vault.");
-                    None
-                },
-            ),
+            RoutingEvent::Connected(_) => {
+                info!("Section has accepted the vault.");
+                None
+            }
             // Ignore all other events
             _ => None,
         }
