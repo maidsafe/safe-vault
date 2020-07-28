@@ -66,16 +66,18 @@ impl Economy {
         // Percentages of farmed and unfarmed.
         let unfarmed_percent = section_balance / section_portion;
         let farmed_percent = 1.0 - unfarmed_percent;
+        let ratio = unfarmed_percent / farmed_percent;
 
         // This is the factor that determines how fast new money should be minted.
-        // Faster when less is farmed, slower when more is farmed.
-        let minting_velocity = unfarmed_percent / farmed_percent;
+        // Faster when less has been minted, slower when more has been minted.
+        // Will keep minting until all is minted.
+        let minting_velocity = (ratio + 1.0).powf(2.0);
 
         // Some obscure tricks to get the base cost within reasonable values
         // for very small as well as very large networks (up to about 130 billion nodes).
         let numerator = 1 / (total_nodes * total_nodes) / NANOS;
-        let denominator = (minting_velocity.powf(prefix_len as f64) + (1.0 / NANOS as f64)) * 1.0
-            / (NANOS as f64).powf(0.5);
+        let denominator =
+            (ratio.powf(prefix_len as f64) + (1.0 / NANOS as f64)) / (NANOS as f64).powf(0.5);
 
         // This is the basis for store cost during the period.
         let period_base_cost = u64::max(1, (numerator as f64 / denominator) as u64);
