@@ -329,9 +329,9 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let res = self.get_chunk(&address, origin, MapAction::Read)?;
-        let result = res.and_then(|data| match data {
-            Map::Seq(map) => Ok(map.values().into()),
-            Map::Unseq(map) => Ok(map.values().into()),
+        let result = res.map(|data| match data {
+            Map::Seq(map) => map.values().into(),
+            Map::Unseq(map) => map.values().into(),
         });
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapValues(result),
@@ -349,9 +349,9 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let res = self.get_chunk(&address, origin, MapAction::Read)?;
-        let result = res.and_then(|data| match data {
-            Map::Seq(map) => Ok(map.entries().clone().into()),
-            Map::Unseq(map) => Ok(map.entries().clone().into()),
+        let result = res.map(|data| match data {
+            Map::Seq(map) => map.entries().clone().into(),
+            Map::Unseq(map) => map.entries().clone().into(),
         });
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapEntries(result),

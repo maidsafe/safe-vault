@@ -2,4 +2,4 @@
 
 set -e -x
 
-cargo clippy "$@" --all-targets -- -D warnings
+RUSTFLAGS="-D warnings" cargo clippy "$@" --all-targets

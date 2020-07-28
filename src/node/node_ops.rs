@@ -75,6 +75,7 @@ impl Into<NodeOperation> for Vec<Option<NodeOperation>> {
 /// All duties carried out by
 /// a node in the network.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum NetworkDuty {
     RunAsAdult(AdultDuty),
     RunAsElder(ElderDuty),
@@ -447,6 +448,7 @@ pub enum ChunkDuty {
 /// keeping track of rewards, and issuing
 /// payouts from the section account.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum RewardDuty {
     /// Whenever there has been write
     /// operations on the network, we
