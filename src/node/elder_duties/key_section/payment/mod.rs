@@ -42,8 +42,8 @@ pub struct Payments {
     wrapping: ElderMsgWrapping,
     calc: Economy,
     store_cost: Money,
-    previous_counter: u64,
-    counter: u64,
+    previous_writes: u64,
+    writes: u64,
 }
 
 impl Payments {
@@ -60,19 +60,19 @@ impl Payments {
             wrapping,
             calc,
             store_cost: Money::zero(),
-            previous_counter: 1,
-            counter: 1,
+            previous_writes: 1,
+            writes: 1,
         }
     }
 
     pub fn update_costs(&mut self) -> Option<NodeOperation> {
         let indicator = self.calc.update_indicator()?;
-        let cost_base = indicator.period_base_cost.as_nano();
-        let load = self.counter as f64 / self.previous_counter as f64;
-        let store_cost = load * cost_base as f64;
+        let base_cost = indicator.period_base_cost.as_nano();
+        let load = self.writes as f64 / self.previous_writes as f64;
+        let store_cost = load * base_cost as f64;
         self.store_cost = Money::from_nano(store_cost as u64);
-        self.previous_counter = self.counter;
-        self.counter = 1;
+        self.previous_writes = self.writes;
+        self.writes = 1;
 
         Some(
             RewardDuty::UpdateRewards(MintingMetrics {
@@ -133,9 +133,14 @@ impl Payments {
 
         use TransferError::*;
         if recipient_is_not_section {
-            let error = CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient));
-            let result = self.wrapping.error(error, msg.id(), &msg.origin.address());
-            return result.map(|c| c.into());
+            return self
+                .wrapping
+                .error(
+                    CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient)),
+                    msg.id(),
+                    &msg.origin.address(),
+                )
+                .map(|c| c.into());
         }
         let registration = self.replica_mut().register(&payment);
         let result = match registration {
@@ -147,16 +152,21 @@ impl Payments {
         };
         let result = match result {
             Ok(_) => {
-                self.counter += 1;
+                self.writes += 1;
                 // Paying too little will see the amount be forfeited.
                 // This is because it is easy to know the cost by querying,
                 // so you are forced to do the job properly, instead of burdoning the network.
                 let store_cost = Money::from_nano(num_bytes + self.store_cost.as_nano());
                 if store_cost > payment.amount() {
-                    let error =
-                        CmdError::Transfer(TransferRegistration(Error::InsufficientBalance)); // todo, better error, like `TooLowPayment`
-                    let result = self.wrapping.error(error, msg.id(), &msg.origin.address());
-                    return result.map(|c| c.into());
+                    // todo, better error, like `TooLowPayment`
+                    return self
+                        .wrapping
+                        .error(
+                            CmdError::Transfer(TransferRegistration(Error::InsufficientBalance)),
+                            msg.id(),
+                            &msg.origin.address(),
+                        )
+                        .map(|c| c.into());
                 }
                 self.wrapping.forward(msg)
             }
