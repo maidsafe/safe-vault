@@ -151,6 +151,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                         .collect::<Vec<_>>()
                         .into(),
                 ),
+                None => break,
             }
         }
     }

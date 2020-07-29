@@ -43,16 +43,22 @@ pub enum NodeOperation {
     /// Multiple operations, that will
     /// be carried out sequentially.
     Multiple(Vec<NetworkDuty>),
+    // No op.
+    None,
 }
 
 impl NodeOperation {
     fn from_many(ops: Vec<NodeOperation>) -> NodeOperation {
         use NodeOperation::*;
+        if ops.is_empty() {
+            return None;
+        }
         let multiple = ops
             .into_iter()
             .map(|c| match c {
                 Single(duty) => vec![duty],
                 Multiple(duties) => duties,
+                None => vec![],
             })
             .flatten()
             .collect();
