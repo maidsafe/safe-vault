@@ -307,9 +307,6 @@ impl Transfers {
         // We will just validate the proofs and then apply the event.
         let message = match self.replica.borrow_mut().receive_propagated(proof) {
             Ok(_) => return None,
-            // self.send(Message {
-            //     event: Event::TransferReceived
-            // }),
             Err(err) => Message::NodeCmdError {
                 error: NodeCmdError::Transfers(TransferPropagation(err)),
                 id: MessageId::new(),

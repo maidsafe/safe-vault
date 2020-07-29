@@ -14,12 +14,11 @@ use std::path::Path;
 const TRANSFERS_DB_NAME: &str = "transfers.db";
 const GROUP_CHANGES: &str = "group_changes";
 
-/// Disk storage
+/// Disk storage for transfers.
 pub(crate) struct TransferStore {
     db: PickleDb,
 }
 
-/// In memory store lacks transactionality
 impl TransferStore {
     pub fn new<R: AsRef<Path>>(root_dir: R, init_mode: Init) -> Result<Self> {
         Ok(Self {
@@ -63,7 +62,7 @@ impl TransferStore {
         match event {
             ReplicaEvent::KnownGroupAdded(e) => {
                 if !self.db.lexists(GROUP_CHANGES) {
-                    // Creates if not exists. A stream always starts with a credit.
+                    // Creates if not exists.
                     match self.db.lcreate(GROUP_CHANGES) {
                         Ok(_) => (),
                         Err(error) => return Err(Error::PickleDb(error)),
@@ -92,14 +91,14 @@ impl TransferStore {
                 let id = e.from();
                 match self.db.ladd(&id.to_db_key(), &e) {
                     Some(_) => Ok(()),
-                    None => Err(Error::NetworkData("Failed to write event to db.".into())),
+                    None => Err(Error::NetworkData("Failed to write event to db.".into())), // A stream always starts with a credit, so not existing when debiting is simply invalid.
                 }
             }
             ReplicaEvent::TransferRegistered(e) => {
                 let id = e.from();
                 match self.db.ladd(&id.to_db_key(), &e) {
                     Some(_) => Ok(()),
-                    None => Err(Error::NetworkData("Failed to write event to db.".into())),
+                    None => Err(Error::NetworkData("Failed to write event to db.".into())), // A stream always starts with a credit, so not existing when debiting is simply invalid.
                 }
             }
         }
