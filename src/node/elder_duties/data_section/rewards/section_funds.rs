@@ -32,7 +32,6 @@ impl SectionFunds {
         }
     }
 
-    #[allow(dead_code)]
     /// At Elder churn, we must transition to a new account.
     pub fn transition(&mut self, to: TransferActor<Validator>) -> Option<MessagingDuty> {
         // TODO:

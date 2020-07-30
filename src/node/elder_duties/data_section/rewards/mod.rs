@@ -71,7 +71,6 @@ impl Rewards {
         }
     }
 
-    #[allow(dead_code)]
     pub fn transition(&mut self, to: TransferActor<Validator>) -> Option<NodeOperation> {
         Some(self.section_funds.transition(to)?.into())
     }

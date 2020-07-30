@@ -173,9 +173,8 @@ impl Transfers {
         }
     }
 
-    /// Get the PublicKeySet of our replicas
+    /// Get all the events of the Replica.
     fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<MessagingDuty> {
-        // validate signature
         let result = match self.replica.borrow().all_events() {
             None => Err(Error::NoSuchData),
             Some(events) => Ok(events),

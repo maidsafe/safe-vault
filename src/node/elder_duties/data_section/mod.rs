@@ -76,7 +76,6 @@ impl DataSection {
         }
     }
 
-    #[allow(dead_code)]
     // Transition the section funds account to the new key.
     pub fn elders_changed(&mut self) -> Option<NodeOperation> {
         let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
