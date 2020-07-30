@@ -656,6 +656,7 @@ impl IDataHandler {
         if let Ok(metadata) = self.get_metadata_for(*target) {
             return closest_holders
                 .difference(&metadata.holders)
+                .take(IMMUTABLE_DATA_COPY_COUNT - metadata.holders.len())
                 .cloned()
                 .collect();
         }
