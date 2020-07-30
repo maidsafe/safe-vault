@@ -17,8 +17,9 @@ use crate::{
 };
 use safe_nd::{
     Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
-    NodeCmdError, NodeEvent, NodeQuery, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
-    PublicKey, QueryResponse, ReplicaEvent, Result, SignedTransfer, TransferError,
+    NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
+    NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse, ReplicaEvent, Result,
+    SignedTransfer, TransferError,
 };
 use std::{
     cell::RefCell,
@@ -126,6 +127,7 @@ impl Transfers {
     ) -> Option<MessagingDuty> {
         use TransferQuery::*;
         match query {
+            GetReplicaEvents => self.all_events(msg_id, origin),
             GetReplicaKeys(account_id) => self.get_replica_pks(account_id, msg_id, origin),
             GetBalance(account_id) => self.balance(account_id, msg_id, origin),
             GetHistory { at, since_version } => self.history(at, *since_version, msg_id, origin),
@@ -169,6 +171,23 @@ impl Transfers {
             Ok(()) => None,
             Err(e) => panic!(e), // we must be able to initiate the replica, otherwise this node cannot function
         }
+    }
+
+    /// Get the PublicKeySet of our replicas
+    fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<MessagingDuty> {
+        // validate signature
+        let result = match self.replica.borrow().all_events() {
+            None => Err(Error::NoSuchData),
+            Some(events) => Ok(events),
+        };
+        use NodeQueryResponse::*;
+        use NodeTransferQueryResponse::*;
+        self.wrapping.send(Message::NodeQueryResponse {
+            response: Transfers(SyncEvents(result)),
+            id: MessageId::new(),
+            correlation_id: msg_id,
+            query_origin: origin,
+        })
     }
 
     /// Get the PublicKeySet of our replicas

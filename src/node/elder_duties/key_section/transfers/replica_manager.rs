@@ -70,6 +70,10 @@ impl ReplicaManager {
         })
     }
 
+    pub(crate) fn all_events(&self) -> Option<Vec<ReplicaEvent>> {
+        self.store.try_load().ok()
+    }
+
     pub(crate) fn history(&self, id: &AccountId) -> Option<Vec<ReplicaEvent>> {
         self.store.history(id)
     }

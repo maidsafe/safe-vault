@@ -9,13 +9,14 @@
 use crate::node::node_duties::accumulation::Accumulation;
 use crate::node::node_ops::{
     AdultDuty, ChunkDuty, GatewayDuty, MessagingDuty, MetadataDuty, NodeOperation, RewardDuty,
-    TransferCmd, TransferDuty,
+    TransferCmd, TransferDuty, TransferQuery,
 };
 use crate::node::section_querying::SectionQuerying;
 use log::error;
 use safe_nd::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
-    NodeEvent, NodeRewardCmd, NodeTransferCmd, Query, XorName,
+    NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardCmd, NodeTransferCmd, NodeTransferQuery,
+    NodeTransferQueryResponse, Query, XorName,
 };
 
 // NB: This approach is not entirely good, so will be improved.
@@ -369,6 +370,24 @@ impl NetworkMsgAnalysis {
                     id,
                 } => Some(TransferDuty::ProcessCmd {
                     cmd: TransferCmd::PropagateTransfer(debit_agreement.clone()),
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                }),
+                Message::NodeQuery {
+                    query: NodeQuery::Transfers(NodeTransferQuery::SyncEvents(_)),
+                    id,
+                } => Some(TransferDuty::ProcessQuery {
+                    query: TransferQuery::GetReplicaEvents,
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                }),
+                Message::NodeQueryResponse {
+                    response:
+                        NodeQueryResponse::Transfers(NodeTransferQueryResponse::SyncEvents(events)),
+                    id,
+                    ..
+                } => Some(TransferDuty::ProcessCmd {
+                    cmd: TransferCmd::InitiateReplica(events.clone().ok()?),
                     msg_id: *id,
                     origin: msg.origin.address(),
                 }),

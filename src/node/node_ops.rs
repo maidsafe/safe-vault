@@ -588,6 +588,7 @@ pub enum TransferQuery {
         /// The last version of transfers we know of.
         since_version: usize,
     },
+    GetReplicaEvents,
 }
 
 /// Cmds carried out on AT2 Replicas.
