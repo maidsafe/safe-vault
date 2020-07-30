@@ -13,8 +13,8 @@ use crate::node::economy::MintingMetrics;
 use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
 use safe_nd::{
     AccountId, Address, AuthCmd, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope,
-    MsgSender, PaymentQuery, PublicId, PublicKey, RewardCounter, SignedTransfer, TransferValidated,
-    XorName,
+    MsgSender, PaymentQuery, PublicId, PublicKey, ReplicaEvent, RewardCounter, SignedTransfer,
+    TransferValidated, XorName,
 };
 use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
@@ -589,6 +589,9 @@ pub enum TransferQuery {
 /// Cmds carried out on AT2 Replicas.
 #[derive(Debug)]
 pub enum TransferCmd {
+    /// Initiates a new Replica with the
+    /// state of existing Replicas in the group.
+    InitiateReplica(Vec<ReplicaEvent>),
     #[cfg(feature = "simulated-payouts")]
     /// Cmd to simulate a farming payout
     SimulatePayout(Transfer),

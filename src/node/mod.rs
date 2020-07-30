@@ -160,15 +160,15 @@ impl<R: CryptoRng + Rng> Node<R> {
         use NetworkDuty::*;
         match duty {
             RunAsAdult(duty) => {
-                info!("Handling Adult duty: {:?}", duty);
+                info!("Running as Adult: {:?}", duty);
                 self.duties.adult_duties()?.process(&duty)
             }
             RunAsElder(duty) => {
-                info!("Handling Elder duty: {:?}", duty);
+                info!("Running as Elder: {:?}", duty);
                 self.duties.elder_duties()?.process(duty)
             }
             RunAsNode(duty) => {
-                info!("Handling Node duty: {:?}", duty);
+                info!("Running as Node: {:?}", duty);
                 self.duties.process(duty)
             }
         }

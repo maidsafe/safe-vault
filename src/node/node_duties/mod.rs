@@ -19,7 +19,7 @@ use crate::node::{
     section_querying::SectionQuerying,
     state_db::NodeInfo,
 };
-use log::info;
+use log::{info, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
@@ -95,7 +95,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
 
     pub fn process(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
-        info!("Processing NodeDuty: {:?}", duty);
+        info!("Processing: {:?}", duty);
         match duty {
             BecomeAdult => self.become_adult(),
             BecomeElder => self.become_elder(),
@@ -120,7 +120,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
     fn become_elder(&mut self) -> Option<NodeOperation> {
         use DutyLevel::*;
         let total_used_space = Rc::new(Cell::new(0));
-        info!("Getting Promoted To Elder");
+        info!("Attempting to assume Elder duties..");
         if matches!(self.duty_level, Elder(_)) {
             return None;
         }
@@ -130,6 +130,8 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             self.routing.clone(),
             self.rng.take()?,
         ) {
+            let mut duties = duties;
+            let initiation = duties.initiate();
             self.duty_level = Elder(duties);
             let node = self.routing.borrow();
             info!("Updating BLS Keys");
@@ -143,8 +145,11 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             // let it be upper layer resp.
             // Also, "Error-to-Unit" is not a good conversion..
             //dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
+            info!("Successfully assumed Elder duties!");
+            initiation
+        } else {
+            warn!("Was not able to assume Elder duties!");
+            None
         }
-        info!("Promoted To Elder!");
-        None
     }
 }

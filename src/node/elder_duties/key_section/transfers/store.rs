@@ -15,7 +15,7 @@ const TRANSFERS_DB_NAME: &str = "transfers.db";
 const GROUP_CHANGES: &str = "group_changes";
 
 /// Disk storage for transfers.
-pub(crate) struct TransferStore {
+pub struct TransferStore {
     db: PickleDb,
 }
 

@@ -168,6 +168,8 @@ impl Payments {
                         )
                         .map(|c| c.into());
                 }
+                // consider having the section actor be
+                // informed of this transfer as well..
                 self.wrapping.forward(msg)
             }
             Err(error) => self.wrapping.error(

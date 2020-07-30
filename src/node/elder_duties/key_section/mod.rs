@@ -17,7 +17,7 @@ use self::{
     client::ClientGateway,
     client_msg_analysis::ClientMsgAnalysis,
     payment::Payments,
-    transfers::{replica_manager::ReplicaManager, Transfers},
+    transfers::{replica_manager::ReplicaManager, store::TransferStore, Transfers},
 };
 use crate::{
     node::msg_wrapping::ElderMsgWrapping,
@@ -149,6 +149,13 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         self.payments.update_costs()
     }
 
+    /// Issues a query to existing Replicas
+    /// asking for their events, as to catch up and
+    /// start working properly in the group.
+    pub fn synch_with_replicas(&mut self) -> Option<NodeOperation> {
+        self.transfers.synch_with_replicas()
+    }
+
     fn replica_manager(
         info: NodeInfo,
         routing: Rc<RefCell<Routing>>,
@@ -158,12 +165,12 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let secret_key_share = node.secret_key_share()?;
         let key_index = node.our_index()?;
         let proof_chain = node.our_history().ok_or(RoutingError::InvalidState)?;
+        let store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
         let replica_manager = ReplicaManager::new(
-            info,
+            store,
             secret_key_share,
             key_index,
             public_key_set,
-            vec![],
             proof_chain.clone(),
         )?;
         Ok(Rc::new(RefCell::new(replica_manager)))

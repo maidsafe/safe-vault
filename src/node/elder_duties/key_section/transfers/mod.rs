@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 pub mod replica_manager;
-mod store;
+pub mod store;
 
 pub use self::replica_manager::ReplicaManager;
 use crate::{
@@ -17,8 +17,8 @@ use crate::{
 };
 use safe_nd::{
     Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
-    NodeCmdError, NodeEvent, NodeTransferCmd, NodeTransferError, PublicKey, QueryResponse, Result,
-    SignedTransfer, TransferError,
+    NodeCmdError, NodeEvent, NodeQuery, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
+    PublicKey, QueryResponse, ReplicaEvent, Result, SignedTransfer, TransferError,
 };
 use std::{
     cell::RefCell,
@@ -72,6 +72,18 @@ impl Transfers {
             replica,
             wrapping,
         }
+    }
+
+    /// Issues a query to existing Replicas
+    /// asking for their events, as to catch up and
+    /// start working properly in the group.
+    pub fn synch_with_replicas(&mut self) -> Option<NodeOperation> {
+        self.wrapping
+            .send(Message::NodeQuery {
+                query: NodeQuery::Transfers(NodeTransferQuery::SyncEvents(self.keys.public_key())),
+                id: MessageId::new(),
+            })
+            .map(|c| c.into())
     }
 
     pub fn update_replica_on_churn(
@@ -128,6 +140,7 @@ impl Transfers {
     ) -> Option<MessagingDuty> {
         use TransferCmd::*;
         match cmd {
+            InitiateReplica(events) => self.initiate_replica(events),
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
             SimulatePayout(transfer) => self
@@ -146,6 +159,15 @@ impl Transfers {
             PropagateTransfer(debit_agreement) => {
                 self.receive_propagated(&debit_agreement, msg_id, origin)
             }
+        }
+    }
+
+    /// Initiates a new Replica with the
+    /// state of existing Replicas in the group.
+    fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Option<MessagingDuty> {
+        match self.replica.borrow_mut().initiate(events) {
+            Ok(()) => None,
+            Err(e) => panic!(e), // we must be able to initiate the replica, otherwise this node cannot function
         }
     }
 

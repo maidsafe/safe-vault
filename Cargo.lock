@@ -2200,7 +2200,7 @@ dependencies = [
 [[package]]
 name = "safe-nd"
 version = "0.10.1"
-source = "git+https://github.com/maidsafe/safe-nd.git?branch=farming#214c00b48346640b37c3a5c4af57fffa1f1449fd"
+source = "git+https://github.com/maidsafe/safe-nd.git?branch=farming#809bfa823d971d2ab19c32b1ce26f89f6d82662c"
 dependencies = [
  "bincode",
  "crdts",
@@ -2233,7 +2233,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/safe-transfers#7d781ad0d9270370e61c56510ec187c6b1f38eb4"
+source = "git+https://github.com/maidsafe/safe-transfers#7f4811752dfb2a18b27fe082b99045ed8d880a00"
 dependencies = [
  "bincode",
  "crdts",

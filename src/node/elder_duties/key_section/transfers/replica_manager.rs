@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::store::TransferStore;
-use crate::{node::state_db::NodeInfo, Error, Result};
+use crate::Result;
 use log::info;
 use safe_nd::{
-    AccountId, DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey,
+    AccountId, DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey, PublicKey,
     ReplicaEvent, Result as NdResult, SignedTransfer, TransferPropagated, TransferRegistered,
     TransferValidated,
 };
-use safe_transfers::TransferReplica as Replica;
+use safe_transfers::{get_genesis, TransferReplica as Replica};
 use threshold_crypto::{PublicKeySet, SecretKeyShare};
 
 use routing::SectionProofChain;
@@ -22,7 +22,7 @@ use routing::SectionProofChain;
 use {
     crate::node::node_ops::MessagingDuty,
     rand::thread_rng,
-    safe_nd::{PublicKey, Signature, SignatureShare, Transfer},
+    safe_nd::{Signature, SignatureShare, Transfer},
     threshold_crypto::{SecretKey, SecretKeySet},
 };
 
@@ -33,52 +33,41 @@ use {
 pub struct ReplicaManager {
     replica: Replica,
     store: TransferStore,
+    info: ReplicaInfo,
+}
+
+struct ReplicaInfo {
+    initiating: bool,
+    secret_key: SecretKeyShare,
+    key_index: usize,
+    peer_replicas: PublicKeySet,
     section_proof_chain: SectionProofChain,
 }
 
-#[allow(unused)]
 impl ReplicaManager {
     pub(crate) fn new(
-        info: NodeInfo,
+        store: TransferStore,
         secret_key: &SecretKeyShare,
         key_index: usize,
         peer_replicas: &PublicKeySet,
-        events: Vec<ReplicaEvent>,
         section_proof_chain: SectionProofChain,
     ) -> Result<Self> {
-        let mut store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
-        if events.is_empty() {
-            let events = store.try_load()?;
-            let mut replica = Replica::from_history(
+        Ok(Self {
+            store,
+            replica: Replica::from_history(
                 secret_key.clone(),
                 key_index,
                 peer_replicas.clone(),
-                events,
-            )?;
-            Ok(Self {
-                store,
-                replica,
+                vec![],
+            )?,
+            info: ReplicaInfo {
+                initiating: true,
+                secret_key: secret_key.clone(),
+                key_index,
+                peer_replicas: peer_replicas.clone(),
                 section_proof_chain,
-            })
-        } else {
-            /// OKs on empty vec as well, only errors from underlying storage.
-            match store.init(events.clone()) {
-                Ok(()) => {
-                    let mut replica = Replica::from_history(
-                        secret_key.clone(),
-                        key_index,
-                        peer_replicas.clone(),
-                        events,
-                    )?;
-                    Ok(Self {
-                        store,
-                        replica,
-                        section_proof_chain,
-                    })
-                }
-                Err(e) => Err(Error::NetworkData(NdError::InvalidOperation)), // todo: storage error
-            }
-        }
+            },
+        })
     }
 
     pub(crate) fn history(&self, id: &AccountId) -> Option<Vec<ReplicaEvent>> {
@@ -89,21 +78,86 @@ impl ReplicaManager {
         self.replica.balance(id)
     }
 
+    /// Needs to be called before the replica manager
+    /// can run properly. Any events from existing Replicas
+    /// are supposed to be passed in. Without them, this Replica will
+    /// not be able to function properly together with the others.
+    pub(crate) fn initiate(&mut self, events: &[ReplicaEvent]) -> NdResult<()> {
+        if !self.info.initiating {
+            // can only synch while initiating
+            return Err(NdError::InvalidOperation);
+        }
+        if events.is_empty() {
+            // This means we are the first node in the network.
+            let balance = u32::MAX as u64 * 1_000_000_000;
+            let debit_proof = get_genesis(
+                balance,
+                PublicKey::Bls(self.info.peer_replicas.public_key()),
+            )?;
+            match self.replica.genesis(&debit_proof, || None) {
+                Ok(Some(event)) => {
+                    let event = ReplicaEvent::TransferPropagated(event);
+                    self.persist(event)?;
+                }
+                Ok(None) | Err(_) => return Err(NdError::InvalidOperation), // todo: storage error
+            };
+        } else {
+            let existing_events = self
+                .store
+                .try_load()
+                .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+            let events: Vec<_> = events
+                .iter()
+                .cloned()
+                .filter(|e| !existing_events.contains(e))
+                .collect();
+            // no more should be necessary for merging
+            // these sets of events, but remains to be seen.
+            // only order required is within specific streams,
+            // and that order should have been presereved.
+            // (otherwise we can simply call sort on the vec.)
+            self.store
+                .init(events.clone())
+                .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+            self.replica = Replica::from_history(
+                self.info.secret_key.clone(),
+                self.info.key_index,
+                self.info.peer_replicas.clone(),
+                events,
+            )?;
+            // make sure to indicate that we are no longer initiating
+            self.info.initiating = false;
+        }
+        Ok(())
+    }
+
     pub(crate) fn churn(
         &mut self,
         secret_key: SecretKeyShare,
-        index: usize,
+        key_index: usize,
         peer_replicas: PublicKeySet,
         section_proof_chain: SectionProofChain,
     ) -> NdResult<()> {
         match self.store.try_load() {
             Ok(events) => {
-                self.replica = Replica::from_history(secret_key, index, peer_replicas, events)?;
-                self.section_proof_chain = section_proof_chain;
+                let events = if self.info.initiating { vec![] } else { events };
+                self.replica = Replica::from_history(
+                    secret_key.clone(),
+                    key_index,
+                    peer_replicas.clone(),
+                    events,
+                )?;
+                self.info = ReplicaInfo {
+                    initiating: self.info.initiating,
+                    secret_key,
+                    key_index,
+                    peer_replicas,
+                    section_proof_chain,
+                };
                 info!("Successfully updated Replica details on churn");
                 Ok(())
             }
-            Err(e) => Err(NdError::InvalidOperation), // todo: storage error
+            Err(_e) => Err(NdError::InvalidOperation), // todo: storage error
         }
     }
 
@@ -111,6 +165,8 @@ impl ReplicaManager {
         &mut self,
         transfer: SignedTransfer,
     ) -> NdResult<Option<TransferValidated>> {
+        self.check_init_status()?;
+
         let result = self.replica.validate(transfer);
         if let Ok(Some(event)) = result {
             match self.persist(ReplicaEvent::TransferValidated(event.clone())) {
@@ -126,6 +182,8 @@ impl ReplicaManager {
         &mut self,
         proof: &DebitAgreementProof,
     ) -> NdResult<Option<TransferRegistered>> {
+        self.check_init_status()?;
+
         let serialized = bincode::serialize(&proof.signed_transfer)
             .map_err(|e| NdError::NetworkOther(e.to_string()))?;
         let sig = proof
@@ -135,7 +193,7 @@ impl ReplicaManager {
             .ok_or_else(|| {
                 NdError::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
             })?;
-        let section_keys = self.section_proof_chain.clone();
+        let section_keys = self.info.section_proof_chain.clone();
 
         let result = self.replica.clone().register(proof, move || {
             let key = section_keys
@@ -163,9 +221,11 @@ impl ReplicaManager {
         &mut self,
         proof: &DebitAgreementProof,
     ) -> NdResult<Option<TransferPropagated>> {
+        self.check_init_status()?;
+
         let serialized = bincode::serialize(&proof.signed_transfer)
             .map_err(|e| NdError::NetworkOther(e.to_string()))?;
-        let section_keys = self.section_proof_chain.clone();
+        let section_keys = self.info.section_proof_chain.clone();
         let sig = proof
             .debiting_replicas_sig
             .clone()
@@ -203,15 +263,23 @@ impl ReplicaManager {
     fn persist(&mut self, event: ReplicaEvent) -> NdResult<()> {
         self.store
             .try_append(event.clone())
-            .map(|_| {
-                self.replica.apply(event);
-            })
-            .map_err(|e| NdError::NetworkOther(e.to_string()))
+            .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+        self.replica.apply(event)
     }
 
     /// Get the replica's PK set
     pub fn replicas_pk_set(&self) -> Option<PublicKeySet> {
         self.replica.replicas_pk_set()
+    }
+
+    /// While a Replica is initiating, i.e.
+    /// retrieving events from the other Replicas,
+    /// it will return an error on incoming cmds.
+    fn check_init_status(&mut self) -> NdResult<()> {
+        if self.info.initiating {
+            return Err(NdError::InvalidOperation);
+        }
+        Ok(())
     }
 }
 

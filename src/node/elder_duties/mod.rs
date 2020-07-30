@@ -49,6 +49,13 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         })
     }
 
+    /// Issues a query to existing Replicas
+    /// asking for their events, as to catch up and
+    /// start working properly in the group.
+    pub fn initiate(&mut self) -> Option<NodeOperation> {
+        self.key_section.synch_with_replicas()
+    }
+
     pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
         use ElderDuty::*;
         match duty {
