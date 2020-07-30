@@ -156,8 +156,8 @@ impl Payments {
                 // Paying too little will see the amount be forfeited.
                 // This is because it is easy to know the cost by querying,
                 // so you are forced to do the job properly, instead of burdoning the network.
-                let store_cost = Money::from_nano(num_bytes + self.store_cost.as_nano());
-                if store_cost > payment.amount() {
+                let total_cost = Money::from_nano(num_bytes + self.store_cost.as_nano());
+                if total_cost > payment.amount() {
                     // todo, better error, like `TooLowPayment`
                     return self
                         .wrapping

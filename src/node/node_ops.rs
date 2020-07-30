@@ -53,6 +53,10 @@ impl NodeOperation {
         if ops.is_empty() {
             return None;
         }
+        if ops.len() == 1 {
+            let mut ops = ops;
+            return ops.remove(0);
+        }
         let multiple = ops
             .into_iter()
             .map(|c| match c {

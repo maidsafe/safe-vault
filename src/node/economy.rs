@@ -36,7 +36,7 @@ pub struct Indicator {
 pub struct MintingMetrics {
     /// The current BLS key of the section.
     pub key: PublicKey,
-    /// The calculated store cost for the period,
+    /// The base cost for the period, weighted by the load delta compared to previous period,
     /// (i.e. the specific Elder constellation represented by the PublicKey).
     pub store_cost: Money,
     /// The velocity is a scaling

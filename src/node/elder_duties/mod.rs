@@ -87,13 +87,14 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
 
     ///
     fn elders_changed(&mut self) -> Option<NodeOperation> {
-        Some(
-            vec![
-                self.key_section.elders_changed(),
-                // self.data_section.elders_changed(),
-            ]
-            .into(),
-        )
+        self.key_section.elders_changed()
+        // Some(
+        //     vec![
+        //         self.key_section.elders_changed(),
+        //         self.data_section.elders_changed(),
+        //     ]
+        //     .into(),
+        // )
     }
 }
 
