@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::ToDbKey;
-use safe_nd::XorName;
 use serde::{de::DeserializeOwned, Serialize};
+use xor_name::XorName;
 
 pub(crate) trait Chunk: Serialize + DeserializeOwned {
     type Id: ChunkId;

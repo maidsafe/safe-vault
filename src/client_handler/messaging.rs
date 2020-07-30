@@ -14,7 +14,7 @@ use rand::{CryptoRng, Rng};
 use routing::Node;
 use safe_nd::{
     HandshakeRequest, HandshakeResponse, Message, MessageId, NodePublicId, Notification, PublicId,
-    Request, Response, Signature, Transaction, XorName,
+    Request, Response, Signature, Transaction,
 };
 use serde::Serialize;
 use std::{
@@ -24,6 +24,7 @@ use std::{
     net::SocketAddr,
     rc::Rc,
 };
+use xor_name::XorName;
 
 pub(super) struct Messaging {
     id: NodePublicId,
@@ -318,7 +319,7 @@ impl Messaging {
         if !self
             .routing_node
             .borrow()
-            .matches_our_prefix(&xor_name::XorName(client_id.name().0))
+            .matches_our_prefix(client_id.name())
             .unwrap_or(false)
         {
             debug!(
@@ -421,13 +422,13 @@ impl Messaging {
         if !self
             .routing_node
             .borrow()
-            .matches_our_prefix(&xor_name::XorName(client_id.name().0))
+            .matches_our_prefix(client_id.name())
             .unwrap_or(false)
         {
             let closest_known_elders = self
                 .routing_node
                 .borrow()
-                .our_elders_sorted_by_distance_to(&xor_name::XorName(client_id.name().0))
+                .our_elders_sorted_by_distance_to(client_id.name())
                 .into_iter()
                 .map(|p2p_node| {
                     let peer_addr = *p2p_node.peer_addr();

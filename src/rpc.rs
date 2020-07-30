@@ -8,11 +8,12 @@
 
 //! RPC messages internal to Vaults.
 
-use safe_nd::{Coins, IDataAddress, MessageId, PublicId, Request, Response, XorName};
+use safe_nd::{Coins, IDataAddress, MessageId, PublicId, Request, Response};
 use safe_network_signature_aggregator::ProofShare;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use threshold_crypto::Signature;
+use xor_name::XorName;
 
 /// RPC messages exchanged between nodes.
 #[allow(clippy::large_enum_variant)]

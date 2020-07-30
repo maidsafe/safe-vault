@@ -11,10 +11,11 @@ use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use routing::SrcLocation;
-use safe_nd::{ClientPublicId, Coins, PublicId, PublicKey, Result as NdResult, XorName};
+use safe_nd::{ClientPublicId, Coins, PublicId, PublicKey, Result as NdResult};
 use serde::Serialize;
 use std::{fs, path::Path};
 use unwrap::unwrap;
+use xor_name::XorName;
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,

@@ -13,7 +13,7 @@ use rand::SeedableRng;
 use routing::Node;
 use safe_nd::{
     Error as NdError, IData, IDataAddress, IDataRequest, MessageId, NodeFullId, NodePublicId,
-    PublicId, PublicKey, Request, Response, Result as NdResult, XorName,
+    PublicId, PublicKey, Request, Response, Result as NdResult,
 };
 use safe_network_signature_aggregator::ProofShare;
 use serde::{Deserialize, Serialize};
@@ -25,6 +25,7 @@ use std::{
 };
 use threshold_crypto::Signature;
 use tiny_keccak::sha3_256;
+use xor_name::XorName;
 
 const IMMUTABLE_META_DB_NAME: &str = "immutable_data.db";
 const HOLDER_META_DB_NAME: &str = "holder_data.db";
@@ -624,7 +625,7 @@ impl IDataHandler {
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let routing_node = self.routing_node.borrow_mut();
         let mut closest_adults = routing_node
-            .our_adults_sorted_by_distance_to(&xor_name::XorName(target.0))
+            .our_adults_sorted_by_distance_to(&target)
             .iter()
             .take(IMMUTABLE_DATA_ADULT_COPY_COUNT)
             .map(|p2p_node| XorName(p2p_node.name().0))
@@ -632,7 +633,7 @@ impl IDataHandler {
 
         if closest_adults.len() < IMMUTABLE_DATA_COPY_COUNT {
             let mut closest_elders = routing_node
-                .our_elders_sorted_by_distance_to(&xor_name::XorName(target.0))
+                .our_elders_sorted_by_distance_to(&target)
                 .into_iter()
                 .take(IMMUTABLE_DATA_COPY_COUNT - closest_adults.len())
                 .map(|p2p_node| XorName(p2p_node.name().0))

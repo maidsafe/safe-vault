@@ -21,10 +21,9 @@ use safe_network_signature_aggregator::{Proof, ProofShare};
 use sdata_handler::SDataHandler;
 
 use log::{debug, error, trace};
-use safe_nd::{
-    IDataAddress, IDataRequest, MessageId, NodePublicId, PublicId, Request, Response, XorName,
-};
+use safe_nd::{IDataAddress, IDataRequest, MessageId, NodePublicId, PublicId, Request, Response};
 use threshold_crypto::{Signature, SignatureShare};
+use xor_name::XorName;
 
 use std::{
     cell::{Cell, RefCell},

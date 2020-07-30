@@ -22,7 +22,7 @@ use routing::{
     event::Event as RoutingEvent, DstLocation, Node, SrcLocation, TransportEvent as ClientEvent,
 };
 use safe_nd::{
-    ClientRequest, LoginPacketRequest, MessageId, NodeFullId, PublicId, Request, Response, XorName,
+    ClientRequest, LoginPacketRequest, MessageId, NodeFullId, PublicId, Request, Response,
 };
 use safe_network_signature_aggregator::{
     AccumulationError, Proof, ProofShare, SignatureAggregator,
@@ -36,6 +36,7 @@ use std::{
     path::PathBuf,
     rc::Rc,
 };
+use xor_name::XorName;
 
 const STATE_FILENAME: &str = "state";
 
@@ -660,10 +661,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                 for target in targets {
                     if target == *self.id.public_id().name() {
                         info!("Vault is one of the targets. Accumulating message locally");
-                        next_action = self.accumulate_rpc(
-                            SrcLocation::Node(xor_name::XorName(target.0)),
-                            rpc.clone(),
-                        );
+                        next_action = self.accumulate_rpc(SrcLocation::Node(target), rpc.clone());
                     } else {
                         // Always None
                         let _ = self.send_message_to_peer(target, rpc.clone());
@@ -709,7 +707,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
             .borrow_mut()
             .send_message(
                 SrcLocation::Node(name),
-                DstLocation::Node(xor_name::XorName(target.0)),
+                DstLocation::Node(target),
                 utils::serialise(&rpc),
             )
             .map_or_else(
@@ -768,7 +766,7 @@ impl<R: CryptoRng + Rng> Vault<R> {
                         .client_handler_mut()?
                         .handle_vault_rpc(requester_name, rpc),
                     _data_request => self.data_handler_mut()?.handle_vault_rpc(
-                        SrcLocation::Node(xor_name::XorName(dst_section_address.0)), // dummy xorname
+                        SrcLocation::Node(dst_section_address), // dummy xorname
                         rpc,
                         None,
                     ),

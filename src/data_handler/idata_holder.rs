@@ -14,7 +14,6 @@ use log::{error, info};
 use routing::SrcLocation;
 use safe_nd::{
     Error as NdError, IData, IDataAddress, MessageId, NodePublicId, PublicId, Request, Response,
-    XorName,
 };
 use std::{
     cell::Cell,
@@ -23,6 +22,7 @@ use std::{
     rc::Rc,
 };
 use threshold_crypto::Signature;
+use xor_name::XorName;
 
 pub(crate) struct IDataHolder {
     id: NodePublicId,

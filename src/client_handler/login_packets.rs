@@ -16,9 +16,10 @@ use crate::{
 use log::error;
 use safe_nd::{
     Coins, Error as NdError, LoginPacket, LoginPacketRequest, MessageId, NodePublicId, PublicId,
-    PublicKey, Request, Response, Result as NdResult, Transaction, TransactionId, XorName,
+    PublicKey, Request, Response, Result as NdResult, Transaction, TransactionId,
 };
 use std::fmt::{self, Display, Formatter};
+use xor_name::XorName;
 
 pub(super) struct LoginPackets {
     id: NodePublicId,

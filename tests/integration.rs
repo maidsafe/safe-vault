@@ -34,11 +34,12 @@ use safe_nd::{
     PubImmutableData, PublicKey, Request, Response, Result as NdResult, SData, SDataAddress,
     SDataIndex, SDataMutationOperation, SDataOwner, SDataPrivUserPermissions,
     SDataPubUserPermissions, SDataRequest, SDataUser, SDataUserPermissions, SeqMutableData,
-    Transaction, UnpubImmutableData, UnseqMutableData, XorName,
+    Transaction, UnpubImmutableData, UnseqMutableData,
 };
 use safe_vault::{Result, COST_OF_PUT};
 use std::collections::{BTreeMap, BTreeSet};
 use unwrap::unwrap;
+use xor_name::XorName;
 
 #[test]
 fn client_connects() {

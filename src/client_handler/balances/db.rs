@@ -8,13 +8,14 @@
 
 use crate::{utils, vault::Init, Result, ToDbKey};
 use pickledb::PickleDb;
-use safe_nd::{Coins, PublicKey, XorName};
+use safe_nd::{Coins, PublicKey};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
     path::Path,
 };
+use xor_name::XorName;
 
 const BALANCES_DB_NAME: &str = "balances.db";
 

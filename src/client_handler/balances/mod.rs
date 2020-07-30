@@ -18,9 +18,10 @@ use crate::{
 use log::{error, info, trace};
 use safe_nd::{
     Coins, CoinsRequest, Error as NdError, MessageId, NodePublicId, PublicId, PublicKey, Request,
-    Response, Transaction, TransactionId, XorName,
+    Response, Transaction, TransactionId,
 };
 use std::fmt::{self, Display, Formatter};
+use xor_name::XorName;
 
 pub struct Balances {
     id: NodePublicId,

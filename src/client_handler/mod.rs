@@ -31,13 +31,14 @@ use bytes::Bytes;
 use log::{error, trace};
 use rand::{CryptoRng, Rng};
 use routing::Node;
-use safe_nd::{Coins, MessageId, NodePublicId, PublicId, Request, Response, Signature, XorName};
+use safe_nd::{Coins, MessageId, NodePublicId, PublicId, Request, Response, Signature};
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     rc::Rc,
 };
+use xor_name::XorName;
 
 /// The cost to Put a chunk to the network.
 pub const COST_OF_PUT: Coins = Coins::from_nano(1);

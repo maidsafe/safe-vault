@@ -28,17 +28,16 @@ log = "~0.4.7"
 mock-quic-p2p = { git = "https://github.com/maidsafe/quic-p2p", optional = true }
 pickledb = "~0.4.0"
 quick-error = "1.2.2"
-rand = "~0.6.5"
-rand_chacha = "~0.1.1"
-routing_rand_core = { package = "rand_core", version = "~0.5.1" }
+rand = "~0.7.3"
+rand_chacha = "0.2.2"
 routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" }
-safe-network-signature-aggregator = { git = "https://github.com/maidsafe/safe-network-signature-aggregator", rev = "fc462f7" }
-safe-nd = "~0.10.1"
+safe-network-signature-aggregator = { git = "https://github.com/maidsafe/safe-network-signature-aggregator" }
+safe-nd = "~0.11.0"
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.97", features = ["derive"] }
 serde_json = "1.0.40"
 structopt = "~0.2.18"
-threshold_crypto = "0.3.2"
+threshold_crypto = "~0.4.0"
 tiny-keccak = "1.5.0"
 unwrap = "1.2.1"
 xor_name = "1"
