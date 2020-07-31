@@ -10,7 +10,7 @@
 use safe_nd::Transfer;
 
 use crate::node::economy::MintingMetrics;
-use routing::{event::Event as NetworkEvent, TransportEvent as ClientEvent};
+use routing::{event::Event as NetworkEvent, Prefix, TransportEvent as ClientEvent};
 use safe_nd::{
     AccountId, Address, AuthCmd, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope,
     MsgSender, PaymentQuery, PublicId, PublicKey, ReplicaEvent, RewardCounter, SignedTransfer,
@@ -223,8 +223,8 @@ pub enum ElderDuty {
     /// changes as well, which leads to necessary updates
     /// of various places using the multisig of the section.
     ProcessElderChange {
-        // /// The prefix of our section.
-        // prefix: Prefix,
+        /// The prefix of our section.
+        prefix: Prefix,
         /// The BLS public key of our section.
         key: PublicKey,
         /// The set of elders of our section.

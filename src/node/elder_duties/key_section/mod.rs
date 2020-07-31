@@ -28,8 +28,8 @@ use crate::{
 };
 use log::trace;
 use rand::{CryptoRng, Rng};
-use routing::{Node as Routing, RoutingError};
-use safe_nd::{ElderDuties, MsgEnvelope, PublicId};
+use routing::{Node as Routing, Prefix, RoutingError};
+use safe_nd::{AccountId, ElderDuties, MsgEnvelope, PublicId, XorName};
 use std::{cell::RefCell, rc::Rc};
 
 /// A Key Section interfaces with clients,
@@ -147,6 +147,14 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         }
         // update payment costs
         self.payments.update_costs()
+    }
+
+    pub fn section_split(&mut self, prefix: Prefix) -> Option<NodeOperation> {
+        let not_matching = |key: AccountId| {
+            let xorname: XorName = key.into();
+            !prefix.matches(&routing::XorName(xorname.0))
+        };
+        Some(self.transfers.drop_accounts(not_matching)?.into())
     }
 
     /// Issues a query to existing Replicas

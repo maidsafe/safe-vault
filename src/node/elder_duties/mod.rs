@@ -14,10 +14,10 @@ use crate::{
     node::keys::NodeKeys,
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Result,
+    Error, Result,
 };
 use rand::{CryptoRng, Rng};
-use routing::Node as Routing;
+use routing::{Node as Routing, Prefix};
 use safe_nd::XorName;
 use std::{
     cell::{Cell, RefCell},
@@ -28,6 +28,7 @@ use std::{
 /// Duties carried out by an Elder node.
 pub struct ElderDuties<R: CryptoRng + Rng> {
     keys: NodeKeys,
+    prefix: Prefix,
     key_section: KeySection<R>,
     data_section: DataSection,
 }
@@ -39,11 +40,12 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         routing: Rc<RefCell<Routing>>,
         rng: R,
     ) -> Result<Self> {
+        let prefix = *routing.borrow().our_prefix().ok_or(Error::Logic)?;
         let key_section = KeySection::new(info.clone(), routing.clone(), rng)?;
         let data_section = DataSection::new(info.clone(), total_used_space, routing)?;
-
         Ok(Self {
             keys: info.keys,
+            prefix,
             key_section,
             data_section,
         })
@@ -64,7 +66,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
                 old_node_id,
                 new_node_id,
             } => self.relocated_member_joined(old_node_id, new_node_id),
-            ProcessElderChange { .. } => self.elders_changed(),
+            ProcessElderChange { prefix, .. } => self.elders_changed(prefix),
             RunAsKeySection(duty) => self.key_section.process(duty),
             RunAsDataSection(duty) => self.data_section.process(duty),
         }
@@ -86,14 +88,21 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     }
 
     ///
-    fn elders_changed(&mut self) -> Option<NodeOperation> {
-        Some(
-            vec![
-                self.key_section.elders_changed(),
-                self.data_section.elders_changed(),
-            ]
-            .into(),
-        )
+    fn elders_changed(&mut self, prefix: Prefix) -> Option<NodeOperation> {
+        let mut ops = vec![
+            self.key_section.elders_changed(),
+            self.data_section.elders_changed(),
+        ];
+
+        if prefix != self.prefix {
+            self.prefix = prefix;
+            // drops accounts
+            ops.push(self.key_section.section_split(prefix));
+            // pays rewards to Elders
+            ops.push(self.data_section.section_split());
+        }
+
+        Some(ops.into())
     }
 }
 

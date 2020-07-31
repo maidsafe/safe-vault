@@ -16,13 +16,14 @@ use crate::{
     node::node_ops::{MessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
 use safe_nd::{
-    Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
-    NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
-    NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse, ReplicaEvent, Result,
-    SignedTransfer, TransferError,
+    AccountId, Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message,
+    MessageId, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd,
+    NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse,
+    ReplicaEvent, Result, SignedTransfer, TransferError,
 };
 use std::{
     cell::RefCell,
+    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
@@ -97,6 +98,24 @@ impl Transfers {
         self.replica
             .borrow_mut()
             .churn(sec_key_share, index, pub_key_set, proof_chain)
+    }
+
+    /// When section splits, the Replicas in either resulting section
+    /// also split the responsibility of the accounts.
+    /// Thus, both Replica groups need to drop the accounts that
+    /// the other group is now responsible for.
+    pub fn drop_accounts<F>(&mut self, not_matching: F) -> Option<MessagingDuty>
+    where
+        F: Fn(AccountId) -> bool,
+    {
+        let all_keys = self.replica.borrow_mut().all_keys()?;
+        let accounts = all_keys
+            .iter()
+            .filter(|key| not_matching(**key))
+            .copied()
+            .collect::<BTreeSet<AccountId>>();
+        self.replica.borrow_mut().drop_accounts(&accounts).ok()?;
+        None
     }
 
     /// When handled by Elders in the dst

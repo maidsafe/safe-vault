@@ -15,6 +15,7 @@ use safe_nd::{
     TransferValidated,
 };
 use safe_transfers::{get_genesis, TransferReplica as Replica};
+use std::collections::BTreeSet;
 use threshold_crypto::{PublicKeySet, SecretKeyShare};
 
 use routing::SectionProofChain;
@@ -70,6 +71,10 @@ impl ReplicaManager {
         })
     }
 
+    pub(crate) fn all_keys(&self) -> Option<Vec<AccountId>> {
+        self.store.all_stream_keys()
+    }
+
     pub(crate) fn all_events(&self) -> Option<Vec<ReplicaEvent>> {
         self.store.try_load().ok()
     }
@@ -80,6 +85,28 @@ impl ReplicaManager {
 
     pub(crate) fn balance(&self, id: &AccountId) -> Option<Money> {
         self.replica.balance(id)
+    }
+
+    /// When section splits, the Replicas in either resulting section
+    /// also split the responsibility of the accounts.
+    /// Thus, both Replica groups need to drop the accounts that
+    /// the other group is now responsible for.
+    pub(crate) fn drop_accounts(&mut self, accounts: &BTreeSet<AccountId>) -> NdResult<()> {
+        self.check_init_status()?;
+
+        // Drops the streams from db.
+        self.store
+            .drop(accounts)
+            .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+
+        // Replays the kept streams
+        // on a new instance of a Replica.
+        self.churn(
+            self.info.secret_key.clone(),
+            self.info.key_index,
+            self.info.peer_replicas.clone(),
+            self.info.section_proof_chain.clone(),
+        )
     }
 
     /// Needs to be called before the replica manager

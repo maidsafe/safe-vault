@@ -78,7 +78,10 @@ quick_error! {
         /// Account doesn't exist.
         NoSuchAccount {}
         /// Logic error.
-        Logic {}
+        Logic {
+            display("Logic error")
+            from()
+        }
     }
 }
 

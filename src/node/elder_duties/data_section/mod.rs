@@ -84,6 +84,11 @@ impl DataSection {
         self.rewards.transition(actor)
     }
 
+    // At section split, all Elders get their reward payout.
+    pub fn section_split(&mut self) -> Option<NodeOperation> {
+        None
+    }
+
     pub fn relocated_member_joined(
         &mut self,
         old_node_id: XorName,

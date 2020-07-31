@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::state_db::Init, utils, Error, Result, ToDbKey};
+use crate::{node::state_db::Init, to_db_key::from_db_key, utils, Error, Result, ToDbKey};
 use pickledb::PickleDb;
 use safe_nd::{AccountId, ReplicaEvent};
-use std::path::Path;
+use std::{collections::BTreeSet, path::Path};
 
 const TRANSFERS_DB_NAME: &str = "transfers.db";
 const GROUP_CHANGES: &str = "group_changes";
@@ -26,6 +26,17 @@ impl TransferStore {
         })
     }
 
+    pub fn all_stream_keys(&self) -> Option<Vec<AccountId>> {
+        let keys = self
+            .db
+            .get_all()
+            .iter()
+            .filter_map(|key| from_db_key(key))
+            .collect();
+
+        Some(keys)
+    }
+
     pub fn history(&self, id: &AccountId) -> Option<Vec<ReplicaEvent>> {
         let list: Vec<ReplicaEvent> = self
             .db
@@ -40,6 +51,10 @@ impl TransferStore {
         let keys = self.db.get_all();
         let events: Vec<ReplicaEvent> = keys
             .iter()
+            //.filter(|key| self.db.lexists(&key)) 
+            // not all keys are necessarily lists..,
+            // in which case we would get an exception at liter below
+            // but in current impl, they all are, so no need to filter, yet.
             .map(|key| {
                 self.db
                     .liter(&key)
@@ -49,6 +64,13 @@ impl TransferStore {
             .flatten()
             .collect();
         Ok(events)
+    }
+
+    pub fn drop(&mut self, streams: &BTreeSet<AccountId>) -> Result<()> {
+        for stream in streams {
+            let _ = self.db.lrem_list(&stream.to_db_key());
+        }
+        Ok(())
     }
 
     pub fn init(&mut self, events: Vec<ReplicaEvent>) -> Result<()> {

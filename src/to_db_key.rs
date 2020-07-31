@@ -10,7 +10,7 @@ use crate::utils;
 use safe_nd::{
     BlobAddress, ClientPublicId, MapAddress, PublicId, PublicKey, SequenceAddress, XorName,
 };
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 
 pub(crate) trait ToDbKey: Serialize {
     /// The encoded string representation of an identifier, used as a key in the context of a
@@ -19,6 +19,11 @@ pub(crate) trait ToDbKey: Serialize {
         let serialised = utils::serialise(&self);
         base64::encode(&serialised)
     }
+}
+
+pub fn from_db_key<T: DeserializeOwned>(key: &str) -> Option<T> {
+    let decoded = base64::decode(key).ok()?;
+    utils::deserialise(&decoded)
 }
 
 impl ToDbKey for SequenceAddress {}

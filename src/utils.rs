@@ -12,7 +12,7 @@ use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use routing::Node as Routing;
 use safe_nd::{BlsKeypairShare, Keypair, PublicId, PublicKey};
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 use std::{cell::RefCell, fs, path::Path, rc::Rc};
 use threshold_crypto::{self, serde_impl::SerdeSecret};
 use unwrap::unwrap;
@@ -46,6 +46,10 @@ pub(crate) fn random_vec<R: CryptoRng + Rng>(rng: &mut R, size: usize) -> Vec<u8
 
 pub(crate) fn serialise<T: Serialize>(data: &T) -> Vec<u8> {
     unwrap!(bincode::serialize(data))
+}
+
+pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> T {
+    unwrap!(bincode::deserialize(bytes))
 }
 
 /// Returns the client's or app's public key if `public_id` represents a Client or App respectively,

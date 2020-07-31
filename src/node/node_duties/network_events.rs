@@ -85,16 +85,18 @@ impl NetworkEvents {
                 );
                 self.evaluate_msg(content)
             }
-            RoutingEvent::EldersChanged { key, elders, .. } => {
-                Some(
-                    ProcessElderChange {
-                        //prefix,
-                        key: PublicKey::Bls(key),
-                        elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
-                    }
-                    .into(),
-                )
-            }
+            RoutingEvent::EldersChanged {
+                key,
+                elders,
+                prefix,
+            } => Some(
+                ProcessElderChange {
+                    prefix,
+                    key: PublicKey::Bls(key),
+                    elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+                }
+                .into(),
+            ),
             // Ignore all other events
             _ => None,
         }
