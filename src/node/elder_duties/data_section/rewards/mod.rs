@@ -10,7 +10,7 @@ mod farming;
 mod section_funds;
 mod validator;
 
-use self::section_funds::SectionFunds;
+use self::section_funds::{Payout, SectionFunds};
 pub use self::{farming::FarmingSystem, validator::Validator};
 use crate::{
     node::economy::MintingMetrics,
@@ -78,33 +78,35 @@ impl Rewards {
     pub fn process(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
         use RewardDuty::*;
         let result = match duty {
-            AccumulateReward { points, msg_id } => self.accumulate_reward(points, msg_id),
-            AddNewAccount { id, node_id } => self.add_account(id, node_id),
+            AccumulateReward { points, msg_id } => self.accumulate_reward(points, msg_id)?.into(),
+            AddNewAccount { id, node_id } => self.add_account(id, node_id)?.into(),
             AddRelocatedAccount {
                 old_node_id,
                 new_node_id,
-            } => self.add_relocated_account(old_node_id, new_node_id),
+            } => self.add_relocated_account(old_node_id, new_node_id)?.into(),
             ClaimRewardCounter {
                 old_node_id,
                 new_node_id,
                 msg_id,
                 origin,
-            } => self.claim_rewards(old_node_id, new_node_id, msg_id, &origin),
+            } => self
+                .claim_rewards(old_node_id, new_node_id, msg_id, &origin)?
+                .into(),
             ReceiveClaimedRewards {
                 id,
                 node_id,
                 counter,
-            } => self.receive_claimed_rewards(id, node_id, counter),
-            PrepareAccountMove { node_id } => self.prepare_move(node_id),
-            ReceivePayoutValidation(validation) => self.section_funds.receive(validation),
+            } => self.receive_claimed_rewards(id, node_id, counter)?.into(),
+            PrepareAccountMove { node_id } => self.prepare_move(node_id)?.into(),
+            ReceivePayoutValidation(validation) => self.section_funds.receive(validation)?,
             UpdateRewards(metrics) => {
                 self.farming.set_base_cost(metrics.store_cost);
                 self.minting_metrics = metrics;
-                None
+                NodeOperation::None
             }
         };
 
-        result.map(|c| c.into())
+        Some(result)
     }
 
     /// 0. A brand new node has joined our section.
@@ -193,9 +195,11 @@ impl Rewards {
                 // we initiate payout to the account.
                 if counter.reward > Money::zero() {
                     info!("Initiating reward payout to: {}.", id);
-                    return self
-                        .section_funds
-                        .initiate_reward_payout(counter.reward, id);
+                    return self.section_funds.initiate_reward_payout(Payout {
+                        to: id,
+                        amount: counter.reward,
+                        node_id,
+                    });
                 }
                 None
             }
