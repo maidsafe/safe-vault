@@ -95,11 +95,10 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         ];
 
         if prefix != self.prefix {
+            // section has split!
             self.prefix = prefix;
-            // drops accounts
             ops.push(self.key_section.section_split(prefix));
-            // pays rewards to Elders
-            ops.push(self.data_section.section_split());
+            ops.push(self.data_section.section_split(prefix));
         }
 
         Some(ops.into())

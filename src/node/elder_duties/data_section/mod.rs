@@ -20,7 +20,7 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Result,
 };
-use routing::Node as Routing;
+use routing::{Node as Routing, Prefix};
 use safe_nd::XorName;
 use safe_transfers::TransferActor;
 use std::{
@@ -38,9 +38,10 @@ pub struct DataSection {
     /// Rewards for performing storage
     /// services to the network.
     rewards: Rewards,
-    #[allow(dead_code)]
     /// The transport layer.
     routing: Rc<RefCell<Routing>>,
+    /// Information about our section.
+    section: SectionQuerying,
 }
 
 impl DataSection {
@@ -50,10 +51,10 @@ impl DataSection {
         total_used_space: &Rc<Cell<u64>>,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
-        let section_querying = SectionQuerying::new(routing.clone());
+        let section = SectionQuerying::new(routing.clone());
 
         // Metadata
-        let metadata = Metadata::new(info.clone(), &total_used_space, section_querying)?;
+        let metadata = Metadata::new(info.clone(), &total_used_space, section.clone())?;
 
         // Rewards
         let keypair = utils::key_pair(routing.clone())?;
@@ -65,6 +66,7 @@ impl DataSection {
             metadata,
             rewards,
             routing,
+            section,
         })
     }
 
@@ -78,15 +80,26 @@ impl DataSection {
 
     // Transition the section funds account to the new key.
     pub fn elders_changed(&mut self) -> Option<NodeOperation> {
-        let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
+        let pub_key_set = self.section.public_key_set()?;
         let keypair = utils::key_pair(self.routing.clone()).ok()?;
         let actor = TransferActor::new(keypair, pub_key_set, Validator {});
         self.rewards.transition(actor)
     }
 
     // At section split, all Elders get their reward payout.
-    pub fn section_split(&mut self) -> Option<NodeOperation> {
-        None
+    pub fn section_split(&mut self, prefix: Prefix) -> Option<NodeOperation> {
+        // First remove nodes that are no longer in our section.
+        let to_remove = self
+            .rewards
+            .all_nodes()
+            .into_iter()
+            .filter(|c| !prefix.matches(&routing::XorName(c.0)))
+            .collect();
+        self.rewards.remove(to_remove);
+
+        // Then payout rewards to all the Elders.
+        let elders = self.section.our_elder_names();
+        self.rewards.payout_rewards(elders)
     }
 
     pub fn relocated_member_joined(

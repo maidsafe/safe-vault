@@ -9,7 +9,8 @@
 use crate::node::state_db::AgeGroup;
 use routing::Node as Routing;
 use safe_nd::XorName;
-use std::{cell::RefCell, net::SocketAddr, rc::Rc};
+use std::{cell::RefCell, collections::BTreeSet, net::SocketAddr, rc::Rc};
+use threshold_crypto::PublicKeySet;
 
 /// Querying of our section's member
 /// composition, and other section related things.
@@ -25,6 +26,10 @@ impl SectionQuerying {
 
     pub fn our_name(&self) -> XorName {
         XorName(self.routing.borrow().id().name().0)
+    }
+
+    pub fn public_key_set(&self) -> Option<PublicKeySet> {
+        Some(self.routing.borrow().public_key_set().ok()?.clone())
     }
 
     /// This can be asked for anything that has an XorName.
@@ -45,13 +50,12 @@ impl SectionQuerying {
             .unwrap_or(false)
     }
 
-    #[allow(unused)]
-    pub fn our_elder_names(&self) -> Vec<XorName> {
+    pub fn our_elder_names(&self) -> BTreeSet<XorName> {
         self.routing
             .borrow_mut()
             .our_elders()
             .map(|p2p_node| XorName(p2p_node.name().0))
-            .collect::<Vec<_>>()
+            .collect::<BTreeSet<_>>()
     }
 
     pub fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {

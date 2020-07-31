@@ -25,7 +25,7 @@ use safe_nd::{
     NodeEvent, NodeRewardCmd, NodeRewardError, RewardCounter, XorName,
 };
 use safe_transfers::TransferActor;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 /// The accumulation and paying
 /// out of rewards to nodes for
@@ -71,6 +71,23 @@ impl Rewards {
         }
     }
 
+    pub fn all_nodes(&self) -> Vec<XorName> {
+        self.node_accounts.keys().copied().collect()
+    }
+
+    pub fn remove(&mut self, split_nodes: BTreeSet<XorName>) {
+        for node in split_nodes {
+            if let Some(account) = self.node_accounts.remove(&node) {
+                let _ = match account {
+                    RewardAccount::Active(id) | RewardAccount::AwaitingMove(id) => {
+                        self.farming.claim(id)
+                    }
+                    _ => continue,
+                };
+            }
+        }
+    }
+
     pub fn transition(&mut self, to: TransferActor<Validator>) -> Option<NodeOperation> {
         Some(self.section_funds.transition(to)?.into())
     }
@@ -107,6 +124,47 @@ impl Rewards {
         };
 
         Some(result)
+    }
+
+    pub fn payout_rewards(&mut self, node_ids: BTreeSet<XorName>) -> Option<NodeOperation> {
+        let mut payouts: Vec<NodeOperation> = vec![];
+        for node_id in node_ids {
+            // Try get the account..
+            let id = match self.node_accounts.get(&node_id) {
+                None => {
+                    warn!("No account found for node: {}.", node_id);
+                    continue;
+                }
+                Some(account) => {
+                    match account {
+                        // ..and validate its state.
+                        RewardAccount::Active(id) => *id,
+                        _ => {
+                            warn!("Invalid operation: Account is not active.");
+                            return None;
+                        }
+                    }
+                }
+            };
+            // claim the rewards
+            if let Ok(counter) = self.farming.claim(id) {
+                // add the account back again
+                let _ = self.farming.add_account(id, counter.work);
+                if counter.reward > Money::zero() {
+                    info!("Initiating local reward payout to node: {}.", node_id);
+                    if let Some(payout) = self.section_funds.initiate_reward_payout(Payout {
+                        to: id,
+                        amount: counter.reward,
+                        node_id,
+                    }) {
+                        // add the payout to list of ops
+                        payouts.push(payout.into());
+                    }
+                }
+            }
+        }
+
+        Some(payouts.into())
     }
 
     /// 0. A brand new node has joined our section.
