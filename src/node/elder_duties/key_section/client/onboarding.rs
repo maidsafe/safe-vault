@@ -18,17 +18,6 @@ use std::{
     net::SocketAddr,
 };
 
-#[derive(Clone, Debug)]
-pub struct ClientInfo {
-    pub public_id: PublicId,
-}
-
-impl Display for ClientInfo {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.public_id.name())
-    }
-}
-
 /// A client is defined as a public key
 /// used by a specific socket address.
 /// Onboarding module deals with new and existing
@@ -40,7 +29,7 @@ impl Display for ClientInfo {
 pub struct Onboarding {
     id: NodePublicId,
     section: SectionQuerying,
-    clients: HashMap<SocketAddr, ClientInfo>,
+    clients: HashMap<SocketAddr, PublicId>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicId)>,
 }
@@ -50,22 +39,19 @@ impl Onboarding {
         Self {
             id,
             section,
-            clients: HashMap::<SocketAddr, ClientInfo>::new(),
+            clients: HashMap::<SocketAddr, PublicId>::new(),
             client_candidates: Default::default(),
         }
     }
 
     /// Query
-    pub fn contains(&mut self, peer_addr: SocketAddr) -> bool {
-        self.clients.contains_key(&peer_addr)
+    pub fn public_id(&mut self, peer_addr: SocketAddr) -> Option<&PublicId> {
+        self.clients.get(&peer_addr)
     }
 
     pub fn remove_client(&mut self, peer_addr: SocketAddr) {
-        if let Some(client) = self.clients.remove(&peer_addr) {
-            info!(
-                "{}: Removed client {:?} on {}",
-                self, client.public_id, peer_addr
-            );
+        if let Some(public_id) = self.clients.remove(&peer_addr) {
+            info!("{}: Removed client {:?} on {}", self, public_id, peer_addr);
         } else {
             let _ = self.client_candidates.remove(&peer_addr);
             info!("{}: Removed client candidate on {}", self, peer_addr);
@@ -164,7 +150,7 @@ impl Onboarding {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
                     info!("{}: Accepted {} on {}.", self, public_id, peer_addr,);
-                    let _ = self.clients.insert(peer_addr, ClientInfo { public_id });
+                    let _ = self.clients.insert(peer_addr, public_id);
                     None
                 }
                 Err(err) => {

@@ -6,14 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use super::client_input_parse::{
-    try_deserialize_handshake, try_deserialize_msg, ClientInput, ClientMsg,
-};
+pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_msg};
 pub use super::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
 use log::{error, info, warn};
 use rand::{CryptoRng, Rng};
-use safe_nd::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, NodePublicId};
+use safe_nd::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, NodePublicId, PublicId};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
@@ -39,8 +37,8 @@ impl ClientMsgTracking {
         }
     }
 
-    pub fn contains(&mut self, peer_addr: SocketAddr) -> bool {
-        self.onboarding.contains(peer_addr)
+    pub fn public_id(&mut self, peer_addr: SocketAddr) -> Option<&PublicId> {
+        self.onboarding.public_id(peer_addr)
     }
 
     pub fn process_handshake<R: CryptoRng + Rng>(

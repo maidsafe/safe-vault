@@ -7,12 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use bytes::Bytes;
-use log::{info, warn};
-use safe_nd::{HandshakeRequest, Message, MessageId, MsgEnvelope, MsgSender, PublicId};
-use std::{
-    fmt::{self, Display, Formatter},
-    net::SocketAddr,
-};
+use log::info;
+use safe_nd::{HandshakeRequest, Message, MsgEnvelope, MsgSender};
+use std::net::SocketAddr;
 
 /*
 Parsing of bytes received from a client,
@@ -23,39 +20,16 @@ kinds of input; messages and handshake requests.
 /// The different types
 /// of input to the network
 /// from a client.
-pub enum ClientInput {
-    /// Messages sent from a connected
-    /// client, in order to use the services
-    /// of the network.
-    Msg(ClientMsg),
-    /// Requests sent in the bootstrapping
-    /// process, where a client connects
-    /// to the network.
-    Handshake(HandshakeRequest),
-}
+/// 1. Requests sent in the bootstrapping
+/// process, where a client connects
+/// to the network.
+/// 2. Messages sent from a connected
+/// client, in order to use the services
+/// of the network.
 
-#[derive(Clone, Debug)]
-pub struct ClientMsg {
-    pub msg: MsgEnvelope,
-    pub public_id: PublicId,
-}
-
-impl ClientMsg {
-    pub fn id(&self) -> MessageId {
-        self.msg.id()
-    }
-}
-
-impl Display for ClientMsg {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}, {}", self.public_id.name(), &self.msg.id().0)
-    }
-}
-
-pub fn try_deserialize_msg(bytes: &Bytes) -> Option<ClientInput> {
+pub fn try_deserialize_msg(bytes: &Bytes) -> Option<MsgEnvelope> {
     let msg = match bincode::deserialize(&bytes) {
-        Ok((
-            public_id,
+        Ok(
             msg
             @
             MsgEnvelope {
@@ -63,9 +37,8 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Option<ClientInput> {
                 origin: MsgSender::Client { .. },
                 ..
             },
-        ))
-        | Ok((
-            public_id,
+        )
+        | Ok(
             msg
             @
             MsgEnvelope {
@@ -73,17 +46,13 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Option<ClientInput> {
                 origin: MsgSender::Client { .. },
                 ..
             },
-        )) => ClientMsg { msg, public_id },
-        another => {
-            warn!("some other messageeeeeee {:?}", another);
-            return None;
-        } // Only cmds and queries from client are allowed through here.
+        ) => msg,
+        _ => return None, // Only cmds and queries from client are allowed through here.
     };
-    warn!("Deserialized client msg: {}", msg);
-    Some(ClientInput::Msg(msg))
+    Some(msg)
 }
 
-pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Option<ClientInput> {
+pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Option<HandshakeRequest> {
     let hs = match bincode::deserialize(&bytes) {
         Ok(hs @ HandshakeRequest::Bootstrap(_))
         | Ok(hs @ HandshakeRequest::Join(_))
@@ -96,6 +65,5 @@ pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Option
             return None;
         }
     };
-
-    Some(ClientInput::Handshake(hs))
+    Some(hs)
 }

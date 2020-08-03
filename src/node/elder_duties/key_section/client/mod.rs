@@ -10,7 +10,7 @@ mod client_input_parse;
 mod client_msg_tracking;
 mod onboarding;
 use self::{
-    client_input_parse::{try_deserialize_handshake, try_deserialize_msg, ClientInput},
+    client_input_parse::{try_deserialize_handshake, try_deserialize_msg},
     client_msg_tracking::ClientMsgTracking,
     onboarding::Onboarding,
 };
@@ -77,7 +77,11 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         use ClientEvent::*;
         match event {
             ConnectedTo { peer } => {
-                if !self.client_msg_tracking.contains(peer.peer_addr()) {
+                if self
+                    .client_msg_tracking
+                    .public_id(peer.peer_addr())
+                    .is_none()
+                {
                     info!("{}: Connected to new client on {}", self, peer.peer_addr());
                 }
             }
@@ -85,38 +89,29 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                 self.client_msg_tracking.remove_client(peer.peer_addr());
             }
             NewMessage { peer, msg } => {
-                let parsed = if self.client_msg_tracking.contains(peer.peer_addr()) {
-                    try_deserialize_msg(msg)
+                let existing_client = self
+                    .client_msg_tracking
+                    .public_id(peer.peer_addr())
+                    .cloned();
+                if let Some(public_id) = existing_client {
+                    let msg = try_deserialize_msg(msg)?;
+                    info!("Deserialized client msg from {}", public_id);
+                    let result = self
+                        .client_msg_tracking
+                        .track_incoming(msg.id(), peer.peer_addr());
+                    if result.is_some() {
+                        return result.map(|c| c.into());
+                    }
+                    use KeySectionDuty::*;
+                    return Some(EvaluateClientMsg { public_id, msg }.into());
                 } else {
-                    try_deserialize_handshake(msg, peer.peer_addr())
-                }?;
-
-                let parsed = match parsed {
-                    ClientInput::Msg(msg) => {
-                        let result = self
-                            .client_msg_tracking
-                            .track_incoming(msg.id(), peer.peer_addr());
-                        if result.is_some() {
-                            return result.map(|c| c.into());
-                        }
-                        msg
-                    }
-                    ClientInput::Handshake(request) => {
-                        let mut rng = ChaChaRng::from_seed(self.rng.gen());
-                        return self
-                            .client_msg_tracking
-                            .process_handshake(request, peer.peer_addr(), &mut rng)
-                            .map(|c| c.into());
-                    }
-                };
-                use KeySectionDuty::*;
-                return Some(
-                    EvaluateClientMsg {
-                        public_id: parsed.public_id,
-                        msg: parsed.msg,
-                    }
-                    .into(),
-                );
+                    let hs = try_deserialize_handshake(msg, peer.peer_addr())?;
+                    let mut rng = ChaChaRng::from_seed(self.rng.gen());
+                    return self
+                        .client_msg_tracking
+                        .process_handshake(hs, peer.peer_addr(), &mut rng)
+                        .map(|c| c.into());
+                }
             }
             SentUserMessage { peer, .. } => {
                 trace!(
