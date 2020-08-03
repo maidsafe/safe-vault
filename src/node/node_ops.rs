@@ -14,12 +14,13 @@ use routing::{event::Event as NetworkEvent, Prefix, TransportEvent as ClientEven
 use safe_nd::{
     AccountId, Address, AuthCmd, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope,
     MsgSender, PaymentQuery, PublicId, PublicKey, ReplicaEvent, RewardCounter, SignedTransfer,
-    TransferValidated, XorName,
+    TransferValidated,
 };
 use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::{collections::BTreeSet, net::SocketAddr};
+use xor_name::XorName;
 
 /// Internal messages are what is passed along
 /// within a node, between the entry point and

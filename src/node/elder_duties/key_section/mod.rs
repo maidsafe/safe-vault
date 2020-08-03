@@ -29,8 +29,9 @@ use crate::{
 use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::{Node as Routing, Prefix, RoutingError};
-use safe_nd::{AccountId, ElderDuties, MsgEnvelope, PublicId, XorName};
+use safe_nd::{AccountId, ElderDuties, MsgEnvelope, PublicId};
 use std::{cell::RefCell, rc::Rc};
+use xor_name::XorName;
 
 /// A Key Section interfaces with clients,
 /// who are essentially a public key,
@@ -153,7 +154,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         // Removes accounts that are no longer our section responsibility.
         let not_matching = |key: AccountId| {
             let xorname: XorName = key.into();
-            !prefix.matches(&routing::XorName(xorname.0))
+            !prefix.matches(&XorName(xorname.0))
         };
         Some(self.transfers.drop_accounts(not_matching)?.into())
     }

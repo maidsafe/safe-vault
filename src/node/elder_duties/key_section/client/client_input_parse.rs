@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use bytes::Bytes;
-use log::info;
+use log::{info, warn};
 use safe_nd::{HandshakeRequest, Message, MessageId, MsgEnvelope, MsgSender, PublicId};
 use std::{
     fmt::{self, Display, Formatter},
@@ -74,9 +74,12 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Option<ClientInput> {
                 ..
             },
         )) => ClientMsg { msg, public_id },
-        _ => return None, // Only cmds and queries from client are allowed through here.
+        another => {
+            warn!("some other messageeeeeee {:?}", another);
+            return None;
+        } // Only cmds and queries from client are allowed through here.
     };
-    info!("Deserialized client msg from {}", msg.public_id);
+    warn!("Deserialized client msg: {}", msg);
     Some(ClientInput::Msg(msg))
 }
 
@@ -93,5 +96,6 @@ pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Option
             return None;
         }
     };
+
     Some(ClientInput::Handshake(hs))
 }

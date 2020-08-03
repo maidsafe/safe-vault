@@ -11,7 +11,9 @@ use crate::node::node_ops::{ElderDuty, GroupDecision, KeySectionDuty, NodeDuty, 
 use hex_fmt::HexFmt;
 use log::{error, info, trace};
 use routing::event::Event as RoutingEvent;
-use safe_nd::{MsgEnvelope, PublicKey, XorName};
+use safe_nd::{MsgEnvelope, PublicKey};
+
+use xor_name::XorName;
 
 /// Maps events from the transport layer
 /// into domain messages for the various modules.

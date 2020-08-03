@@ -11,7 +11,7 @@ pub use super::client_input_parse::{
 };
 pub use super::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
-use log::{error, info};
+use log::{error, info, warn};
 use rand::{CryptoRng, Rng};
 use safe_nd::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, NodePublicId};
 use std::{
@@ -65,6 +65,7 @@ impl ClientMsgTracking {
         // We could have received a group decision containing a client msg,
         // before receiving the msg from that client directly.
         if let Some(msg) = self.tracked_outgoing.remove(&msg_id) {
+            warn!("Tracking incoming: Prior group decision on msg found.");
             return Some(MessagingDuty::SendToClient {
                 address: client_address,
                 msg,

@@ -27,7 +27,7 @@ use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use reading::Reading;
-use safe_nd::{Cmd, ElderDuties, Message, MsgEnvelope, Query, XorName};
+use safe_nd::{Cmd, ElderDuties, Message, MsgEnvelope, Query};
 use sequence_storage::SequenceStorage;
 use std::{
     cell::Cell,
@@ -35,6 +35,7 @@ use std::{
     rc::Rc,
 };
 use writing::Writing;
+use xor_name::XorName;
 
 /// This module is called `Metadata`
 /// as a preparation for the responsibilities

@@ -17,7 +17,7 @@ use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
     Blob, BlobAddress, BlobRead, BlobWrite, CmdError, Error as NdError, Message, MessageId,
-    MsgEnvelope, NodeCmd, NodeDataCmd, PublicKey, QueryResponse, Result as NdResult, XorName,
+    MsgEnvelope, NodeCmd, NodeDataCmd, PublicKey, QueryResponse, Result as NdResult,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -25,6 +25,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 use tiny_keccak::sha3_256;
+use xor_name::XorName;
 
 const BLOB_META_DB_NAME: &str = "immutable_data.db";
 const HOLDER_META_DB_NAME: &str = "holder_data.db";

@@ -13,8 +13,10 @@ use crate::{
 };
 use safe_nd::{
     AccountId, DebitAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, Result,
-    TransferValidated, XorName,
+    TransferValidated,
 };
+use xor_name::XorName;
+
 use safe_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
 use ActorEvent::*;

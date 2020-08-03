@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::utils;
-use safe_nd::{
-    BlobAddress, ClientPublicId, MapAddress, PublicId, PublicKey, SequenceAddress, XorName,
-};
+use safe_nd::{BlobAddress, ClientPublicId, MapAddress, PublicId, PublicKey, SequenceAddress};
 use serde::{de::DeserializeOwned, Serialize};
+use xor_name::XorName;
 
 pub(crate) trait ToDbKey: Serialize {
     /// The encoded string representation of an identifier, used as a key in the context of a

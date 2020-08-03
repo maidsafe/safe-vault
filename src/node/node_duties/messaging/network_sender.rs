@@ -12,8 +12,9 @@ use crate::{
 };
 use log::{error, info};
 use routing::{DstLocation, Node as Routing, SrcLocation};
-use safe_nd::{Address, MsgEnvelope, XorName};
+use safe_nd::{Address, MsgEnvelope};
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
+use xor_name::XorName;
 
 /// Sending of msgs to other nodes in the network.
 pub(super) struct NetworkSender {
@@ -28,7 +29,7 @@ impl NetworkSender {
     pub fn send_to_node(&self, msg: MsgEnvelope) -> Option<MessagingDuty> {
         let name = *self.routing.borrow().id().name();
         let dst = match msg.destination() {
-            Address::Node(xorname) => DstLocation::Node(routing::XorName(xorname.0)),
+            Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
             Address::Section(_) => return Some(MessagingDuty::SendToSection(msg)),
             Address::Client(_) => return None,
         };
@@ -58,7 +59,7 @@ impl NetworkSender {
                 .borrow_mut()
                 .send_message(
                     SrcLocation::Node(name),
-                    DstLocation::Node(routing::XorName(target.0)),
+                    DstLocation::Node(XorName(target.0)),
                     utils::serialise(&msg),
                 )
                 .map_or_else(
@@ -76,9 +77,9 @@ impl NetworkSender {
     pub fn send_to_network(&self, msg: MsgEnvelope) -> Option<MessagingDuty> {
         let name = *self.routing.borrow().id().name();
         let dst = match msg.destination() {
-            Address::Node(xorname) => DstLocation::Node(routing::XorName(xorname.0)),
+            Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
             Address::Client(xorname) | Address::Section(xorname) => {
-                DstLocation::Section(routing::XorName(xorname.0))
+                DstLocation::Section(XorName(xorname.0))
             }
         };
         self.routing

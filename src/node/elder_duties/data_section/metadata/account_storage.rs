@@ -15,13 +15,14 @@ use crate::{
 };
 use safe_nd::{
     Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,
-    PublicKey, QueryResponse, Result as NdResult, XorName,
+    PublicKey, QueryResponse, Result as NdResult,
 };
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use xor_name::XorName;
 
 /// Operations over the data type Account.
 /// NB: This type is to be deprecated, as it

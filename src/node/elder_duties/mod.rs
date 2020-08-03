@@ -18,12 +18,12 @@ use crate::{
 };
 use rand::{CryptoRng, Rng};
 use routing::{Node as Routing, Prefix};
-use safe_nd::XorName;
 use std::{
     cell::{Cell, RefCell},
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
 pub struct ElderDuties<R: CryptoRng + Rng> {

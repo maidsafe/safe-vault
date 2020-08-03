@@ -21,12 +21,12 @@ use crate::{
     utils, Result,
 };
 use routing::{Node as Routing, Prefix};
-use safe_nd::XorName;
 use safe_transfers::TransferActor;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
+use xor_name::XorName;
 
 /// A DataSection is responsible for
 /// the storage and retrieval of data,
@@ -93,7 +93,7 @@ impl DataSection {
             .rewards
             .all_nodes()
             .into_iter()
-            .filter(|c| !prefix.matches(&routing::XorName(c.0)))
+            .filter(|c| !prefix.matches(&XorName(c.0)))
             .collect();
         self.rewards.remove(to_remove);
 

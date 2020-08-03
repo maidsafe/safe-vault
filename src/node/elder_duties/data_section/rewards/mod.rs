@@ -22,8 +22,10 @@ use log::{info, warn};
 use safe_farming::{Accumulation, RewardCounterSet, StorageRewards};
 use safe_nd::{
     AccountId, Address, ElderDuties, Error, Message, MessageId, Money, NodeCmd, NodeCmdError,
-    NodeEvent, NodeRewardCmd, NodeRewardError, RewardCounter, XorName,
+    NodeEvent, NodeRewardCmd, NodeRewardError, RewardCounter,
 };
+use xor_name::XorName;
+
 use safe_transfers::TransferActor;
 use std::collections::{BTreeSet, HashMap};
 

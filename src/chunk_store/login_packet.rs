@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::Chunk;
-use safe_nd::{Account, XorName};
+use safe_nd::Account;
+use xor_name::XorName;
 
 impl Chunk for Account {
     type Id = XorName;

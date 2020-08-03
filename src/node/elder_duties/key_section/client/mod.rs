@@ -9,7 +9,6 @@
 mod client_input_parse;
 mod client_msg_tracking;
 mod onboarding;
-
 use self::{
     client_input_parse::{try_deserialize_handshake, try_deserialize_msg, ClientInput},
     client_msg_tracking::ClientMsgTracking,
@@ -27,6 +26,7 @@ use crate::{
 use log::{error, info, trace};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
+
 use routing::TransportEvent as ClientEvent;
 use safe_nd::{Address, MsgEnvelope};
 use std::fmt::{self, Display, Formatter};
@@ -90,6 +90,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                 } else {
                     try_deserialize_handshake(msg, peer.peer_addr())
                 }?;
+
                 let parsed = match parsed {
                     ClientInput::Msg(msg) => {
                         let result = self

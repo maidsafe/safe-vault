@@ -10,8 +10,10 @@ use crate::{node::keys::NodeKeys, node::node_ops::MessagingDuty, utils};
 use log::info;
 use safe_nd::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NodeCmdError, XorName,
+    NodeCmdError,
 };
+use xor_name::XorName;
+
 use serde::Serialize;
 use std::collections::BTreeSet;
 

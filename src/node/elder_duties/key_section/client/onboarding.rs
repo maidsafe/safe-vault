@@ -9,7 +9,7 @@
 use crate::node::node_ops::MessagingDuty;
 use crate::node::section_querying::SectionQuerying;
 use crate::utils;
-use log::{debug, info, warn};
+use log::{debug, info, trace};
 use rand::{CryptoRng, Rng};
 use safe_nd::{HandshakeRequest, HandshakeResponse, NodePublicId, PublicId, Signature};
 use std::{
@@ -99,7 +99,7 @@ impl Onboarding {
                 .section
                 .our_elder_addresses_sorted_by_distance_to(client_id.name());
             if closest_known_elders.is_empty() {
-                warn!(
+                trace!(
                     "{}: No closest known elders in any section we know of",
                     self
                 );
@@ -149,6 +149,7 @@ impl Onboarding {
         peer_addr: SocketAddr,
         signature: &Signature,
     ) -> Option<MessagingDuty> {
+        trace!("Receive challenge response");
         if let Some((challenge, public_id)) = self.client_candidates.remove(&peer_addr) {
             let public_key = match utils::own_key(&public_id) {
                 Some(pk) => pk,

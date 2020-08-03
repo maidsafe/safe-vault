@@ -16,8 +16,9 @@ use log::error;
 use safe_nd::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
     NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardCmd, NodeTransferCmd, NodeTransferQuery,
-    NodeTransferQueryResponse, Query, XorName,
+    NodeTransferQueryResponse, Query,
 };
+use xor_name::XorName;
 
 // NB: This approach is not entirely good, so will be improved.
 
