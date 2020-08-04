@@ -33,7 +33,7 @@ pickledb = "~0.4.0"
 quick-error = "1.2.2"
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
-routing = { git = "https://github.com/maidsafe/routing.git", branch = "fleming" }
+routing = { git = "https://github.com/joshuef/routing.git", branch = "RandoXor" }
 safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "farming" }
 safe-farming = { git = "https://github.com/maidsafe/safe-farming.git" }
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
@@ -49,7 +49,7 @@ sha2 = "0.8.1"
 safe-transfers = "0.1.0"
 ed25519 = "1.0.1"
 signature = "1.1.0"
-xor_name = "1"
+xor_name = { git="https://github.com/joshuef/xor-name.git", branch="AddRandom"}
 
 [dev_dependencies]
 maplit = "1.0.1"
