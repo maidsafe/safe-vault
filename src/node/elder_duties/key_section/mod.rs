@@ -26,7 +26,7 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
-use log::trace;
+use log::{trace, warn};
 use rand::{CryptoRng, Rng};
 use routing::{Node as Routing, Prefix, RoutingError};
 use safe_nd::{AccountId, ElderDuties, MsgEnvelope, PublicId};
@@ -99,6 +99,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     }
 
     fn evaluate(&mut self, public_id: PublicId, msg: &MsgEnvelope) -> Option<NodeOperation> {
+        warn!("Pre-evaluating msg envelope: {:?}", msg);
         if let Some(error) = self.auth.verify_client_signature(msg) {
             return Some(error.into());
         };

@@ -115,7 +115,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         loop {
             let result = match self.receiver.next_event() {
                 Received::Client(event) => {
-                    info!("Received a Client Event from quic-p2p: {:?}", event);
+                    info!("Received a Client Event from quic-p2p.");
                     ProcessClientEvent(event).into()
                 }
                 Received::Network(event) => {

@@ -9,7 +9,7 @@
 use super::msg_analysis::NetworkMsgAnalysis;
 use crate::node::node_ops::{ElderDuty, GroupDecision, KeySectionDuty, NodeDuty, NodeOperation};
 use hex_fmt::HexFmt;
-use log::{error, info, trace};
+use log::{error, info, trace, warn};
 use routing::event::Event as RoutingEvent;
 use safe_nd::{MsgEnvelope, PublicKey};
 
@@ -106,7 +106,10 @@ impl NetworkEvents {
 
     fn evaluate_msg(&mut self, content: Vec<u8>) -> Option<NodeOperation> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
-            Ok(msg) => self.analysis.evaluate(&msg),
+            Ok(msg) => {
+                warn!("Message Envelope received. Contents: {:?}", &msg);
+                self.analysis.evaluate(&msg)
+            }
             Err(e) => {
                 error!(
                     "Error deserializing received network message into MsgEnvelope type: {:?}",
