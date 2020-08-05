@@ -69,7 +69,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let replica_manager = Self::replica_manager(info.clone(), routing.clone())?;
 
         // Payments
-        let payments = Payments::new(info.keys.clone(), routing.clone(), replica_manager.clone());
+        let payments = Payments::new(info.keys.clone(), replica_manager.clone());
 
         // Transfers
         let transfers = Transfers::new(info.keys, replica_manager);
@@ -147,8 +147,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             // the node can't work correctly without it..
             panic!(error)
         }
-        // update payment costs
-        self.payments.update_costs()
+        None
     }
 
     pub fn section_split(&mut self, prefix: Prefix) -> Option<NodeOperation> {
@@ -163,8 +162,8 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub fn synch_with_replicas(&mut self) -> Option<NodeOperation> {
-        self.transfers.synch_with_replicas()
+    pub fn query_replica_events(&mut self) -> Option<NodeOperation> {
+        self.transfers.query_replica_events()
     }
 
     fn replica_manager(

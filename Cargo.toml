@@ -35,7 +35,6 @@ rand = "~0.7.3"
 rand_chacha = "~0.2.2"
 routing = { git = "https://github.com/joshuef/routing.git", branch = "RandoXor" }
 safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "farming" }
-safe-farming = { git = "https://github.com/maidsafe/safe-farming.git" }
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"

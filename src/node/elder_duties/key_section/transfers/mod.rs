@@ -79,10 +79,12 @@ impl Transfers {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub fn synch_with_replicas(&mut self) -> Option<NodeOperation> {
+    pub fn query_replica_events(&mut self) -> Option<NodeOperation> {
         self.wrapping
             .send(Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::SyncEvents(self.keys.public_key())),
+                query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(
+                    self.keys.public_key(),
+                )),
                 id: MessageId::new(),
             })
             .map(|c| c.into())
@@ -201,7 +203,7 @@ impl Transfers {
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         self.wrapping.send(Message::NodeQueryResponse {
-            response: Transfers(SyncEvents(result)),
+            response: Transfers(GetReplicaEvents(result)),
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin,

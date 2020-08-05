@@ -15,8 +15,8 @@ use crate::node::section_querying::SectionQuerying;
 use log::error;
 use safe_nd::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
-    NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardCmd, NodeTransferCmd, NodeTransferQuery,
-    NodeTransferQueryResponse, Query,
+    NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
+    NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
 use xor_name::XorName;
 
@@ -122,14 +122,14 @@ impl NetworkMsgAnalysis {
                 ..
             })
         };
-        let is_accumulating_reward_cmd = || {
-            matches!(msg.message, Message::NodeCmd {
-                cmd: NodeCmd::Rewards(NodeRewardCmd::ClaimRewardCounter { .. }),
+        let is_accumulating_reward_query = || {
+            matches!(msg.message, Message::NodeQuery {
+                query: NodeQuery::Rewards(NodeRewardQuery::GetAccountId { .. }),
                 ..
             })
         };
 
-        is_accumulating_reward_cmd()
+        is_accumulating_reward_query()
             && from_single_rewards_elder()
             && self.is_dst_for(msg)
             && self.is_elder()
@@ -292,25 +292,20 @@ impl NetworkMsgAnalysis {
             return None;
         }
 
-        // SectionPayoutValidated and ReceiveClaimedRewards
+        // SectionPayoutValidated and GetAccountId
         // do not need accumulation since they are accumulated in the domain logic.
+        use NodeRewardQueryResponse::*;
         match &msg.message {
             Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(validation),
                 ..
             } => Some(RewardDuty::ReceivePayoutValidation(validation.clone())),
-            Message::NodeEvent {
-                event:
-                    NodeEvent::RewardCounterClaimed {
-                        account_id,
-                        new_node_id,
-                        counter,
-                    },
+            Message::NodeQueryResponse {
+                response: NodeQueryResponse::Rewards(GetAccountId(Ok((account_id, new_node_id)))),
                 ..
-            } => Some(RewardDuty::ReceiveClaimedRewards {
+            } => Some(RewardDuty::ReceiveAccountId {
                 id: *account_id,
                 node_id: *new_node_id,
-                counter: counter.clone(),
             }),
             _ => None,
         }
@@ -331,16 +326,16 @@ impl NetworkMsgAnalysis {
             return None;
         }
 
-        use NodeRewardCmd::*;
+        use NodeRewardQuery::*;
         match &msg.message {
-            Message::NodeCmd {
-                cmd:
-                    NodeCmd::Rewards(ClaimRewardCounter {
+            Message::NodeQuery {
+                query:
+                    NodeQuery::Rewards(GetAccountId {
                         old_node_id,
                         new_node_id,
                     }),
                 id,
-            } => Some(RewardDuty::ClaimRewardCounter {
+            } => Some(RewardDuty::GetAccountId {
                 old_node_id: *old_node_id,
                 new_node_id: *new_node_id,
                 msg_id: *id,
@@ -375,7 +370,7 @@ impl NetworkMsgAnalysis {
                     origin: msg.origin.address(),
                 }),
                 Message::NodeQuery {
-                    query: NodeQuery::Transfers(NodeTransferQuery::SyncEvents(_)),
+                    query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(_)),
                     id,
                 } => Some(TransferDuty::ProcessQuery {
                     query: TransferQuery::GetReplicaEvents,
@@ -384,7 +379,9 @@ impl NetworkMsgAnalysis {
                 }),
                 Message::NodeQueryResponse {
                     response:
-                        NodeQueryResponse::Transfers(NodeTransferQueryResponse::SyncEvents(events)),
+                        NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetReplicaEvents(
+                            events,
+                        )),
                     id,
                     ..
                 } => Some(TransferDuty::ProcessCmd {

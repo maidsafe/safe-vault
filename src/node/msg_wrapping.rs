@@ -10,7 +10,6 @@ use crate::{node::keys::NodeKeys, node::node_ops::MessagingDuty, utils};
 use log::info;
 use safe_nd::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NodeCmdError,
 };
 use xor_name::XorName;
 
@@ -48,14 +47,6 @@ impl AdultMsgWrapping {
     pub fn send(&self, message: Message) -> Option<MessagingDuty> {
         self.inner.send(message)
     }
-
-    // pub fn send_to_adults(
-    //     &self,
-    //     targets: BTreeSet<XorName>,
-    //     msg: &MsgEnvelope,
-    // ) -> Option<MessagingDuty> {
-    //     self.inner.send_to_adults(targets, msg)
-    // }
 
     pub fn error(
         &self,
@@ -98,15 +89,6 @@ impl ElderMsgWrapping {
     ) -> Option<MessagingDuty> {
         self.inner.error(error, msg_id, origin)
     }
-
-    pub fn network_error(
-        &self,
-        error: NodeCmdError,
-        msg_id: MessageId,
-        origin: &Address,
-    ) -> Option<MessagingDuty> {
-        self.inner.network_error(error, msg_id, origin)
-    }
 }
 
 impl MsgWrapping {
@@ -141,20 +123,6 @@ impl MsgWrapping {
     ) -> Option<MessagingDuty> {
         info!("Error {:?}", error);
         self.send(Message::CmdError {
-            id: MessageId::new(),
-            error,
-            correlation_id: msg_id,
-            cmd_origin: origin.clone(),
-        })
-    }
-
-    pub fn network_error(
-        &self,
-        error: NodeCmdError,
-        msg_id: MessageId,
-        origin: &Address,
-    ) -> Option<MessagingDuty> {
-        self.send(Message::NodeCmdError {
             id: MessageId::new(),
             error,
             correlation_id: msg_id,

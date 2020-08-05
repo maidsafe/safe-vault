@@ -6,21 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod calc;
-
 use super::transfers::replica_manager::ReplicaManager;
 use crate::{
-    node::economy::MintingMetrics,
     node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{NodeOperation, PaymentDuty, RewardDuty},
+    node::node_ops::{NodeOperation, PaymentDuty},
     utils,
 };
-use calc::Economy;
-use routing::Node as Routing;
 use safe_nd::{
-    Address, Cmd, CmdError, ElderDuties, Error, Message, MessageId, Money, MsgEnvelope,
-    PaymentQuery, PublicKey, QueryResponse, Result, TransferError,
+    Cmd, CmdError, ElderDuties, Error, Message, Money, MsgEnvelope, PublicKey, Result,
+    TransferError,
 };
 use std::{
     cell::{RefCell, RefMut},
@@ -40,48 +35,16 @@ pub struct Payments {
     keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
-    calc: Economy,
-    store_cost: Money,
-    previous_writes: u64,
-    writes: u64,
 }
 
 impl Payments {
-    pub fn new(
-        keys: NodeKeys,
-        routing: Rc<RefCell<Routing>>,
-        replica: Rc<RefCell<ReplicaManager>>,
-    ) -> Self {
+    pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
         let wrapping = ElderMsgWrapping::new(keys.clone(), ElderDuties::Payment);
-        let calc = Economy::new(keys.public_key(), routing, replica.clone());
         Self {
             keys,
             replica,
             wrapping,
-            calc,
-            store_cost: Money::zero(),
-            previous_writes: 1,
-            writes: 1,
         }
-    }
-
-    pub fn update_costs(&mut self) -> Option<NodeOperation> {
-        let indicator = self.calc.update_indicator()?;
-        let base_cost = indicator.period_base_cost.as_nano();
-        let load = self.writes as f64 / self.previous_writes as f64;
-        let store_cost = load * base_cost as f64;
-        self.store_cost = Money::from_nano(store_cost as u64);
-        self.previous_writes = self.writes;
-        self.writes = 1;
-
-        Some(
-            RewardDuty::UpdateRewards(MintingMetrics {
-                key: indicator.period_key,
-                store_cost: self.store_cost,
-                velocity: indicator.minting_velocity,
-            })
-            .into(),
-        )
     }
 
     // The code in this method is a bit messy, needs to be cleaned up.
@@ -89,28 +52,7 @@ impl Payments {
         use PaymentDuty::*;
         match duty {
             ProcessPayment(msg) => self.process_payment(msg),
-            ProcessQuery {
-                query,
-                msg_id,
-                origin,
-            } => match query {
-                PaymentQuery::GetStoreCost(_) => self.store_cost(msg_id, origin),
-            },
         }
-    }
-
-    fn store_cost(&self, msg_id: &MessageId, origin: &Address) -> Option<NodeOperation> {
-        let public_key = PublicKey::Bls(self.replica.borrow().replicas_pk_set()?.public_key());
-        Some(
-            self.wrapping
-                .send(Message::QueryResponse {
-                    response: QueryResponse::GetStoreCost(Ok((public_key, self.store_cost))),
-                    id: MessageId::new(),
-                    correlation_id: *msg_id,
-                    query_origin: origin.clone(),
-                })?
-                .into(),
-        )
     }
 
     fn process_payment(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
@@ -152,11 +94,10 @@ impl Payments {
         };
         let result = match result {
             Ok(_) => {
-                self.writes += 1;
                 // Paying too little will see the amount be forfeited.
                 // This is because it is easy to know the cost by querying,
                 // so you are forced to do the job properly, instead of burdoning the network.
-                let total_cost = Money::from_nano(num_bytes + self.store_cost.as_nano());
+                let total_cost = Money::from_nano(num_bytes);
                 if total_cost > payment.amount() {
                     // todo, better error, like `TooLowPayment`
                     return self

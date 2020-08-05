@@ -9,12 +9,10 @@
 #[cfg(feature = "simulated-payouts")]
 use safe_nd::Transfer;
 
-use crate::node::economy::MintingMetrics;
 use routing::{event::Event as NetworkEvent, Prefix, TransportEvent as ClientEvent};
 use safe_nd::{
     AccountId, Address, AuthCmd, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope,
-    MsgSender, PaymentQuery, PublicId, PublicKey, ReplicaEvent, RewardCounter, SignedTransfer,
-    TransferValidated,
+    MsgSender, PublicId, PublicKey, ReplicaEvent, SignedTransfer, TransferValidated,
 };
 use serde::export::Formatter;
 use serde::{Deserialize, Serialize};
@@ -216,10 +214,14 @@ impl Debug for MessagingDuty {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum ElderDuty {
+    ProcessNewMember(XorName),
     /// As members are lost for various reasons
     /// there are certain things the Elders need
     /// to do, to update for that.
-    ProcessLostMember { name: XorName, age: u8 },
+    ProcessLostMember {
+        name: XorName,
+        age: u8,
+    },
     /// Elder changes means the section public key
     /// changes as well, which leads to necessary updates
     /// of various places using the multisig of the section.
@@ -231,9 +233,13 @@ pub enum ElderDuty {
         /// The set of elders of our section.
         elders: BTreeSet<XorName>,
     },
-    ProcessJoinedMember {
+    ProcessRelocatedMember {
+        /// The id of the node at the previous section.
         old_node_id: XorName,
+        /// The id of the node at its new section (i.e. this one).
         new_node_id: XorName,
+        // The age of the node (among things determines if it is eligible for rewards yet).
+        age: u8,
     },
     /// A key section interfaces with clients.
     RunAsKeySection(KeySectionDuty),
@@ -393,16 +399,6 @@ pub enum PaymentDuty {
     /// within a data write, is credited
     /// to the section funds.
     ProcessPayment(MsgEnvelope),
-    /// Clients need to query for the
-    /// current store cost, as to be able
-    /// to make correct payments for their data.
-    ProcessQuery {
-        query: PaymentQuery,
-        ///
-        msg_id: MessageId,
-        ///
-        origin: Address,
-    },
 }
 
 impl Into<NodeOperation> for PaymentDuty {
@@ -461,43 +457,23 @@ pub enum ChunkDuty {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum RewardDuty {
-    /// Whenever there has been write
-    /// operations on the network, we
-    /// accumulate rewards for the nodes
-    /// of our section.
-    AccumulateReward {
-        /// The points can be anything,
-        /// but in our StorageReward system,
-        /// it is the number of bytes of a write
-        /// operation.
-        points: u64,
-        /// Idempotency.
-        /// An individual write operation can
-        /// only lead to a farming reward once.
-        msg_id: MessageId,
-    },
-    /// TODO: Evaluate the need for this one.
-    /// When adding an account before relocation
-    /// (does this even happen?)
-    AddNewAccount {
-        /// The account id for reward payouts.
-        id: AccountId,
-        /// The node id.
-        node_id: XorName,
-    },
+    /// With the node id.
+    AddNewNode(XorName),
     /// We add relocated nodes to our rewards
     /// system, so that they can participate
     /// in the farming rewards.
-    AddRelocatedAccount {
+    AddRelocatedNode {
         /// The id of the node at the previous section.
         old_node_id: XorName,
         /// The id of the node at its new section (i.e. this one).
         new_node_id: XorName,
+        // The age of the node, determines if it is eligible for rewards yet.
+        age: u8,
     },
     /// When a node is relocated from us, the other
     /// section will claim the reward counter, so that
     /// they can pay it out to their new node.
-    ClaimRewardCounter {
+    GetAccountId {
         /// The id of the node at the previous section.
         old_node_id: XorName,
         /// The id of the node at its new section (i.e. this one).
@@ -508,25 +484,21 @@ pub enum RewardDuty {
         origin: Address,
     },
     /// When a node has been relocated to our section
-    /// we receive the reward counter from the other section.
-    ReceiveClaimedRewards {
-        /// The account to which the claimed
+    /// we receive the account id from the other section.
+    ReceiveAccountId {
+        /// The account to which the accumulated
         /// rewards should be paid out.
         id: AccountId,
         /// The node which accumulated the rewards.
         node_id: XorName,
-        /// The accumulated rewards and work.
-        counter: RewardCounter,
     },
     /// When a node has left for some reason,
-    /// we prepare for its reward counter to be claimed.
-    PrepareAccountMove { node_id: XorName },
+    /// we deactivate it.
+    DeactivateNode(XorName),
     /// The distributed Actor of a section,
     /// receives and accumulates the validated
     /// reward payout from its Replicas,
     ReceivePayoutValidation(TransferValidated),
-    /// Updates the figures used in reward calculation.
-    UpdateRewards(MintingMetrics),
 }
 
 impl Into<NodeOperation> for RewardDuty {

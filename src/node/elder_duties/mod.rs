@@ -55,17 +55,19 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     /// asking for their events, as to catch up and
     /// start working properly in the group.
     pub fn initiate(&mut self) -> Option<NodeOperation> {
-        self.key_section.synch_with_replicas()
+        self.key_section.query_replica_events()
     }
 
     pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
         use ElderDuty::*;
         match duty {
+            ProcessNewMember(name) => self.new_node_joined(name),
             ProcessLostMember { name, age } => self.member_left(name, age),
-            ProcessJoinedMember {
+            ProcessRelocatedMember {
                 old_node_id,
                 new_node_id,
-            } => self.relocated_member_joined(old_node_id, new_node_id),
+                age,
+            } => self.relocated_node_joined(old_node_id, new_node_id, age),
             ProcessElderChange { prefix, .. } => self.elders_changed(prefix),
             RunAsKeySection(duty) => self.key_section.process(duty),
             RunAsDataSection(duty) => self.data_section.process(duty),
@@ -73,13 +75,19 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     }
 
     ///
-    fn relocated_member_joined(
+    fn new_node_joined(&mut self, name: XorName) -> Option<NodeOperation> {
+        self.data_section.new_node_joined(name)
+    }
+
+    ///
+    fn relocated_node_joined(
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
+        age: u8,
     ) -> Option<NodeOperation> {
         self.data_section
-            .relocated_member_joined(old_node_id, new_node_id)
+            .relocated_node_joined(old_node_id, new_node_id, age)
     }
 
     ///

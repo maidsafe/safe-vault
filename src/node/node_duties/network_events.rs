@@ -58,18 +58,21 @@ impl NetworkEvents {
                     .into(),
                 )
             }
+            RoutingEvent::InfantJoined { name, .. } => {
+                trace!("New node has joined the network");
+                Some(ProcessNewMember(XorName(name.0)).into())
+            }
             RoutingEvent::MemberJoined {
                 name,
                 previous_name,
-                ..
+                age,
             } => {
                 trace!("New member has joined the section");
-                // info!("No. of Elders: {}", self.routing.borrow().our_elders().count());
-                // info!("No. of Adults: {}", self.routing.borrow().our_adults().count());
                 Some(
-                    ProcessJoinedMember {
+                    ProcessRelocatedMember {
                         old_node_id: XorName(name.0),
                         new_node_id: XorName(previous_name.0),
+                        age,
                     }
                     .into(),
                 )
