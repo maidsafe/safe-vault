@@ -37,6 +37,7 @@ use unwrap::unwrap;
 
 const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP is enabled in your router's settings and try again. \
                                 Note that not all routers are supported in this testnet. Visit https://safenetforum.org for more information.";
+const VAULT_MODULE_NAME: &str = "safe_vault";
 
 /// Runs a SAFE Network vault.
 #[tokio::main]
@@ -76,8 +77,9 @@ async fn main() {
         )
     };
 
-    let verbosity = config.verbose().to_level_filter().to_string();
-    let logger = Logger::with_env_or_str(verbosity)
+    let level_filter = config.verbose().to_level_filter();
+    let module_log_filter = format!("{}={}", VAULT_MODULE_NAME, level_filter.to_string());
+    let logger = Logger::with_env_or_str(module_log_filter)
         .format(do_format)
         .suppress_timestamp();
 
