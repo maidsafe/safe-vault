@@ -22,7 +22,7 @@ pub(crate) trait ToDbKey: Serialize {
 
 pub fn from_db_key<T: DeserializeOwned>(key: &str) -> Option<T> {
     let decoded = base64::decode(key).ok()?;
-    utils::deserialise(&decoded)
+    Some(utils::deserialise(&decoded))
 }
 
 impl ToDbKey for SequenceAddress {}
@@ -32,3 +32,24 @@ impl ToDbKey for MapAddress {}
 impl ToDbKey for PublicId {}
 impl ToDbKey for PublicKey {}
 impl ToDbKey for XorName {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::Result;
+    use safe_nd::PublicKey;
+    use threshold_crypto::SecretKey;
+
+    #[test]
+    fn to_from_db_key() -> Result<()> {
+        let key = get_random_pk();
+        let serialised = key.to_db_key();
+        let deserialised = from_db_key(&serialised).unwrap();
+        assert_eq!(key, deserialised);
+        Ok(())
+    }
+
+    fn get_random_pk() -> PublicKey {
+        PublicKey::from(SecretKey::random().public_key())
+    }
+}

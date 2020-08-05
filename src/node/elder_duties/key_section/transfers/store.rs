@@ -90,7 +90,10 @@ impl TransferStore {
                         Err(error) => return Err(Error::PickleDb(error)),
                     };
                 }
-                match self.db.ladd(GROUP_CHANGES, &ReplicaEvent::KnownGroupAdded(e)) {
+                match self
+                    .db
+                    .ladd(GROUP_CHANGES, &ReplicaEvent::KnownGroupAdded(e))
+                {
                     Some(_) => Ok(()),
                     None => Err(Error::NetworkData("Failed to write event to db.".into())),
                 }
@@ -104,25 +107,96 @@ impl TransferStore {
                         Err(error) => return Err(Error::PickleDb(error)),
                     };
                 }
-                match self.db.ladd(key, &ReplicaEvent::TransferPropagated(e.clone())) {
+                match self.db.ladd(key, &ReplicaEvent::TransferPropagated(e)) {
                     Some(_) => Ok(()),
                     None => Err(Error::NetworkData("Failed to write event to db.".into())),
                 }
             }
             ReplicaEvent::TransferValidated(e) => {
                 let id = e.from();
-                match self.db.ladd(&id.to_db_key(), &ReplicaEvent::TransferValidated(e)) {
+                match self
+                    .db
+                    .ladd(&id.to_db_key(), &ReplicaEvent::TransferValidated(e))
+                {
                     Some(_) => Ok(()),
                     None => Err(Error::NetworkData("Failed to write event to db.".into())), // A stream always starts with a credit, so not existing when debiting is simply invalid.
                 }
             }
             ReplicaEvent::TransferRegistered(e) => {
                 let id = e.from();
-                match self.db.ladd(&id.to_db_key(), &ReplicaEvent::TransferRegistered(e)) {
+                match self
+                    .db
+                    .ladd(&id.to_db_key(), &ReplicaEvent::TransferRegistered(e))
+                {
                     Some(_) => Ok(()),
                     None => Err(Error::NetworkData("Failed to write event to db.".into())), // A stream always starts with a credit, so not existing when debiting is simply invalid.
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::Result;
+    use safe_nd::{PublicKey, TransferPropagated};
+    use safe_transfers::get_genesis;
+    use tempdir::TempDir;
+    use threshold_crypto::SecretKey;
+
+    #[test]
+    fn history() -> Result<()> {
+        let tmp_dir = TempDir::new("history")?;
+        let root_dir = tmp_dir.path();
+        let mut store = TransferStore::new(root_dir, Init::New)?;
+        let account_id = get_random_pk();
+        let debit_proof = get_genesis(10, account_id)?;
+        store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
+            debit_proof,
+            debiting_replicas: get_random_pk(),
+            crediting_replica_sig: dummy_sig(),
+        }))?;
+        if let Some(history) = store.history(&account_id) {
+            assert_eq!(history.len(), 1);
+        } else {
+            panic!();
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn all_stream_keys() -> Result<()> {
+        let tmp_dir = TempDir::new("all_stream_keys")?;
+        let root_dir = tmp_dir.path();
+        let mut store = TransferStore::new(root_dir, Init::New)?;
+        let account_id = get_random_pk();
+        let debit_proof = get_genesis(10, account_id)?;
+        store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
+            debit_proof,
+            debiting_replicas: get_random_pk(),
+            crediting_replica_sig: dummy_sig(),
+        }))?;
+        if let Some(list) = store.all_stream_keys() {
+            assert_eq!(list.len(), 1);
+        } else {
+            panic!();
+        }
+        Ok(())
+    }
+
+    fn get_random_pk() -> PublicKey {
+        PublicKey::from(SecretKey::random().public_key())
+    }
+
+    use safe_nd::SignatureShare;
+    use threshold_crypto::SecretKeyShare;
+    fn dummy_sig() -> SignatureShare {
+        let dummy_shares = SecretKeyShare::default();
+        let dummy_sig = dummy_shares.sign("DUMMY MSG");
+        SignatureShare {
+            index: 0,
+            share: dummy_sig,
         }
     }
 }
