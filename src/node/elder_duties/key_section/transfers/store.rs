@@ -90,7 +90,7 @@ impl TransferStore {
                         Err(error) => return Err(Error::PickleDb(error)),
                     };
                 }
-                match self.db.ladd(GROUP_CHANGES, &e) {
+                match self.db.ladd(GROUP_CHANGES, &ReplicaEvent::KnownGroupAdded(e)) {
                     Some(_) => Ok(()),
                     None => Err(Error::NetworkData("Failed to write event to db.".into())),
                 }
@@ -104,21 +104,21 @@ impl TransferStore {
                         Err(error) => return Err(Error::PickleDb(error)),
                     };
                 }
-                match self.db.ladd(key, &e) {
+                match self.db.ladd(key, &ReplicaEvent::TransferPropagated(e.clone())) {
                     Some(_) => Ok(()),
                     None => Err(Error::NetworkData("Failed to write event to db.".into())),
                 }
             }
             ReplicaEvent::TransferValidated(e) => {
                 let id = e.from();
-                match self.db.ladd(&id.to_db_key(), &e) {
+                match self.db.ladd(&id.to_db_key(), &ReplicaEvent::TransferValidated(e)) {
                     Some(_) => Ok(()),
                     None => Err(Error::NetworkData("Failed to write event to db.".into())), // A stream always starts with a credit, so not existing when debiting is simply invalid.
                 }
             }
             ReplicaEvent::TransferRegistered(e) => {
                 let id = e.from();
-                match self.db.ladd(&id.to_db_key(), &e) {
+                match self.db.ladd(&id.to_db_key(), &ReplicaEvent::TransferRegistered(e)) {
                     Some(_) => Ok(()),
                     None => Err(Error::NetworkData("Failed to write event to db.".into())), // A stream always starts with a credit, so not existing when debiting is simply invalid.
                 }
