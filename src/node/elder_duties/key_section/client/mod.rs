@@ -15,26 +15,24 @@ use self::{
     onboarding::Onboarding,
 };
 use crate::{
-    node::keys::NodeKeys,
     node::state_db::NodeInfo,
     node::{
         node_ops::{GatewayDuty, KeySectionDuty, MessagingDuty, NodeOperation},
         section_querying::SectionQuerying,
     },
-    Result,
+    utils, Result,
 };
-use log::{error, info, trace};
+use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
 use routing::TransportEvent as ClientEvent;
-use safe_nd::{Address, MsgEnvelope};
+use safe_nd::{Address, MsgEnvelope, MsgSender};
 use std::fmt::{self, Display, Formatter};
 
 /// A client gateway routes messages
 /// back and forth between a client and the network.
 pub struct ClientGateway<R: CryptoRng + Rng> {
-    keys: NodeKeys,
     section: SectionQuerying,
     client_msg_tracking: ClientMsgTracking,
     rng: R,
@@ -42,11 +40,10 @@ pub struct ClientGateway<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> ClientGateway<R> {
     pub fn new(info: NodeInfo, section: SectionQuerying, rng: R) -> Result<Self> {
-        let onboarding = Onboarding::new(info.public_id(), section.clone());
-        let client_msg_tracking = ClientMsgTracking::new(info.public_id(), onboarding);
+        let onboarding = Onboarding::new(info.public_key().unwrap(), section.clone());
+        let client_msg_tracking = ClientMsgTracking::new(onboarding);
 
         let gateway = Self {
-            keys: info.keys,
             section,
             client_msg_tracking,
             rng,
@@ -79,7 +76,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
             ConnectedTo { peer } => {
                 if self
                     .client_msg_tracking
-                    .public_id(peer.peer_addr())
+                    .get_public_key(peer.peer_addr())
                     .is_none()
                 {
                     info!("{}: Connected to new client on {}", self, peer.peer_addr());
@@ -89,13 +86,13 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                 self.client_msg_tracking.remove_client(peer.peer_addr());
             }
             NewMessage { peer, msg } => {
-                let existing_client = self
-                    .client_msg_tracking
-                    .public_id(peer.peer_addr())
-                    .cloned();
-                if let Some(public_id) = existing_client {
+                let existing_client = self.client_msg_tracking.get_public_key(peer.peer_addr());
+                if let Some(public_key) = existing_client {
                     let msg = try_deserialize_msg(msg)?;
-                    info!("Deserialized client msg from {}", public_id);
+                    info!("Deserialized client msg from {}", public_key);
+                    if !validate_client_sig(&msg) {
+                        return None;
+                    }
                     let result = self
                         .client_msg_tracking
                         .track_incoming(msg.id(), peer.peer_addr());
@@ -103,7 +100,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                         return result.map(|c| c.into());
                     }
                     use KeySectionDuty::*;
-                    return Some(EvaluateClientMsg { public_id, msg }.into());
+                    return Some(EvaluateClientMsg(msg).into());
                 } else {
                     let hs = try_deserialize_handshake(msg, peer.peer_addr())?;
                     let mut rng = ChaChaRng::from_seed(self.rng.gen());
@@ -134,8 +131,31 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     }
 }
 
+fn validate_client_sig(msg: &MsgEnvelope) -> bool {
+    let signature = match &msg.origin {
+        MsgSender::Client(proof) => proof.signature(),
+        _ => return false,
+    };
+    match msg
+        .origin
+        .id()
+        .verify(&signature, utils::serialise(&msg.message))
+    {
+        Ok(_) => true,
+        Err(error) => {
+            warn!(
+                "{:?} from {} is invalid: {}",
+                msg.message.id(),
+                msg.origin.id(),
+                error
+            );
+            false
+        }
+    }
+}
+
 impl<R: CryptoRng + Rng> Display for ClientGateway<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.keys.public_key())
+        write!(formatter, "ClientGateway")
     }
 }

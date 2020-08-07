@@ -43,7 +43,6 @@ impl Messaging {
             SendToNode(msg) => self.network_sender.send_to_node(msg),
             SendToSection(msg) => self.network_sender.send_to_network(msg),
             SendToAdults { targets, msg } => self.network_sender.send_to_nodes(targets, &msg),
-            VoteFor(decision) => self.network_sender.vote_for(decision),
             SendHandshake { address, response } => self.client_sender.handshake(address, &response),
             DisconnectClient(address) => self.client_sender.disconnect(address),
         };

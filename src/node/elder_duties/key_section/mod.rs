@@ -6,30 +6,27 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod auth;
 mod client;
 mod client_msg_analysis;
 mod payment;
 mod transfers;
 
 use self::{
-    auth::{Auth, AuthKeysDb},
     client::ClientGateway,
     client_msg_analysis::ClientMsgAnalysis,
     payment::Payments,
     transfers::{replica_manager::ReplicaManager, store::TransferStore, Transfers},
 };
 use crate::{
-    node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{AuthDuty, GroupDecision, KeySectionDuty, NodeOperation},
+    node::node_ops::{KeySectionDuty, NodeOperation},
     node::section_querying::SectionQuerying,
     node::state_db::NodeInfo,
     Result,
 };
-use log::{trace, warn};
+use log::warn;
 use rand::{CryptoRng, Rng};
 use routing::{Node as Routing, Prefix, RoutingError};
-use safe_nd::{AccountId, ElderDuties, MsgEnvelope, PublicId};
+use safe_nd::{AccountId, MsgEnvelope};
 use std::{cell::RefCell, rc::Rc};
 use xor_name::XorName;
 
@@ -45,7 +42,6 @@ use xor_name::XorName;
 /// of client side Authenticator. (The module is an optimisation
 /// but introduces excessive complexity/responsibility for the network.)
 pub struct KeySection<R: CryptoRng + Rng> {
-    auth: Auth,
     gateway: ClientGateway<R>,
     payments: Payments,
     transfers: Transfers,
@@ -56,11 +52,6 @@ pub struct KeySection<R: CryptoRng + Rng> {
 impl<R: CryptoRng + Rng> KeySection<R> {
     pub fn new(info: NodeInfo, routing: Rc<RefCell<Routing>>, rng: R) -> Result<Self> {
         let section_querying = SectionQuerying::new(routing.clone());
-        let wrapping = ElderMsgWrapping::new(info.keys.clone(), ElderDuties::Gateway);
-
-        // Auth
-        let auth_keys_db = AuthKeysDb::new(info.root_dir.clone(), info.init_mode)?;
-        let auth = Auth::new(info.keys.clone(), auth_keys_db, wrapping);
 
         // ClientGateway
         let gateway = ClientGateway::new(info.clone(), section_querying, rng)?;
@@ -77,7 +68,6 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
 
         Ok(Self {
-            auth,
             gateway,
             payments,
             transfers,
@@ -89,46 +79,16 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     pub fn process(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
         use KeySectionDuty::*;
         match duty {
-            EvaluateClientMsg { public_id, msg } => self.evaluate(public_id, &msg),
-            ProcessGroupDecision(decision) => self.process_group_decision(decision),
-            RunAsAuth(duty) => self.auth.process(duty),
+            EvaluateClientMsg(msg) => self.evaluate(&msg),
             RunAsGateway(duty) => self.gateway.process(&duty),
             RunAsPayment(duty) => self.payments.process(&duty),
             RunAsTransfers(duty) => self.transfers.process(&duty),
         }
     }
 
-    fn evaluate(&mut self, public_id: PublicId, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
         warn!("Pre-evaluating msg envelope: {:?}", msg);
-        if let Some(error) = self.auth.verify_client_signature(msg) {
-            return Some(error.into());
-        };
-        if let Some(error) = self.auth.authorise_app(&public_id, &msg) {
-            return Some(error.into());
-        }
         self.msg_analysis.evaluate(msg)
-    }
-
-    /// Basically.. when Gateway nodes have voted and agreed,
-    /// that this is a valid client request to handle locally,
-    /// they'll process it locally.
-    fn process_group_decision(&mut self, decision: GroupDecision) -> Option<NodeOperation> {
-        use GroupDecision::*;
-        trace!("KeySection: Group decided on {:?}", decision);
-        match decision {
-            Process {
-                cmd,
-                msg_id,
-                origin,
-            } => Some(
-                AuthDuty::Process {
-                    cmd,
-                    msg_id,
-                    origin,
-                }
-                .into(),
-            ),
-        }
     }
 
     // Update our replica with the latest keys

@@ -8,7 +8,7 @@
 
 use super::transfers::replica_manager::ReplicaManager;
 use crate::{
-    node::keys::NodeKeys,
+    node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeOperation, PaymentDuty},
     utils,
@@ -32,19 +32,14 @@ use std::{
 /// which would be a section closest to the data
 /// (where it is then handled by Elders with Metadata duties).
 pub struct Payments {
-    keys: NodeKeys,
     replica: Rc<RefCell<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
 }
 
 impl Payments {
-    pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
-        let wrapping = ElderMsgWrapping::new(keys.clone(), ElderDuties::Payment);
-        Self {
-            keys,
-            replica,
-            wrapping,
-        }
+    pub fn new(keys: NodeSigningKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
+        let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Payment);
+        Self { replica, wrapping }
     }
 
     // The code in this method is a bit messy, needs to be cleaned up.
@@ -95,8 +90,10 @@ impl Payments {
         let result = match result {
             Ok(_) => {
                 // Paying too little will see the amount be forfeited.
-                // This is because it is easy to know the cost by querying,
-                // so you are forced to do the job properly, instead of burdoning the network.
+                // This is because it is easy to know the cost by
+                // serializing the write and counting the num bytes,
+                // so you are forced to do the job properly.
+                // This prevents spam of the network.
                 let total_cost = Money::from_nano(num_bytes);
                 if total_cost > payment.amount() {
                     // todo, better error, like `TooLowPayment`
@@ -136,6 +133,6 @@ impl Payments {
 
 impl Display for Payments {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.keys.public_key())
+        write!(formatter, "Payments")
     }
 }

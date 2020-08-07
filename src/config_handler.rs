@@ -11,6 +11,7 @@ use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use log::{debug, Level};
 use routing::TransportConfig as NetworkConfig;
+use safe_nd::PublicKey;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
@@ -64,8 +65,7 @@ const ARGS: [&str; 18] = [
 pub struct Config {
     /// The address to be credited when this vault farms SafeCoin.
     #[structopt(short, long, parse(try_from_str))]
-    // TODO - Fix before committing - Use ClientPublicId rather than String
-    wallet_address: Option<String>,
+    wallet_address: Option<PublicKey>,
     /// Upper limit in bytes for allowed network storage on this vault.
     #[structopt(short, long)]
     max_capacity: Option<u64>,
@@ -128,7 +128,7 @@ impl Config {
     }
 
     /// The address to be credited when this vault farms SafeCoin.
-    pub fn wallet_address(&self) -> Option<&String> {
+    pub fn wallet_address(&self) -> Option<&PublicKey> {
         self.wallet_address.as_ref()
     }
 

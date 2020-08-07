@@ -11,7 +11,7 @@ pub use super::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
 use log::{error, info, warn};
 use rand::{CryptoRng, Rng};
-use safe_nd::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, NodePublicId, PublicId};
+use safe_nd::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
@@ -21,24 +21,22 @@ use std::{
 /// Tracks incoming and outgoingg messages
 /// between client and network.
 pub struct ClientMsgTracking {
-    id: NodePublicId,
     onboarding: Onboarding,
     tracked_incoming: HashMap<MessageId, SocketAddr>,
     tracked_outgoing: HashMap<MessageId, MsgEnvelope>,
 }
 
 impl ClientMsgTracking {
-    pub fn new(id: NodePublicId, onboarding: Onboarding) -> Self {
+    pub fn new(onboarding: Onboarding) -> Self {
         Self {
-            id,
             onboarding,
             tracked_incoming: Default::default(),
             tracked_outgoing: Default::default(),
         }
     }
 
-    pub fn public_id(&mut self, peer_addr: SocketAddr) -> Option<&PublicId> {
-        self.onboarding.public_id(peer_addr)
+    pub fn get_public_key(&mut self, peer_addr: SocketAddr) -> Option<&PublicKey> {
+        self.onboarding.get_public_key(peer_addr)
     }
 
     pub fn process_handshake<R: CryptoRng + Rng>(
@@ -131,6 +129,6 @@ impl ClientMsgTracking {
 
 impl Display for ClientMsgTracking {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.id.name())
+        write!(formatter, "ClientMsgTracking")
     }
 }

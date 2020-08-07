@@ -10,9 +10,7 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{
-    node::keys::NodeKeys, node::node_ops::MessagingDuty, node::state_db::NodeInfo, Result,
-};
+use crate::{node::node_ops::MessagingDuty, node::state_db::NodeInfo, Result};
 use chunk_storage::ChunkStorage;
 use reading::Reading;
 use writing::Writing;
@@ -28,19 +26,14 @@ use std::{
 
 /// Operations on data chunks.
 pub(crate) struct Chunks {
-    keys: NodeKeys,
     chunk_storage: ChunkStorage,
 }
 
 impl Chunks {
     pub fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
-        let keys = node_info.keys();
         let chunk_storage = ChunkStorage::new(node_info, total_used_space)?;
 
-        Ok(Self {
-            keys,
-            chunk_storage,
-        })
+        Ok(Self { chunk_storage })
     }
 
     pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
@@ -163,6 +156,6 @@ impl Chunks {
 
 impl Display for Chunks {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.keys.public_key())
+        write!(formatter, "Chunks")
     }
 }

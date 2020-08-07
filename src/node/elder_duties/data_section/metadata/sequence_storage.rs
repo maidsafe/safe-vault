@@ -8,7 +8,6 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
-    node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::MessagingDuty,
     node::state_db::NodeInfo,
@@ -28,7 +27,6 @@ use std::{
 
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
-    keys: NodeKeys,
     chunks: SequenceChunkStore,
     wrapping: ElderMsgWrapping,
 }
@@ -45,11 +43,7 @@ impl SequenceStorage {
             Rc::clone(total_used_space),
             node_info.init_mode,
         )?;
-        Ok(Self {
-            keys: node_info.keys(),
-            chunks,
-            wrapping,
-        })
+        Ok(Self { chunks, wrapping })
     }
 
     pub(super) fn read(
@@ -393,6 +387,6 @@ impl SequenceStorage {
 
 impl Display for SequenceStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.keys.public_key())
+        write!(formatter, "SequenceStorage")
     }
 }

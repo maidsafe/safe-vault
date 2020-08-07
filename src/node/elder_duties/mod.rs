@@ -11,7 +11,6 @@ mod key_section;
 
 use self::{data_section::DataSection, key_section::KeySection};
 use crate::{
-    node::keys::NodeKeys,
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
     Error, Result,
@@ -27,7 +26,6 @@ use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
 pub struct ElderDuties<R: CryptoRng + Rng> {
-    keys: NodeKeys,
     prefix: Prefix,
     key_section: KeySection<R>,
     data_section: DataSection,
@@ -42,9 +40,8 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     ) -> Result<Self> {
         let prefix = *routing.borrow().our_prefix().ok_or(Error::Logic)?;
         let key_section = KeySection::new(info.clone(), routing.clone(), rng)?;
-        let data_section = DataSection::new(info.clone(), total_used_space, routing)?;
+        let data_section = DataSection::new(info, total_used_space, routing)?;
         Ok(Self {
-            keys: info.keys,
             prefix,
             key_section,
             data_section,
@@ -115,6 +112,6 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
 
 impl<R: CryptoRng + Rng> Display for ElderDuties<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.keys.public_key())
+        write!(formatter, "ElderDuties")
     }
 }

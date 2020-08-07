@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{keys::NodeKeys, msg_wrapping::AdultMsgWrapping, node_ops::MessagingDuty};
+use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::MessagingDuty};
 use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
 use log::{error, info};
 use safe_nd::{
@@ -21,7 +21,6 @@ use std::{
 
 /// Storage of data chunks.
 pub(crate) struct ChunkStorage {
-    keys: NodeKeys,
     chunks: BlobChunkStore,
     wrapping: AdultMsgWrapping,
 }
@@ -35,11 +34,7 @@ impl ChunkStorage {
             node_info.init_mode,
         )?;
         let wrapping = AdultMsgWrapping::new(node_info.keys(), AdultDuties::ChunkStorage);
-        Ok(Self {
-            keys: node_info.keys(),
-            chunks,
-            wrapping,
-        })
+        Ok(Self { chunks, wrapping })
     }
 
     pub(crate) fn store(
@@ -179,6 +174,6 @@ impl ChunkStorage {
 
 impl Display for ChunkStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.keys.public_key())
+        write!(formatter, "ChunkStorage")
     }
 }

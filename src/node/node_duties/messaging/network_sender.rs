@@ -6,10 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{
-    node::node_ops::{GroupDecision, MessagingDuty},
-    utils,
-};
+use crate::{node::node_ops::MessagingDuty, utils};
 use log::{error, info};
 use routing::{DstLocation, Node as Routing, SrcLocation};
 use safe_nd::{Address, MsgEnvelope};
@@ -94,20 +91,6 @@ impl NetworkSender {
                     info!("Sent to section with: {:?}", msg);
                     None
                 },
-            )
-    }
-
-    ///
-    pub fn vote_for(&mut self, decision: GroupDecision) -> Option<MessagingDuty> {
-        self.routing
-            .borrow_mut()
-            .vote_for_user_event(utils::serialise(&decision))
-            .map_or_else(
-                |_err| {
-                    error!("Cannot vote; node is not an Elder");
-                    None
-                },
-                |()| None,
             )
     }
 }

@@ -7,35 +7,37 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::utils;
-use safe_nd::{
-    BlsProof, BlsProofShare, Ed25519Proof, NodeKeypairs, NodePublicId, Proof, PublicKey, Signature,
-};
+use routing::Node as Routing;
+use safe_nd::{BlsProof, BlsProofShare, Ed25519Proof, Proof, PublicKey, Signature, SignatureShare};
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
+use threshold_crypto::PublicKeySet;
 
-/// Abstraction over
-/// the key pairs of the node,
-/// to simplify its usage in various modules.
 #[derive(Clone)]
-pub struct NodeKeys {
-    keys: Rc<RefCell<NodeKeypairs>>,
+pub struct NodeSigningKeys {
+    routing: Rc<RefCell<Routing>>,
 }
 
-impl NodeKeys {
-    pub fn new(keys: Rc<RefCell<NodeKeypairs>>) -> Self {
-        Self { keys }
+impl NodeSigningKeys {
+    pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
+        Self { routing }
     }
 
-    pub fn public_id(&self) -> NodePublicId {
-        self.keys.borrow().public_id().clone()
+    pub fn public_key(&self) -> Option<PublicKey> {
+        let node = self.routing.borrow();
+        let index = node.our_index().ok()?;
+        let share = node.public_key_set().ok()?.public_key_share(index);
+        Some(PublicKey::BlsShare(share))
     }
 
-    pub fn public_key(&self) -> PublicKey {
-        self.keys.borrow().public_key()
-    }
-
+    /// Signs with the BLS if any, else the Ed25519.
     pub fn sign<T: Serialize>(&self, data: &T) -> Signature {
-        self.keys.borrow().sign(&utils::serialise(data))
+        let data = utils::serialise(data);
+        if let Some(sig) = self.sign_using_bls(&data) {
+            sig
+        } else {
+            self.sign_using_ed25519(&data)
+        }
     }
 
     pub fn produce_proof<T: Serialize>(&self, data: &T) -> Proof {
@@ -43,25 +45,47 @@ impl NodeKeys {
             Signature::BlsShare(share) => Proof::BlsShare(BlsProofShare {
                 index: share.index,
                 signature_share: share.share,
-                public_key_set: match self.keys.borrow().public_key_set() {
-                    Some(key_set) => key_set.clone(),
+                public_key_set: match self.public_key_set() {
+                    Some(key_set) => key_set,
                     None => unreachable!(), // this is admittedly not very elegant code..
                 },
             }),
             Signature::Ed25519(signature) => Proof::Ed25519(Ed25519Proof {
                 public_key: match self.public_key() {
-                    PublicKey::Ed25519(key) => key,
+                    Some(PublicKey::Ed25519(key)) => key,
                     _ => unreachable!(), // this is admittedly not very elegant code..
                 },
                 signature,
             }),
             Signature::Bls(signature) => Proof::Bls(BlsProof {
                 public_key: match self.public_key() {
-                    PublicKey::Bls(key) => key,
+                    Some(PublicKey::Bls(key)) => key,
                     _ => unreachable!(), // this is admittedly not very elegant code..
                 },
                 signature,
             }),
         }
+    }
+
+    fn public_key_set(&self) -> Option<PublicKeySet> {
+        let node = self.routing.borrow();
+        Some(node.public_key_set().ok()?.clone())
+    }
+
+    /// Creates a detached Ed25519 signature of `data`.
+    fn sign_using_ed25519<T: AsRef<[u8]>>(&self, _data: &T) -> Signature {
+        unimplemented!()
+        //Signature::Ed25519(self.ed25519.sign(data.as_ref()))
+    }
+
+    /// Creates a detached BLS signature share of `data` if the `self` holds a BLS keypair share.
+    fn sign_using_bls<T: AsRef<[u8]>>(&self, data: &T) -> Option<Signature> {
+        let node = self.routing.borrow();
+        let index = node.our_index().ok()?;
+        let bls_secret_key = node.secret_key_share().ok()?;
+        Some(Signature::BlsShare(SignatureShare {
+            index,
+            share: bls_secret_key.sign(data),
+        }))
     }
 }

@@ -11,7 +11,7 @@ use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use routing::Node as Routing;
-use safe_nd::{BlsKeypairShare, Keypair, PublicId, PublicKey};
+use safe_nd::{BlsKeypairShare, Keypair};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cell::RefCell, fs, path::Path, rc::Rc};
 use threshold_crypto::{self, serde_impl::SerdeSecret};
@@ -50,16 +50,6 @@ pub(crate) fn serialise<T: Serialize>(data: &T) -> Vec<u8> {
 
 pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> T {
     unwrap!(bincode::deserialize(bytes))
-}
-
-/// Returns the client's or app's public key if `public_id` represents a Client or App respectively,
-/// or None if it represents a Node.
-pub(crate) fn own_key(public_id: &PublicId) -> Option<&PublicKey> {
-    match public_id {
-        PublicId::Node(_) => None,
-        PublicId::Client(ref client) => Some(client.public_key()),
-        PublicId::App(ref app) => Some(app.public_key()),
-    }
 }
 
 // NB: needs to allow for nodes not having a key share yet?

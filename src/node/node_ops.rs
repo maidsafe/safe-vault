@@ -11,11 +11,10 @@ use safe_nd::Transfer;
 
 use routing::{event::Event as NetworkEvent, Prefix, TransportEvent as ClientEvent};
 use safe_nd::{
-    AccountId, Address, AuthCmd, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope,
-    MsgSender, PublicId, PublicKey, ReplicaEvent, SignedTransfer, TransferValidated,
+    AccountId, Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
+    ReplicaEvent, SignedTransfer, TransferValidated,
 };
 use serde::export::Formatter;
-use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
@@ -91,23 +90,6 @@ pub enum NetworkDuty {
     RunAsNode(NodeDuty),
 }
 
-/// A GroupDecision is something only
-/// taking place at key sections, for
-/// requests from clients which they need to agree on.
-/// Currently there is only one such group of
-/// requests: AuthCmds. These will be deprecated.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum GroupDecision {
-    /// When Gateway nodes consider a request
-    /// valid, they will vote for it to be forwarded.
-    /// As they reach consensus, this is then carried out.
-    Process {
-        cmd: AuthCmd,
-        msg_id: MessageId,
-        origin: MsgSender,
-    },
-}
-
 // --------------- Node ---------------
 
 /// Common duties run by all nodes.
@@ -163,9 +145,6 @@ pub enum MessagingDuty {
         targets: BTreeSet<XorName>,
         msg: MsgEnvelope,
     },
-    /// Vote for a cmd so we can process the deferred action on consensus.
-    /// (Currently immediately.)
-    VoteFor(GroupDecision),
     /// At a key section, connecting clients start the
     /// interchange of handshakes. The network returns
     /// handshake responses to the client.
@@ -202,7 +181,6 @@ impl Debug for MessagingDuty {
             }
             Self::SendToNode(msg) => write!(f, "SendToNode [ msg: {:?} ]", msg),
             Self::SendToSection(msg) => write!(f, "SendToSection [ msg: {:?} ]", msg),
-            Self::VoteFor(decision) => write!(f, "VoteFor(Decision: {:?})", decision),
             Self::DisconnectClient(addr) => write!(f, "Disconnection(Address: {:?})", addr),
         }
     }
@@ -282,15 +260,7 @@ pub enum KeySectionDuty {
     /// Incoming client msgs
     /// are to be evaluated and
     /// sent to their respective module.
-    EvaluateClientMsg {
-        public_id: PublicId,
-        msg: MsgEnvelope,
-    },
-    /// Group decisions are to be carried out.
-    ProcessGroupDecision(GroupDecision),
-    /// Auth duties is soon to be deprecated
-    /// to instead be handled clientside at the Authenticator.
-    RunAsAuth(AuthDuty),
+    EvaluateClientMsg(MsgEnvelope),
     /// As a Gateway, the node interfaces with
     /// clients, interpreting handshakes and msgs,
     /// and also correlating network msgs (such as cmd errors
@@ -327,42 +297,6 @@ pub enum DataSectionDuty {
     /// the network by storing metadata / data, and
     /// carrying out operations on those.
     RunAsRewards(RewardDuty),
-}
-
-// --------------- Auth (Temporary!) ---------------
-
-/// These things will be handled client
-/// side instead, in the Authenticator app.
-#[derive(Debug)]
-pub enum AuthDuty {
-    ///
-    Process {
-        ///
-        cmd: AuthCmd,
-        ///
-        msg_id: MessageId,
-        ///
-        origin: MsgSender,
-    },
-    ///
-    ListAuthKeysAndVersion {
-        /// The Client id.
-        client: PublicKey,
-        ///
-        msg_id: MessageId,
-        ///
-        origin: MsgSender,
-    },
-}
-
-impl Into<NodeOperation> for AuthDuty {
-    fn into(self) -> NodeOperation {
-        use ElderDuty::*;
-        use KeySectionDuty::*;
-        use NetworkDuty::*;
-        use NodeOperation::*;
-        Single(RunAsElder(RunAsKeySection(RunAsAuth(self))))
-    }
 }
 
 // --------------- Gateway ---------------

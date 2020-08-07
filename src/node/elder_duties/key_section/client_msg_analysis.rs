@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::node_ops::{
-    GroupDecision, MessagingDuty, NodeOperation, PaymentDuty, TransferDuty,
-};
+use crate::node::node_ops::{NodeOperation, PaymentDuty, TransferDuty};
 
 use crate::node::section_querying::SectionQuerying;
 use log::warn;
@@ -33,26 +31,9 @@ impl ClientMsgAnalysis {
             Some(duty.into())
         } else if let Some(duty) = self.try_transfers(msg) {
             Some(duty.into())
-        } else if let Some(duty) = self.try_auth(msg) {
-            Some(duty.into())
         } else {
             None
         }
-    }
-
-    fn try_auth(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        let cmd = match &msg.message {
-            Message::Cmd {
-                cmd: Cmd::Auth(auth_cmd),
-                ..
-            } => auth_cmd.clone(),
-            _ => return None,
-        };
-        Some(MessagingDuty::VoteFor(GroupDecision::Process {
-            cmd,
-            msg_id: msg.id(),
-            origin: msg.origin.clone(),
-        }))
     }
 
     /// We do not accumulate these request, they are executed

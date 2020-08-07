@@ -11,7 +11,7 @@ pub mod store;
 
 pub use self::replica_manager::ReplicaManager;
 use crate::{
-    node::keys::NodeKeys,
+    node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
@@ -61,13 +61,13 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.
 pub struct Transfers {
-    keys: NodeKeys,
+    keys: NodeSigningKeys,
     replica: Rc<RefCell<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
 }
 
 impl Transfers {
-    pub fn new(keys: NodeKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
+    pub fn new(keys: NodeSigningKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
         let wrapping = ElderMsgWrapping::new(keys.clone(), ElderDuties::Transfer);
         Self {
             keys,
@@ -83,7 +83,7 @@ impl Transfers {
         self.wrapping
             .send(Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(
-                    self.keys.public_key(),
+                    self.keys.public_key()?,
                 )),
                 id: MessageId::new(),
             })
@@ -387,6 +387,6 @@ impl Transfers {
 
 impl Display for Transfers {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.keys.public_key())
+        write!(formatter, "Transfers")
     }
 }

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::keys::NodeKeys, node::node_ops::MessagingDuty, utils};
+use crate::{node::keys::NodeSigningKeys, node::node_ops::MessagingDuty, utils};
 use log::info;
 use safe_nd::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
@@ -34,12 +34,12 @@ pub struct AdultMsgWrapping {
 /// to be sent on the wire.
 #[derive(Clone)]
 struct MsgWrapping {
-    keys: NodeKeys,
+    keys: NodeSigningKeys,
     duty: Duty,
 }
 
 impl AdultMsgWrapping {
-    pub fn new(keys: NodeKeys, duty: AdultDuties) -> Self {
+    pub fn new(keys: NodeSigningKeys, duty: AdultDuties) -> Self {
         let inner = MsgWrapping::new(keys, Duty::Adult(duty));
         Self { inner }
     }
@@ -59,7 +59,7 @@ impl AdultMsgWrapping {
 }
 
 impl ElderMsgWrapping {
-    pub fn new(keys: NodeKeys, duty: ElderDuties) -> Self {
+    pub fn new(keys: NodeSigningKeys, duty: ElderDuties) -> Self {
         let inner = MsgWrapping::new(keys, Duty::Elder(duty));
         Self { inner }
     }
@@ -92,7 +92,7 @@ impl ElderMsgWrapping {
 }
 
 impl MsgWrapping {
-    pub fn new(keys: NodeKeys, duty: Duty) -> Self {
+    pub fn new(keys: NodeSigningKeys, duty: Duty) -> Self {
         Self { keys, duty }
     }
 

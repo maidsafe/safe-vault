@@ -24,7 +24,6 @@ use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
-use safe_nd::{NodeKeypairs, NodePublicId};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -42,7 +41,6 @@ pub enum DutyLevel<R: CryptoRng + Rng> {
 /// Within the duty level, there are then additional
 /// duties to be carried out, depending on the level.
 pub struct NodeDuties<R: CryptoRng + Rng> {
-    keys: Rc<RefCell<NodeKeypairs>>,
     node_info: NodeInfo,
     duty_level: DutyLevel<R>,
     network_events: NetworkEvents,
@@ -52,18 +50,12 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> NodeDuties<R> {
-    pub fn new(
-        keys: Rc<RefCell<NodeKeypairs>>,
-        node_info: NodeInfo,
-        routing: Rc<RefCell<Routing>>,
-        rng: R,
-    ) -> Self {
+    pub fn new(node_info: NodeInfo, routing: Rc<RefCell<Routing>>, rng: R) -> Self {
         let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(SectionQuerying::new(
             routing.clone(),
         )));
         let messaging = Messaging::new(routing.clone());
         Self {
-            keys,
             node_info,
             duty_level: DutyLevel::Infant,
             network_events,
@@ -71,10 +63,6 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             routing,
             rng: Some(rng),
         }
-    }
-
-    pub fn id(&self) -> NodePublicId {
-        self.node_info.public_id()
     }
 
     pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
@@ -133,14 +121,6 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             let mut duties = duties;
             let initiation = duties.initiate();
             self.duty_level = Elder(duties);
-            let node = self.routing.borrow();
-            info!("Updating BLS Keys");
-            let index = node.our_index().ok()?;
-            let bls_secret_key = node.secret_key_share().ok()?;
-            let public_key_set = node.public_key_set().ok()?.clone();
-            self.keys
-                .borrow_mut()
-                .set_bls_keys(index, bls_secret_key.clone(), public_key_set);
             // NB: This is wrong, shouldn't write to disk here,
             // let it be upper layer resp.
             // Also, "Error-to-Unit" is not a good conversion..

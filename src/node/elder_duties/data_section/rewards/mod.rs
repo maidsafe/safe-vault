@@ -12,7 +12,7 @@ mod validator;
 use self::section_funds::{Payout, SectionFunds};
 pub use self::validator::Validator;
 use crate::{
-    node::keys::NodeKeys,
+    node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation, RewardDuty},
 };
@@ -53,7 +53,7 @@ fn reward(age: Age) -> Money {
 }
 
 impl Rewards {
-    pub fn new(keys: NodeKeys, actor: TransferActor<Validator>) -> Self {
+    pub fn new(keys: NodeSigningKeys, actor: TransferActor<Validator>) -> Self {
         let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Rewards);
         let section_funds = SectionFunds::new(actor, wrapping.clone());
         Self {

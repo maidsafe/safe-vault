@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::NetworkMsgAnalysis;
-use crate::node::node_ops::{ElderDuty, GroupDecision, KeySectionDuty, NodeDuty, NodeOperation};
+use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
 use routing::event::Event as RoutingEvent;
@@ -28,18 +28,8 @@ impl NetworkEvents {
 
     pub fn process(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
         use ElderDuty::*;
-        use KeySectionDuty::*;
         use NodeDuty::*;
         match event {
-            RoutingEvent::Consensus(custom_event) => {
-                match bincode::deserialize::<GroupDecision>(&custom_event) {
-                    Ok(group_decision) => Some(ProcessGroupDecision(group_decision).into()),
-                    Err(e) => {
-                        error!("Invalid GroupDecision passed from Routing: {:?}", e);
-                        None
-                    }
-                }
-            }
             RoutingEvent::PromotedToAdult => {
                 info!("Node promoted to Adult");
                 Some(BecomeAdult.into())

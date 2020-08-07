@@ -20,17 +20,18 @@ pub use crate::node::node_duties::messaging::Receiver;
 pub use crate::node::state_db::{Command, Init};
 use crate::{
     node::{
-        keys::NodeKeys,
+        keys::NodeSigningKeys,
         node_duties::{messaging::Received, NodeDuties},
         node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
-        state_db::{read_state, AgeGroup, NodeInfo},
+        state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup, NodeInfo},
     },
     Config, Result,
 };
+use ed25519_dalek::Keypair as Ed25519Keypair;
 use log::{info, warn};
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
-use safe_nd::NodeKeypairs;
+use safe_nd::PublicKey;
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
@@ -56,13 +57,21 @@ impl<R: CryptoRng + Rng> Node<R> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
 
-        let (age_group, keypairs) = read_state(&root_dir)?.unwrap_or_else(|| {
-            let keypairs = NodeKeypairs::new(&mut rng);
-            (Infant, keypairs)
+        let reward_key = match config.wallet_address() {
+            Some(public_key) => *public_key,
+            None => {
+                let ed25519 = Ed25519Keypair::generate(&mut rng);
+                store_new_reward_keypair(root_dir, &ed25519).unwrap_or(());
+                PublicKey::Ed25519(ed25519.public)
+            }
+        };
+        let age_group = get_age_group(&root_dir)?.unwrap_or_else(|| {
+            let age_group = Infant;
+            store_age_group(root_dir, age_group.clone()).unwrap_or(());
+            age_group
         });
 
-        let keypairs = Rc::new(RefCell::new(keypairs));
-        let keys = NodeKeys::new(keypairs.clone());
+        let keys = NodeSigningKeys::new(routing.clone());
 
         let node_info = NodeInfo {
             keys,
@@ -74,7 +83,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             max_storage_capacity: config.max_capacity(),
         };
 
-        let mut duties = NodeDuties::new(keypairs, node_info, routing.clone(), rng);
+        let mut duties = NodeDuties::new(node_info, routing.clone(), rng);
 
         use AgeGroup::*;
         let _ = match age_group {
@@ -89,8 +98,12 @@ impl<R: CryptoRng + Rng> Node<R> {
             routing,
         };
 
+        node.register(reward_key);
+
         Ok(node)
     }
+
+    fn register(&self, _reward_key: PublicKey) {}
 
     /// Returns our connection info.
     pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
@@ -176,6 +189,6 @@ impl<R: CryptoRng + Rng> Node<R> {
 
 impl<R: CryptoRng + Rng> Display for Node<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.duties.id())
+        write!(formatter, "Node")
     }
 }

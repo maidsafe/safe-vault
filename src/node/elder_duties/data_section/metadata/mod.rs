@@ -15,7 +15,6 @@ mod sequence_storage;
 mod writing;
 
 use crate::{
-    node::keys::NodeKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MetadataDuty, NodeOperation},
     node::section_querying::SectionQuerying,
@@ -44,7 +43,6 @@ use xor_name::XorName;
 /// the structures + their metadata - handled at `Elders` - with
 /// all underlying data being chunks stored at `Adults`.
 pub struct Metadata {
-    keys: NodeKeys,
     elder_stores: ElderStores,
     #[allow(unused)]
     wrapping: ElderMsgWrapping,
@@ -62,8 +60,7 @@ impl Metadata {
         let blob_register =
             BlobRegister::new(node_info.clone(), wrapping.clone(), section_querying)?;
         let map_storage = MapStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
-        let sequence_storage =
-            SequenceStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
+        let sequence_storage = SequenceStorage::new(node_info, total_used_space, wrapping.clone())?;
         let elder_stores = ElderStores::new(
             account_storage,
             blob_register,
@@ -71,7 +68,6 @@ impl Metadata {
             sequence_storage,
         );
         Ok(Self {
-            keys: node_info.keys(),
             elder_stores,
             wrapping,
         })
@@ -263,6 +259,6 @@ impl Metadata {
 
 impl Display for Metadata {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.keys.public_key())
+        write!(formatter, "Metadata")
     }
 }
