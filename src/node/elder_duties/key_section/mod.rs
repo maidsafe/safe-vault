@@ -23,11 +23,10 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
-use log::warn;
 use rand::{CryptoRng, Rng};
 use routing::{Node as Routing, Prefix, RoutingError};
-use safe_nd::{AccountId, MsgEnvelope};
-use std::{cell::RefCell, rc::Rc};
+use safe_nd::AccountId;
+use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 use xor_name::XorName;
 
 /// A Key Section interfaces with clients,
@@ -38,33 +37,22 @@ use xor_name::XorName;
 /// and routing messages back and forth to clients.
 /// Payments deals with the payment for data writes,
 /// while transfers deals with sending money between keys.
-/// Auth is a module that is being deprecated in favour
-/// of client side Authenticator. (The module is an optimisation
-/// but introduces excessive complexity/responsibility for the network.)
 pub struct KeySection<R: CryptoRng + Rng> {
     gateway: ClientGateway<R>,
     payments: Payments,
     transfers: Transfers,
     msg_analysis: ClientMsgAnalysis,
+    replica_manager: Rc<RefCell<ReplicaManager>>,
     routing: Rc<RefCell<Routing>>,
 }
 
 impl<R: CryptoRng + Rng> KeySection<R> {
     pub fn new(info: NodeInfo, routing: Rc<RefCell<Routing>>, rng: R) -> Result<Self> {
         let section_querying = SectionQuerying::new(routing.clone());
-
-        // ClientGateway
         let gateway = ClientGateway::new(info.clone(), section_querying, rng)?;
-
-        // (AT2 Replicas)
-        let replica_manager = Self::replica_manager(info.clone(), routing.clone())?;
-
-        // Payments
+        let replica_manager = Self::new_replica_manager(info.clone(), routing.clone())?;
         let payments = Payments::new(info.keys.clone(), replica_manager.clone());
-
-        // Transfers
-        let transfers = Transfers::new(info.keys, replica_manager);
-
+        let transfers = Transfers::new(info.keys, replica_manager.clone());
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
 
         Ok(Self {
@@ -72,23 +60,17 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             payments,
             transfers,
             msg_analysis,
+            replica_manager,
             routing,
         })
     }
 
-    pub fn process(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
-        use KeySectionDuty::*;
-        match duty {
-            EvaluateClientMsg(msg) => self.evaluate(&msg),
-            RunAsGateway(duty) => self.gateway.process(&duty),
-            RunAsPayment(duty) => self.payments.process(&duty),
-            RunAsTransfers(duty) => self.transfers.process(&duty),
-        }
-    }
-
-    fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-        warn!("Pre-evaluating msg envelope: {:?}", msg);
-        self.msg_analysis.evaluate(msg)
+    /// Issues queries to Elders of the section
+    /// as to catch up with shares state and
+    /// start working properly in the group.
+    pub fn catchup_with_section(&mut self) -> Option<NodeOperation> {
+        // currently only at2 replicas need to catch up
+        self.transfers.catchup_with_replicas()
     }
 
     // Update our replica with the latest keys
@@ -96,37 +78,52 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let pub_key_set = self.routing.borrow().public_key_set().ok()?.clone();
         let sec_key_share = self.routing.borrow().secret_key_share().ok()?.clone();
         let proof_chain = self.routing.borrow().our_history()?.clone();
-        let our_index = self.routing.borrow().our_index().ok()?;
-        if let Err(error) = self.transfers.update_replica_on_churn(
-            pub_key_set,
+        let index = self.routing.borrow().our_index().ok()?;
+        match self.replica_manager.borrow_mut().update_replica_keys(
             sec_key_share,
-            our_index,
+            index,
+            pub_key_set,
             proof_chain,
         ) {
-            // we must crash if we can't update the replica
-            // the node can't work correctly without it..
-            panic!(error)
+            Ok(()) => None,
+            Err(e) => panic!(e), // Temporary brittle solution before lazy messaging impl.
         }
-        None
     }
 
+    /// When section splits, the Replicas in either resulting section
+    /// also split the responsibility of the accounts.
+    /// Thus, both Replica groups need to drop the accounts that
+    /// the other group is now responsible for.
     pub fn section_split(&mut self, prefix: Prefix) -> Option<NodeOperation> {
         // Removes accounts that are no longer our section responsibility.
         let not_matching = |key: AccountId| {
             let xorname: XorName = key.into();
             !prefix.matches(&XorName(xorname.0))
         };
-        Some(self.transfers.drop_accounts(not_matching)?.into())
+        let all_keys = self.replica_manager.borrow_mut().all_keys()?;
+        let accounts = all_keys
+            .iter()
+            .filter(|key| not_matching(**key))
+            .copied()
+            .collect::<BTreeSet<AccountId>>();
+        self.replica_manager
+            .borrow_mut()
+            .drop_accounts(&accounts)
+            .ok()?;
+        None
     }
 
-    /// Issues a query to existing Replicas
-    /// asking for their events, as to catch up and
-    /// start working properly in the group.
-    pub fn query_replica_events(&mut self) -> Option<NodeOperation> {
-        self.transfers.query_replica_events()
+    pub fn process(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
+        use KeySectionDuty::*;
+        match duty {
+            EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg),
+            RunAsGateway(duty) => self.gateway.process(&duty),
+            RunAsPayment(duty) => self.payments.process(&duty),
+            RunAsTransfers(duty) => self.transfers.process(&duty),
+        }
     }
 
-    fn replica_manager(
+    fn new_replica_manager(
         info: NodeInfo,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Rc<RefCell<ReplicaManager>>> {

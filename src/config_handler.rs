@@ -350,7 +350,7 @@ mod test {
     #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
-        let expected_size = 280;
+        let expected_size = 456;
         assert_eq!(
             expected_size,
             mem::size_of::<Config>(),

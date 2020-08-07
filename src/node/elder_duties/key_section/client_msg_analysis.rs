@@ -9,10 +9,11 @@
 use crate::node::node_ops::{NodeOperation, PaymentDuty, TransferDuty};
 
 use crate::node::section_querying::SectionQuerying;
-use log::warn;
+use log::info;
 use routing::Node as Routing;
 use safe_nd::{Cmd, Message, MsgEnvelope, MsgSender, Query};
 use std::{cell::RefCell, rc::Rc};
+
 /// Evaluates msgs sent directly from a client,
 /// i.e. not remote msgs from the network.
 pub struct ClientMsgAnalysis {
@@ -26,7 +27,7 @@ impl ClientMsgAnalysis {
     }
 
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-        warn!("Evaluation of client msg envelope: {:?}", msg);
+        info!("Evaluation of client msg envelope: {:?}", msg);
         if let Some(duty) = self.try_data_payment(msg) {
             Some(duty.into())
         } else if let Some(duty) = self.try_transfers(msg) {

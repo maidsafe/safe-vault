@@ -101,7 +101,7 @@ impl ReplicaManager {
 
         // Replays the kept streams
         // on a new instance of a Replica.
-        self.churn(
+        self.update_replica_keys(
             self.info.secret_key.clone(),
             self.info.key_index,
             self.info.peer_replicas.clone(),
@@ -162,7 +162,7 @@ impl ReplicaManager {
         Ok(())
     }
 
-    pub(crate) fn churn(
+    pub(crate) fn update_replica_keys(
         &mut self,
         secret_key: SecretKeyShare,
         key_index: usize,

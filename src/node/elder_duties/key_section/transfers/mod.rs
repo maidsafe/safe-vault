@@ -16,22 +16,19 @@ use crate::{
     node::node_ops::{MessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
 use safe_nd::{
-    AccountId, Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message,
-    MessageId, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd,
-    NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse,
-    ReplicaEvent, Result, SignedTransfer, TransferError,
+    Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
+    NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
+    NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse, ReplicaEvent,
+    SignedTransfer, TransferError,
 };
 use std::{
     cell::RefCell,
-    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
 
-use routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use safe_nd::Transfer;
-use threshold_crypto::{PublicKeySet, SecretKeyShare};
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -61,63 +58,29 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.
 pub struct Transfers {
-    keys: NodeSigningKeys,
     replica: Rc<RefCell<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
 }
 
 impl Transfers {
     pub fn new(keys: NodeSigningKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
-        let wrapping = ElderMsgWrapping::new(keys.clone(), ElderDuties::Transfer);
-        Self {
-            keys,
-            replica,
-            wrapping,
-        }
+        let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Transfer);
+        Self { replica, wrapping }
     }
 
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub fn query_replica_events(&mut self) -> Option<NodeOperation> {
+    pub fn catchup_with_replicas(&mut self) -> Option<NodeOperation> {
+        // prepare replica init
         self.wrapping
             .send(Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(
-                    self.keys.public_key()?,
-                )),
+                query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(PublicKey::Bls(
+                    self.replica.borrow_mut().replicas_pk_set()?.public_key(),
+                ))),
                 id: MessageId::new(),
             })
             .map(|c| c.into())
-    }
-
-    pub fn update_replica_on_churn(
-        &mut self,
-        pub_key_set: PublicKeySet,
-        sec_key_share: SecretKeyShare,
-        index: usize,
-        proof_chain: SectionProofChain,
-    ) -> Result<()> {
-        self.replica
-            .borrow_mut()
-            .churn(sec_key_share, index, pub_key_set, proof_chain)
-    }
-
-    /// When section splits, the Replicas in either resulting section
-    /// also split the responsibility of the accounts.
-    /// Thus, both Replica groups need to drop the accounts that
-    /// the other group is now responsible for.
-    pub fn drop_accounts<F>(&mut self, not_matching: F) -> Option<MessagingDuty>
-    where
-        F: Fn(AccountId) -> bool,
-    {
-        let all_keys = self.replica.borrow_mut().all_keys()?;
-        let accounts = all_keys
-            .iter()
-            .filter(|key| not_matching(**key))
-            .copied()
-            .collect::<BTreeSet<AccountId>>();
-        self.replica.borrow_mut().drop_accounts(&accounts).ok()?;
-        None
     }
 
     /// When handled by Elders in the dst
@@ -188,9 +151,10 @@ impl Transfers {
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
     fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Option<MessagingDuty> {
+        // We must be able to initiate the replica, otherwise this node cannot function.
         match self.replica.borrow_mut().initiate(events) {
             Ok(()) => None,
-            Err(e) => panic!(e), // we must be able to initiate the replica, otherwise this node cannot function
+            Err(e) => panic!(e), // Temporary brittle solution before lazy messaging impl.
         }
     }
 

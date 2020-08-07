@@ -8,6 +8,7 @@
 
 use crate::node::state_db::AgeGroup;
 use routing::Node as Routing;
+use safe_nd::PublicKey;
 use std::{cell::RefCell, collections::BTreeSet, net::SocketAddr, rc::Rc};
 use threshold_crypto::PublicKeySet;
 use xor_name::XorName;
@@ -26,6 +27,12 @@ impl SectionQuerying {
 
     pub fn our_name(&self) -> XorName {
         XorName(self.routing.borrow().id().name().0)
+    }
+
+    pub fn public_key(&self) -> Option<PublicKey> {
+        Some(PublicKey::Bls(
+            self.routing.borrow().public_key_set().ok()?.public_key(),
+        ))
     }
 
     pub fn public_key_set(&self) -> Option<PublicKeySet> {

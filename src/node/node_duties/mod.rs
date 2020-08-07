@@ -119,14 +119,14 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             self.rng.take()?,
         ) {
             let mut duties = duties;
-            let initiation = duties.initiate();
+            let op = duties.initiate();
             self.duty_level = Elder(duties);
             // NB: This is wrong, shouldn't write to disk here,
             // let it be upper layer resp.
             // Also, "Error-to-Unit" is not a good conversion..
             //dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
             info!("Successfully assumed Elder duties!");
-            initiation
+            op
         } else {
             warn!("Was not able to assume Elder duties!");
             None

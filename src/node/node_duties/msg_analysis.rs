@@ -370,13 +370,19 @@ impl NetworkMsgAnalysis {
                     origin: msg.origin.address(),
                 }),
                 Message::NodeQuery {
-                    query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(_)),
+                    query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(public_key)),
                     id,
-                } => Some(TransferDuty::ProcessQuery {
-                    query: TransferQuery::GetReplicaEvents,
-                    msg_id: *id,
-                    origin: msg.origin.address(),
-                }),
+                } => {
+                    if public_key == &self.section.public_key()? {
+                        Some(TransferDuty::ProcessQuery {
+                            query: TransferQuery::GetReplicaEvents,
+                            msg_id: *id,
+                            origin: msg.origin.address(),
+                        })
+                    } else {
+                        None
+                    }
+                }
                 Message::NodeQueryResponse {
                     response:
                         NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetReplicaEvents(

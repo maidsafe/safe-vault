@@ -48,11 +48,12 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         })
     }
 
-    /// Issues a query to existing Replicas
-    /// asking for their events, as to catch up and
+    /// Issues queries to Elders of the section
+    /// as to catch up with shares state and
     /// start working properly in the group.
     pub fn initiate(&mut self) -> Option<NodeOperation> {
-        self.key_section.query_replica_events()
+        // currently only key section needs to catch up
+        self.key_section.catchup_with_section()
     }
 
     pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
