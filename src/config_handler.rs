@@ -359,7 +359,7 @@ mod test {
 
         let app_name = Config::clap().get_name().to_string();
         let test_values = [
-            ["wallet-address", "abc"],
+            ["wallet-address", "PublicKey::Bls(86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103)"],
             ["max-capacity", "1"],
             ["root-dir", "dir"],
             ["verbose", "None"],
