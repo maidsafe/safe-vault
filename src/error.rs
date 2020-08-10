@@ -65,14 +65,11 @@ quick_error! {
             display("Routing error: {:?}", error)
             from()
         }
-        // /// Unknown Request type.
-        // UnknownRequestType(request: Request) {
-        //     display("Unknown Request type: {:?}", request)
-        // }
-        // /// Unknown Response type.
-        // UnknownResponseType(response: Response) {
-        //     display("Unknown Response type: {:?}", response)
-        // }
+        ///
+        InvalidConfig(error: String) {
+            display("Config error: {:?}", error)
+            from()
+        }
         /// Message is invalid.
         InvalidMessage {}
         /// Account doesn't exist.

@@ -140,10 +140,10 @@ impl TransferStore {
 mod test {
     use super::*;
     use crate::Result;
+    use bls::SecretKey;
     use safe_nd::{PublicKey, TransferPropagated};
     use safe_transfers::get_genesis;
     use tempdir::TempDir;
-    use threshold_crypto::SecretKey;
 
     #[test]
     fn history() -> Result<()> {
@@ -189,8 +189,8 @@ mod test {
         PublicKey::from(SecretKey::random().public_key())
     }
 
+    use bls::SecretKeyShare;
     use safe_nd::SignatureShare;
-    use threshold_crypto::SecretKeyShare;
     fn dummy_sig() -> SignatureShare {
         let dummy_shares = SecretKeyShare::default();
         let dummy_sig = dummy_shares.sign("DUMMY MSG");

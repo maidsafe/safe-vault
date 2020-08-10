@@ -39,7 +39,7 @@ self_update = { version = "~0.16.0", default-features = false, features = ["rust
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
 structopt = "~0.2.18"
-threshold_crypto = "~0.4.0"
+bls = { package = "threshold_crypto", version = "~0.4.0" }
 tiny-keccak = "1.5.0"
 unwrap = "1.2.1"
 crdts = "4.1.0"
@@ -53,7 +53,6 @@ xor_name = { git="https://github.com/joshuef/xor-name.git", branch="AddRandom"}
 [dev_dependencies]
 maplit = "1.0.1"
 tempdir = "~0.3.7"
-threshold_crypto = "~0.4.0"
 
 [[bin]]
 name = "safe_vault"

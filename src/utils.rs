@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{node::state_db::Init, Result};
+use bls::{self, serde_impl::SerdeSecret};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
@@ -14,7 +15,6 @@ use routing::Node as Routing;
 use safe_nd::{BlsKeypairShare, Keypair};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cell::RefCell, fs, path::Path, rc::Rc};
-use threshold_crypto::{self, serde_impl::SerdeSecret};
 use unwrap::unwrap;
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(

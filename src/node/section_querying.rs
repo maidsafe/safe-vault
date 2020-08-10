@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::state_db::AgeGroup;
+use bls::PublicKeySet;
 use routing::Node as Routing;
 use safe_nd::PublicKey;
 use std::{cell::RefCell, collections::BTreeSet, net::SocketAddr, rc::Rc};
-use threshold_crypto::PublicKeySet;
 use xor_name::XorName;
 
 /// Querying of our section's member

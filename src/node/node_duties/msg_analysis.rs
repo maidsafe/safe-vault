@@ -373,6 +373,8 @@ impl NetworkMsgAnalysis {
                     query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(public_key)),
                     id,
                 } => {
+                    // This comparison is a good example of the need to use `lazy messaging`,
+                    // as to handle that the expected public key is not the same as the current.
                     if public_key == &self.section.public_key()? {
                         Some(TransferDuty::ProcessQuery {
                             query: TransferQuery::GetReplicaEvents,

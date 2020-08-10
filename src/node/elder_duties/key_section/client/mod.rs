@@ -20,7 +20,7 @@ use crate::{
         node_ops::{GatewayDuty, KeySectionDuty, MessagingDuty, NodeOperation},
         section_querying::SectionQuerying,
     },
-    utils, Result,
+    utils, Error, Result,
 };
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
@@ -40,7 +40,7 @@ pub struct ClientGateway<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> ClientGateway<R> {
     pub fn new(info: NodeInfo, section: SectionQuerying, rng: R) -> Result<Self> {
-        let onboarding = Onboarding::new(info.public_key().unwrap(), section.clone());
+        let onboarding = Onboarding::new(info.public_key().ok_or(Error::Logic)?, section.clone());
         let client_msg_tracking = ClientMsgTracking::new(onboarding);
 
         let gateway = Self {

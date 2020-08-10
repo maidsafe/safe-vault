@@ -27,7 +27,7 @@ use crate::{
     },
     Config, Result,
 };
-use ed25519_dalek::Keypair as Ed25519Keypair;
+use bls::SecretKey;
 use log::{info, warn};
 use rand::{CryptoRng, Rng};
 use routing::Node as Routing;
@@ -52,17 +52,18 @@ impl<R: CryptoRng + Rng> Node<R> {
         receiver: Receiver,
         routing: Rc<RefCell<Routing>>,
         config: &Config,
-        mut rng: R,
+        rng: R,
     ) -> Result<Self> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
 
         let reward_key = match config.wallet_address() {
-            Some(public_key) => *public_key,
+            Some(public_key) => PublicKey::Bls(state_db::pk_from_hex(public_key)?),
             None => {
-                let ed25519 = Ed25519Keypair::generate(&mut rng);
-                store_new_reward_keypair(root_dir, &ed25519).unwrap_or(());
-                PublicKey::Ed25519(ed25519.public)
+                let secret = SecretKey::random();
+                let public = secret.public_key();
+                store_new_reward_keypair(root_dir, &secret, &public)?;
+                PublicKey::Bls(public)
             }
         };
         let age_group = get_age_group(&root_dir)?.unwrap_or_else(|| {

@@ -8,6 +8,7 @@
 
 use super::store::TransferStore;
 use crate::Result;
+use bls::{PublicKeySet, SecretKeyShare};
 use log::info;
 use safe_nd::{
     AccountId, DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey, PublicKey,
@@ -16,15 +17,14 @@ use safe_nd::{
 };
 use safe_transfers::{get_genesis, TransferReplica as Replica};
 use std::collections::BTreeSet;
-use threshold_crypto::{PublicKeySet, SecretKeyShare};
 
 use routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use {
     crate::node::node_ops::MessagingDuty,
+    bls::{SecretKey, SecretKeySet},
     rand::thread_rng,
     safe_nd::{Signature, SignatureShare, Transfer},
-    threshold_crypto::{SecretKey, SecretKeySet},
 };
 
 /// Manages an instance of an AT2 Replica,

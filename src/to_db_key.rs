@@ -37,8 +37,8 @@ impl ToDbKey for XorName {}
 mod test {
     use super::*;
     use crate::Result;
+    use bls::SecretKey;
     use safe_nd::PublicKey;
-    use threshold_crypto::SecretKey;
 
     #[test]
     fn to_from_db_key() -> Result<()> {

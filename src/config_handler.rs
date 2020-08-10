@@ -11,7 +11,6 @@ use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use log::{debug, Level};
 use routing::TransportConfig as NetworkConfig;
-use safe_nd::PublicKey;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
@@ -64,8 +63,9 @@ const ARGS: [&str; 18] = [
 #[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))]
 pub struct Config {
     /// The address to be credited when this vault farms SafeCoin.
+    /// A hex formatted BLS public key.
     #[structopt(short, long, parse(try_from_str))]
-    wallet_address: Option<PublicKey>,
+    wallet_address: Option<String>,
     /// Upper limit in bytes for allowed network storage on this vault.
     #[structopt(short, long)]
     max_capacity: Option<u64>,
@@ -128,7 +128,7 @@ impl Config {
     }
 
     /// The address to be credited when this vault farms SafeCoin.
-    pub fn wallet_address(&self) -> Option<&PublicKey> {
+    pub fn wallet_address(&self) -> Option<&String> {
         self.wallet_address.as_ref()
     }
 
@@ -350,7 +350,7 @@ mod test {
     #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
-        let expected_size = 456;
+        let expected_size = 280;
         assert_eq!(
             expected_size,
             mem::size_of::<Config>(),
@@ -359,7 +359,7 @@ mod test {
 
         let app_name = Config::clap().get_name().to_string();
         let test_values = [
-            ["wallet-address", "PublicKey::Bls(86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103)"],
+            ["wallet-address", "86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103"],
             ["max-capacity", "1"],
             ["root-dir", "dir"],
             ["verbose", "None"],

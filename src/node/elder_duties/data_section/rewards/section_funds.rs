@@ -277,8 +277,8 @@ impl SectionFunds {
     }
 }
 
+use bls::SecretKeyShare;
 use safe_nd::SignatureShare;
-use threshold_crypto::SecretKeyShare;
 fn dummy_sig() -> SignatureShare {
     let dummy_shares = SecretKeyShare::default();
     let dummy_sig = dummy_shares.sign("DUMMY MSG");

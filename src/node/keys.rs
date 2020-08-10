@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::utils;
+use bls::PublicKeySet;
 use routing::Node as Routing;
 use safe_nd::{BlsProof, BlsProofShare, Ed25519Proof, Proof, PublicKey, Signature, SignatureShare};
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
-use threshold_crypto::PublicKeySet;
 
 #[derive(Clone)]
 pub struct NodeSigningKeys {
