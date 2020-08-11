@@ -13,12 +13,14 @@ use crate::node::node_ops::{
 };
 use crate::node::section_querying::SectionQuerying;
 use log::error;
+use routing::Node;
 use safe_nd::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
     NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
     NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
-use xor_name::XorName;
+use std::cell::{Ref, RefCell};
+use std::rc::Rc;
 
 // NB: This approach is not entirely good, so will be improved.
 
@@ -26,11 +28,17 @@ use xor_name::XorName;
 /// i.e. not msgs sent directly from a client.
 pub struct NetworkMsgAnalysis {
     accumulation: Accumulation,
-    section: SectionQuerying,
+    section: Rc<RefCell<Node>>,
+}
+
+impl SectionQuerying for NetworkMsgAnalysis {
+    fn routing(&self) -> Ref<Node> {
+        self.section.borrow()
+    }
 }
 
 impl NetworkMsgAnalysis {
-    pub fn new(section: SectionQuerying) -> Self {
+    pub fn new(section: Rc<RefCell<Node>>) -> Self {
         Self {
             accumulation: Accumulation::new(),
             section,
@@ -38,7 +46,7 @@ impl NetworkMsgAnalysis {
     }
 
     pub fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
-        self.self_is_handler_for(&msg.destination().xorname())
+        self.handles(&msg.destination().xorname())
     }
 
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
@@ -74,9 +82,9 @@ impl NetworkMsgAnalysis {
     fn try_messaging(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         use Address::*;
         let destined_for_network = || match msg.destination() {
-            Client(address) => !self.self_is_handler_for(&address),
-            Node(address) => address != self.section.our_name(),
-            Section(address) => !self.self_is_handler_for(&address),
+            Client(address) => !self.handles(&address),
+            Node(address) => address != self.our_name(),
+            Section(address) => !self.handles(&address),
         };
 
         if destined_for_network() {
@@ -167,7 +175,7 @@ impl NetworkMsgAnalysis {
     // todo: eval all msg types!
     fn try_client_entry(&self, msg: &MsgEnvelope) -> Option<GatewayDuty> {
         let is_our_client_msg = || match msg.destination() {
-            Address::Client(address) => self.self_is_handler_for(&address),
+            Address::Client(address) => self.handles(&address),
             _ => false,
         };
 
@@ -375,7 +383,7 @@ impl NetworkMsgAnalysis {
                 } => {
                     // This comparison is a good example of the need to use `lazy messaging`,
                     // as to handle that the expected public key is not the same as the current.
-                    if public_key == &self.section.public_key()? {
+                    if public_key == &self.public_key()? {
                         Some(TransferDuty::ProcessQuery {
                             query: TransferQuery::GetReplicaEvents,
                             msg_id: *id,
@@ -436,17 +444,5 @@ impl NetworkMsgAnalysis {
             }),
             _ => None,
         }
-    }
-
-    fn self_is_handler_for(&self, address: &XorName) -> bool {
-        self.section.handles(address)
-    }
-
-    fn is_elder(&self) -> bool {
-        self.section.is_elder()
-    }
-
-    fn is_adult(&self) -> bool {
-        self.section.is_adult()
     }
 }

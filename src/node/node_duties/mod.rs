@@ -16,7 +16,6 @@ use crate::node::{
     elder_duties::ElderDuties,
     node_duties::messaging::Messaging,
     node_ops::{NodeDuty, NodeOperation},
-    section_querying::SectionQuerying,
     state_db::NodeInfo,
 };
 use log::{info, warn};
@@ -51,9 +50,7 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> NodeDuties<R> {
     pub fn new(node_info: NodeInfo, routing: Rc<RefCell<Routing>>, rng: R) -> Self {
-        let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(SectionQuerying::new(
-            routing.clone(),
-        )));
+        let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
         let messaging = Messaging::new(routing.clone());
         Self {
             node_info,

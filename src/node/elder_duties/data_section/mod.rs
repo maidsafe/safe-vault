@@ -23,7 +23,7 @@ use crate::{
 use routing::{Node as Routing, Prefix};
 use safe_transfers::TransferActor;
 use std::{
-    cell::{Cell, RefCell},
+    cell::{Cell, Ref, RefCell},
     rc::Rc,
 };
 use xor_name::XorName;
@@ -40,8 +40,12 @@ pub struct DataSection {
     rewards: Rewards,
     /// The transport layer.
     routing: Rc<RefCell<Routing>>,
-    /// Information about our section.
-    section: SectionQuerying,
+}
+
+impl SectionQuerying for DataSection {
+    fn routing(&self) -> Ref<Routing> {
+        self.routing.borrow()
+    }
 }
 
 impl DataSection {
@@ -51,10 +55,8 @@ impl DataSection {
         total_used_space: &Rc<Cell<u64>>,
         routing: Rc<RefCell<Routing>>,
     ) -> Result<Self> {
-        let section = SectionQuerying::new(routing.clone());
-
         // Metadata
-        let metadata = Metadata::new(info.clone(), &total_used_space, section.clone())?;
+        let metadata = Metadata::new(info.clone(), &total_used_space, routing.clone())?;
 
         // Rewards
         let keypair = utils::key_pair(routing.clone())?;
@@ -66,7 +68,6 @@ impl DataSection {
             metadata,
             rewards,
             routing,
-            section,
         })
     }
 
@@ -80,7 +81,7 @@ impl DataSection {
 
     // Transition the section funds account to the new key.
     pub fn elders_changed(&mut self) -> Option<NodeOperation> {
-        let pub_key_set = self.section.public_key_set()?;
+        let pub_key_set = self.public_key_set()?;
         let keypair = utils::key_pair(self.routing.clone()).ok()?;
         let actor = TransferActor::new(keypair, pub_key_set, Validator {});
         self.rewards.transition(actor)
@@ -98,7 +99,7 @@ impl DataSection {
         self.rewards.remove(to_remove);
 
         // Then payout rewards to all the Elders.
-        let elders = self.section.our_elder_names();
+        let elders = self.our_elder_names();
         self.rewards.payout_rewards(elders)
     }
 

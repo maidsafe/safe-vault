@@ -26,25 +26,33 @@ use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
-use routing::TransportEvent as ClientEvent;
+use routing::{Node, TransportEvent as ClientEvent};
 use safe_nd::{Address, MsgEnvelope, MsgSender};
+use std::cell::{Ref, RefCell};
 use std::fmt::{self, Display, Formatter};
+use std::rc::Rc;
 
 /// A client gateway routes messages
 /// back and forth between a client and the network.
 pub struct ClientGateway<R: CryptoRng + Rng> {
-    section: SectionQuerying,
+    routing: Rc<RefCell<Node>>,
     client_msg_tracking: ClientMsgTracking,
     rng: R,
 }
 
+impl<R: CryptoRng + Rng> SectionQuerying for ClientGateway<R> {
+    fn routing(&self) -> Ref<Node> {
+        self.routing.borrow()
+    }
+}
+
 impl<R: CryptoRng + Rng> ClientGateway<R> {
-    pub fn new(info: NodeInfo, section: SectionQuerying, rng: R) -> Result<Self> {
-        let onboarding = Onboarding::new(info.public_key().ok_or(Error::Logic)?, section.clone());
+    pub fn new(info: NodeInfo, routing: Rc<RefCell<Node>>, rng: R) -> Result<Self> {
+        let onboarding = Onboarding::new(info.public_key().ok_or(Error::Logic)?, routing.clone());
         let client_msg_tracking = ClientMsgTracking::new(onboarding);
 
         let gateway = Self {
-            section,
+            routing,
             client_msg_tracking,
             rng,
         };
@@ -62,7 +70,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
 
     fn try_find_client(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         if let Address::Client(xorname) = &msg.destination() {
-            if self.section.handles(&xorname) {
+            if self.handles(&xorname) {
                 return self.client_msg_tracking.match_outgoing(msg);
             }
         }

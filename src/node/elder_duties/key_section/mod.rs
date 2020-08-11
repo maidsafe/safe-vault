@@ -1,7 +1,7 @@
 // Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// Unless required by app   licable law or agreed to in writing, the SAFE Network Software distributed
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
@@ -19,7 +19,6 @@ use self::{
 };
 use crate::{
     node::node_ops::{KeySectionDuty, NodeOperation},
-    node::section_querying::SectionQuerying,
     node::state_db::NodeInfo,
     Result,
 };
@@ -48,8 +47,7 @@ pub struct KeySection<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> KeySection<R> {
     pub fn new(info: NodeInfo, routing: Rc<RefCell<Routing>>, rng: R) -> Result<Self> {
-        let section_querying = SectionQuerying::new(routing.clone());
-        let gateway = ClientGateway::new(info.clone(), section_querying, rng)?;
+        let gateway = ClientGateway::new(info.clone(), routing.clone(), rng)?;
         let replica_manager = Self::new_replica_manager(info.clone(), routing.clone())?;
         let payments = Payments::new(info.keys.clone(), replica_manager.clone());
         let transfers = Transfers::new(info.keys, replica_manager.clone());

@@ -15,14 +15,17 @@ use crate::{
 };
 use log::{info, trace, warn};
 use pickledb::PickleDb;
+use routing::Node;
 use safe_nd::{
     Blob, BlobAddress, BlobRead, BlobWrite, CmdError, Error as NdError, Message, MessageId,
     MsgEnvelope, NodeCmd, NodeDataCmd, PublicKey, QueryResponse, Result as NdResult,
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    cell::{Ref, RefCell},
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
+    rc::Rc,
 };
 use tiny_keccak::sha3_256;
 use xor_name::XorName;
@@ -52,14 +55,20 @@ pub(super) struct BlobRegister {
     #[allow(unused)]
     full_adults: PickleDb,
     wrapping: ElderMsgWrapping,
-    section_querying: SectionQuerying,
+    routing: Rc<RefCell<Node>>,
+}
+
+impl SectionQuerying for BlobRegister {
+    fn routing(&self) -> Ref<Node> {
+        self.routing.borrow()
+    }
 }
 
 impl BlobRegister {
     pub(super) fn new(
         node_info: NodeInfo,
         wrapping: ElderMsgWrapping,
-        section_querying: SectionQuerying,
+        routing: Rc<RefCell<Node>>,
     ) -> Result<Self> {
         let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode)?;
         let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode)?;
@@ -70,7 +79,7 @@ impl BlobRegister {
             metadata,
             holders,
             full_adults,
-            section_querying,
+            routing,
             wrapping,
         })
     }
@@ -429,14 +438,10 @@ impl BlobRegister {
     // Used to fetch the list of holders for a new chunk.
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let take = CHUNK_ADULT_COPY_COUNT;
-        let mut closest_adults = self
-            .section_querying
-            .our_adults_sorted_by_distance_to(&target, take);
+        let mut closest_adults = self.our_adults_sorted_by_distance_to(&target, take);
         if closest_adults.len() < CHUNK_COPY_COUNT {
             let take = CHUNK_COPY_COUNT - closest_adults.len();
-            let mut closest_elders = self
-                .section_querying
-                .our_elder_names_sorted_by_distance_to(&target, take);
+            let mut closest_elders = self.our_elder_names_sorted_by_distance_to(&target, take);
             closest_adults.append(&mut closest_elders);
             closest_adults
         } else {

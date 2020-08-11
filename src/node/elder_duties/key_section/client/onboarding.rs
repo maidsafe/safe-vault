@@ -11,7 +11,10 @@ use crate::node::section_querying::SectionQuerying;
 use crate::utils;
 use log::{debug, info, trace};
 use rand::{CryptoRng, Rng};
+use routing::Node;
 use safe_nd::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
+use std::cell::{Ref, RefCell};
+use std::rc::Rc;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
@@ -28,17 +31,23 @@ use std::{
 /// the Elders of this section.
 pub struct Onboarding {
     node_id: PublicKey,
-    section: SectionQuerying,
+    routing: Rc<RefCell<Node>>,
     clients: HashMap<SocketAddr, PublicKey>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicKey)>,
 }
 
+impl SectionQuerying for Onboarding {
+    fn routing(&self) -> Ref<Node> {
+        self.routing.borrow()
+    }
+}
+
 impl Onboarding {
-    pub fn new(node_id: PublicKey, section: SectionQuerying) -> Self {
+    pub fn new(node_id: PublicKey, routing: Rc<RefCell<Node>>) -> Self {
         Self {
             node_id,
-            section,
+            routing,
             clients: HashMap::<SocketAddr, PublicKey>::new(),
             client_candidates: Default::default(),
         }
@@ -82,12 +91,11 @@ impl Onboarding {
             "{}: Trying to bootstrap..: {} on {}",
             self, client_key, peer_addr
         );
-        let elders = if self.section.matches_our_prefix((*client_key).into()) {
-            self.section.our_elder_addresses()
+        let elders = if self.matches_our_prefix((*client_key).into()) {
+            self.our_elder_addresses()
         } else {
-            let closest_known_elders = self
-                .section
-                .our_elder_addresses_sorted_by_distance_to(&(*client_key).into());
+            let closest_known_elders =
+                self.our_elder_addresses_sorted_by_distance_to(&(*client_key).into());
             if closest_known_elders.is_empty() {
                 trace!(
                     "{}: No closest known elders in any section we know of",
@@ -115,7 +123,7 @@ impl Onboarding {
             "{}: Trying to join..: {} on {}",
             self, client_key, peer_addr
         );
-        if self.section.matches_our_prefix(client_key.into()) {
+        if self.matches_our_prefix(client_key.into()) {
             let challenge = utils::random_vec(rng, 8);
             let _ = self
                 .client_candidates

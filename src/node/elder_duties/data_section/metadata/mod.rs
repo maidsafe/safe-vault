@@ -17,7 +17,6 @@ mod writing;
 use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MetadataDuty, NodeOperation},
-    node::section_querying::SectionQuerying,
     node::state_db::NodeInfo,
     Result,
 };
@@ -26,8 +25,10 @@ use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use reading::Reading;
+use routing::Node;
 use safe_nd::{Cmd, ElderDuties, Message, MsgEnvelope, Query};
 use sequence_storage::SequenceStorage;
+use std::cell::RefCell;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -52,13 +53,12 @@ impl Metadata {
     pub fn new(
         node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        section_querying: SectionQuerying,
+        routing: Rc<RefCell<Node>>,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
         let account_storage =
             AccountStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
-        let blob_register =
-            BlobRegister::new(node_info.clone(), wrapping.clone(), section_querying)?;
+        let blob_register = BlobRegister::new(node_info.clone(), wrapping.clone(), routing)?;
         let map_storage = MapStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
         let sequence_storage = SequenceStorage::new(node_info, total_used_space, wrapping.clone())?;
         let elder_stores = ElderStores::new(

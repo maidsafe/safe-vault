@@ -10,19 +10,25 @@ use crate::node::node_ops::{NodeOperation, PaymentDuty, TransferDuty};
 
 use crate::node::section_querying::SectionQuerying;
 use log::info;
-use routing::Node as Routing;
+use routing::{Node as Routing, Node};
 use safe_nd::{Cmd, Message, MsgEnvelope, MsgSender, Query};
+use std::cell::Ref;
 use std::{cell::RefCell, rc::Rc};
 
 /// Evaluates msgs sent directly from a client,
 /// i.e. not remote msgs from the network.
 pub struct ClientMsgAnalysis {
-    section: SectionQuerying,
+    section: Rc<RefCell<Routing>>,
+}
+
+impl SectionQuerying for ClientMsgAnalysis {
+    fn routing(&self) -> Ref<Node> {
+        self.section.borrow()
+    }
 }
 
 impl ClientMsgAnalysis {
-    pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
-        let section = SectionQuerying::new(routing);
+    pub fn new(section: Rc<RefCell<Routing>>) -> Self {
         Self { section }
     }
 
@@ -54,9 +60,9 @@ impl ClientMsgAnalysis {
         };
 
         let shall_process =
-            |msg| is_data_write() && from_client() && self.is_dst_for(msg) && self.is_elder();
+            |msg| is_data_write() && from_client() && self.handles(msg) && self.is_elder();
 
-        if !shall_process(msg) {
+        if !shall_process(&msg.destination().xorname()) {
             return None;
         }
 
@@ -66,14 +72,14 @@ impl ClientMsgAnalysis {
     fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
         let from_client = || matches!(msg.origin, MsgSender::Client { .. });
 
-        let shall_process = |msg| from_client() && self.is_dst_for(msg) && self.is_elder();
+        let shall_process = |msg| from_client() && self.handles(msg) && self.is_elder();
 
         let duty = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
                 ..
             } => {
-                if !shall_process(msg) {
+                if !shall_process(&msg.destination().xorname()) {
                     return None;
                 }
                 TransferDuty::ProcessCmd {
@@ -86,7 +92,7 @@ impl ClientMsgAnalysis {
                 query: Query::Transfer(query),
                 ..
             } => {
-                if !shall_process(msg) {
+                if !shall_process(&msg.destination().xorname()) {
                     return None;
                 }
                 TransferDuty::ProcessQuery {
@@ -98,13 +104,5 @@ impl ClientMsgAnalysis {
             _ => return None,
         };
         Some(duty)
-    }
-
-    fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
-        self.section.handles(&msg.destination().xorname())
-    }
-
-    fn is_elder(&self) -> bool {
-        self.section.is_elder()
     }
 }
