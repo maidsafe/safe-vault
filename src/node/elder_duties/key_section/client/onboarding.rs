@@ -8,7 +8,7 @@
 
 use crate::node::node_ops::MessagingDuty;
 use crate::node::section_querying::SectionQuerying;
-use crate::utils;
+use crate::{network::Routing, utils};
 use log::{debug, info, trace};
 use rand::{CryptoRng, Rng};
 use safe_nd::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
@@ -26,16 +26,16 @@ use std::{
 /// Most notably, this is the handshake process
 /// taking place between a connecting client and
 /// the Elders of this section.
-pub struct Onboarding {
+pub struct Onboarding<R: Routing + Clone> {
     node_id: PublicKey,
-    section: SectionQuerying,
+    section: SectionQuerying<R>,
     clients: HashMap<SocketAddr, PublicKey>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicKey)>,
 }
 
-impl Onboarding {
-    pub fn new(node_id: PublicKey, section: SectionQuerying) -> Self {
+impl<R: Routing + Clone> Onboarding<R> {
+    pub fn new(node_id: PublicKey, section: SectionQuerying<R>) -> Self {
         Self {
             node_id,
             section,
@@ -58,11 +58,11 @@ impl Onboarding {
         }
     }
 
-    pub fn process<R: CryptoRng + Rng>(
+    pub fn process<G: CryptoRng + Rng>(
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
-        rng: &mut R,
+        rng: &mut G,
     ) -> Option<MessagingDuty> {
         match handshake {
             HandshakeRequest::Bootstrap(client_key) => self.try_bootstrap(peer_addr, &client_key),
@@ -105,11 +105,11 @@ impl Onboarding {
     }
 
     /// Handles a received join request from a client.
-    fn try_join<R: CryptoRng + Rng>(
+    fn try_join<G: CryptoRng + Rng>(
         &mut self,
         peer_addr: SocketAddr,
         client_key: PublicKey,
-        rng: &mut R,
+        rng: &mut G,
     ) -> Option<MessagingDuty> {
         info!(
             "{}: Trying to join..: {} on {}",
@@ -225,7 +225,7 @@ impl Onboarding {
     // }
 }
 
-impl Display for Onboarding {
+impl<R: Routing + Clone> Display for Onboarding<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Onboarding")
     }

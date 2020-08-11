@@ -15,6 +15,7 @@ mod sequence_storage;
 mod writing;
 
 use crate::{
+    network::Routing,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MetadataDuty, NodeOperation},
     node::section_querying::SectionQuerying,
@@ -42,17 +43,17 @@ use xor_name::XorName;
 /// has been implemented; where the data types are all simply
 /// the structures + their metadata - handled at `Elders` - with
 /// all underlying data being chunks stored at `Adults`.
-pub struct Metadata {
-    elder_stores: ElderStores,
+pub struct Metadata<R: Routing + Clone> {
+    elder_stores: ElderStores<R>,
     #[allow(unused)]
-    wrapping: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping<R>,
 }
 
-impl Metadata {
+impl<R: Routing + Clone> Metadata<R> {
     pub fn new(
-        node_info: NodeInfo,
+        node_info: NodeInfo<R>,
         total_used_space: &Rc<Cell<u64>>,
-        section_querying: SectionQuerying,
+        section_querying: SectionQuerying<R>,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
         let account_storage =
@@ -257,7 +258,7 @@ impl Metadata {
     // }
 }
 
-impl Display for Metadata {
+impl<R: Routing + Clone> Display for Metadata<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Metadata")
     }

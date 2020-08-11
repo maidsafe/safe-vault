@@ -8,6 +8,7 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, MapChunkStore},
+    network::Routing,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::MessagingDuty,
     node::state_db::NodeInfo,
@@ -25,16 +26,16 @@ use std::{
 };
 
 /// Operations over the data type Map.
-pub(super) struct MapStorage {
+pub(super) struct MapStorage<R: Routing + Clone> {
     chunks: MapChunkStore,
-    wrapping: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping<R>,
 }
 
-impl MapStorage {
+impl<R: Routing + Clone> MapStorage<R> {
     pub(super) fn new(
-        node_info: NodeInfo,
+        node_info: NodeInfo<R>,
         total_used_space: &Rc<Cell<u64>>,
-        wrapping: ElderMsgWrapping,
+        wrapping: ElderMsgWrapping<R>,
     ) -> Result<Self> {
         let chunks = MapChunkStore::new(
             node_info.path(),
@@ -413,7 +414,7 @@ impl MapStorage {
     }
 }
 
-impl Display for MapStorage {
+impl<R: Routing + Clone> Display for MapStorage<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "MapStorage")
     }

@@ -6,26 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::node_ops::MessagingDuty, utils};
+use crate::{network::Routing, node::node_ops::MessagingDuty, utils};
 use bytes::Bytes;
 use log::{info, warn};
-use routing::Node as Routing;
 use safe_nd::{Address, HandshakeResponse, MsgEnvelope};
 use serde::Serialize;
 use std::{
-    cell::RefCell,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
-    rc::Rc,
 };
 
 /// Sending of messages to clients.
-pub(super) struct ClientSender {
-    routing: Rc<RefCell<Routing>>,
+pub(super) struct ClientSender<R: Routing + Clone> {
+    routing: R,
 }
 
-impl ClientSender {
-    pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
+impl<R: Routing + Clone> ClientSender<R> {
+    pub fn new(routing: R) -> Self {
         Self { routing }
     }
 
@@ -45,8 +42,8 @@ impl ClientSender {
         self.send_any_to_client(recipient, hs)
     }
 
-    pub fn disconnect(&self, peer_addr: SocketAddr) -> Option<MessagingDuty> {
-        if let Err(err) = self.routing.borrow_mut().disconnect_from_client(peer_addr) {
+    pub fn disconnect(&mut self, peer_addr: SocketAddr) -> Option<MessagingDuty> {
+        if let Err(err) = self.routing.disconnect_from_client(peer_addr) {
             warn!("{}: Could not disconnect client: {:?}", self, err);
         }
 
@@ -63,11 +60,7 @@ impl ClientSender {
         let msg = utils::serialise(msg);
         let bytes = Bytes::from(msg);
 
-        if let Err(e) = self
-            .routing
-            .borrow_mut()
-            .send_message_to_client(recipient, bytes, 0)
-        {
+        if let Err(e) = self.routing.send_message_to_client(recipient, bytes) {
             warn!(
                 "{}: Could not send message to client {}: {:?}",
                 self, recipient, e
@@ -77,7 +70,7 @@ impl ClientSender {
     }
 }
 
-impl Display for ClientSender {
+impl<R: Routing + Clone> Display for ClientSender<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ClientSender")
     }

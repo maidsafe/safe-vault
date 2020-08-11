@@ -15,42 +15,36 @@ use self::{
 };
 
 use crate::{
+    network::Routing,
     node::node_ops::{DataSectionDuty, NodeOperation, RewardDuty},
     node::section_querying::SectionQuerying,
     node::state_db::NodeInfo,
     utils, Result,
 };
-use routing::{Node as Routing, Prefix};
+use routing::Prefix;
 use safe_transfers::TransferActor;
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use std::{cell::Cell, rc::Rc};
 use xor_name::XorName;
 
 /// A DataSection is responsible for
 /// the storage and retrieval of data,
 /// and the rewarding of nodes in the section
 /// for participating in these duties.
-pub struct DataSection {
+pub struct DataSection<R: Routing + Clone> {
     /// The logic for managing data.
-    metadata: Metadata,
+    metadata: Metadata<R>,
     /// Rewards for performing storage
     /// services to the network.
-    rewards: Rewards,
+    rewards: Rewards<R>,
     /// The transport layer.
-    routing: Rc<RefCell<Routing>>,
+    routing: R,
     /// Information about our section.
-    section: SectionQuerying,
+    section: SectionQuerying<R>,
 }
 
-impl DataSection {
+impl<R: Routing + Clone> DataSection<R> {
     ///
-    pub fn new(
-        info: NodeInfo,
-        total_used_space: &Rc<Cell<u64>>,
-        routing: Rc<RefCell<Routing>>,
-    ) -> Result<Self> {
+    pub fn new(info: NodeInfo<R>, total_used_space: &Rc<Cell<u64>>, routing: R) -> Result<Self> {
         let section = SectionQuerying::new(routing.clone());
 
         // Metadata
@@ -58,7 +52,7 @@ impl DataSection {
 
         // Rewards
         let keypair = utils::key_pair(routing.clone())?;
-        let public_key_set = routing.borrow().public_key_set()?.clone();
+        let public_key_set = routing.public_key_set()?.clone();
         let actor = TransferActor::new(keypair, public_key_set, Validator {});
         let rewards = Rewards::new(info.keys, actor);
 

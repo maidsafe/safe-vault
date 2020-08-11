@@ -10,28 +10,29 @@ pub mod client_sender;
 pub mod network_sender;
 pub mod receiver;
 
+use crate::network::Routing;
 use crate::node::node_ops::{MessagingDuty, NodeOperation};
 use client_sender::ClientSender;
 use log::info;
 use network_sender::NetworkSender;
 pub use receiver::{Received, Receiver};
-use routing::Node as Routing;
-use std::{cell::RefCell, rc::Rc};
 
 /// Sending of messages
 /// to nodes and clients in the network.
-pub struct Messaging {
-    client_sender: ClientSender,
-    network_sender: NetworkSender,
+pub struct Messaging<R: Routing + Clone> {
+    client_sender: ClientSender<R>,
+    network_sender: NetworkSender<R>,
+    _p: std::marker::PhantomData<R>,
 }
 
-impl Messaging {
-    pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
+impl<R: Routing + Clone> Messaging<R> {
+    pub fn new(routing: R) -> Self {
         let client_sender = ClientSender::new(routing.clone());
         let network_sender = NetworkSender::new(routing);
         Self {
             client_sender,
             network_sender,
+            _p: Default::default(),
         }
     }
 

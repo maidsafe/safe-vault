@@ -7,22 +7,28 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
+use crate::network::Routing;
 use crate::node::node_ops::MessagingDuty;
 use log::error;
 use safe_nd::{Address, BlobRead, MsgEnvelope, MsgSender};
 
 /// Read operations on data chunks.
-pub(super) struct Reading {
+pub(super) struct Reading<R: Routing + Clone> {
     read: BlobRead,
     msg: MsgEnvelope,
+    _p: std::marker::PhantomData<R>,
 }
 
-impl Reading {
+impl<R: Routing + Clone> Reading<R> {
     pub fn new(read: BlobRead, msg: MsgEnvelope) -> Self {
-        Self { read, msg }
+        Self {
+            read,
+            msg,
+            _p: Default::default(),
+        }
     }
 
-    pub fn get_result(&self, storage: &ChunkStorage) -> Option<MessagingDuty> {
+    pub fn get_result(&self, storage: &ChunkStorage<R>) -> Option<MessagingDuty> {
         let BlobRead::Get(address) = self.read;
         if let Address::Section(_) = self.msg.most_recent_sender().address() {
             if self.verify_msg() {

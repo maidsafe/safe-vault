@@ -15,6 +15,7 @@ use self::{
     onboarding::Onboarding,
 };
 use crate::{
+    network::Routing,
     node::state_db::NodeInfo,
     node::{
         node_ops::{GatewayDuty, KeySectionDuty, MessagingDuty, NodeOperation},
@@ -32,14 +33,15 @@ use std::fmt::{self, Display, Formatter};
 
 /// A client gateway routes messages
 /// back and forth between a client and the network.
-pub struct ClientGateway<R: CryptoRng + Rng> {
-    section: SectionQuerying,
-    client_msg_tracking: ClientMsgTracking,
+pub struct ClientGateway<R: CryptoRng + Rng, N: Routing + Clone> {
+    section: SectionQuerying<N>,
+    client_msg_tracking: ClientMsgTracking<N>,
     rng: R,
+    _p: std::marker::PhantomData<N>,
 }
 
-impl<R: CryptoRng + Rng> ClientGateway<R> {
-    pub fn new(info: NodeInfo, section: SectionQuerying, rng: R) -> Result<Self> {
+impl<R: CryptoRng + Rng, N: Routing + Clone> ClientGateway<R, N> {
+    pub fn new(info: NodeInfo<N>, section: SectionQuerying<N>, rng: R) -> Result<Self> {
         let onboarding = Onboarding::new(info.public_key().ok_or(Error::Logic)?, section.clone());
         let client_msg_tracking = ClientMsgTracking::new(onboarding);
 
@@ -47,6 +49,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
             section,
             client_msg_tracking,
             rng,
+            _p: Default::default(),
         };
 
         Ok(gateway)
@@ -154,7 +157,7 @@ fn validate_client_sig(msg: &MsgEnvelope) -> bool {
     }
 }
 
-impl<R: CryptoRng + Rng> Display for ClientGateway<R> {
+impl<R: CryptoRng + Rng, N: Routing + Clone> Display for ClientGateway<R, N> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ClientGateway")
     }

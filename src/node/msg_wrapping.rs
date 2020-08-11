@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::keys::NodeSigningKeys, node::node_ops::MessagingDuty, utils};
+use crate::{network::Routing, node::keys::NodeSigningKeys, node::node_ops::MessagingDuty, utils};
 use log::info;
 use safe_nd::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
@@ -18,14 +18,14 @@ use std::collections::BTreeSet;
 
 /// Wrapping of msgs sent by Elders.
 #[derive(Clone)]
-pub struct ElderMsgWrapping {
-    inner: MsgWrapping,
+pub struct ElderMsgWrapping<R: Routing + Clone> {
+    inner: MsgWrapping<R>,
 }
 
 /// Wrapping of msgs sent by Adults.
 #[derive(Clone)]
-pub struct AdultMsgWrapping {
-    inner: MsgWrapping,
+pub struct AdultMsgWrapping<R: Routing + Clone> {
+    inner: MsgWrapping<R>,
 }
 
 /// Msg wrapping simplifies
@@ -33,13 +33,13 @@ pub struct AdultMsgWrapping {
 /// a sender duty onto remote msgs
 /// to be sent on the wire.
 #[derive(Clone)]
-struct MsgWrapping {
-    keys: NodeSigningKeys,
+struct MsgWrapping<R: Routing + Clone> {
+    keys: NodeSigningKeys<R>,
     duty: Duty,
 }
 
-impl AdultMsgWrapping {
-    pub fn new(keys: NodeSigningKeys, duty: AdultDuties) -> Self {
+impl<R: Routing + Clone> AdultMsgWrapping<R> {
+    pub fn new(keys: NodeSigningKeys<R>, duty: AdultDuties) -> Self {
         let inner = MsgWrapping::new(keys, Duty::Adult(duty));
         Self { inner }
     }
@@ -58,8 +58,8 @@ impl AdultMsgWrapping {
     }
 }
 
-impl ElderMsgWrapping {
-    pub fn new(keys: NodeSigningKeys, duty: ElderDuties) -> Self {
+impl<R: Routing + Clone> ElderMsgWrapping<R> {
+    pub fn new(keys: NodeSigningKeys<R>, duty: ElderDuties) -> Self {
         let inner = MsgWrapping::new(keys, Duty::Elder(duty));
         Self { inner }
     }
@@ -91,8 +91,8 @@ impl ElderMsgWrapping {
     }
 }
 
-impl MsgWrapping {
-    pub fn new(keys: NodeSigningKeys, duty: Duty) -> Self {
+impl<R: Routing + Clone> MsgWrapping<R> {
+    pub fn new(keys: NodeSigningKeys<R>, duty: Duty) -> Self {
         Self { keys, duty }
     }
 

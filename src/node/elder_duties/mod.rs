@@ -11,34 +11,35 @@ mod key_section;
 
 use self::{data_section::DataSection, key_section::KeySection};
 use crate::{
+    network::Routing,
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
     Error, Result,
 };
 use rand::{CryptoRng, Rng};
-use routing::{Node as Routing, Prefix};
+use routing::Prefix;
 use std::{
-    cell::{Cell, RefCell},
+    cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
 use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
-pub struct ElderDuties<R: CryptoRng + Rng> {
+pub struct ElderDuties<R: CryptoRng + Rng, N: Routing + Clone> {
     prefix: Prefix,
-    key_section: KeySection<R>,
-    data_section: DataSection,
+    key_section: KeySection<R, N>,
+    data_section: DataSection<N>,
 }
 
-impl<R: CryptoRng + Rng> ElderDuties<R> {
+impl<R: CryptoRng + Rng, N: Routing + Clone> ElderDuties<R, N> {
     pub fn new(
-        info: NodeInfo,
+        info: NodeInfo<N>,
         total_used_space: &Rc<Cell<u64>>,
-        routing: Rc<RefCell<Routing>>,
+        routing: N,
         rng: R,
     ) -> Result<Self> {
-        let prefix = *routing.borrow().our_prefix().ok_or(Error::Logic)?;
+        let prefix = routing.our_prefix().ok_or(Error::Logic)?;
         let key_section = KeySection::new(info.clone(), routing.clone(), rng)?;
         let data_section = DataSection::new(info, total_used_space, routing)?;
         Ok(Self {
@@ -111,7 +112,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     }
 }
 
-impl<R: CryptoRng + Rng> Display for ElderDuties<R> {
+impl<R: CryptoRng + Rng, N: Routing + Clone> Display for ElderDuties<R, N> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ElderDuties")
     }

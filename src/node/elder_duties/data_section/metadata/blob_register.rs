@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    network::Routing,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation},
     node::section_querying::SectionQuerying,
@@ -46,20 +47,20 @@ struct HolderMetadata {
 }
 
 /// Operations over the data type Blob.
-pub(super) struct BlobRegister {
+pub(super) struct BlobRegister<R: Routing + Clone> {
     metadata: PickleDb,
     holders: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
-    wrapping: ElderMsgWrapping,
-    section_querying: SectionQuerying,
+    wrapping: ElderMsgWrapping<R>,
+    section_querying: SectionQuerying<R>,
 }
 
-impl BlobRegister {
+impl<R: Routing + Clone> BlobRegister<R> {
     pub(super) fn new(
-        node_info: NodeInfo,
-        wrapping: ElderMsgWrapping,
-        section_querying: SectionQuerying,
+        node_info: NodeInfo<R>,
+        wrapping: ElderMsgWrapping<R>,
+        section_querying: SectionQuerying<R>,
     ) -> Result<Self> {
         let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode)?;
         let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode)?;
@@ -462,7 +463,7 @@ impl BlobRegister {
     }
 }
 
-impl Display for BlobRegister {
+impl<R: Routing + Clone> Display for BlobRegister<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "BlobRegister")
     }

@@ -29,8 +29,8 @@
 
 use flexi_logger::{DeferredNow, Logger};
 use log::{self, Record};
-use routing::{Node as Routing, NodeConfig};
-use safe_vault::{self, write_connection_info, Command, Config, Node, Receiver};
+use routing::{Node as RoutingLayer, NodeConfig};
+use safe_vault::{self, write_connection_info, Command, Config, Network, Node, Receiver};
 use self_update::cargo_crate_version;
 use self_update::Status;
 use std::{cell::RefCell, io::Write, process, rc::Rc};
@@ -127,7 +127,7 @@ fn main() {
     node_config.first = config.is_first();
     node_config.transport_config = config.network_config().clone();
     node_config.network_params.recommended_section_size = 500;
-    let (routing, routing_rx, client_rx) = Routing::new(node_config);
+    let (routing, routing_rx, client_rx) = RoutingLayer::new(node_config);
 
     let is_first = config.is_first();
 
@@ -138,8 +138,9 @@ fn main() {
     }
 
     let mut rng = rand::thread_rng();
-    let routing = Rc::new(RefCell::new(routing));
-    let receiver = Receiver::new(routing_rx, client_rx, command_rx, routing.clone());
+    let routing_layer = Rc::new(RefCell::new(routing));
+    let routing = Network::new(routing_layer.clone());
+    let receiver = Receiver::new(routing_rx, client_rx, command_rx, routing_layer);
 
     match Node::new(receiver, routing, &config, &mut rng) {
         Ok(mut vault) => match vault.our_connection_info() {

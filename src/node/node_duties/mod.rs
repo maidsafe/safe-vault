@@ -11,6 +11,7 @@ pub mod messaging;
 mod msg_analysis;
 mod network_events;
 
+use crate::network::Routing;
 use crate::node::{
     adult_duties::AdultDuties,
     elder_duties::ElderDuties,
@@ -23,34 +24,30 @@ use log::{info, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
-use routing::Node as Routing;
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use std::{cell::Cell, rc::Rc};
 
 #[allow(clippy::large_enum_variant)]
-pub enum DutyLevel<R: CryptoRng + Rng> {
+pub enum DutyLevel<R: CryptoRng + Rng, N: Routing + Clone> {
     Infant,
-    Adult(AdultDuties),
-    Elder(ElderDuties<R>),
+    Adult(AdultDuties<N>),
+    Elder(ElderDuties<R, N>),
 }
 
 /// Node duties are those that all nodes
 /// carry out. (TBD: adjust for Infant level, which might be doing nothing now).
 /// Within the duty level, there are then additional
 /// duties to be carried out, depending on the level.
-pub struct NodeDuties<R: CryptoRng + Rng> {
-    node_info: NodeInfo,
-    duty_level: DutyLevel<R>,
-    network_events: NetworkEvents,
-    messaging: Messaging,
-    routing: Rc<RefCell<Routing>>,
+pub struct NodeDuties<R: CryptoRng + Rng, N: Routing + Clone> {
+    node_info: NodeInfo<N>,
+    duty_level: DutyLevel<R, N>,
+    network_events: NetworkEvents<N>,
+    messaging: Messaging<N>,
+    routing: N,
     rng: Option<R>,
 }
 
-impl<R: CryptoRng + Rng> NodeDuties<R> {
-    pub fn new(node_info: NodeInfo, routing: Rc<RefCell<Routing>>, rng: R) -> Self {
+impl<R: CryptoRng + Rng, N: Routing + Clone> NodeDuties<R, N> {
+    pub fn new(node_info: NodeInfo<N>, routing: N, rng: R) -> Self {
         let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(SectionQuerying::new(
             routing.clone(),
         )));
@@ -65,7 +62,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         }
     }
 
-    pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
+    pub fn adult_duties(&mut self) -> Option<&mut AdultDuties<N>> {
         use DutyLevel::*;
         match &mut self.duty_level {
             Adult(ref mut duties) => Some(duties),
@@ -73,7 +70,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         }
     }
 
-    pub fn elder_duties(&mut self) -> Option<&mut ElderDuties<R>> {
+    pub fn elder_duties(&mut self) -> Option<&mut ElderDuties<R, N>> {
         use DutyLevel::*;
         match &mut self.duty_level {
             Elder(ref mut duties) => Some(duties),

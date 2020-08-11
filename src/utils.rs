@@ -6,15 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::state_db::Init, Result};
+use crate::{network::Routing, node::state_db::Init, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
-use routing::Node as Routing;
 use safe_nd::{BlsKeypairShare, Keypair};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{cell::RefCell, fs, path::Path, rc::Rc};
+use std::{fs, path::Path};
 use unwrap::unwrap;
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
@@ -53,13 +52,12 @@ pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> T {
 }
 
 // NB: needs to allow for nodes not having a key share yet?
-pub(crate) fn key_pair(routing: Rc<RefCell<Routing>>) -> Result<Keypair> {
-    let node = routing.borrow();
-    let index = node.our_index()?;
-    let bls_secret_key = node.secret_key_share()?;
+pub(crate) fn key_pair<R: Routing + Clone>(routing: R) -> Result<Keypair> {
+    let index = routing.our_index()?;
+    let bls_secret_key = routing.secret_key_share()?;
     let secret = SerdeSecret(bls_secret_key.clone());
     let public = bls_secret_key.public_key_share();
-    let public_key_set = node.public_key_set()?.clone();
+    let public_key_set = routing.public_key_set()?.clone();
     Ok(Keypair::BlsShare(BlsKeypairShare {
         index,
         secret,

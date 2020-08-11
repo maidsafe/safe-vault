@@ -10,6 +10,7 @@ mod chunks;
 
 use self::chunks::Chunks;
 use crate::{
+    network::Routing,
     node::node_ops::{AdultDuty, ChunkDuty, NodeOperation},
     node::state_db::NodeInfo,
     Result,
@@ -22,12 +23,12 @@ use std::{
 
 /// The main duty of an Adult node is
 /// storage and retrieval of data chunks.
-pub struct AdultDuties {
-    chunks: Chunks,
+pub struct AdultDuties<R: Routing + Clone> {
+    chunks: Chunks<R>,
 }
 
-impl AdultDuties {
-    pub fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+impl<R: Routing + Clone> AdultDuties<R> {
+    pub fn new(node_info: NodeInfo<R>, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let chunks = Chunks::new(node_info, &total_used_space)?;
         Ok(Self { chunks })
     }
@@ -44,7 +45,7 @@ impl AdultDuties {
     }
 }
 
-impl Display for AdultDuties {
+impl<R: Routing + Clone> Display for AdultDuties<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "AdultDuties")
     }

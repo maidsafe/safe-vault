@@ -6,23 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::network::Routing;
 use crate::node::node_ops::{NodeOperation, PaymentDuty, TransferDuty};
-
 use crate::node::section_querying::SectionQuerying;
 use log::info;
-use routing::Node as Routing;
 use safe_nd::{Cmd, Message, MsgEnvelope, MsgSender, Query};
-use std::{cell::RefCell, rc::Rc};
 
 /// Evaluates msgs sent directly from a client,
 /// i.e. not remote msgs from the network.
-pub struct ClientMsgAnalysis {
-    section: SectionQuerying,
+pub struct ClientMsgAnalysis<R: Routing + Clone> {
+    section: SectionQuerying<R>,
 }
 
-impl ClientMsgAnalysis {
-    pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
-        let section = SectionQuerying::new(routing);
+impl<R: Routing + Clone> ClientMsgAnalysis<R> {
+    pub fn new(section: SectionQuerying<R>) -> Self {
         Self { section }
     }
 

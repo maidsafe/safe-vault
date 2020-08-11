@@ -19,6 +19,7 @@ mod section_querying;
 pub use crate::node::node_duties::messaging::Receiver;
 pub use crate::node::state_db::{Command, Init};
 use crate::{
+    network::Routing,
     node::{
         keys::NodeSigningKeys,
         node_duties::{messaging::Received, NodeDuties},
@@ -30,30 +31,22 @@ use crate::{
 use bls::SecretKey;
 use log::{info, warn};
 use rand::{CryptoRng, Rng};
-use routing::Node as Routing;
 use safe_nd::PublicKey;
 use std::{
-    cell::RefCell,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
-    rc::Rc,
 };
 
 /// Main node struct.
-pub struct Node<R: CryptoRng + Rng> {
-    duties: NodeDuties<R>,
+pub struct Node<R: CryptoRng + Rng, N: Routing + Clone> {
+    duties: NodeDuties<R, N>,
     receiver: Receiver,
-    routing: Rc<RefCell<Routing>>,
+    routing: N,
 }
 
-impl<R: CryptoRng + Rng> Node<R> {
+impl<R: CryptoRng + Rng, N: Routing + Clone> Node<R, N> {
     /// Initialize a new node.
-    pub fn new(
-        receiver: Receiver,
-        routing: Rc<RefCell<Routing>>,
-        config: &Config,
-        rng: R,
-    ) -> Result<Self> {
+    pub fn new(receiver: Receiver, routing: N, config: &Config, rng: R) -> Result<Self> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
 
@@ -108,15 +101,12 @@ impl<R: CryptoRng + Rng> Node<R> {
 
     /// Returns our connection info.
     pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.routing
-            .borrow_mut()
-            .our_connection_info()
-            .map_err(From::from)
+        self.routing.our_connection_info().map_err(From::from)
     }
 
     /// Returns whether routing node is in elder state.
     pub fn is_elder(&mut self) -> bool {
-        self.routing.borrow().is_elder()
+        self.routing.is_elder()
     }
 
     /// Starts the node, and runs the main event loop.
@@ -136,11 +126,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                     ProcessNetworkEvent(event).into()
                 }
                 Received::Unknown(channel) => {
-                    if let Err(err) = self
-                        .routing
-                        .borrow_mut()
-                        .handle_selected_operation(channel.index)
-                    {
+                    if let Err(err) = self.routing.handle_selected_operation(channel.index) {
                         warn!("Could not process operation: {}", err);
                     }
                     continue;
@@ -188,7 +174,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     }
 }
 
-impl<R: CryptoRng + Rng> Display for Node<R> {
+impl<R: CryptoRng + Rng, N: Routing + Clone> Display for Node<R, N> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Node")
     }

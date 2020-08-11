@@ -6,32 +6,31 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::node_ops::MessagingDuty, utils};
+use crate::{network::Routing, node::node_ops::MessagingDuty, utils};
 use log::{error, info};
-use routing::{DstLocation, Node as Routing, SrcLocation};
+use routing::{DstLocation, SrcLocation};
 use safe_nd::{Address, MsgEnvelope};
-use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// Sending of msgs to other nodes in the network.
-pub(super) struct NetworkSender {
-    routing: Rc<RefCell<Routing>>,
+pub(super) struct NetworkSender<R: Routing + Clone> {
+    routing: R,
 }
 
-impl NetworkSender {
-    pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
+impl<R: Routing + Clone> NetworkSender<R> {
+    pub fn new(routing: R) -> Self {
         Self { routing }
     }
 
-    pub fn send_to_node(&self, msg: MsgEnvelope) -> Option<MessagingDuty> {
-        let name = *self.routing.borrow().id().name();
+    pub fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
+        let name = *self.routing.id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
             Address::Section(_) => return Some(MessagingDuty::SendToSection(msg)),
             Address::Client(_) => return None,
         };
         self.routing
-            .borrow_mut()
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
             .map_or_else(
                 |err| {
@@ -46,14 +45,13 @@ impl NetworkSender {
     }
 
     pub fn send_to_nodes(
-        &self,
+        &mut self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
-        let name = *self.routing.borrow().id().name();
+        let name = *self.routing.id().name();
         for target in targets {
             self.routing
-                .borrow_mut()
                 .send_message(
                     SrcLocation::Node(name),
                     DstLocation::Node(XorName(target.0)),
@@ -71,8 +69,8 @@ impl NetworkSender {
         None
     }
 
-    pub fn send_to_network(&self, msg: MsgEnvelope) -> Option<MessagingDuty> {
-        let name = *self.routing.borrow().id().name();
+    pub fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
+        let name = *self.routing.id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
             Address::Client(xorname) | Address::Section(xorname) => {
@@ -80,7 +78,6 @@ impl NetworkSender {
             }
         };
         self.routing
-            .borrow_mut()
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
             .map_or_else(
                 |err| {

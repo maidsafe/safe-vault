@@ -32,6 +32,7 @@
 mod chunk_store;
 mod config_handler;
 mod error;
+mod network;
 mod node;
 mod to_db_key;
 mod utils;
@@ -42,5 +43,6 @@ pub use crate::{
     chunk_store::error::Error as ChunkStoreError,
     config_handler::{write_connection_info, Config},
     error::{Error, Result},
+    network::Network,
     node::{state_db::Command, Node, Receiver},
 };

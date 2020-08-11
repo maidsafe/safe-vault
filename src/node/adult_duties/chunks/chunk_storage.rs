@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::MessagingDuty};
-use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
+use crate::{chunk_store::BlobChunkStore, network::Routing, node::state_db::NodeInfo, Result};
 use log::{error, info};
 use safe_nd::{
     AdultDuties, Blob, BlobAddress, CmdError, Error as NdError, Message, MessageId, MsgSender,
@@ -20,13 +20,13 @@ use std::{
 };
 
 /// Storage of data chunks.
-pub(crate) struct ChunkStorage {
+pub(crate) struct ChunkStorage<R: Routing + Clone> {
     chunks: BlobChunkStore,
-    wrapping: AdultMsgWrapping,
+    wrapping: AdultMsgWrapping<R>,
 }
 
-impl ChunkStorage {
-    pub(crate) fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+impl<R: Routing + Clone> ChunkStorage<R> {
+    pub(crate) fn new(node_info: NodeInfo<R>, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let chunks = BlobChunkStore::new(
             node_info.path(),
             node_info.max_storage_capacity,
@@ -172,7 +172,7 @@ impl ChunkStorage {
     }
 }
 
-impl Display for ChunkStorage {
+impl<R: Routing + Clone> Display for ChunkStorage<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ChunkStorage")
     }

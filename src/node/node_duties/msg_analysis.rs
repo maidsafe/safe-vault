@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::network::Routing;
 use crate::node::node_duties::accumulation::Accumulation;
 use crate::node::node_ops::{
     AdultDuty, ChunkDuty, GatewayDuty, MessagingDuty, MetadataDuty, NodeOperation, RewardDuty,
@@ -24,13 +25,13 @@ use xor_name::XorName;
 
 /// Evaluates remote msgs from the network,
 /// i.e. not msgs sent directly from a client.
-pub struct NetworkMsgAnalysis {
+pub struct NetworkMsgAnalysis<R: Routing + Clone> {
     accumulation: Accumulation,
-    section: SectionQuerying,
+    section: SectionQuerying<R>,
 }
 
-impl NetworkMsgAnalysis {
-    pub fn new(section: SectionQuerying) -> Self {
+impl<R: Routing + Clone> NetworkMsgAnalysis<R> {
+    pub fn new(section: SectionQuerying<R>) -> Self {
         Self {
             accumulation: Accumulation::new(),
             section,

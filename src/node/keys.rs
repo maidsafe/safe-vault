@@ -6,27 +6,24 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::utils;
+use crate::{network::Routing, utils};
 use bls::PublicKeySet;
-use routing::Node as Routing;
 use safe_nd::{BlsProof, BlsProofShare, Ed25519Proof, Proof, PublicKey, Signature, SignatureShare};
 use serde::Serialize;
-use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone)]
-pub struct NodeSigningKeys {
-    routing: Rc<RefCell<Routing>>,
+pub struct NodeSigningKeys<N: Routing + Clone> {
+    routing: N,
 }
 
-impl NodeSigningKeys {
-    pub fn new(routing: Rc<RefCell<Routing>>) -> Self {
+impl<N: Routing + Clone> NodeSigningKeys<N> {
+    pub fn new(routing: N) -> Self {
         Self { routing }
     }
 
     pub fn public_key(&self) -> Option<PublicKey> {
-        let node = self.routing.borrow();
-        let index = node.our_index().ok()?;
-        let share = node.public_key_set().ok()?.public_key_share(index);
+        let index = self.routing.our_index().ok()?;
+        let share = self.routing.public_key_set().ok()?.public_key_share(index);
         Some(PublicKey::BlsShare(share))
     }
 
@@ -68,8 +65,7 @@ impl NodeSigningKeys {
     }
 
     fn public_key_set(&self) -> Option<PublicKeySet> {
-        let node = self.routing.borrow();
-        Some(node.public_key_set().ok()?.clone())
+        Some(self.routing.public_key_set().ok()?.clone())
     }
 
     /// Creates a detached Ed25519 signature of `data`.
@@ -80,9 +76,8 @@ impl NodeSigningKeys {
 
     /// Creates a detached BLS signature share of `data` if the `self` holds a BLS keypair share.
     fn sign_using_bls<T: AsRef<[u8]>>(&self, data: &T) -> Option<Signature> {
-        let node = self.routing.borrow();
-        let index = node.our_index().ok()?;
-        let bls_secret_key = node.secret_key_share().ok()?;
+        let index = self.routing.our_index().ok()?;
+        let bls_secret_key = self.routing.secret_key_share().ok()?;
         Some(Signature::BlsShare(SignatureShare {
             index,
             share: bls_secret_key.sign(data),

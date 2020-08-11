@@ -8,6 +8,7 @@
 
 use super::transfers::replica_manager::ReplicaManager;
 use crate::{
+    network::Routing,
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeOperation, PaymentDuty},
@@ -31,13 +32,13 @@ use std::{
 /// the actual write request (without payment info) to a DataSection,
 /// which would be a section closest to the data
 /// (where it is then handled by Elders with Metadata duties).
-pub struct Payments {
+pub struct Payments<R: Routing + Clone> {
     replica: Rc<RefCell<ReplicaManager>>,
-    wrapping: ElderMsgWrapping,
+    wrapping: ElderMsgWrapping<R>,
 }
 
-impl Payments {
-    pub fn new(keys: NodeSigningKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
+impl<R: Routing + Clone> Payments<R> {
+    pub fn new(keys: NodeSigningKeys<R>, replica: Rc<RefCell<ReplicaManager>>) -> Self {
         let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Payment);
         Self { replica, wrapping }
     }
@@ -131,7 +132,7 @@ impl Payments {
     }
 }
 
-impl Display for Payments {
+impl<R: Routing + Clone> Display for Payments<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Payments")
     }

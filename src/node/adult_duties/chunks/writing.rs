@@ -7,22 +7,28 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
+use crate::network::Routing;
 use crate::node::node_ops::MessagingDuty;
 use log::error;
 use safe_nd::{BlobWrite, MsgEnvelope, MsgSender};
 
 /// Write operations on data chunks.
-pub(super) struct Writing {
+pub(super) struct Writing<R: Routing + Clone> {
     write: BlobWrite,
     msg: MsgEnvelope,
+    _p: std::marker::PhantomData<R>,
 }
 
-impl Writing {
+impl<R: Routing + Clone> Writing<R> {
     pub fn new(write: BlobWrite, msg: MsgEnvelope) -> Self {
-        Self { write, msg }
+        Self {
+            write,
+            msg,
+            _p: Default::default(),
+        }
     }
 
-    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<MessagingDuty> {
+    pub fn get_result(&self, storage: &mut ChunkStorage<R>) -> Option<MessagingDuty> {
         use BlobWrite::*;
         match &self.write {
             New(data) => {

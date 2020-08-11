@@ -12,6 +12,7 @@ mod validator;
 use self::section_funds::{Payout, SectionFunds};
 pub use self::validator::Validator;
 use crate::{
+    network::Routing,
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation, RewardDuty},
@@ -28,10 +29,10 @@ use xor_name::XorName;
 /// The accumulation and paying
 /// out of rewards to nodes for
 /// their work in the network.
-pub struct Rewards {
+pub struct Rewards<R: Routing + Clone> {
     node_accounts: HashMap<XorName, RewardAccount>,
-    section_funds: SectionFunds,
-    wrapping: ElderMsgWrapping,
+    section_funds: SectionFunds<R>,
+    wrapping: ElderMsgWrapping<R>,
 }
 
 type Age = u8;
@@ -52,8 +53,8 @@ fn reward(age: Age) -> Money {
     Money::from_nano(2_u64.pow(age as u32) * 1_000_000_000)
 }
 
-impl Rewards {
-    pub fn new(keys: NodeSigningKeys, actor: TransferActor<Validator>) -> Self {
+impl<R: Routing + Clone> Rewards<R> {
+    pub fn new(keys: NodeSigningKeys<R>, actor: TransferActor<Validator>) -> Self {
         let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Rewards);
         let section_funds = SectionFunds::new(actor, wrapping.clone());
         Self {

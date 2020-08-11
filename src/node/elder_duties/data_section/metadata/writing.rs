@@ -10,21 +10,27 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
+use crate::network::Routing;
 use crate::node::node_ops::{MessagingDuty, NodeOperation};
 use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MsgEnvelope, SequenceWrite};
 
 /// Write operations on data.
-pub(super) struct Writing {
+pub(super) struct Writing<R: Routing + Clone> {
     cmd: DataCmd,
     msg: MsgEnvelope,
+    _p: std::marker::PhantomData<R>,
 }
 
-impl Writing {
+impl<R: Routing + Clone> Writing<R> {
     pub fn new(cmd: DataCmd, msg: MsgEnvelope) -> Self {
-        Self { cmd, msg }
+        Self {
+            cmd,
+            msg,
+            _p: Default::default(),
+        }
     }
 
-    pub fn get_result(&mut self, stores: &mut ElderStores) -> Option<NodeOperation> {
+    pub fn get_result(&mut self, stores: &mut ElderStores<R>) -> Option<NodeOperation> {
         use DataCmd::*;
         let result = match self.cmd.clone() {
             Blob(write) => self.blob(write, stores.blob_register_mut()),
@@ -35,18 +41,18 @@ impl Writing {
         result.map(|c| c.into())
     }
 
-    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister) -> Option<MessagingDuty> {
+    fn blob(&mut self, write: BlobWrite, register: &mut BlobRegister<R>) -> Option<MessagingDuty> {
         register.write(write, &self.msg)
     }
 
-    fn map(&mut self, write: MapWrite, storage: &mut MapStorage) -> Option<MessagingDuty> {
+    fn map(&mut self, write: MapWrite, storage: &mut MapStorage<R>) -> Option<MessagingDuty> {
         storage.write(write, self.msg.id(), &self.msg.origin)
     }
 
     fn sequence(
         &mut self,
         write: SequenceWrite,
-        storage: &mut SequenceStorage,
+        storage: &mut SequenceStorage<R>,
     ) -> Option<MessagingDuty> {
         storage.write(write, self.msg.id(), &self.msg.origin)
     }
@@ -54,7 +60,7 @@ impl Writing {
     fn account(
         &mut self,
         write: AccountWrite,
-        storage: &mut AccountStorage,
+        storage: &mut AccountStorage<R>,
     ) -> Option<MessagingDuty> {
         storage.write(write, self.msg.id(), &self.msg.origin)
     }
