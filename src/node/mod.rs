@@ -84,7 +84,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             Elder => duties.process(node_ops::NodeDuty::BecomeElder),
         };
 
-        let node = Self {
+        let mut node = Self {
             duties,
             receiver,
             routing,
@@ -95,7 +95,10 @@ impl<R: CryptoRng + Rng> Node<R> {
         Ok(node)
     }
 
-    fn register(&self, _reward_key: PublicKey) {}
+    fn register(&mut self, reward_key: PublicKey) {
+        let result = self.duties.process(NodeDuty::RegisterWallet(reward_key));
+        self.process_while_any(result);
+    }
 
     /// Returns our connection info.
     pub fn our_connection_info(&mut self) -> Result<SocketAddr> {

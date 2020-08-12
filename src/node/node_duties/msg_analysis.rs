@@ -15,8 +15,8 @@ use crate::Network;
 use log::error;
 use safe_nd::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
-    NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
-    NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
+    NodeDuties, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
+    NodeSystemCmd, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
 use xor_name::XorName;
 
@@ -275,7 +275,36 @@ impl NetworkMsgAnalysis {
         if result.is_some() {
             return result;
         }
-        self.try_accumulated_rewards(msg)
+        let result = self.try_accumulated_rewards(msg);
+        if result.is_some() {
+            return result;
+        }
+        self.try_wallet_register(msg)
+    }
+
+    fn try_wallet_register(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
+        let from_node = || {
+            matches!(msg.most_recent_sender(), MsgSender::Node {
+                duty: Duty::Node(NodeDuties::NodeConfig),
+                ..
+            })
+        };
+        let shall_process = |msg| from_node() && self.is_dst_for(msg) && self.is_elder();
+
+        if !shall_process(msg) {
+            return None;
+        }
+
+        match &msg.message {
+            Message::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet { wallet, .. }),
+                ..
+            } => Some(RewardDuty::SetNodeAccount {
+                account_id: *wallet,
+                node_id: msg.origin.address().xorname(),
+            }),
+            _ => None,
+        }
     }
 
     // Check non-accumulated reward msgs.
@@ -303,7 +332,7 @@ impl NetworkMsgAnalysis {
             Message::NodeQueryResponse {
                 response: NodeQueryResponse::Rewards(GetAccountId(Ok((account_id, new_node_id)))),
                 ..
-            } => Some(RewardDuty::ReceiveAccountId {
+            } => Some(RewardDuty::ActivateNodeAccount {
                 id: *account_id,
                 node_id: *new_node_id,
             }),

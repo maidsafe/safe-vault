@@ -38,15 +38,18 @@ pub struct Rewards {
 type Age = u8;
 
 pub enum RewardAccount {
-    /// When added.
-    AwaitingStart(Age),
+    /// When a new node joins the network.
+    NewNode,
+    //Adult(AccountId),
+    /// When a node has been relocated to us.
+    AwaitingActivation(Age),
     /// After we have received the account id, the
     /// stage of the RewardAccount is `Active`.
     Active { id: AccountId, age: Age },
     /// After a node leaves the section
     /// the RewardAccount transitions into
-    /// stage `Inactive`.
-    Inactive(AccountId),
+    /// stage `AwaitingRelocation`.
+    AwaitingRelocation(AccountId),
 }
 
 fn reward(age: Age) -> Money {
@@ -87,13 +90,17 @@ impl Rewards {
     pub fn process(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
         use RewardDuty::*;
         let result = match duty {
-            AddNewNode(node_id) => self.add_node(node_id)?.into(),
-            AddRelocatedNode {
+            AddNewNode(node_id) => self.add_new_node(node_id)?.into(),
+            SetNodeAccount {
+                node_id,
+                account_id,
+            } => self.set_node_account(node_id, account_id)?.into(),
+            AddRelocatingNode {
                 old_node_id,
                 new_node_id,
                 age,
             } => self
-                .add_relocated_account(old_node_id, new_node_id, age)?
+                .add_relocating_node(old_node_id, new_node_id, age)?
                 .into(),
             GetAccountId {
                 old_node_id,
@@ -103,7 +110,7 @@ impl Rewards {
             } => self
                 .get_account_id(old_node_id, new_node_id, msg_id, &origin)?
                 .into(),
-            ReceiveAccountId { id, node_id } => self.receive_account_id(id, node_id)?.into(),
+            ActivateNodeAccount { id, node_id } => self.activate_node_account(id, node_id)?.into(),
             DeactivateNode(node_id) => self.deactivate(node_id)?.into(),
             ReceivePayoutValidation(validation) => self.section_funds.receive(validation)?,
         };
@@ -152,16 +159,36 @@ impl Rewards {
     /// It still hasn't registered an account id at
     /// this point, but will as part of starting up.
     /// At age 5 it gets its first reward payout.
-    fn add_node(&mut self, node_id: XorName) -> Option<MessagingDuty> {
-        let _ = self
-            .node_accounts
-            .insert(node_id, RewardAccount::AwaitingStart(4));
+    fn add_new_node(&mut self, node_id: XorName) -> Option<MessagingDuty> {
+        let _ = self.node_accounts.insert(node_id, RewardAccount::NewNode);
         None
     }
 
-    /// 1. When a node is relocated to our section, we add the node id
-    /// and send a cmd to old section, for retreiving the account id.
-    fn add_relocated_account(
+    /// 1. A new node registers an account id for future reward payout.
+    /// ... or, an active node updates its account.
+    fn set_node_account(&mut self, node_id: XorName, id: AccountId) -> Option<MessagingDuty> {
+        // Try get the account..
+        let account = match self.node_accounts.get_mut(&node_id) {
+            None => return None,
+            Some(account) => {
+                match account {
+                    // ..and validate its state.
+                    RewardAccount::NewNode => RewardAccount::AwaitingRelocation(id),
+                    RewardAccount::Active { age, .. } => RewardAccount::Active { age: *age, id },
+                    _ => {
+                        warn!("Cannot set node account unless active or new.");
+                        return None;
+                    }
+                }
+            }
+        };
+        let _ = self.node_accounts.insert(node_id, account);
+        None
+    }
+
+    /// 2. When a node is relocated to our section, we add the node id
+    /// and send a query to old section, for retreiving the account id.
+    fn add_relocating_node(
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
@@ -171,7 +198,7 @@ impl Rewards {
         use NodeRewardQuery::*;
         use RewardAccount::*;
 
-        let account = AwaitingStart(age);
+        let account = AwaitingActivation(age);
         let _ = self.node_accounts.insert(new_node_id, account);
 
         self.wrapping.send(Message::NodeQuery {
@@ -183,10 +210,10 @@ impl Rewards {
         })
     }
 
-    /// 2. The old section will send back the account id.
+    /// 3. The old section will send back the account id, which allows us to activate it.
     /// At this point, we payout a standard reward based on the node age,
     /// which represents the work performed in its previous section.
-    fn receive_account_id(&mut self, id: AccountId, node_id: XorName) -> Option<MessagingDuty> {
+    fn activate_node_account(&mut self, id: AccountId, node_id: XorName) -> Option<MessagingDuty> {
         // If we ever hit these errors, something is very odd
         // most likely a bug, because we are receiving an event triggered by our cmd.
         // So, it doesn't make much sense to send some error msg back on the wire.
@@ -196,15 +223,15 @@ impl Rewards {
         // Try get the account..
         let age = match self.node_accounts.get_mut(&node_id) {
             None => {
-                warn!("Invalid receive: No such account found to receive the rewards.");
+                warn!("Invalid operation: Node not found {}.", node_id);
                 return None;
             }
             Some(account) => {
                 match account {
                     // ..and validate its state.
-                    RewardAccount::AwaitingStart(age) => *age,
+                    RewardAccount::AwaitingActivation(age) => *age,
                     _ => {
-                        warn!("Invalid receive: Account is not awaiting start.");
+                        warn!("Invalid operation: Account is not awaiting activation.");
                         return None;
                     }
                 }
@@ -229,13 +256,14 @@ impl Rewards {
     fn deactivate(&mut self, node_id: XorName) -> Option<MessagingDuty> {
         let id = match self.node_accounts.get(&node_id) {
             Some(RewardAccount::Active { id, .. }) => *id,
-            Some(RewardAccount::AwaitingStart { .. }) // hmm.. left when AwaitingStart is a tricky case..
-            | Some(RewardAccount::Inactive(_))
+            Some(RewardAccount::AwaitingActivation { .. }) // hmm.. left when AwaitingActivation is a tricky case.. // Might be case for lazy messaging..
+            | Some(RewardAccount::AwaitingRelocation(_))
+            | Some(RewardAccount::NewNode)
             | None => return None,
         };
         let _ = self
             .node_accounts
-            .insert(node_id, RewardAccount::Inactive(id));
+            .insert(node_id, RewardAccount::AwaitingRelocation(id));
         None
     }
 
@@ -251,22 +279,23 @@ impl Rewards {
         origin: &Address,
     ) -> Option<MessagingDuty> {
         let account_id = match self.node_accounts.get(&old_node_id) {
-            Some(RewardAccount::Inactive(id)) => *id,
-            Some(RewardAccount::Active { .. }) => {
+            Some(RewardAccount::AwaitingRelocation(id)) => *id,
+            Some(RewardAccount::NewNode)
+            | Some(RewardAccount::AwaitingActivation { .. })
+            | Some(RewardAccount::Active { .. }) => {
                 // ..means the node has not left, and was not
-                // marked as awaiting move..
+                // marked as relocating..
                 // (Could be a case for lazy messaging..)
                 return self.wrapping.send(Message::NodeQueryResponse {
                     response: Rewards(GetAccountId(Err(Error::NetworkOther(
-                        "InvalidClaim: Account is not awaiting move.".to_string(),
+                        "Account is not being relocated.".to_string(),
                     )))),
                     id: MessageId::new(),
                     correlation_id: msg_id,
                     query_origin: origin.clone(),
                 });
             }
-            Some(RewardAccount::AwaitingStart { .. }) // todo: return error, but we need to have the account id in that case, or change / extend the current error(s)
-            | None => return None,
+            None => return None,
         };
 
         // Remove the old node, as it is being

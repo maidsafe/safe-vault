@@ -104,7 +104,7 @@ impl DataSection {
         age: u8,
     ) -> Option<NodeOperation> {
         // Adds the relocated account.
-        let first = self.rewards.process(RewardDuty::AddRelocatedNode {
+        let first = self.rewards.process(RewardDuty::AddRelocatingNode {
             old_node_id,
             new_node_id,
             age,

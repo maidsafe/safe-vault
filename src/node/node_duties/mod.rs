@@ -14,6 +14,7 @@ mod network_events;
 use crate::node::{
     adult_duties::AdultDuties,
     elder_duties::ElderDuties,
+    msg_wrapping::NodeMsgWrapping,
     node_duties::messaging::Messaging,
     node_ops::{NodeDuty, NodeOperation},
     state_db::NodeInfo,
@@ -23,6 +24,7 @@ use log::{info, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
+use safe_nd::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
 use std::{cell::Cell, rc::Rc};
 
 #[allow(clippy::large_enum_variant)]
@@ -79,11 +81,25 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         use NodeDuty::*;
         info!("Processing: {:?}", duty);
         match duty {
+            RegisterWallet(wallet) => self.register_wallet(wallet),
             BecomeAdult => self.become_adult(),
             BecomeElder => self.become_elder(),
             ProcessMessaging(duty) => self.messaging.process(duty),
             ProcessNetworkEvent(event) => self.network_events.process(event),
         }
+    }
+
+    fn register_wallet(&mut self, wallet: PublicKey) -> Option<NodeOperation> {
+        let wrapping = NodeMsgWrapping::new(self.node_info.keys(), safe_nd::NodeDuties::NodeConfig);
+        wrapping
+            .send(Message::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
+                    wallet,
+                    section: self.node_info.public_key()?.into(),
+                }),
+                id: MessageId::new(),
+            })
+            .map(|c| c.into())
     }
 
     fn become_adult(&mut self) -> Option<NodeOperation> {

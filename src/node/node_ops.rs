@@ -95,6 +95,8 @@ pub enum NetworkDuty {
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
+    ///
+    RegisterWallet(PublicKey),
     /// On being promoted, an Infant node becomes an Adult.
     BecomeAdult,
     /// On being promoted, an Adult node becomes an Elder.
@@ -116,6 +118,7 @@ impl Into<NodeOperation> for NodeDuty {
 impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::RegisterWallet(_) => write!(f, "RegisterWallet"),
             Self::BecomeAdult => write!(f, "BecomeAdult"),
             Self::BecomeElder => write!(f, "BecomeElder"),
             Self::ProcessMessaging(duty) => duty.fmt(f),
@@ -393,10 +396,18 @@ pub enum ChunkDuty {
 pub enum RewardDuty {
     /// With the node id.
     AddNewNode(XorName),
+    /// Set the account for a node.
+    SetNodeAccount {
+        /// The node which accumulated the rewards.
+        node_id: XorName,
+        /// The account to which the accumulated
+        /// rewards should be paid out.
+        account_id: AccountId,
+    },
     /// We add relocated nodes to our rewards
     /// system, so that they can participate
     /// in the farming rewards.
-    AddRelocatedNode {
+    AddRelocatingNode {
         /// The id of the node at the previous section.
         old_node_id: XorName,
         /// The id of the node at its new section (i.e. this one).
@@ -419,7 +430,7 @@ pub enum RewardDuty {
     },
     /// When a node has been relocated to our section
     /// we receive the account id from the other section.
-    ReceiveAccountId {
+    ActivateNodeAccount {
         /// The account to which the accumulated
         /// rewards should be paid out.
         id: AccountId,

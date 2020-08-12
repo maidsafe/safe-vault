@@ -10,6 +10,7 @@ use crate::{node::keys::NodeSigningKeys, node::node_ops::MessagingDuty, utils};
 use log::info;
 use safe_nd::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
+    NodeDuties,
 };
 use xor_name::XorName;
 
@@ -28,6 +29,12 @@ pub struct AdultMsgWrapping {
     inner: MsgWrapping,
 }
 
+/// Wrapping of msgs sent by any Node.
+#[derive(Clone)]
+pub struct NodeMsgWrapping {
+    inner: MsgWrapping,
+}
+
 /// Msg wrapping simplifies
 /// the signing and stamping of
 /// a sender duty onto remote msgs
@@ -36,6 +43,17 @@ pub struct AdultMsgWrapping {
 struct MsgWrapping {
     keys: NodeSigningKeys,
     duty: Duty,
+}
+
+impl NodeMsgWrapping {
+    pub fn new(keys: NodeSigningKeys, duty: NodeDuties) -> Self {
+        let inner = MsgWrapping::new(keys, Duty::Node(duty));
+        Self { inner }
+    }
+
+    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
+        self.inner.send(message)
+    }
 }
 
 impl AdultMsgWrapping {
