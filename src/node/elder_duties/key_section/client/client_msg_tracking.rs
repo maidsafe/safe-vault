@@ -8,7 +8,6 @@
 
 pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_msg};
 pub use super::onboarding::Onboarding;
-use crate::network::Routing;
 use crate::node::node_ops::MessagingDuty;
 use log::{error, info, warn};
 use rand::{CryptoRng, Rng};
@@ -21,14 +20,14 @@ use std::{
 
 /// Tracks incoming and outgoingg messages
 /// between client and network.
-pub struct ClientMsgTracking<R: Routing + Clone> {
-    onboarding: Onboarding<R>,
+pub struct ClientMsgTracking {
+    onboarding: Onboarding,
     tracked_incoming: HashMap<MessageId, SocketAddr>,
     tracked_outgoing: HashMap<MessageId, MsgEnvelope>,
 }
 
-impl<R: Routing + Clone> ClientMsgTracking<R> {
-    pub fn new(onboarding: Onboarding<R>) -> Self {
+impl ClientMsgTracking {
+    pub fn new(onboarding: Onboarding) -> Self {
         Self {
             onboarding,
             tracked_incoming: Default::default(),
@@ -128,7 +127,7 @@ impl<R: Routing + Clone> ClientMsgTracking<R> {
     }
 }
 
-impl<R: Routing + Clone> Display for ClientMsgTracking<R> {
+impl Display for ClientMsgTracking {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ClientMsgTracking")
     }

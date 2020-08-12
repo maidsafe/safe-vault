@@ -15,13 +15,9 @@ use self::{
     onboarding::Onboarding,
 };
 use crate::{
-    network::Routing,
+    node::node_ops::{GatewayDuty, KeySectionDuty, MessagingDuty, NodeOperation},
     node::state_db::NodeInfo,
-    node::{
-        node_ops::{GatewayDuty, KeySectionDuty, MessagingDuty, NodeOperation},
-        section_querying::SectionQuerying,
-    },
-    utils, Error, Result,
+    utils, Error, Network, Result,
 };
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
@@ -33,23 +29,21 @@ use std::fmt::{self, Display, Formatter};
 
 /// A client gateway routes messages
 /// back and forth between a client and the network.
-pub struct ClientGateway<R: CryptoRng + Rng, N: Routing + Clone> {
-    section: SectionQuerying<N>,
-    client_msg_tracking: ClientMsgTracking<N>,
+pub struct ClientGateway<R: CryptoRng + Rng> {
+    client_msg_tracking: ClientMsgTracking,
     rng: R,
-    _p: std::marker::PhantomData<N>,
+    routing: Network,
 }
 
-impl<R: CryptoRng + Rng, N: Routing + Clone> ClientGateway<R, N> {
-    pub fn new(info: NodeInfo<N>, section: SectionQuerying<N>, rng: R) -> Result<Self> {
-        let onboarding = Onboarding::new(info.public_key().ok_or(Error::Logic)?, section.clone());
+impl<R: CryptoRng + Rng> ClientGateway<R> {
+    pub fn new(info: NodeInfo, routing: Network, rng: R) -> Result<Self> {
+        let onboarding = Onboarding::new(info.public_key().ok_or(Error::Logic)?, routing.clone());
         let client_msg_tracking = ClientMsgTracking::new(onboarding);
 
         let gateway = Self {
-            section,
             client_msg_tracking,
             rng,
-            _p: Default::default(),
+            routing,
         };
 
         Ok(gateway)
@@ -65,7 +59,7 @@ impl<R: CryptoRng + Rng, N: Routing + Clone> ClientGateway<R, N> {
 
     fn try_find_client(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         if let Address::Client(xorname) = &msg.destination() {
-            if self.section.handles(&xorname) {
+            if self.routing.matches_our_prefix(*xorname) {
                 return self.client_msg_tracking.match_outgoing(msg);
             }
         }
@@ -157,7 +151,7 @@ fn validate_client_sig(msg: &MsgEnvelope) -> bool {
     }
 }
 
-impl<R: CryptoRng + Rng, N: Routing + Clone> Display for ClientGateway<R, N> {
+impl<R: CryptoRng + Rng> Display for ClientGateway<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ClientGateway")
     }

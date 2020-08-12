@@ -10,23 +10,22 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::network::Routing;
 
 /// The various data type stores,
 /// that are only managed at Elders.
-pub(super) struct ElderStores<R: Routing + Clone> {
-    account_storage: AccountStorage<R>,
-    blob_register: BlobRegister<R>,
-    map_storage: MapStorage<R>,
-    sequence_storage: SequenceStorage<R>,
+pub(super) struct ElderStores {
+    account_storage: AccountStorage,
+    blob_register: BlobRegister,
+    map_storage: MapStorage,
+    sequence_storage: SequenceStorage,
 }
 
-impl<R: Routing + Clone> ElderStores<R> {
+impl ElderStores {
     pub fn new(
-        account_storage: AccountStorage<R>,
-        blob_register: BlobRegister<R>,
-        map_storage: MapStorage<R>,
-        sequence_storage: SequenceStorage<R>,
+        account_storage: AccountStorage,
+        blob_register: BlobRegister,
+        map_storage: MapStorage,
+        sequence_storage: SequenceStorage,
     ) -> Self {
         Self {
             account_storage,
@@ -36,35 +35,35 @@ impl<R: Routing + Clone> ElderStores<R> {
         }
     }
 
-    pub fn account_storage(&self) -> &AccountStorage<R> {
+    pub fn account_storage(&self) -> &AccountStorage {
         &self.account_storage
     }
 
-    pub fn blob_register(&self) -> &BlobRegister<R> {
+    pub fn blob_register(&self) -> &BlobRegister {
         &self.blob_register
     }
 
-    pub fn map_storage(&self) -> &MapStorage<R> {
+    pub fn map_storage(&self) -> &MapStorage {
         &self.map_storage
     }
 
-    pub fn sequence_storage(&self) -> &SequenceStorage<R> {
+    pub fn sequence_storage(&self) -> &SequenceStorage {
         &self.sequence_storage
     }
 
-    pub fn account_storage_mut(&mut self) -> &mut AccountStorage<R> {
+    pub fn account_storage_mut(&mut self) -> &mut AccountStorage {
         &mut self.account_storage
     }
 
-    pub fn blob_register_mut(&mut self) -> &mut BlobRegister<R> {
+    pub fn blob_register_mut(&mut self) -> &mut BlobRegister {
         &mut self.blob_register
     }
 
-    pub fn map_storage_mut(&mut self) -> &mut MapStorage<R> {
+    pub fn map_storage_mut(&mut self) -> &mut MapStorage {
         &mut self.map_storage
     }
 
-    pub fn sequence_storage_mut(&mut self) -> &mut SequenceStorage<R> {
+    pub fn sequence_storage_mut(&mut self) -> &mut SequenceStorage {
         &mut self.sequence_storage
     }
 }

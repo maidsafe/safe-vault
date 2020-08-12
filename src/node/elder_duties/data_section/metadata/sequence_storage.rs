@@ -8,7 +8,6 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
-    network::Routing,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::MessagingDuty,
     node::state_db::NodeInfo,
@@ -27,16 +26,16 @@ use std::{
 };
 
 /// Operations over the data type Sequence.
-pub(super) struct SequenceStorage<R: Routing + Clone> {
+pub(super) struct SequenceStorage {
     chunks: SequenceChunkStore,
-    wrapping: ElderMsgWrapping<R>,
+    wrapping: ElderMsgWrapping,
 }
 
-impl<R: Routing + Clone> SequenceStorage<R> {
+impl SequenceStorage {
     pub(super) fn new(
-        node_info: NodeInfo<R>,
+        node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        wrapping: ElderMsgWrapping<R>,
+        wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
         let chunks = SequenceChunkStore::new(
             node_info.path(),
@@ -386,7 +385,7 @@ impl<R: Routing + Clone> SequenceStorage<R> {
     }
 }
 
-impl<R: Routing + Clone> Display for SequenceStorage<R> {
+impl Display for SequenceStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "SequenceStorage")
     }

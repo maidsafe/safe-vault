@@ -8,7 +8,6 @@
 
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
-    network::Routing,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::MessagingDuty,
     node::state_db::NodeInfo,
@@ -29,16 +28,16 @@ use xor_name::XorName;
 /// NB: This type is to be deprecated, as it
 /// will be handled client side at Authenticator,
 /// and stored as any other data to the network.
-pub(super) struct AccountStorage<R: Routing + Clone> {
+pub(super) struct AccountStorage {
     chunks: AccountChunkStore,
-    wrapping: ElderMsgWrapping<R>,
+    wrapping: ElderMsgWrapping,
 }
 
-impl<R: Routing + Clone> AccountStorage<R> {
+impl AccountStorage {
     pub fn new(
-        node_info: NodeInfo<R>,
+        node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        wrapping: ElderMsgWrapping<R>,
+        wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
         let chunks = AccountChunkStore::new(
             node_info.path(),
@@ -167,7 +166,7 @@ impl<R: Routing + Clone> AccountStorage<R> {
     }
 }
 
-impl<R: Routing + Clone> Display for AccountStorage<R> {
+impl Display for AccountStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "AccountStorage")
     }

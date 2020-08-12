@@ -15,11 +15,9 @@ use self::{
 };
 
 use crate::{
-    network::Routing,
     node::node_ops::{DataSectionDuty, NodeOperation, RewardDuty},
-    node::section_querying::SectionQuerying,
     node::state_db::NodeInfo,
-    utils, Result,
+    utils, Network, Result,
 };
 use routing::Prefix;
 use safe_transfers::TransferActor;
@@ -30,29 +28,25 @@ use xor_name::XorName;
 /// the storage and retrieval of data,
 /// and the rewarding of nodes in the section
 /// for participating in these duties.
-pub struct DataSection<R: Routing + Clone> {
+pub struct DataSection {
     /// The logic for managing data.
-    metadata: Metadata<R>,
+    metadata: Metadata,
     /// Rewards for performing storage
     /// services to the network.
-    rewards: Rewards<R>,
-    /// The transport layer.
-    routing: R,
-    /// Information about our section.
-    section: SectionQuerying<R>,
+    rewards: Rewards,
+    /// The routing layer.
+    routing: Network,
 }
 
-impl<R: Routing + Clone> DataSection<R> {
+impl DataSection {
     ///
-    pub fn new(info: NodeInfo<R>, total_used_space: &Rc<Cell<u64>>, routing: R) -> Result<Self> {
-        let section = SectionQuerying::new(routing.clone());
-
+    pub fn new(info: NodeInfo, total_used_space: &Rc<Cell<u64>>, routing: Network) -> Result<Self> {
         // Metadata
-        let metadata = Metadata::new(info.clone(), &total_used_space, section.clone())?;
+        let metadata = Metadata::new(info.clone(), &total_used_space, routing.clone())?;
 
         // Rewards
         let keypair = utils::key_pair(routing.clone())?;
-        let public_key_set = routing.public_key_set()?.clone();
+        let public_key_set = routing.public_key_set()?;
         let actor = TransferActor::new(keypair, public_key_set, Validator {});
         let rewards = Rewards::new(info.keys, actor);
 
@@ -60,7 +54,6 @@ impl<R: Routing + Clone> DataSection<R> {
             metadata,
             rewards,
             routing,
-            section,
         })
     }
 
@@ -74,7 +67,7 @@ impl<R: Routing + Clone> DataSection<R> {
 
     // Transition the section funds account to the new key.
     pub fn elders_changed(&mut self) -> Option<NodeOperation> {
-        let pub_key_set = self.section.public_key_set()?;
+        let pub_key_set = self.routing.public_key_set().ok()?;
         let keypair = utils::key_pair(self.routing.clone()).ok()?;
         let actor = TransferActor::new(keypair, pub_key_set, Validator {});
         self.rewards.transition(actor)
@@ -92,7 +85,7 @@ impl<R: Routing + Clone> DataSection<R> {
         self.rewards.remove(to_remove);
 
         // Then payout rewards to all the Elders.
-        let elders = self.section.our_elder_names();
+        let elders = self.routing.our_elder_names();
         self.rewards.payout_rewards(elders)
     }
 

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{network::Routing, node::state_db::Init, Result};
+use crate::{node::state_db::Init, Network, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
@@ -52,12 +52,12 @@ pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> T {
 }
 
 // NB: needs to allow for nodes not having a key share yet?
-pub(crate) fn key_pair<R: Routing + Clone>(routing: R) -> Result<Keypair> {
+pub(crate) fn key_pair(routing: Network) -> Result<Keypair> {
     let index = routing.our_index()?;
     let bls_secret_key = routing.secret_key_share()?;
     let secret = SerdeSecret(bls_secret_key.clone());
     let public = bls_secret_key.public_key_share();
-    let public_key_set = routing.public_key_set()?.clone();
+    let public_key_set = routing.public_key_set()?;
     Ok(Keypair::BlsShare(BlsKeypairShare {
         index,
         secret,

@@ -6,21 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::network::Routing;
 use crate::node::node_ops::{NodeOperation, PaymentDuty, TransferDuty};
-use crate::node::section_querying::SectionQuerying;
+use crate::Network;
 use log::info;
 use safe_nd::{Cmd, Message, MsgEnvelope, MsgSender, Query};
 
 /// Evaluates msgs sent directly from a client,
 /// i.e. not remote msgs from the network.
-pub struct ClientMsgAnalysis<R: Routing + Clone> {
-    section: SectionQuerying<R>,
+pub struct ClientMsgAnalysis {
+    routing: Network,
 }
 
-impl<R: Routing + Clone> ClientMsgAnalysis<R> {
-    pub fn new(section: SectionQuerying<R>) -> Self {
-        Self { section }
+impl ClientMsgAnalysis {
+    pub fn new(routing: Network) -> Self {
+        Self { routing }
     }
 
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
@@ -98,10 +97,10 @@ impl<R: Routing + Clone> ClientMsgAnalysis<R> {
     }
 
     fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
-        self.section.handles(&msg.destination().xorname())
+        self.routing.matches_our_prefix(msg.destination().xorname())
     }
 
     fn is_elder(&self) -> bool {
-        self.section.is_elder()
+        self.routing.is_elder()
     }
 }

@@ -6,18 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{network::Routing, utils};
+use crate::{utils, Network};
 use bls::PublicKeySet;
 use safe_nd::{BlsProof, BlsProofShare, Ed25519Proof, Proof, PublicKey, Signature, SignatureShare};
 use serde::Serialize;
 
 #[derive(Clone)]
-pub struct NodeSigningKeys<N: Routing + Clone> {
-    routing: N,
+pub struct NodeSigningKeys {
+    routing: Network,
 }
 
-impl<N: Routing + Clone> NodeSigningKeys<N> {
-    pub fn new(routing: N) -> Self {
+impl NodeSigningKeys {
+    pub fn new(routing: Network) -> Self {
         Self { routing }
     }
 
@@ -65,7 +65,7 @@ impl<N: Routing + Clone> NodeSigningKeys<N> {
     }
 
     fn public_key_set(&self) -> Option<PublicKeySet> {
-        Some(self.routing.public_key_set().ok()?.clone())
+        Some(self.routing.public_key_set().ok()?)
     }
 
     /// Creates a detached Ed25519 signature of `data`.

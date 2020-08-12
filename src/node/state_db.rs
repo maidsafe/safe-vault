@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{network::Routing, node::keys::NodeSigningKeys, utils, Error, Result};
+use crate::{node::keys::NodeSigningKeys, utils, Error, Result};
 use bls::{self, serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -74,8 +74,8 @@ pub enum Command {
 /// to init its various dbs
 /// (among things).
 #[derive(Clone)]
-pub struct NodeInfo<R: Routing + Clone> {
-    pub keys: NodeSigningKeys<R>,
+pub struct NodeInfo {
+    pub keys: NodeSigningKeys,
     pub root_dir: PathBuf,
     pub init_mode: Init,
     /// Upper limit in bytes for allowed network storage on this node.
@@ -84,7 +84,7 @@ pub struct NodeInfo<R: Routing + Clone> {
     pub max_storage_capacity: u64,
 }
 
-impl<R: Routing + Clone> NodeInfo<R> {
+impl NodeInfo {
     pub fn path(&self) -> &Path {
         self.root_dir.as_path()
     }
@@ -93,7 +93,7 @@ impl<R: Routing + Clone> NodeInfo<R> {
         self.keys.public_key()
     }
 
-    pub fn keys(&self) -> NodeSigningKeys<R> {
+    pub fn keys(&self) -> NodeSigningKeys {
         self.keys.clone()
     }
 }

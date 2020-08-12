@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::state_db::AgeGroup;
 use crate::{Error, Result};
 use bytes::Bytes;
 use crossbeam_channel::RecvError;
@@ -13,6 +14,8 @@ use routing::{
     DstLocation, Node as RoutingLayer, P2pNode, PublicId, RoutingError, SectionProofChain,
     SrcLocation,
 };
+use safe_nd::PublicKey;
+use std::collections::BTreeSet;
 use std::{cell::RefCell, net::SocketAddr, rc::Rc};
 use xor_name::{Prefix, XorName};
 
@@ -22,102 +25,91 @@ pub struct Network {
     routing: Rc<RefCell<RoutingLayer>>,
 }
 
+#[allow(missing_docs)]
 impl Network {
-    ///
     pub fn new(routing: Rc<RefCell<RoutingLayer>>) -> Self {
         Self { routing }
     }
-}
 
-impl Routing for Network {
-    fn handle_selected_operation(&mut self, op_index: usize) -> Result<(), RecvError> {
+    pub fn our_name(&self) -> XorName {
+        XorName(self.routing.borrow().id().name().0)
+    }
+
+    pub fn public_key(&self) -> Option<PublicKey> {
+        Some(PublicKey::Bls(
+            self.routing.borrow().public_key_set().ok()?.public_key(),
+        ))
+    }
+
+    pub fn public_key_set(&self) -> Result<bls::PublicKeySet, Error> {
+        Ok(self.routing.borrow().public_key_set()?.clone())
+    }
+
+    pub fn handle_selected_operation(&mut self, op_index: usize) -> Result<(), RecvError> {
         self.routing
             .borrow_mut()
             .handle_selected_operation(op_index)
     }
 
-    fn is_running(&self) -> bool {
+    pub fn is_running(&self) -> bool {
         self.routing.borrow().is_running()
     }
 
-    fn id(&self) -> PublicId {
+    pub fn id(&self) -> PublicId {
         *self.routing.borrow().id()
     }
 
-    fn name(&self) -> XorName {
+    pub fn name(&self) -> XorName {
         *self.routing.borrow().name()
     }
 
-    fn our_connection_info(&mut self) -> Result<SocketAddr> {
+    pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
         self.routing
             .borrow_mut()
             .our_connection_info()
-            .map_err(|e| Error::Routing(e))
+            .map_err(Error::Routing)
     }
 
-    fn our_prefix(&self) -> Option<Prefix> {
-        self.routing.borrow().our_prefix().map(|c| *c)
+    pub fn our_prefix(&self) -> Option<Prefix> {
+        self.routing.borrow().our_prefix().copied()
     }
 
-    fn matches_our_prefix(&self, name: &XorName) -> Result<bool> {
+    pub fn matches_our_prefix(&self, name: XorName) -> bool {
         self.routing
             .borrow()
-            .matches_our_prefix(name)
-            .map_err(|e| Error::Routing(e))
+            .matches_our_prefix(&XorName(name.0))
+            .unwrap_or(false)
     }
 
-    fn is_elder(&self) -> bool {
-        self.routing.borrow().is_elder()
+    pub fn our_elders(&self) -> Vec<P2pNode> {
+        self.routing.borrow().our_elders().cloned().collect()
     }
 
-    fn our_elders(&self) -> Vec<P2pNode> {
+    pub fn our_elders_sorted_by_distance_to(&self, name: &XorName) -> Vec<P2pNode> {
         self.routing
             .borrow()
-            .our_elders()
-            .into_iter()
-            .cloned()
-            .collect()
-    }
-
-    fn our_elders_sorted_by_distance_to(&self, name: &XorName) -> Vec<P2pNode> {
-        let routing = self.routing.borrow();
-        routing
             .our_elders_sorted_by_distance_to(name)
             .into_iter()
             .cloned()
             .collect()
     }
 
-    fn our_adults(&self) -> Vec<P2pNode> {
-        self.routing
-            .borrow()
-            .our_adults()
-            .into_iter()
-            .cloned()
-            .collect()
+    pub fn our_adults(&self) -> Vec<P2pNode> {
+        self.routing.borrow().our_adults().cloned().collect()
     }
 
-    fn our_adults_sorted_by_distance_to(&self, name: &XorName) -> Vec<P2pNode> {
-        self.routing
-            .borrow()
-            .our_adults_sorted_by_distance_to(name)
-            .into_iter()
-            .cloned()
-            .collect()
-    }
-
-    fn in_dst_location(&self, dst: &DstLocation) -> bool {
+    pub fn in_dst_location(&self, dst: &DstLocation) -> bool {
         self.routing.borrow().in_dst_location(dst)
     }
 
-    fn vote_for_user_event(&mut self, event: Vec<u8>) -> Result<()> {
+    pub fn vote_for_user_event(&mut self, event: Vec<u8>) -> Result<()> {
         self.routing
             .borrow_mut()
             .vote_for_user_event(event)
-            .map_err(|e| Error::Routing(e))
+            .map_err(Error::Routing)
     }
 
-    fn send_message(
+    pub fn send_message(
         &mut self,
         src: SrcLocation,
         dst: DstLocation,
@@ -126,131 +118,109 @@ impl Routing for Network {
         self.routing.borrow_mut().send_message(src, dst, content)
     }
 
-    fn send_message_to_client(&mut self, peer_addr: SocketAddr, msg: Bytes) -> Result<()> {
+    pub fn send_message_to_client(&mut self, peer_addr: SocketAddr, msg: Bytes) -> Result<()> {
         self.routing
             .borrow_mut()
             .send_message_to_client(peer_addr, msg, 0)
-            .map_err(|e| Error::Routing(e))
+            .map_err(Error::Routing)
     }
 
-    fn disconnect_from_client(&mut self, peer_addr: SocketAddr) -> Result<()> {
+    pub fn disconnect_from_client(&mut self, peer_addr: SocketAddr) -> Result<()> {
         self.routing
             .borrow_mut()
             .disconnect_from_client(peer_addr)
-            .map_err(|e| Error::Routing(e))
+            .map_err(Error::Routing)
     }
 
-    fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.routing
-            .borrow()
-            .public_key_set()
-            .map_err(|e| Error::Routing(e))
-            .map(|c| c.clone())
-    }
-
-    fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
+    pub fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
         self.routing
             .borrow()
             .secret_key_share()
-            .map_err(|e| Error::Routing(e))
+            .map_err(Error::Routing)
             .map(|c| c.clone())
     }
 
-    fn our_history(&self) -> Option<SectionProofChain> {
-        self.routing.borrow().our_history().map(|c| c.clone())
+    pub fn our_history(&self) -> Option<SectionProofChain> {
+        self.routing.borrow().our_history().cloned()
     }
 
-    fn our_index(&self) -> Result<usize> {
+    pub fn our_index(&self) -> Result<usize> {
+        self.routing.borrow().our_index().map_err(Error::Routing)
+    }
+
+    pub fn our_elder_names(&self) -> BTreeSet<XorName> {
         self.routing
             .borrow()
-            .our_index()
-            .map_err(|e| Error::Routing(e))
+            .our_elders()
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<BTreeSet<_>>()
     }
-}
 
-///
-pub trait Routing {
-    /// Processes events received externally from one of the channels.
-    /// For this function to work properly, the node event channels need to
-    /// be registered by calling [`ApprovedPeer::register`](#method.register).
-    /// [`Select::ready`] needs to be called to get `op_index`, the event channel index.
-    ///
-    /// This function is non-blocking.
-    ///
-    /// Errors are permanent failures due to either: node termination, the permanent closing of one
-    /// of the event channels, or an invalid (unknown) channel index.
-    ///
-    /// [`Select::ready`]: https://docs.rs/crossbeam-channel/0.3/crossbeam_channel/struct.Select.html#method.ready
-    fn handle_selected_operation(&mut self, op_index: usize) -> Result<(), RecvError>;
+    pub fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
+        self.routing
+            .borrow()
+            .our_elders()
+            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
+            .collect::<Vec<_>>()
+    }
 
-    /// Returns whether this node is running or has been terminated.
-    fn is_running(&self) -> bool;
+    pub fn our_elder_addresses_sorted_by_distance_to(
+        &self,
+        name: &XorName,
+    ) -> Vec<(XorName, SocketAddr)> {
+        self.routing
+            .borrow_mut()
+            .our_elders_sorted_by_distance_to(&XorName(name.0))
+            .into_iter()
+            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
+            .collect::<Vec<_>>()
+    }
 
-    /// Returns the `PublicId` of this node.
-    fn id(&self) -> PublicId;
+    pub fn our_elder_names_sorted_by_distance_to(
+        &self,
+        name: &XorName,
+        count: usize,
+    ) -> Vec<XorName> {
+        self.routing
+            .borrow()
+            .our_elders_sorted_by_distance_to(&XorName(name.0))
+            .into_iter()
+            .take(count)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
+    }
 
-    /// The name of this node.
-    fn name(&self) -> XorName;
+    pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
+        self.routing
+            .borrow()
+            .our_adults_sorted_by_distance_to(&XorName(name.0))
+            .into_iter()
+            .take(count)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
+    }
 
-    /// Returns connection info of this node.
-    fn our_connection_info(&mut self) -> Result<SocketAddr>;
+    pub fn is_elder(&self) -> bool {
+        matches!(self.our_duties(), AgeGroup::Elder)
+    }
 
-    /// Our `Prefix` once we are a part of the section.
-    fn our_prefix(&self) -> Option<Prefix>;
+    pub fn is_adult(&self) -> bool {
+        matches!(self.our_duties(), AgeGroup::Adult)
+    }
 
-    /// Finds out if the given XorName matches our prefix. Returns error if we don't have a prefix
-    /// because we haven't joined any section yet.
-    fn matches_our_prefix(&self, name: &XorName) -> Result<bool>;
-
-    /// Returns whether the node is Elder.
-    fn is_elder(&self) -> bool;
-
-    /// Returns the information of all the current section elders.
-    fn our_elders(&self) -> Vec<P2pNode>;
-
-    /// Returns the elders of our section sorted by their distance to `name` (closest first).
-    fn our_elders_sorted_by_distance_to(&self, name: &XorName) -> Vec<P2pNode>;
-
-    /// Returns the information of all the current section adults.
-    fn our_adults(&self) -> Vec<P2pNode>;
-
-    /// Returns the adults of our section sorted by their distance to `name` (closest first).
-    /// If we are not elder or if there are no adults in the section, returns empty vec.
-    fn our_adults_sorted_by_distance_to(&self, name: &XorName) -> Vec<P2pNode>;
-
-    /// Checks whether the given location represents self.
-    fn in_dst_location(&self, dst: &DstLocation) -> bool;
-
-    /// Vote for a user-defined event.
-    /// Returns `InvalidState` error if we are not an elder.
-    fn vote_for_user_event(&mut self, event: Vec<u8>) -> Result<()>;
-
-    /// Send a message.
-    fn send_message(
-        &mut self,
-        src: SrcLocation,
-        dst: DstLocation,
-        content: Vec<u8>,
-    ) -> Result<(), RoutingError>;
-
-    /// Send a message to a client peer.
-    fn send_message_to_client(&mut self, peer_addr: SocketAddr, msg: Bytes) -> Result<()>;
-
-    /// Disconnect form a client peer.
-    fn disconnect_from_client(&mut self, peer_addr: SocketAddr) -> Result<()>;
-
-    /// Returns the current BLS public key set or `RoutingError::InvalidState` if we are not joined
-    /// yet.
-    fn public_key_set(&self) -> Result<bls::PublicKeySet>;
-
-    /// Returns the current BLS secret key share or `RoutingError::InvalidState` if we are not
-    /// elder.
-    fn secret_key_share(&self) -> Result<bls::SecretKeyShare>;
-
-    /// Returns our section proof chain, or `None` if we are not joined yet.
-    fn our_history(&self) -> Option<SectionProofChain>;
-
-    /// Returns our index in the current BLS group or `RoutingError::InvalidState` if section key was
-    /// not generated yet.
-    fn our_index(&self) -> Result<usize>;
+    fn our_duties(&self) -> AgeGroup {
+        if self.routing.borrow().is_elder() {
+            AgeGroup::Elder
+        } else if self
+            .routing
+            .borrow()
+            .our_adults()
+            .map(|c| c.name())
+            .any(|x| *x == *self.routing.borrow().name())
+        {
+            AgeGroup::Adult
+        } else {
+            AgeGroup::Infant
+        }
+    }
 }

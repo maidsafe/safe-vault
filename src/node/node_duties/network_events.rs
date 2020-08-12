@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::NetworkMsgAnalysis;
-use crate::network::Routing;
 use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
@@ -18,12 +17,12 @@ use xor_name::XorName;
 
 /// Maps events from the transport layer
 /// into domain messages for the various modules.
-pub struct NetworkEvents<R: Routing + Clone> {
-    analysis: NetworkMsgAnalysis<R>,
+pub struct NetworkEvents {
+    analysis: NetworkMsgAnalysis,
 }
 
-impl<R: Routing + Clone> NetworkEvents<R> {
-    pub fn new(analysis: NetworkMsgAnalysis<R>) -> Self {
+impl NetworkEvents {
+    pub fn new(analysis: NetworkMsgAnalysis) -> Self {
         Self { analysis }
     }
 

@@ -10,7 +10,7 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{network::Routing, node::node_ops::MessagingDuty, node::state_db::NodeInfo, Result};
+use crate::{node::node_ops::MessagingDuty, node::state_db::NodeInfo, Result};
 use chunk_storage::ChunkStorage;
 use reading::Reading;
 use writing::Writing;
@@ -25,12 +25,12 @@ use std::{
 };
 
 /// Operations on data chunks.
-pub(crate) struct Chunks<R: Routing + Clone> {
-    chunk_storage: ChunkStorage<R>,
+pub(crate) struct Chunks {
+    chunk_storage: ChunkStorage,
 }
 
-impl<R: Routing + Clone> Chunks<R> {
-    pub fn new(node_info: NodeInfo<R>, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+impl Chunks {
+    pub fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let chunk_storage = ChunkStorage::new(node_info, total_used_space)?;
 
         Ok(Self { chunk_storage })
@@ -154,7 +154,7 @@ impl<R: Routing + Clone> Chunks<R> {
     // }
 }
 
-impl<R: Routing + Clone> Display for Chunks<R> {
+impl Display for Chunks {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Chunks")
     }

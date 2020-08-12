@@ -14,19 +14,17 @@ mod keys;
 mod msg_wrapping;
 mod node_duties;
 mod node_ops;
-mod section_querying;
 
 pub use crate::node::node_duties::messaging::Receiver;
 pub use crate::node::state_db::{Command, Init};
 use crate::{
-    network::Routing,
     node::{
         keys::NodeSigningKeys,
         node_duties::{messaging::Received, NodeDuties},
         node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup, NodeInfo},
     },
-    Config, Result,
+    Config, Network, Result,
 };
 use bls::SecretKey;
 use log::{info, warn};
@@ -38,15 +36,15 @@ use std::{
 };
 
 /// Main node struct.
-pub struct Node<R: CryptoRng + Rng, N: Routing + Clone> {
-    duties: NodeDuties<R, N>,
+pub struct Node<R: CryptoRng + Rng> {
+    duties: NodeDuties<R>,
     receiver: Receiver,
-    routing: N,
+    routing: Network,
 }
 
-impl<R: CryptoRng + Rng, N: Routing + Clone> Node<R, N> {
+impl<R: CryptoRng + Rng> Node<R> {
     /// Initialize a new node.
-    pub fn new(receiver: Receiver, routing: N, config: &Config, rng: R) -> Result<Self> {
+    pub fn new(receiver: Receiver, routing: Network, config: &Config, rng: R) -> Result<Self> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
 
@@ -174,7 +172,7 @@ impl<R: CryptoRng + Rng, N: Routing + Clone> Node<R, N> {
     }
 }
 
-impl<R: CryptoRng + Rng, N: Routing + Clone> Display for Node<R, N> {
+impl<R: CryptoRng + Rng> Display for Node<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Node")
     }

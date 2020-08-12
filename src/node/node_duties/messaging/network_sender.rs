@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{network::Routing, node::node_ops::MessagingDuty, utils};
+use crate::{node::node_ops::MessagingDuty, utils, Network};
 use log::{error, info};
 use routing::{DstLocation, SrcLocation};
 use safe_nd::{Address, MsgEnvelope};
@@ -14,12 +14,12 @@ use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// Sending of msgs to other nodes in the network.
-pub(super) struct NetworkSender<R: Routing + Clone> {
-    routing: R,
+pub(super) struct NetworkSender {
+    routing: Network,
 }
 
-impl<R: Routing + Clone> NetworkSender<R> {
-    pub fn new(routing: R) -> Self {
+impl NetworkSender {
+    pub fn new(routing: Network) -> Self {
         Self { routing }
     }
 

@@ -6,13 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::network::Routing;
 use crate::node::node_duties::accumulation::Accumulation;
 use crate::node::node_ops::{
     AdultDuty, ChunkDuty, GatewayDuty, MessagingDuty, MetadataDuty, NodeOperation, RewardDuty,
     TransferCmd, TransferDuty, TransferQuery,
 };
-use crate::node::section_querying::SectionQuerying;
+use crate::Network;
 use log::error;
 use safe_nd::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
@@ -25,16 +24,16 @@ use xor_name::XorName;
 
 /// Evaluates remote msgs from the network,
 /// i.e. not msgs sent directly from a client.
-pub struct NetworkMsgAnalysis<R: Routing + Clone> {
+pub struct NetworkMsgAnalysis {
     accumulation: Accumulation,
-    section: SectionQuerying<R>,
+    routing: Network,
 }
 
-impl<R: Routing + Clone> NetworkMsgAnalysis<R> {
-    pub fn new(section: SectionQuerying<R>) -> Self {
+impl NetworkMsgAnalysis {
+    pub fn new(routing: Network) -> Self {
         Self {
             accumulation: Accumulation::new(),
-            section,
+            routing,
         }
     }
 
@@ -76,7 +75,7 @@ impl<R: Routing + Clone> NetworkMsgAnalysis<R> {
         use Address::*;
         let destined_for_network = || match msg.destination() {
             Client(address) => !self.self_is_handler_for(&address),
-            Node(address) => address != self.section.our_name(),
+            Node(address) => address != self.routing.our_name(),
             Section(address) => !self.self_is_handler_for(&address),
         };
 
@@ -376,7 +375,7 @@ impl<R: Routing + Clone> NetworkMsgAnalysis<R> {
                 } => {
                     // This comparison is a good example of the need to use `lazy messaging`,
                     // as to handle that the expected public key is not the same as the current.
-                    if public_key == &self.section.public_key()? {
+                    if public_key == &self.routing.public_key()? {
                         Some(TransferDuty::ProcessQuery {
                             query: TransferQuery::GetReplicaEvents,
                             msg_id: *id,
@@ -440,14 +439,14 @@ impl<R: Routing + Clone> NetworkMsgAnalysis<R> {
     }
 
     fn self_is_handler_for(&self, address: &XorName) -> bool {
-        self.section.handles(address)
+        self.routing.matches_our_prefix(*address)
     }
 
     fn is_elder(&self) -> bool {
-        self.section.is_elder()
+        self.routing.is_elder()
     }
 
     fn is_adult(&self) -> bool {
-        self.section.is_adult()
+        self.routing.is_adult()
     }
 }

@@ -8,7 +8,6 @@
 
 use super::validator::Validator;
 use crate::{
-    network::Routing,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation},
 };
@@ -24,9 +23,9 @@ use ActorEvent::*;
 
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
-pub(super) struct SectionFunds<R: Routing + Clone> {
+pub(super) struct SectionFunds {
     actor: TransferActor<Validator>,
-    wrapping: ElderMsgWrapping<R>,
+    wrapping: ElderMsgWrapping,
     state: State,
 }
 
@@ -48,8 +47,8 @@ struct State {
     next_actor: Option<TransferActor<Validator>>, // we could do a queue here, and when starting transition skip all but the last one, but that is also prone to edge case problems..
 }
 
-impl<R: Routing + Clone> SectionFunds<R> {
-    pub fn new(actor: TransferActor<Validator>, wrapping: ElderMsgWrapping<R>) -> Self {
+impl SectionFunds {
+    pub fn new(actor: TransferActor<Validator>, wrapping: ElderMsgWrapping) -> Self {
         Self {
             actor,
             wrapping,

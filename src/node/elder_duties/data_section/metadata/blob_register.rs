@@ -7,12 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    network::Routing,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation},
-    node::section_querying::SectionQuerying,
     node::NodeInfo,
-    utils, Result, ToDbKey,
+    utils, Network, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use pickledb::PickleDb;
@@ -47,20 +45,20 @@ struct HolderMetadata {
 }
 
 /// Operations over the data type Blob.
-pub(super) struct BlobRegister<R: Routing + Clone> {
+pub(super) struct BlobRegister {
     metadata: PickleDb,
     holders: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
-    wrapping: ElderMsgWrapping<R>,
-    section_querying: SectionQuerying<R>,
+    routing: Network,
+    wrapping: ElderMsgWrapping,
 }
 
-impl<R: Routing + Clone> BlobRegister<R> {
+impl BlobRegister {
     pub(super) fn new(
-        node_info: NodeInfo<R>,
-        wrapping: ElderMsgWrapping<R>,
-        section_querying: SectionQuerying<R>,
+        node_info: NodeInfo,
+        wrapping: ElderMsgWrapping,
+        routing: Network,
     ) -> Result<Self> {
         let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode)?;
         let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode)?;
@@ -71,7 +69,7 @@ impl<R: Routing + Clone> BlobRegister<R> {
             metadata,
             holders,
             full_adults,
-            section_querying,
+            routing,
             wrapping,
         })
     }
@@ -430,13 +428,11 @@ impl<R: Routing + Clone> BlobRegister<R> {
     // Used to fetch the list of holders for a new chunk.
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let take = CHUNK_ADULT_COPY_COUNT;
-        let mut closest_adults = self
-            .section_querying
-            .our_adults_sorted_by_distance_to(&target, take);
+        let mut closest_adults = self.routing.our_adults_sorted_by_distance_to(&target, take);
         if closest_adults.len() < CHUNK_COPY_COUNT {
             let take = CHUNK_COPY_COUNT - closest_adults.len();
             let mut closest_elders = self
-                .section_querying
+                .routing
                 .our_elder_names_sorted_by_distance_to(&target, take);
             closest_adults.append(&mut closest_elders);
             closest_adults
@@ -463,7 +459,7 @@ impl<R: Routing + Clone> BlobRegister<R> {
     }
 }
 
-impl<R: Routing + Clone> Display for BlobRegister<R> {
+impl Display for BlobRegister {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "BlobRegister")
     }

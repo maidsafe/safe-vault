@@ -15,12 +15,10 @@ mod sequence_storage;
 mod writing;
 
 use crate::{
-    network::Routing,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MetadataDuty, NodeOperation},
-    node::section_querying::SectionQuerying,
     node::state_db::NodeInfo,
-    Result,
+    Network, Result,
 };
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
@@ -43,23 +41,22 @@ use xor_name::XorName;
 /// has been implemented; where the data types are all simply
 /// the structures + their metadata - handled at `Elders` - with
 /// all underlying data being chunks stored at `Adults`.
-pub struct Metadata<R: Routing + Clone> {
-    elder_stores: ElderStores<R>,
+pub struct Metadata {
+    elder_stores: ElderStores,
     #[allow(unused)]
-    wrapping: ElderMsgWrapping<R>,
+    wrapping: ElderMsgWrapping,
 }
 
-impl<R: Routing + Clone> Metadata<R> {
+impl Metadata {
     pub fn new(
-        node_info: NodeInfo<R>,
+        node_info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        section_querying: SectionQuerying<R>,
+        routing: Network,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
         let account_storage =
             AccountStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
-        let blob_register =
-            BlobRegister::new(node_info.clone(), wrapping.clone(), section_querying)?;
+        let blob_register = BlobRegister::new(node_info.clone(), wrapping.clone(), routing)?;
         let map_storage = MapStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
         let sequence_storage = SequenceStorage::new(node_info, total_used_space, wrapping.clone())?;
         let elder_stores = ElderStores::new(
@@ -258,7 +255,7 @@ impl<R: Routing + Clone> Metadata<R> {
     // }
 }
 
-impl<R: Routing + Clone> Display for Metadata<R> {
+impl Display for Metadata {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Metadata")
     }

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{network::Routing, node::node_ops::MessagingDuty, utils};
+use crate::{node::node_ops::MessagingDuty, utils, Network};
 use bytes::Bytes;
 use log::{info, warn};
 use safe_nd::{Address, HandshakeResponse, MsgEnvelope};
@@ -17,12 +17,12 @@ use std::{
 };
 
 /// Sending of messages to clients.
-pub(super) struct ClientSender<R: Routing + Clone> {
-    routing: R,
+pub(super) struct ClientSender {
+    routing: Network,
 }
 
-impl<R: Routing + Clone> ClientSender<R> {
-    pub fn new(routing: R) -> Self {
+impl ClientSender {
+    pub fn new(routing: Network) -> Self {
         Self { routing }
     }
 
@@ -70,7 +70,7 @@ impl<R: Routing + Clone> ClientSender<R> {
     }
 }
 
-impl<R: Routing + Clone> Display for ClientSender<R> {
+impl Display for ClientSender {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ClientSender")
     }

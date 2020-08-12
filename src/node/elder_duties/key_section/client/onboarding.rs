@@ -7,8 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::node_ops::MessagingDuty;
-use crate::node::section_querying::SectionQuerying;
-use crate::{network::Routing, utils};
+use crate::{utils, Network};
 use log::{debug, info, trace};
 use rand::{CryptoRng, Rng};
 use safe_nd::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
@@ -26,19 +25,19 @@ use std::{
 /// Most notably, this is the handshake process
 /// taking place between a connecting client and
 /// the Elders of this section.
-pub struct Onboarding<R: Routing + Clone> {
+pub struct Onboarding {
     node_id: PublicKey,
-    section: SectionQuerying<R>,
+    routing: Network,
     clients: HashMap<SocketAddr, PublicKey>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicKey)>,
 }
 
-impl<R: Routing + Clone> Onboarding<R> {
-    pub fn new(node_id: PublicKey, section: SectionQuerying<R>) -> Self {
+impl Onboarding {
+    pub fn new(node_id: PublicKey, routing: Network) -> Self {
         Self {
             node_id,
-            section,
+            routing,
             clients: HashMap::<SocketAddr, PublicKey>::new(),
             client_candidates: Default::default(),
         }
@@ -82,11 +81,11 @@ impl<R: Routing + Clone> Onboarding<R> {
             "{}: Trying to bootstrap..: {} on {}",
             self, client_key, peer_addr
         );
-        let elders = if self.section.matches_our_prefix((*client_key).into()) {
-            self.section.our_elder_addresses()
+        let elders = if self.routing.matches_our_prefix((*client_key).into()) {
+            self.routing.our_elder_addresses()
         } else {
             let closest_known_elders = self
-                .section
+                .routing
                 .our_elder_addresses_sorted_by_distance_to(&(*client_key).into());
             if closest_known_elders.is_empty() {
                 trace!(
@@ -115,7 +114,7 @@ impl<R: Routing + Clone> Onboarding<R> {
             "{}: Trying to join..: {} on {}",
             self, client_key, peer_addr
         );
-        if self.section.matches_our_prefix(client_key.into()) {
+        if self.routing.matches_our_prefix(client_key.into()) {
             let challenge = utils::random_vec(rng, 8);
             let _ = self
                 .client_candidates
@@ -225,7 +224,7 @@ impl<R: Routing + Clone> Onboarding<R> {
     // }
 }
 
-impl<R: Routing + Clone> Display for Onboarding<R> {
+impl Display for Onboarding {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Onboarding")
     }

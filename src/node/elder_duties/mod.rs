@@ -11,10 +11,9 @@ mod key_section;
 
 use self::{data_section::DataSection, key_section::KeySection};
 use crate::{
-    network::Routing,
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Error, Result,
+    Error, Network, Result,
 };
 use rand::{CryptoRng, Rng};
 use routing::Prefix;
@@ -26,17 +25,17 @@ use std::{
 use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
-pub struct ElderDuties<R: CryptoRng + Rng, N: Routing + Clone> {
+pub struct ElderDuties<R: CryptoRng + Rng> {
     prefix: Prefix,
-    key_section: KeySection<R, N>,
-    data_section: DataSection<N>,
+    key_section: KeySection<R>,
+    data_section: DataSection,
 }
 
-impl<R: CryptoRng + Rng, N: Routing + Clone> ElderDuties<R, N> {
+impl<R: CryptoRng + Rng> ElderDuties<R> {
     pub fn new(
-        info: NodeInfo<N>,
+        info: NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        routing: N,
+        routing: Network,
         rng: R,
     ) -> Result<Self> {
         let prefix = routing.our_prefix().ok_or(Error::Logic)?;
@@ -112,7 +111,7 @@ impl<R: CryptoRng + Rng, N: Routing + Clone> ElderDuties<R, N> {
     }
 }
 
-impl<R: CryptoRng + Rng, N: Routing + Clone> Display for ElderDuties<R, N> {
+impl<R: CryptoRng + Rng> Display for ElderDuties<R> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "ElderDuties")
     }
