@@ -112,6 +112,8 @@ impl SectionFunds {
         }
     }
 
+    /// Will validate and sign the payout, and ask of the replicas to
+    /// do the same, and await their responses as to accumulate the result.
     pub fn initiate_reward_payout(&mut self, payout: Payout) -> Option<MessagingDuty> {
         if self.state.finished.contains(&payout.node_id) {
             return None;
@@ -147,6 +149,9 @@ impl SectionFunds {
         }
     }
 
+    /// As all Replicas have accumulated the distributed
+    /// actor cmds and applied them, they'll send out the
+    /// result, which each actor instance accumulates locally.
     pub fn receive(&mut self, validation: TransferValidated) -> Option<NodeOperation> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
@@ -203,7 +208,7 @@ impl SectionFunds {
         }
     }
 
-    // Can safely be called without opverwriting any
+    // Can safely be called without overwriting any
     // payout in flight, since validations for that are made.
     fn try_pop_queue(&mut self) -> Option<NodeOperation> {
         if let Some(payout) = self.state.queued_payouts.pop_front() {
@@ -239,7 +244,9 @@ impl SectionFunds {
         use safe_nd::ReplicaEvent::*;
         // Set the next actor to be our current.
         self.actor = self.state.next_actor.take().unwrap();
-        // (we're probably not in a very good state though if we happen to not have anything here.. so probably best to panic.. at least until we know we can recover from this)
+        // We checked above that next_actor was some,
+        // only case this could fail is if we're multi threading here.
+        // (which we don't really have reason for here)
 
         // Credit the transfer to the new actor.
         match self

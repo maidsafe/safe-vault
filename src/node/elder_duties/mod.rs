@@ -56,6 +56,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         self.key_section.catchup_with_section()
     }
 
+    /// Processing of any Elder duty.
     pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
         use ElderDuty::*;
         match duty {

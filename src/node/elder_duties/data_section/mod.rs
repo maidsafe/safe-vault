@@ -89,10 +89,14 @@ impl DataSection {
         self.rewards.payout_rewards(elders)
     }
 
+    /// When a new node joins, it is registered for receiving rewards.
     pub fn new_node_joined(&mut self, id: XorName) -> Option<NodeOperation> {
         self.rewards.process(RewardDuty::AddNewNode(id))
     }
 
+    /// When a relocated node joins, a DataSection
+    /// has a few different things to do, such as
+    /// pay out rewards and trigger chunk duplication.    
     pub fn relocated_node_joined(
         &mut self,
         old_node_id: XorName,

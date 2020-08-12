@@ -34,12 +34,13 @@ pub struct Rewards {
     wrapping: ElderMsgWrapping,
 }
 
+// Node age
 type Age = u8;
 
 pub enum RewardAccount {
     /// When added.
     AwaitingStart(Age),
-    /// After having received the account id, the
+    /// After we have received the account id, the
     /// stage of the RewardAccount is `Active`.
     Active { id: AccountId, age: Age },
     /// After a node leaves the section
@@ -63,16 +64,22 @@ impl Rewards {
         }
     }
 
+    /// Returns the node ids of all nodes.
     pub fn all_nodes(&self) -> Vec<XorName> {
         self.node_accounts.keys().copied().collect()
     }
 
+    /// Removes a subset of the nodes,
+    /// more specifically those no longer
+    /// part of this section, after a split.
     pub fn remove(&mut self, split_nodes: BTreeSet<XorName>) {
         for node in split_nodes {
             let _ = self.node_accounts.remove(&node);
         }
     }
 
+    /// After Elder change, we transition to a new
+    /// transfer actor, as there is now a new keypair for it.
     pub fn transition(&mut self, to: TransferActor<Validator>) -> Option<NodeOperation> {
         Some(self.section_funds.transition(to)?.into())
     }
@@ -141,6 +148,10 @@ impl Rewards {
     }
 
     /// 0. A brand new node has joined our section.
+    /// A new node always start at age 4.
+    /// It still hasn't registered an account id at
+    /// this point, but will as part of starting up.
+    /// At age 5 it gets its first reward payout.
     fn add_node(&mut self, node_id: XorName) -> Option<MessagingDuty> {
         let _ = self
             .node_accounts
@@ -148,8 +159,8 @@ impl Rewards {
         None
     }
 
-    /// 1. When a node is relocated to our section, we add the account
-    /// and send a cmd to old section, for claiming the rewards.
+    /// 1. When a node is relocated to our section, we add the node id
+    /// and send a cmd to old section, for retreiving the account id.
     fn add_relocated_account(
         &mut self,
         old_node_id: XorName,
@@ -172,10 +183,9 @@ impl Rewards {
         })
     }
 
-    /// 2. The old section will send back the claimed rewards.
-    /// Work is the total work associated with this account id.
-    /// It is a strictly incrementing value during the lifetime of
-    /// the owner on the network.
+    /// 2. The old section will send back the account id.
+    /// At this point, we payout a standard reward based on the node age,
+    /// which represents the work performed in its previous section.
     fn receive_account_id(&mut self, id: AccountId, node_id: XorName) -> Option<MessagingDuty> {
         // If we ever hit these errors, something is very odd
         // most likely a bug, because we are receiving an event triggered by our cmd.
@@ -215,7 +225,7 @@ impl Rewards {
     }
 
     /// 4. When the section becomes aware that a node has left,
-    /// it is deactivated.
+    /// its account is deactivated.
     fn deactivate(&mut self, node_id: XorName) -> Option<MessagingDuty> {
         let id = match self.node_accounts.get(&node_id) {
             Some(RewardAccount::Active { id, .. }) => *id,
@@ -231,8 +241,8 @@ impl Rewards {
 
     /// 5. The section that received a relocated node,
     /// will locally be executing `add_account(..)` of this very module,
-    /// thereby sending a cmd to the old section, leading to this method
-    /// here being called. An event will be sent back with the claimed counter.
+    /// thereby sending a query to the old section, leading to this method
+    /// here being called. A query response will be sent back with the account id.
     fn get_account_id(
         &mut self,
         old_node_id: XorName,
@@ -245,6 +255,7 @@ impl Rewards {
             Some(RewardAccount::Active { .. }) => {
                 // ..means the node has not left, and was not
                 // marked as awaiting move..
+                // (Could be a case for lazy messaging..)
                 return self.wrapping.send(Message::NodeQueryResponse {
                     response: Rewards(GetAccountId(Err(Error::NetworkOther(
                         "InvalidClaim: Account is not awaiting move.".to_string(),
@@ -264,9 +275,7 @@ impl Rewards {
 
         // Send the reward counter to the new section.
         // Once received over there, the new section
-        // will pay out any accumulated rewards to the account.
-        // From there on, they accumulate rewards for the node
-        // until it is being relocated again.
+        // will pay out the accumulated rewards to the account.
         use NodeQueryResponse::*;
         use NodeRewardQueryResponse::*;
         self.wrapping.send(Message::NodeQueryResponse {
