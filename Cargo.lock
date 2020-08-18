@@ -306,9 +306,9 @@ checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
 name = "chrono"
-version = "0.4.13"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c74d84029116787153e02106bf53e66828452a4b325cc8652b788b5967c0a0b6"
+checksum = "942f72db697d8767c22d46a598e01f2d3b475501ea43d0db4f16d90259182d0b"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -317,9 +317,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "2.33.2"
+version = "2.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10040cdf04294b565d9e0319955430099ec3813a64c952b86a41200ad714ae48"
+checksum = "37e58ac78573c40708d45522f0d80fa2f01cc4f9b4e2bf749807255454312002"
 dependencies = [
  "ansi_term",
  "atty",
@@ -517,9 +517,9 @@ dependencies = [
 
 [[package]]
 name = "either"
-version = "1.5.3"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
+checksum = "cd56b59865bce947ac5958779cfa508f6c3b9497cc762b7e24a12d11ccde2c4f"
 
 [[package]]
 name = "encode_unicode"
@@ -985,7 +985,7 @@ dependencies = [
  "futures-util",
  "hyper",
  "log 0.4.11",
- "rustls 0.18.0",
+ "rustls 0.18.1",
  "tokio",
  "tokio-rustls",
  "webpki",
@@ -1346,9 +1346,9 @@ checksum = "1ab52be62400ca80aa00285d25253d7f7c437b7375c4de678f5405d3afe82ca5"
 
 [[package]]
 name = "once_cell"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b631f7e854af39a1739f401cf34a8a013dfe09eac4fa4dba91e9768bd28168d"
+checksum = "260e51e7efe62b592207e9e13a68e43692a7a279171d6ba57abd208bf23645ad"
 
 [[package]]
 name = "opaque-debug"
@@ -1811,7 +1811,7 @@ dependencies = [
  "mime_guess",
  "percent-encoding 2.1.0",
  "pin-project-lite",
- "rustls 0.18.0",
+ "rustls 0.18.1",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -1843,7 +1843,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/joshuef/routing.git?branch=RandoXor#864c485869651f50ba98d91cbfbe508497cd427d"
+source = "git+https://github.com/joshuef/routing.git?branch=RandoXor#024023f2dc7f7696422cd95c1a670d4e7d152fa6"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -1907,9 +1907,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.18.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cac94b333ee2aac3284c5b8a1b7fb4dd11cba88c244e3fe33cdbd047af0eb693"
+checksum = "5d1126dcf58e93cee7d098dbda643b5f92ed724f1f6a63007c1116eed6700c81"
 dependencies = [
  "base64 0.12.3",
  "log 0.4.11",
@@ -1938,7 +1938,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.10.1"
-source = "git+https://github.com/maidsafe/safe-nd.git?branch=farming#72c595d8de4fea8cf98c6780c184209c6b996f65"
+source = "git+https://github.com/maidsafe/safe-nd.git?branch=farming#6c0a0a1dd859db44c84934e24ecd86ba3195fcca"
 dependencies = [
  "bincode",
  "crdts",
@@ -1974,7 +1974,7 @@ dependencies = [
 [[package]]
 name = "safe-transfers"
 version = "0.1.0"
-source = "git+https://github.com/maidsafe/safe-transfers#2c602ef02a09d3cbb9f005755b941508da44f5ee"
+source = "git+https://github.com/maidsafe/safe-transfers.git#89c6b746ec71dd15ff8e6714d08a79c6bd580384"
 dependencies = [
  "bincode",
  "crdts",
@@ -2083,9 +2083,9 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.114"
+version = "1.0.115"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5317f7588f0a5078ee60ef675ef96735a1442132dc645eb1d12c018620ed8cd3"
+checksum = "e54c9a88f2da7238af84b5101443f0c0d0a3bbdc455e34a5c9497b1903ed55d5"
 dependencies = [
  "serde_derive",
 ]
@@ -2102,9 +2102,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.114"
+version = "1.0.115"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a0be94b04690fbaed37cddffc5c134bf537c8e3329d53e982fe04c374978f8e"
+checksum = "609feed1d0a73cc36a0182a840a9b37b4a82f0b1150369f0536a9e3f2a31dc48"
 dependencies = [
  "proc-macro2 1.0.19",
  "quote 1.0.7",
@@ -2401,9 +2401,9 @@ dependencies = [
 
 [[package]]
 name = "tinyvec"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53953d2d3a5ad81d9f844a32f14ebb121f50b650cd59d0ee2a07cf13c617efed"
+checksum = "238ce071d267c5710f9d31451efec16c5ee22de34df17cc05e56cbc92e967117"
 
 [[package]]
 name = "tmp-ed25519"
@@ -2455,7 +2455,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "228139ddd4fea3fa345a29233009635235833e52807af7ea6448ead03890d6a9"
 dependencies = [
  "futures-core",
- "rustls 0.18.0",
+ "rustls 0.18.1",
  "tokio",
  "webpki",
 ]
@@ -2482,9 +2482,9 @@ checksum = "e987b6bf443f4b5b3b6f38704195592cca41c5bb7aedd3c3693c7081f8289860"
 
 [[package]]
 name = "tracing"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0aae59226cf195d8e74d4b34beae1859257efb4e5fed3f147d2dc2c7d372178"
+checksum = "6d79ca061b032d6ce30c660fded31189ca0b9922bf483cd70759f13a2d86786c"
 dependencies = [
  "cfg-if",
  "log 0.4.11",
@@ -2494,9 +2494,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0693bf8d6f2bf22c690fc61a9d21ac69efdbb894a17ed596b9af0f01e64b84b"
+checksum = "1fe233f4227389ab7df5b32649239da7ebe0b281824b4e84b342d04d3fd8c25e"
 dependencies = [
  "proc-macro2 1.0.19",
  "quote 1.0.7",
@@ -2505,9 +2505,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d593f98af59ebc017c0648f0117525db358745a8894a8d684e185ba3f45954f9"
+checksum = "db63662723c316b43ca36d833707cc93dff82a02ba3d7e354f342682cc8b3545"
 dependencies = [
  "lazy_static",
 ]
@@ -2817,8 +2817,9 @@ dependencies = [
 
 [[package]]
 name = "xor_name"
-version = "1.0.0"
-source = "git+https://github.com/joshuef/xor-name.git?branch=AddRandom#8749265d4fbb18d9505607036cba8b4dccd983ce"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fa8a0b42a4cb692a96d21a3a028c759d763392f11ea4056504c9f6cb7e599c0"
 dependencies = [
  "log 0.4.11",
  "rand 0.7.3",
