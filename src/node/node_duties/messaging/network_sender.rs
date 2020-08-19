@@ -23,7 +23,7 @@ impl NetworkSender {
         Self { routing }
     }
 
-    pub fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
+    pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
         let name = *self.routing.id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
@@ -32,6 +32,7 @@ impl NetworkSender {
         };
         self.routing
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
+            .await
             .map_or_else(
                 |err| {
                     error!("Unable to send MsgEnvelope to Peer: {:?}", err);
@@ -44,7 +45,7 @@ impl NetworkSender {
             )
     }
 
-    pub fn send_to_nodes(
+    pub async fn send_to_nodes(
         &mut self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
@@ -57,6 +58,7 @@ impl NetworkSender {
                     DstLocation::Node(XorName(target.0)),
                     utils::serialise(&msg),
                 )
+                .await
                 .map_or_else(
                     |err| {
                         error!("Unable to send MsgEnvelope to Peer: {:?}", err);
@@ -69,7 +71,7 @@ impl NetworkSender {
         None
     }
 
-    pub fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
+    pub async fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
         let name = *self.routing.id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
@@ -79,6 +81,7 @@ impl NetworkSender {
         };
         self.routing
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
+            .await
             .map_or_else(
                 |err| {
                     error!("Unable to send to section: {:?}", err);

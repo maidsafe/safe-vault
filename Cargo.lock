@@ -1822,7 +1822,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.7.0"
-source = "git+https://github.com/yoga07/quic-p2p.git?branch=old-async#9bc817dd8f7422a994703f8949d24c53a4040782"
+source = "git+https://github.com/bochaco/quic-p2p?branch=fully-async#188eb3fe0405a018e95062a2134b7a3615a8fa0f"
 dependencies = [
  "base64 0.10.1",
  "bincode",
@@ -1831,6 +1831,7 @@ dependencies = [
  "directories 1.0.2",
  "err-derive",
  "futures",
+ "igd",
  "log 0.4.11",
  "quinn",
  "rcgen",
@@ -2163,7 +2164,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/joshuef/routing.git?branch=RandoXor#4f564cb944217cd21a5b71bb734181fa1c73ce31"
+source = "git+https://github.com/bochaco/routing.git?branch=async-quic-p2p-api#79a334c577c1d4817c948d350572799a711c2d5f"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2178,7 +2179,7 @@ dependencies = [
  "log 0.4.11",
  "lru_time_cache",
  "parsec",
- "quic-p2p 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p?branch=fully-async)",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rand_os",
@@ -2187,6 +2188,7 @@ dependencies = [
  "serde",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
+ "tokio",
  "xor_name",
 ]
 

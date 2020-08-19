@@ -15,12 +15,11 @@ mod msg_wrapping;
 mod node_duties;
 mod node_ops;
 
-pub use crate::node::node_duties::messaging::Receiver;
 pub use crate::node::state_db::{Command, Init};
 use crate::{
     node::{
         keys::NodeSigningKeys,
-        node_duties::{messaging::Received, NodeDuties},
+        node_duties::NodeDuties,
         node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup, NodeInfo},
     },
@@ -29,6 +28,7 @@ use crate::{
 use bls::SecretKey;
 use log::{info, warn};
 use rand::{CryptoRng, Rng};
+use routing::{Node as RoutingNode, NodeConfig};
 use safe_nd::PublicKey;
 use std::{
     fmt::{self, Display, Formatter},
@@ -38,13 +38,12 @@ use std::{
 /// Main node struct.
 pub struct Node<R: CryptoRng + Rng> {
     duties: NodeDuties<R>,
-    receiver: Receiver,
     routing: Network,
 }
 
 impl<R: CryptoRng + Rng> Node<R> {
     /// Initialize a new node.
-    pub fn new(receiver: Receiver, routing: Network, config: &Config, rng: R) -> Result<Self> {
+    pub async fn new(config: &Config, rng: R) -> Result<Self> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
 
@@ -63,6 +62,15 @@ impl<R: CryptoRng + Rng> Node<R> {
             age_group
         });
 
+        let is_first = config.is_first();
+        let mut node_config = NodeConfig::default();
+        node_config.first = config.is_first();
+        node_config.transport_config = config.network_config().clone();
+        node_config.network_params.recommended_section_size = 500;
+        let routing_node = RoutingNode::new(node_config).await?;
+
+        let routing = Network::new(routing_node);
+
         let keys = NodeSigningKeys::new(routing.clone());
 
         let node_info = NodeInfo {
@@ -80,24 +88,23 @@ impl<R: CryptoRng + Rng> Node<R> {
         use AgeGroup::*;
         let _ = match age_group {
             Infant => None,
-            Adult => duties.process(node_ops::NodeDuty::BecomeAdult),
-            Elder => duties.process(node_ops::NodeDuty::BecomeElder),
+            Adult => duties.process(node_ops::NodeDuty::BecomeAdult).await,
+            Elder => duties.process(node_ops::NodeDuty::BecomeElder).await,
         };
 
-        let mut node = Self {
-            duties,
-            receiver,
-            routing,
-        };
+        let mut node = Self { duties, routing };
 
-        node.register(reward_key);
+        node.register(reward_key).await;
 
         Ok(node)
     }
 
-    fn register(&mut self, reward_key: PublicKey) {
-        let result = self.duties.process(NodeDuty::RegisterWallet(reward_key));
-        self.process_while_any(result);
+    async fn register(&mut self, reward_key: PublicKey) {
+        let result = self
+            .duties
+            .process(NodeDuty::RegisterWallet(reward_key))
+            .await;
+        self.process_while_any(result).await
     }
 
     /// Returns our connection info.
@@ -113,50 +120,56 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Starts the node, and runs the main event loop.
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
-    pub fn run(&mut self) {
+    pub async fn run(&mut self) -> Result<()> {
         use GatewayDuty::*;
         use NodeDuty::*;
-        loop {
-            let result = match self.receiver.next_event() {
-                Received::Client(event) => {
-                    info!("Received a Client Event from quic-p2p.");
-                    ProcessClientEvent(event).into()
+        let mut event_stream = self.routing.listen_events()?;
+        while let Some(event) = event_stream.next().await {
+            info!("New event received from the Network: {:?}", event);
+            /*Received::Client(event) => {
+                info!("Received a Client Event from quic-p2p.");
+                ProcessClientEvent(event).into()
+            }
+            Received::Network(event) => {
+                info!("Received a Network Event from routing: {:?}", event);
+                ProcessNetworkEvent(event).into()
+            }
+            Received::Unknown(channel) => {
+                if let Err(err) = self.routing.handle_selected_operation(channel.index).await {
+                    warn!("Could not process operation: {}", err);
                 }
-                Received::Network(event) => {
-                    info!("Received a Network Event from routing: {:?}", event);
-                    ProcessNetworkEvent(event).into()
-                }
-                Received::Unknown(channel) => {
-                    if let Err(err) = self.routing.handle_selected_operation(channel.index) {
-                        warn!("Could not process operation: {}", err);
-                    }
-                    continue;
-                }
-                Received::Shutdown => break,
-            };
-            self.process_while_any(Some(result));
+                continue;
+            }
+            Received::Shutdown => break,*/
+            //self.process_while_any(Some(result)).await;
         }
+
+        Ok(())
     }
 
     /// Keeps processing resulting node operations.
-    fn process_while_any(&mut self, op: Option<NodeOperation>) {
+    async fn process_while_any(&mut self, op: Option<NodeOperation>) {
         use NodeOperation::*;
         let mut next_op = op;
         while let Some(op) = next_op {
             next_op = match op {
-                Single(operation) => self.process(operation),
-                Multiple(ops) => Some(
-                    ops.into_iter()
-                        .filter_map(|c| self.process(c))
-                        .collect::<Vec<_>>()
-                        .into(),
-                ),
+                Single(operation) => self.process(operation).await,
+                Multiple(ops) => {
+                    let mut node_op = None;
+                    for c in ops.into_iter() {
+                        if let Some(op) = self.process(c).await {
+                            node_op = op;
+                            break;
+                        }
+                    }
+                    Some(node_op)
+                }
                 None => break,
             }
         }
     }
 
-    fn process(&mut self, duty: NetworkDuty) -> Option<NodeOperation> {
+    async fn process(&mut self, duty: NetworkDuty) -> Option<NodeOperation> {
         use NetworkDuty::*;
         match duty {
             RunAsAdult(duty) => {
@@ -169,7 +182,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             }
             RunAsNode(duty) => {
                 info!("Running as Node: {:?}", duty);
-                self.duties.process(duty)
+                self.duties.process(duty).await
             }
         }
     }

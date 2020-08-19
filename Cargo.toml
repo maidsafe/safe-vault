@@ -36,7 +36,7 @@ quick-error = "1.2.2"
 quic-p2p = { version = "~0.7.0" }
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
-routing = { git = "https://github.com/joshuef/routing.git", branch = "RandoXor" }
+routing = { git = "https://github.com/bochaco/routing.git", branch = "async-quic-p2p-api" }
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
@@ -51,6 +51,7 @@ safe-nd = "~0.11.2"
 safe-transfers = "~0.1.0"
 ed25519 = "1.0.1"
 signature = "1.1.0"
+tokio = { version = "~0.2.5", features = ["macros"] }
 xor_name = "1.1.0"
 
 [dev_dependencies]
