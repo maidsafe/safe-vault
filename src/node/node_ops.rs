@@ -9,7 +9,7 @@
 #[cfg(feature = "simulated-payouts")]
 use safe_nd::Transfer;
 
-use routing::{event::Event as NetworkEvent, Prefix, TransportEvent as ClientEvent};
+use routing::{event::Event as RoutingEvent, Prefix};
 use safe_nd::{
     AccountId, Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
     ReplicaEvent, SignedTransfer, TransferValidated,
@@ -104,7 +104,7 @@ pub enum NodeDuty {
     /// Sending messages on to the network.
     ProcessMessaging(MessagingDuty),
     /// Receiving and processing events from the network.
-    ProcessNetworkEvent(NetworkEvent),
+    ProcessNetworkEvent(RoutingEvent),
 }
 
 impl Into<NodeOperation> for NodeDuty {
@@ -314,7 +314,7 @@ pub enum GatewayDuty {
     FindClientFor(MsgEnvelope),
     /// Incoming events from clients are parsed
     /// at the Gateway, and forwarded to other modules.
-    ProcessClientEvent(ClientEvent),
+    ProcessClientEvent(RoutingEvent),
 }
 
 impl Into<NodeOperation> for GatewayDuty {

@@ -8,14 +8,12 @@
 
 pub mod client_sender;
 pub mod network_sender;
-pub mod receiver;
 
 use crate::node::node_ops::{MessagingDuty, NodeOperation};
 use crate::Network;
 use client_sender::ClientSender;
 use log::info;
 use network_sender::NetworkSender;
-pub use receiver::{Received, Receiver};
 
 /// Sending of messages
 /// to nodes and clients in the network.
@@ -34,15 +32,17 @@ impl Messaging {
         }
     }
 
-    pub fn process(&mut self, duty: MessagingDuty) -> Option<NodeOperation> {
+    pub async fn process(&mut self, duty: MessagingDuty) -> Option<NodeOperation> {
         use MessagingDuty::*;
         info!("Sending message: {:?}", duty);
         let result = match duty {
-            SendToClient { address, msg } => self.client_sender.send(address, &msg),
-            SendToNode(msg) => self.network_sender.send_to_node(msg),
-            SendToSection(msg) => self.network_sender.send_to_network(msg),
-            SendToAdults { targets, msg } => self.network_sender.send_to_nodes(targets, &msg),
-            SendHandshake { address, response } => self.client_sender.handshake(address, &response),
+            SendToClient { address, msg } => self.client_sender.send(address, &msg).await,
+            SendToNode(msg) => self.network_sender.send_to_node(msg).await,
+            SendToSection(msg) => self.network_sender.send_to_network(msg).await,
+            SendToAdults { targets, msg } => self.network_sender.send_to_nodes(targets, &msg).await,
+            SendHandshake { address, response } => {
+                self.client_sender.handshake(address, &response).await
+            }
             DisconnectClient(address) => self.client_sender.disconnect(address),
         };
 

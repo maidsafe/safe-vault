@@ -23,7 +23,7 @@ use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
-use routing::TransportEvent as ClientEvent;
+use routing::event::Event as RoutingEvent;
 use safe_nd::{Address, MsgEnvelope, MsgSender};
 use std::fmt::{self, Display, Formatter};
 
@@ -67,8 +67,8 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     }
 
     /// This is where client input is parsed.
-    fn process_client_event(&mut self, event: &ClientEvent) -> Option<NodeOperation> {
-        use ClientEvent::*;
+    fn process_client_event(&mut self, event: &RoutingEvent) -> Option<NodeOperation> {
+        /*use RoutingEvent::*;
         match event {
             ConnectedTo { peer } => {
                 if self
@@ -123,7 +123,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
             Finish => {
                 info!("{}: Received Finish event", self);
             }
-        }
+        }*/
         None
     }
 }

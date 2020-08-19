@@ -29,11 +29,9 @@
 
 use flexi_logger::{DeferredNow, Logger};
 use log::{self, Record};
-use routing::{Node as RoutingLayer, NodeConfig};
-use safe_vault::{self, write_connection_info, Command, Config, Network, Node, Receiver};
-use self_update::cargo_crate_version;
-use self_update::Status;
-use std::{cell::RefCell, io::Write, process, rc::Rc};
+use safe_vault::{self, write_connection_info, Config, Node};
+use self_update::{cargo_crate_version, Status};
+use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 use unwrap::unwrap;
 
@@ -41,7 +39,8 @@ const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP
                                 Note that not all routers are supported in this testnet. Visit https://safenetforum.org for more information.";
 
 /// Runs a SAFE Network vault.
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut config = Config::new();
 
     if let Some(c) = &config.completions() {
@@ -113,61 +112,50 @@ fn main() {
     );
     log::info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    let (command_tx, command_rx) = crossbeam_channel::bounded(1);
-
-    // Shutdown the vault gracefully on SIGINT (Ctrl+C).
-    let result = ctrlc::set_handler(move || {
-        let _ = command_tx.send(Command::Shutdown);
+    // TODO: Shutdown the vault gracefully on SIGINT (Ctrl+C).
+    /*let result = ctrlc::set_handler(move || {
+        unimplemented!();
     });
     if let Err(error) = result {
         log::error!("Failed to set interrupt handler: {:?}", error)
-    }
-
-    let mut node_config = NodeConfig::default();
-    node_config.first = config.is_first();
-    node_config.transport_config = config.network_config().clone();
-    node_config.network_params.recommended_section_size = 500;
-    let (routing, routing_rx, client_rx) = RoutingLayer::new(node_config);
-
-    let is_first = config.is_first();
-
-    if is_first && !routing.is_running() {
-        log::error!("{}", IGD_ERROR_MESSAGE);
-        println!("{}", IGD_ERROR_MESSAGE);
-        process::exit(1);
-    }
+    }*/
 
     let mut rng = rand::thread_rng();
-    let routing_layer = Rc::new(RefCell::new(routing));
-    let routing = Network::new(routing_layer.clone());
-    let receiver = Receiver::new(routing_rx, client_rx, command_rx, routing_layer);
+    let mut vault = match Node::new(&config, &mut rng).await {
+        Ok(vault) => vault,
+        Err(e) => {
+            println!("Cannot start vault due to error: {:?}", e);
+            log::error!("Cannot start vault due to error: {:?}", e);
+            process::exit(1);
+        }
+    };
 
-    match Node::new(receiver, routing, &config, &mut rng) {
-        Ok(mut vault) => match vault.our_connection_info() {
-            Ok(our_conn_info) => {
-                println!(
-                    "Vault connection info:\n{}",
-                    unwrap!(serde_json::to_string(&our_conn_info))
-                );
-                log::info!(
-                    "Vault connection info: {}",
-                    unwrap!(serde_json::to_string(&our_conn_info))
-                );
+    match vault.our_connection_info() {
+        Ok(our_conn_info) => {
+            println!(
+                "Vault connection info:\n{}",
+                unwrap!(serde_json::to_string(&our_conn_info))
+            );
+            log::info!(
+                "Vault connection info: {}",
+                unwrap!(serde_json::to_string(&our_conn_info))
+            );
 
-                if is_first {
-                    unwrap!(write_connection_info(&our_conn_info));
-                }
-                vault.run();
-                process::exit(0);
+            if config.is_first() {
+                unwrap!(write_connection_info(&our_conn_info));
             }
-            Err(e) => {
-                println!("Cannot start vault due to error: {:?}", e);
-                log::error!("Cannot start vault due to error: {:?}", e);
-                log::error!("{}", IGD_ERROR_MESSAGE);
-                println!("{}", IGD_ERROR_MESSAGE);
-                process::exit(1);
-            }
-        },
+        }
+        Err(e) => {
+            println!("Cannot start vault due to error: {:?}", e);
+            log::error!("Cannot start vault due to error: {:?}", e);
+            log::error!("{}", IGD_ERROR_MESSAGE);
+            println!("{}", IGD_ERROR_MESSAGE);
+            process::exit(1);
+        }
+    }
+
+    match vault.run().await {
+        Ok(()) => process::exit(0),
         Err(e) => {
             println!("Cannot start vault due to error: {:?}", e);
             log::error!("Cannot start vault due to error: {:?}", e);

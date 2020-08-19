@@ -47,5 +47,5 @@ pub use crate::{
     config_handler::{write_connection_info, Config},
     error::{Error, Result},
     network::Network,
-    node::{state_db::Command, Node, Receiver},
+    node::{state_db::Command, Node},
 };

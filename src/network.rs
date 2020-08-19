@@ -11,8 +11,8 @@ use crate::{Error, Result};
 use bytes::Bytes;
 use crossbeam_channel::RecvError;
 use routing::{
-    DstLocation, Node as RoutingLayer, P2pNode, PublicId, RoutingError, SectionProofChain,
-    SrcLocation,
+    DstLocation, EventStream, Node as RoutingNode, P2pNode, PublicId, RoutingError,
+    SectionProofChain, SrcLocation,
 };
 use safe_nd::PublicKey;
 use std::collections::BTreeSet;
@@ -22,13 +22,22 @@ use xor_name::{Prefix, XorName};
 ///
 #[derive(Clone)]
 pub struct Network {
-    routing: Rc<RefCell<RoutingLayer>>,
+    routing: Rc<RefCell<RoutingNode>>,
 }
 
 #[allow(missing_docs)]
 impl Network {
-    pub fn new(routing: Rc<RefCell<RoutingLayer>>) -> Self {
-        Self { routing }
+    pub fn new(node: RoutingNode) -> Self {
+        Self {
+            routing: Rc::new(RefCell::new(node)),
+        }
+    }
+
+    pub fn listen_events(&self) -> Result<EventStream> {
+        self.routing
+            .borrow()
+            .listen_events()
+            .map_err(Error::Routing)
     }
 
     pub fn our_name(&self) -> XorName {
@@ -41,14 +50,8 @@ impl Network {
         ))
     }
 
-    pub fn public_key_set(&self) -> Result<bls::PublicKeySet, Error> {
+    pub fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         Ok(self.routing.borrow().public_key_set()?.clone())
-    }
-
-    pub fn handle_selected_operation(&mut self, op_index: usize) -> Result<(), RecvError> {
-        self.routing
-            .borrow_mut()
-            .handle_selected_operation(op_index)
     }
 
     pub fn is_running(&self) -> bool {
@@ -109,19 +112,27 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub fn send_message(
+    pub async fn send_message(
         &mut self,
         src: SrcLocation,
         dst: DstLocation,
-        content: Vec<u8>,
+        content: Bytes,
     ) -> Result<(), RoutingError> {
-        self.routing.borrow_mut().send_message(src, dst, content)
-    }
-
-    pub fn send_message_to_client(&mut self, peer_addr: SocketAddr, msg: Bytes) -> Result<()> {
         self.routing
             .borrow_mut()
-            .send_message_to_client(peer_addr, msg, 0)
+            .send_message(src, dst, content)
+            .await
+    }
+
+    pub async fn send_message_to_client(
+        &mut self,
+        peer_addr: SocketAddr,
+        msg: Bytes,
+    ) -> Result<()> {
+        self.routing
+            .borrow_mut()
+            .send_message_to_client(peer_addr, msg)
+            .await
             .map_err(Error::Routing)
     }
 
