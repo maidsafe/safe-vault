@@ -26,9 +26,9 @@ use crate::{
     Config, Network, Result,
 };
 use bls::SecretKey;
-use log::{info, warn};
+use log::info;
 use rand::{CryptoRng, Rng};
-use routing::{Node as RoutingNode, NodeConfig};
+use routing::{event::Event, Node as RoutingNode, NodeConfig, SrcLocation};
 use safe_nd::PublicKey;
 use std::{
     fmt::{self, Display, Formatter},
@@ -62,7 +62,6 @@ impl<R: CryptoRng + Rng> Node<R> {
             age_group
         });
 
-        let is_first = config.is_first();
         let mut node_config = NodeConfig::default();
         node_config.first = config.is_first();
         node_config.transport_config = config.network_config().clone();
@@ -121,27 +120,20 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
-        use GatewayDuty::*;
-        use NodeDuty::*;
         let mut event_stream = self.routing.listen_events()?;
         while let Some(event) = event_stream.next().await {
             info!("New event received from the Network: {:?}", event);
-            /*Received::Client(event) => {
-                info!("Received a Client Event from quic-p2p.");
-                ProcessClientEvent(event).into()
+            if let Event::MessageReceived {
+                src: SrcLocation::Client(_),
+                ..
+            } = event
+            {
+                self.process_while_any(Some(GatewayDuty::ProcessClientEvent(event).into()))
+                    .await;
+            } else {
+                self.process_while_any(Some(NodeDuty::ProcessNetworkEvent(event).into()))
+                    .await;
             }
-            Received::Network(event) => {
-                info!("Received a Network Event from routing: {:?}", event);
-                ProcessNetworkEvent(event).into()
-            }
-            Received::Unknown(channel) => {
-                if let Err(err) = self.routing.handle_selected_operation(channel.index).await {
-                    warn!("Could not process operation: {}", err);
-                }
-                continue;
-            }
-            Received::Shutdown => break,*/
-            //self.process_while_any(Some(result)).await;
         }
 
         Ok(())

@@ -9,7 +9,6 @@
 use crate::node::state_db::AgeGroup;
 use crate::{Error, Result};
 use bytes::Bytes;
-use crossbeam_channel::RecvError;
 use routing::{
     DstLocation, EventStream, Node as RoutingNode, P2pNode, PublicId, RoutingError,
     SectionProofChain, SrcLocation,
