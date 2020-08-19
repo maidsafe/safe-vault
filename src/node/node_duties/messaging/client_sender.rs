@@ -26,20 +26,24 @@ impl ClientSender {
         Self { routing }
     }
 
-    pub fn send(&mut self, recipient: SocketAddr, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub async fn send(
+        &mut self,
+        recipient: SocketAddr,
+        msg: &MsgEnvelope,
+    ) -> Option<MessagingDuty> {
         match msg.destination() {
             Address::Node(_) => Some(MessagingDuty::SendToNode(msg.clone())),
             Address::Section(_) => Some(MessagingDuty::SendToSection(msg.clone())),
-            Address::Client(_) => self.send_any_to_client(recipient, msg),
+            Address::Client(_) => self.send_any_to_client(recipient, msg).await,
         }
     }
 
-    pub fn handshake(
+    pub async fn handshake(
         &mut self,
         recipient: SocketAddr,
         hs: &HandshakeResponse,
     ) -> Option<MessagingDuty> {
-        self.send_any_to_client(recipient, hs)
+        self.send_any_to_client(recipient, hs).await
     }
 
     pub fn disconnect(&mut self, peer_addr: SocketAddr) -> Option<MessagingDuty> {
@@ -52,7 +56,7 @@ impl ClientSender {
         None
     }
 
-    fn send_any_to_client<T: Serialize>(
+    async fn send_any_to_client<T: Serialize>(
         &mut self,
         recipient: SocketAddr,
         msg: &T,
@@ -60,7 +64,7 @@ impl ClientSender {
         let msg = utils::serialise(msg);
         let bytes = Bytes::from(msg);
 
-        if let Err(e) = self.routing.send_message_to_client(recipient, bytes) {
+        if let Err(e) = self.routing.send_message_to_client(recipient, bytes).await {
             warn!(
                 "{}: Could not send message to client {}: {:?}",
                 self, recipient, e
