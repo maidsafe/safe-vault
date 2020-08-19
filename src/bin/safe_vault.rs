@@ -28,7 +28,7 @@
 )]
 
 use flexi_logger::{DeferredNow, Logger};
-use log::{self, Record};
+use log::{self, error, info, Record};
 use safe_vault::{self, write_connection_info, Config, Node};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
@@ -97,7 +97,7 @@ async fn main() {
                     process::exit(0);
                 }
             }
-            Err(e) => log::error!("Updating vault failed: {:?}", e),
+            Err(e) => error!("Updating vault failed: {:?}", e),
         }
 
         if config.update_only() {
@@ -110,14 +110,14 @@ async fn main() {
         Config::clap().get_name(),
         env!("CARGO_PKG_VERSION")
     );
-    log::info!("\n\n{}\n{}", message, "=".repeat(message.len()));
+    info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
     // TODO: Shutdown the vault gracefully on SIGINT (Ctrl+C).
     /*let result = ctrlc::set_handler(move || {
         unimplemented!();
     });
     if let Err(error) = result {
-        log::error!("Failed to set interrupt handler: {:?}", error)
+        error!("Failed to set interrupt handler: {:?}", error)
     }*/
 
     let mut rng = rand::thread_rng();
@@ -125,7 +125,7 @@ async fn main() {
         Ok(vault) => vault,
         Err(e) => {
             println!("Cannot start vault due to error: {:?}", e);
-            log::error!("Cannot start vault due to error: {:?}", e);
+            error!("Cannot start vault due to error: {:?}", e);
             process::exit(1);
         }
     };
@@ -136,7 +136,7 @@ async fn main() {
                 "Vault connection info:\n{}",
                 unwrap!(serde_json::to_string(&our_conn_info))
             );
-            log::info!(
+            info!(
                 "Vault connection info: {}",
                 unwrap!(serde_json::to_string(&our_conn_info))
             );
@@ -147,8 +147,8 @@ async fn main() {
         }
         Err(e) => {
             println!("Cannot start vault due to error: {:?}", e);
-            log::error!("Cannot start vault due to error: {:?}", e);
-            log::error!("{}", IGD_ERROR_MESSAGE);
+            error!("Cannot start vault due to error: {:?}", e);
+            error!("{}", IGD_ERROR_MESSAGE);
             println!("{}", IGD_ERROR_MESSAGE);
             process::exit(1);
         }
@@ -158,14 +158,14 @@ async fn main() {
         Ok(()) => process::exit(0),
         Err(e) => {
             println!("Cannot start vault due to error: {:?}", e);
-            log::error!("Cannot start vault due to error: {:?}", e);
+            error!("Cannot start vault due to error: {:?}", e);
             process::exit(1);
         }
     }
 }
 
 fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
-    log::info!("Checking for updates...");
+    info!("Checking for updates...");
     let target = self_update::get_target();
 
     let releases = self_update::backends::github::ReleaseList::configure()

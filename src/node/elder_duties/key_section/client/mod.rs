@@ -19,11 +19,11 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Error, Network, Result,
 };
-use log::{error, info, trace, warn};
+use log::{error, info, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
-use routing::event::Event as RoutingEvent;
+use routing::{event::Event as RoutingEvent, SrcLocation};
 use safe_nd::{Address, MsgEnvelope, MsgSender};
 use std::fmt::{self, Display, Formatter};
 
@@ -68,63 +68,43 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
 
     /// This is where client input is parsed.
     fn process_client_event(&mut self, event: &RoutingEvent) -> Option<NodeOperation> {
-        /*use RoutingEvent::*;
         match event {
-            ConnectedTo { peer } => {
-                if self
-                    .client_msg_tracking
-                    .get_public_key(peer.peer_addr())
-                    .is_none()
-                {
-                    info!("{}: Connected to new client on {}", self, peer.peer_addr());
-                }
-            }
-            ConnectionFailure { peer, .. } => {
-                self.client_msg_tracking.remove_client(peer.peer_addr());
-            }
-            NewMessage { peer, msg } => {
-                let existing_client = self.client_msg_tracking.get_public_key(peer.peer_addr());
+            RoutingEvent::MessageReceived {
+                content,
+                src: SrcLocation::Client(addr),
+                ..
+            } => {
+                let existing_client = self.client_msg_tracking.get_public_key(*addr);
                 if let Some(public_key) = existing_client {
-                    let msg = try_deserialize_msg(msg)?;
+                    let msg = try_deserialize_msg(content)?;
                     info!("Deserialized client msg from {}", public_key);
+
                     if !validate_client_sig(&msg) {
                         return None;
                     }
-                    let result = self
-                        .client_msg_tracking
-                        .track_incoming(msg.id(), peer.peer_addr());
-                    if result.is_some() {
-                        return result.map(|c| c.into());
+
+                    match self.client_msg_tracking.track_incoming(msg.id(), *addr) {
+                        Some(c) => Some(c.into()),
+                        None => {
+                            // FIXME
+                            //let msg_envelope = MsgEnvelope::from(content);
+                            //Some(KeySectionDuty::EvaluateClientMsg(msg_envelope).into())
+                            None
+                        }
                     }
-                    use KeySectionDuty::*;
-                    return Some(EvaluateClientMsg(msg).into());
                 } else {
-                    let hs = try_deserialize_handshake(msg, peer.peer_addr())?;
+                    let hs = try_deserialize_handshake(content, *addr)?;
                     let mut rng = ChaChaRng::from_seed(self.rng.gen());
-                    return self
-                        .client_msg_tracking
-                        .process_handshake(hs, peer.peer_addr(), &mut rng)
-                        .map(|c| c.into());
+                    self.client_msg_tracking
+                        .process_handshake(hs, *addr, &mut rng)
+                        .map(|c| c.into())
                 }
             }
-            SentUserMessage { peer, .. } => {
-                trace!(
-                    "{}: Succesfully sent Message to: {}",
-                    self,
-                    peer.peer_addr()
-                );
+            other => {
+                error!("NOT SUPPORTED YET: {:?}", other);
+                None
             }
-            UnsentUserMessage { peer, .. } => {
-                info!("{}: Could not send message to: {}", self, peer.peer_addr());
-            }
-            BootstrapFailure | BootstrappedTo { .. } => {
-                error!("Unexpected bootstrapping client event")
-            }
-            Finish => {
-                info!("{}: Received Finish event", self);
-            }
-        }*/
-        None
+        }
     }
 }
 
