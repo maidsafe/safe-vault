@@ -170,6 +170,10 @@ impl Onboarding {
         signature: &Signature,
     ) -> Option<MessagingDuty> {
         trace!("Receive challenge response");
+        if self.clients.contains_key(&peer_addr) {
+            info!("{}: Client is already accepted (on {})", self, peer_addr);
+            return None;
+        }
         if let Some((challenge, public_key)) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
