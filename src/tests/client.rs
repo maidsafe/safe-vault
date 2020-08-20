@@ -29,7 +29,7 @@ fn start_network() {
 #[cfg(feature = "simulated-payouts")]
 async fn money_balance_transfer() {
     start_network();
-    client_tests::money_balance_transfer().await;
+    assert!(client_tests::money_balance_transfer().await.is_ok());
 }
 
 #[tokio::test]

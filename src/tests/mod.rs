@@ -20,6 +20,7 @@ use std::net::SocketAddr;
 use std::rc::Rc;
 use std::thread::{self, JoinHandle};
 
+#[allow(unused)]
 #[derive(Default)]
 struct Network {
     vaults: Vec<(Sender<Command>, JoinHandle<()>)>,
@@ -60,6 +61,7 @@ impl Network {
                 // init_logging();
                 genesis_config.set_flag("first", 1);
                 let path = path.join("genesis-vault");
+                std::fs::create_dir_all(&path).expect("Cannot create genesis directory");
                 genesis_config.set_root_dir(&path);
                 genesis_config.listen_on_loopback();
 
@@ -71,14 +73,9 @@ impl Network {
                 let routing_layer = Rc::new(RefCell::new(routing));
                 let routing = NetworkLayer::new(routing_layer.clone());
                 let receiver =
-                    crate::Receiver::new(routing_rx, client_rx, command_rx, routing_layer.clone());
-                let mut node = Node::new(
-                    receiver,
-                    routing.clone(),
-                    &genesis_config,
-                    rand::thread_rng(),
-                )
-                .expect("Unable to start vault Node");
+                    crate::Receiver::new(routing_rx, client_rx, command_rx, routing_layer);
+                let mut node = Node::new(receiver, routing, &genesis_config, rand::thread_rng())
+                    .expect("Unable to start vault Node");
                 let our_conn_info = node
                     .our_connection_info()
                     .expect("Could not get genesis info");
@@ -97,12 +94,11 @@ impl Network {
                     // init_logging();
                     let vault_path = path.join(format!("vault-{}", i));
                     println!("Starting new vault: {:?}", &vault_path);
+                    std::fs::create_dir_all(&vault_path).expect("Cannot create vault directory");
                     vault_config.set_root_dir(&vault_path);
 
                     let mut network_config = NetworkConfig::default();
-                    let _ = network_config
-                        .hard_coded_contacts
-                        .insert(genesis_info.clone());
+                    let _ = network_config.hard_coded_contacts.insert(genesis_info);
                     vault_config.set_network_config(network_config);
                     vault_config.listen_on_loopback();
 
@@ -112,12 +108,8 @@ impl Network {
                     let (routing, routing_rx, client_rx) = Routing::new(routing_config);
                     let routing_layer = Rc::new(RefCell::new(routing));
                     let routing = NetworkLayer::new(routing_layer.clone());
-                    let receiver = crate::Receiver::new(
-                        routing_rx,
-                        client_rx,
-                        command_rx,
-                        routing_layer.clone(),
-                    );
+                    let receiver =
+                        crate::Receiver::new(routing_rx, client_rx, command_rx, routing_layer);
                     let mut node = Node::new(receiver, routing, &vault_config, rand::thread_rng())
                         .expect("Unable to start vault Node");
                     node.run();

@@ -66,6 +66,4 @@ name = "safe_vault"
 doc = false
 
 [features]
-mock_base = ["routing/mock_base", "fxhash", "mock-quic-p2p"]
-mock_parsec = ["routing/mock", "mock_base"]
 simulated-payouts = ["safe-nd/simulated-payouts", "safe-transfers/simulated-payouts", "safe_core/simulated-payouts"]

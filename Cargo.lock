@@ -1394,9 +1394,6 @@ name = "lru_time_cache"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb241df5c4caeb888755363fc95f8a896618dc0d435e9e775f7930cb099beab"
-dependencies = [
- "fake_clock",
-]
 
 [[package]]
 name = "maplit"
@@ -1518,20 +1515,6 @@ dependencies = [
 name = "mock-quic-p2p"
 version = "0.1.0"
 source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6ae0517d0dc51c5fcdb1d50f7243d0500292b0e"
-dependencies = [
- "bytes 0.5.6",
- "crossbeam-channel",
- "fxhash",
- "rand 0.7.3",
- "serde",
- "serde_json",
- "structopt",
-]
-
-[[package]]
-name = "mock-quic-p2p"
-version = "0.1.0"
-source = "git+https://github.com/maidsafe/quic-p2p#602dc620468cf46e35b1035dec5389191cd754f5"
 dependencies = [
  "bytes 0.5.6",
  "crossbeam-channel",
@@ -2186,18 +2169,14 @@ dependencies = [
  "bls_dkg",
  "bytes 0.5.6",
  "crossbeam-channel",
- "ctrlc",
  "ed25519-dalek",
- "env_logger 0.7.1",
  "err-derive",
  "fake_clock",
  "fxhash",
  "hex_fmt",
  "itertools 0.9.0",
- "lazy_static",
  "log 0.4.11",
  "lru_time_cache",
- "mock-quic-p2p 0.1.0 (git+https://github.com/maidsafe/quic-p2p)",
  "parsec",
  "quic-p2p 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.7.3",
@@ -2390,7 +2369,7 @@ dependencies = [
  "lazy_static",
  "log 0.4.11",
  "maplit",
- "mock-quic-p2p 0.1.0 (git+https://github.com/maidsafe/quic-p2p?branch=igd-err)",
+ "mock-quic-p2p",
  "pickledb",
  "quic-p2p 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-error",
