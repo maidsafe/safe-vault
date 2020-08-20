@@ -229,7 +229,8 @@ impl Config {
         } else if arg == ARGS[6] {
             self.network_config.ip = Some(value.parse().unwrap());
         } else if arg == ARGS[10] {
-            self.network_config.our_type = value.parse().unwrap();
+            // TODO: the quic-p2p config doesn't support this value anymore.
+            // self.network_config.our_type = value.parse().unwrap();
         } else if arg == ARGS[12] {
             self.completions = Some(value.parse().unwrap());
         } else if arg == ARGS[13] {
