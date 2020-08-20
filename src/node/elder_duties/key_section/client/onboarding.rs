@@ -93,12 +93,10 @@ impl Onboarding {
             );
             return None;
         }
-
         info!(
             "{}: Trying to bootstrap..: {} on {}",
             self, client_key, peer_addr
         );
-
         let elders = if self.routing.matches_our_prefix((*client_key).into()) {
             self.routing.our_elder_addresses()
         } else {
@@ -128,15 +126,27 @@ impl Onboarding {
         client_key: PublicKey,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
+        if self.clients.contains_key(&peer_addr) {
+            info!(
+                "{}: Client is already accepted..: {} on {}",
+                self, client_key, peer_addr
+            );
+            return None;
+        }
         info!(
             "{}: Trying to join..: {} on {}",
             self, client_key, peer_addr
         );
         if self.routing.matches_our_prefix(client_key.into()) {
-            let challenge = utils::random_vec(rng, 8);
-            let _ = self
-                .client_candidates
-                .insert(peer_addr, (challenge.clone(), client_key));
+            let challenge = if let Some((challenge, _)) = self.client_candidates.get(&peer_addr) {
+                challenge.clone()
+            } else {
+                let challenge = utils::random_vec(rng, 8);
+                let _ = self
+                    .client_candidates
+                    .insert(peer_addr, (challenge.clone(), client_key));
+                challenge
+            };
             Some(MessagingDuty::SendHandshake {
                 address: peer_addr,
                 response: HandshakeResponse::Challenge(self.node_id, challenge),
