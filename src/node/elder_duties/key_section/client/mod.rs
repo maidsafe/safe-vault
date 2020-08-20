@@ -78,19 +78,12 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                 if let Some(public_key) = existing_client {
                     let msg = try_deserialize_msg(content)?;
                     info!("Deserialized client msg from {}", public_key);
-
                     if !validate_client_sig(&msg) {
                         return None;
                     }
-
                     match self.client_msg_tracking.track_incoming(msg.id(), *addr) {
                         Some(c) => Some(c.into()),
-                        None => {
-                            // FIXME
-                            //let msg_envelope = MsgEnvelope::from(content);
-                            //Some(KeySectionDuty::EvaluateClientMsg(msg_envelope).into())
-                            None
-                        }
+                        None => Some(KeySectionDuty::EvaluateClientMsg(msg).into()),
                     }
                 } else {
                     let hs = try_deserialize_handshake(content, *addr)?;
