@@ -1512,20 +1512,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mock-quic-p2p"
-version = "0.1.0"
-source = "git+https://github.com/maidsafe/quic-p2p?branch=igd-err#c6ae0517d0dc51c5fcdb1d50f7243d0500292b0e"
-dependencies = [
- "bytes 0.5.6",
- "crossbeam-channel",
- "fxhash",
- "rand 0.7.3",
- "serde",
- "serde_json",
- "structopt",
-]
-
-[[package]]
 name = "multibase"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2332,7 +2318,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.42.1"
-source = "git+https://github.com/oetyng/safe_client_libs?branch=export_tests#25b419f2d4ddfae96b35c2cf0fef9138dc9b707e"
+source = "git+https://github.com/bochaco/safe_client_libs?branch=minor-changes-conn#5d58841ac19c399c2cf612c0caf23c2764b20c3b"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2353,7 +2339,7 @@ dependencies = [
  "lru",
  "miscreant",
  "pbkdf2",
- "quic-p2p 0.7.0 (git+https://github.com/yoga07/quic-p2p.git?branch=old-async)",
+ "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p?branch=fully-async)",
  "rand 0.7.3",
  "regex",
  "safe-nd",
@@ -2395,9 +2381,8 @@ dependencies = [
  "lazy_static",
  "log 0.4.11",
  "maplit",
- "mock-quic-p2p",
  "pickledb",
- "quic-p2p 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p?branch=fully-async)",
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",
