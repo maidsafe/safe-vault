@@ -1319,9 +1319,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.74"
+version = "0.2.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2f02823cf78b754822df5f7f268fb59822e7296276d3e069d8e8cb26a14bd10"
+checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
 
 [[package]]
 name = "linked-hash-map"
@@ -1761,9 +1761,9 @@ checksum = "b18befed8bc2b61abc79a457295e7e838417326da1586050b919414073977f19"
 
 [[package]]
 name = "ppv-lite86"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "237a5ed80e274dbc66f86bd59c1e25edc039660be53194b5fe0a482e0f2612ea"
+checksum = "c36fa947111f5c62a733b652544dd0016a43ce89619538a8ef92724a6f501a20"
 
 [[package]]
 name = "proc-macro-error"
@@ -1822,7 +1822,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.7.0"
-source = "git+https://github.com/bochaco/quic-p2p?branch=fully-async#8faa2369564a68c5380f18d9467ea8b86ac4ddf2"
+source = "git+https://github.com/bochaco/quic-p2p?branch=fully-async#b6c1e06ef5a5cfc0a677ef7e2194ec3e0a0c782a"
 dependencies = [
  "base64 0.10.1",
  "bincode",
@@ -2164,7 +2164,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/bochaco/routing.git?branch=async-quic-p2p-api#79a334c577c1d4817c948d350572799a711c2d5f"
+source = "git+https://github.com/bochaco/routing.git?branch=async-quic-p2p-api#68ed24fa95d38b77f41601ec9f3c70cfb8d519dc"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2255,8 +2255,8 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "safe-nd"
-version = "0.11.2"
-source = "git+https://github.com/maidsafe/safe-nd.git#59e96f2d797d6149af747d70247a1b37d8dbf586"
+version = "0.11.3"
+source = "git+https://github.com/maidsafe/safe-nd.git#39ed587b76c3ef92c6827264d5c8592d66d8abcc"
 dependencies = [
  "bincode",
  "crdts",

@@ -128,7 +128,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                 ..
             } = event
             {
-                self.process_while_any(Some(GatewayDuty::ProcessClientEvent(event).into()))
+                self.process_while_any(Some(NodeDuty::ProcessNetworkEvent(event).into()))
                     .await;
             } else {
                 self.process_while_any(Some(NodeDuty::ProcessNetworkEvent(event).into()))
