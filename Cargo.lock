@@ -779,7 +779,7 @@ dependencies = [
 [[package]]
 name = "file-per-thread-logger"
 version = "0.1.3"
-source = "git+https://github.com/lionel1704/file-per-thread-logger?branch=allow-uninitialized#da43d93d64eff87c481a7e4355b2b31b30abd356"
+source = "git+https://github.com/lionel1704/file-per-thread-logger?branch=allow-uninitialized#e9afe64bf8b5aa28d298460fc1e439f36c25b895"
 dependencies = [
  "env_logger 0.7.1",
  "log 0.4.11",
