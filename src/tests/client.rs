@@ -28,6 +28,7 @@ fn start_network() {
 #[tokio::test]
 #[cfg(feature = "simulated-payouts")]
 async fn money_balance_transfer() {
+    start_network();
     client_tests::money_balance_transfer().await;
 }
 
@@ -45,6 +46,7 @@ async fn unpub_blob_test() {
 
 #[tokio::test]
 pub async fn blob_deletions_should_cost_put_price() {
+    start_network();
     assert!(blob_tests::blob_deletions_should_cost_put_price()
         .await
         .is_ok());
@@ -70,16 +72,19 @@ pub async fn del_seq_map_test() {
 
 #[tokio::test]
 pub async fn del_unseq_map_test() {
+    start_network();
     assert!(map_tests::del_unseq_map_test().await.is_ok());
 }
 
 #[tokio::test]
 pub async fn del_unseq_map_permission_test() {
+    start_network();
     assert!(map_tests::del_unseq_map_permission_test().await.is_ok());
 }
 
 #[tokio::test]
 pub async fn map_cannot_initially_put_data_with_another_owner_than_current_client() {
+    start_network();
     assert!(
         map_tests::map_cannot_initially_put_data_with_another_owner_than_current_client()
             .await
@@ -89,16 +94,19 @@ pub async fn map_cannot_initially_put_data_with_another_owner_than_current_clien
 
 #[tokio::test]
 async fn map_can_modify_permissions_test() {
+    start_network();
     assert!(map_tests::map_can_modify_permissions_test().await.is_ok());
 }
 
 #[tokio::test]
 pub async fn map_mutations_test() {
+    start_network();
     assert!(map_tests::map_mutations_test().await.is_ok());
 }
 
 #[tokio::test]
 pub async fn map_deletions_should_cost_put_price() {
+    start_network();
     assert!(map_tests::map_deletions_should_cost_put_price()
         .await
         .is_ok());
@@ -106,6 +114,7 @@ pub async fn map_deletions_should_cost_put_price() {
 
 #[tokio::test]
 async fn sequence_deletions_should_cost_put_price() {
+    start_network();
     assert!(sequence_tests::sequence_deletions_should_cost_put_price()
         .await
         .is_ok());
@@ -113,11 +122,13 @@ async fn sequence_deletions_should_cost_put_price() {
 
 #[tokio::test]
 pub async fn sequence_basics_test() {
+    start_network();
     assert!(sequence_tests::sequence_basics_test().await.is_ok());
 }
 
 #[tokio::test]
 pub async fn sequence_private_permissions_test() {
+    start_network();
     assert!(sequence_tests::sequence_private_permissions_test()
         .await
         .is_ok());
@@ -125,6 +136,7 @@ pub async fn sequence_private_permissions_test() {
 
 #[tokio::test]
 pub async fn sequence_pub_permissions_test() {
+    start_network();
     assert!(sequence_tests::sequence_pub_permissions_test()
         .await
         .is_ok());
@@ -132,16 +144,19 @@ pub async fn sequence_pub_permissions_test() {
 
 #[tokio::test]
 pub async fn sequence_append_test() {
+    start_network();
     assert!(sequence_tests::sequence_append_test().await.is_ok());
 }
 
 #[tokio::test]
 pub async fn sequence_owner_test() {
+    start_network();
     assert!(sequence_tests::sequence_owner_test().await.is_ok());
 }
 
 #[tokio::test]
 pub async fn sequence_can_delete_private_test() {
+    start_network();
     assert!(sequence_tests::sequence_can_delete_private_test()
         .await
         .is_ok());
@@ -149,6 +164,7 @@ pub async fn sequence_can_delete_private_test() {
 
 #[tokio::test]
 pub async fn sequence_cannot_delete_public_test() {
+    start_network();
     assert!(sequence_tests::sequence_cannot_delete_public_test()
         .await
         .is_ok());
