@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::state_db::AgeGroup;
-use crate::{Error, Result};
+use crate::{Config as NodeConfig, Error, Result};
 use bytes::Bytes;
 use routing::{
-    DstLocation, EventStream, Node as RoutingNode, P2pNode, PublicId, RoutingError,
-    SectionProofChain, SrcLocation,
+    DstLocation, EventStream, Node as RoutingNode, NodeConfig as RoutingConfig, P2pNode, PublicId,
+    RoutingError, SectionProofChain, SrcLocation,
 };
 use safe_nd::PublicKey;
 use std::collections::BTreeSet;
@@ -26,10 +26,15 @@ pub struct Network {
 
 #[allow(missing_docs)]
 impl Network {
-    pub fn new(node: RoutingNode) -> Self {
-        Self {
-            routing: Rc::new(RefCell::new(node)),
-        }
+    pub async fn new(config: &NodeConfig) -> Result<Self> {
+        let mut node_config = RoutingConfig::default();
+        node_config.first = config.is_first();
+        node_config.transport_config = config.network_config().clone();
+        node_config.network_params.recommended_section_size = 500;
+        let routing = RoutingNode::new(node_config).await?;
+        Ok(Self {
+            routing: Rc::new(RefCell::new(routing)),
+        })
     }
 
     pub fn listen_events(&self) -> Result<EventStream> {
