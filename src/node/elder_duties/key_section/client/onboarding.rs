@@ -72,15 +72,33 @@ impl Onboarding {
         }
     }
 
+    fn shall_bootstrap(&self, peer_addr: &SocketAddr) -> bool {
+        let is_bootstrapping = self.client_candidates.contains_key(peer_addr);
+        let is_bootstrapped = self.clients.contains_key(peer_addr);
+        if is_bootstrapped || is_bootstrapping {
+            return false;
+        }
+        true
+    }
+
     fn try_bootstrap(
         &self,
         peer_addr: SocketAddr,
         client_key: &PublicKey,
     ) -> Option<MessagingDuty> {
+        if !self.shall_bootstrap(&peer_addr) {
+            info!(
+                "{}: Redundant bootstrap..: {} on {}",
+                self, client_key, peer_addr
+            );
+            return None;
+        }
+
         info!(
             "{}: Trying to bootstrap..: {} on {}",
             self, client_key, peer_addr
         );
+
         let elders = if self.routing.matches_our_prefix((*client_key).into()) {
             self.routing.our_elder_addresses()
         } else {
