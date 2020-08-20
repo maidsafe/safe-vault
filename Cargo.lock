@@ -1808,7 +1808,7 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.7.0"
-source = "git+https://github.com/bochaco/quic-p2p?branch=fully-async#dd51569b824f4639e7c7d5f8d9080364f5651a80"
+source = "git+https://github.com/bochaco/quic-p2p.git?branch=fully-async#dd51569b824f4639e7c7d5f8d9080364f5651a80"
 dependencies = [
  "base64 0.10.1",
  "bincode",
@@ -1818,30 +1818,6 @@ dependencies = [
  "err-derive",
  "futures",
  "igd",
- "log 0.4.11",
- "quinn",
- "rcgen",
- "rustls 0.17.0",
- "serde",
- "serde_json",
- "structopt",
- "tokio",
- "unwrap",
- "webpki",
-]
-
-[[package]]
-name = "quic-p2p"
-version = "0.7.0"
-source = "git+https://github.com/yoga07/quic-p2p.git?branch=old-async#9bc817dd8f7422a994703f8949d24c53a4040782"
-dependencies = [
- "base64 0.10.1",
- "bincode",
- "bytes 0.5.6",
- "crossbeam-channel",
- "directories 1.0.2",
- "err-derive",
- "futures",
  "log 0.4.11",
  "quinn",
  "rcgen",
@@ -2189,7 +2165,7 @@ dependencies = [
  "log 0.4.11",
  "lru_time_cache",
  "parsec",
- "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p?branch=fully-async)",
+ "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p.git?branch=fully-async)",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rand_os",
@@ -2266,7 +2242,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe-nd"
 version = "0.11.3"
-source = "git+https://github.com/maidsafe/safe-nd.git#39ed587b76c3ef92c6827264d5c8592d66d8abcc"
+source = "git+https://github.com/maidsafe/safe-nd.git?branch=master#39ed587b76c3ef92c6827264d5c8592d66d8abcc"
 dependencies = [
  "bincode",
  "crdts",
@@ -2318,7 +2294,7 @@ dependencies = [
 [[package]]
 name = "safe_core"
 version = "0.42.1"
-source = "git+https://github.com/bochaco/safe_client_libs?branch=minor-changes-conn#5d58841ac19c399c2cf612c0caf23c2764b20c3b"
+source = "git+https://github.com/bochaco/safe_client_libs?branch=minor-changes-conn#397bcf4bb51b64e3632bcefee100adb131773a73"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2339,7 +2315,7 @@ dependencies = [
  "lru",
  "miscreant",
  "pbkdf2",
- "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p?branch=fully-async)",
+ "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p.git?branch=fully-async)",
  "rand 0.7.3",
  "regex",
  "safe-nd",
@@ -2382,7 +2358,7 @@ dependencies = [
  "log 0.4.11",
  "maplit",
  "pickledb",
- "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p?branch=fully-async)",
+ "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p.git?branch=fully-async)",
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",

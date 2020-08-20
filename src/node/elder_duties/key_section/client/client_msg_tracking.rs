@@ -48,9 +48,9 @@ impl ClientMsgTracking {
         self.onboarding.process(handshake, peer_addr, rng)
     }
 
-    pub fn remove_client(&mut self, peer_addr: SocketAddr) {
-        self.onboarding.remove_client(peer_addr)
-    }
+    // pub fn remove_client(&mut self, peer_addr: SocketAddr) {
+    //     self.onboarding.remove_client(peer_addr)
+    // }
 
     ///
     pub fn track_incoming(

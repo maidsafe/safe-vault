@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{node::node_ops::MessagingDuty, utils, Network};
-use bytes::Bytes;
 use log::{info, warn};
 use safe_nd::{Address, HandshakeResponse, MsgEnvelope};
 use serde::Serialize;
@@ -61,9 +60,7 @@ impl ClientSender {
         recipient: SocketAddr,
         msg: &T,
     ) -> Option<MessagingDuty> {
-        let msg = utils::serialise(msg);
-        let bytes = Bytes::from(msg);
-
+        let bytes = utils::serialise(msg);
         if let Err(e) = self.routing.send_message_to_client(recipient, bytes).await {
             warn!(
                 "{}: Could not send message to client {}: {:?}",

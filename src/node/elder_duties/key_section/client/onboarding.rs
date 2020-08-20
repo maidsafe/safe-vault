@@ -48,14 +48,14 @@ impl Onboarding {
         self.clients.get(&peer_addr)
     }
 
-    pub fn remove_client(&mut self, peer_addr: SocketAddr) {
-        if let Some(public_key) = self.clients.remove(&peer_addr) {
-            info!("{}: Removed client {:?} on {}", self, public_key, peer_addr);
-        } else {
-            let _ = self.client_candidates.remove(&peer_addr);
-            info!("{}: Removed client candidate on {}", self, peer_addr);
-        }
-    }
+    // pub fn remove_client(&mut self, peer_addr: SocketAddr) {
+    //     if let Some(public_key) = self.clients.remove(&peer_addr) {
+    //         info!("{}: Removed client {:?} on {}", self, public_key, peer_addr);
+    //     } else {
+    //         let _ = self.client_candidates.remove(&peer_addr);
+    //         info!("{}: Removed client candidate on {}", self, peer_addr);
+    //     }
+    // }
 
     pub fn process<G: CryptoRng + Rng>(
         &mut self,
