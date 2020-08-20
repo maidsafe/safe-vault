@@ -28,7 +28,7 @@ use crate::{
 use bls::SecretKey;
 use log::info;
 use rand::{CryptoRng, Rng};
-use routing::{event::Event, Node as RoutingNode, NodeConfig, SrcLocation};
+use routing::{event::Event, SrcLocation};
 use safe_nd::PublicKey;
 use std::{
     fmt::{self, Display, Formatter},
@@ -38,7 +38,7 @@ use std::{
 /// Main node struct.
 pub struct Node<R: CryptoRng + Rng> {
     duties: NodeDuties<R>,
-    routing: Network,
+    network_api: Network,
 }
 
 impl<R: CryptoRng + Rng> Node<R> {
@@ -62,15 +62,8 @@ impl<R: CryptoRng + Rng> Node<R> {
             age_group
         });
 
-        let mut node_config = NodeConfig::default();
-        node_config.first = config.is_first();
-        node_config.transport_config = config.network_config().clone();
-        node_config.network_params.recommended_section_size = 500;
-        let routing_node = RoutingNode::new(node_config).await?;
-
-        let routing = Network::new(routing_node);
-
-        let keys = NodeSigningKeys::new(routing.clone());
+        let network_api = Network::new(config).await?;
+        let keys = NodeSigningKeys::new(network_api.clone());
 
         let node_info = NodeInfo {
             keys,
@@ -82,7 +75,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             max_storage_capacity: config.max_capacity(),
         };
 
-        let mut duties = NodeDuties::new(node_info, routing.clone(), rng);
+        let mut duties = NodeDuties::new(node_info, network_api.clone(), rng);
 
         use AgeGroup::*;
         let _ = match age_group {
@@ -91,7 +84,10 @@ impl<R: CryptoRng + Rng> Node<R> {
             Elder => duties.process(node_ops::NodeDuty::BecomeElder).await,
         };
 
-        let mut node = Self { duties, routing };
+        let mut node = Self {
+            duties,
+            network_api,
+        };
 
         node.register(reward_key).await;
 
@@ -108,19 +104,19 @@ impl<R: CryptoRng + Rng> Node<R> {
 
     /// Returns our connection info.
     pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.routing.our_connection_info().map_err(From::from)
+        self.network_api.our_connection_info().map_err(From::from)
     }
 
     /// Returns whether routing node is in elder state.
     pub fn is_elder(&mut self) -> bool {
-        self.routing.is_elder()
+        self.network_api.is_elder()
     }
 
     /// Starts the node, and runs the main event loop.
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
-        let mut event_stream = self.routing.listen_events()?;
+        let mut event_stream = self.network_api.listen_events()?;
         while let Some(event) = event_stream.next().await {
             info!("New event received from the Network: {:?}", event);
             if let Event::MessageReceived {
