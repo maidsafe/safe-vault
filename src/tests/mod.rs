@@ -16,12 +16,13 @@ use quic_p2p::Config as NetworkConfig;
 use routing::NodeConfig as RoutingConfig;
 use std::io::Write;
 use std::net::SocketAddr;
-use std::thread::{self, JoinHandle};
+// use std::thread::{self, JoinHandle};
+use tokio::task::JoinHandle;
 
 #[allow(unused)]
 #[derive(Default)]
 struct Network {
-    vaults: Vec<(Sender<Command>, JoinHandle<()>)>,
+    vaults: Vec<(Sender<Command>, JoinHandle<Result<(), String>>)>,
 }
 
 fn init_logging() {
@@ -53,9 +54,9 @@ impl Network {
         node_config.listen_on_loopback();
         let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
         let mut genesis_config = node_config.clone();
-        let handle = std::thread::Builder::new()
-            .name("vault-genesis".to_string())
-            .spawn(move || {
+        let handle = tokio::spawn( {
+            // .name("vault-genesis".to_string())
+            // .spawn(move || {
                 // init_logging();
                 genesis_config.set_flag("first", 1);
                 let path = path.join("genesis-vault");
@@ -68,23 +69,24 @@ impl Network {
                 routing_config.transport_config = genesis_config.network_config().clone();
 
                 let mut node =
-                    futures::executor::block_on(Node::new(&genesis_config, rand::thread_rng()))
+                    Node::new(&genesis_config, rand::thread_rng()).await
                         .expect("Unable to start vault Node");
                 let our_conn_info = node
                     .our_connection_info()
                     .expect("Could not get genesis info");
                 let _ = write_connection_info(&our_conn_info).unwrap();
-                let _ = futures::executor::block_on(node.run());
-            })
-            .unwrap();
+                // let _ = futures::executor::block_on(node.run());
+                node.run().await.unwrap();
+                futures::future::ok(())
+            });
         vaults.push((command_tx, handle));
         for i in 1..no_of_vaults {
-            thread::sleep(std::time::Duration::from_secs(30));
+            std::thread::sleep(std::time::Duration::from_secs(30));
             let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
             let mut vault_config = node_config.clone();
-            let handle = std::thread::Builder::new()
-                .name(format!("vault-{}", i))
-                .spawn(move || {
+            let handle = tokio::spawn({
+                // .name(format!("vault-{}", i))
+                // .spawn(move || {
                     // init_logging();
                     let vault_path = path.join(format!("vault-{}", i));
                     println!("Starting new vault: {:?}", &vault_path);
@@ -100,11 +102,13 @@ impl Network {
                     routing_config.transport_config = vault_config.network_config().clone();
 
                     let mut node =
-                        futures::executor::block_on(Node::new(&vault_config, rand::thread_rng()))
+                        Node::new(&vault_config, rand::thread_rng()).await
                             .expect("Unable to start vault Node");
-                    let _ = futures::executor::block_on(node.run());
-                })
-                .unwrap();
+                    // let _ = futures::executor::block_on(node.run());
+                    node.run().await.unwrap();
+                    futures::future::ok(())
+                    // Ok(())
+                });
             vaults.push((command_tx, handle));
         }
         Self { vaults }
