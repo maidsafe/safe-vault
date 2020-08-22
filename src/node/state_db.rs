@@ -26,6 +26,7 @@ pub fn store_new_reward_keypair(
 ) -> Result<()> {
     let secret_key_path = root_dir.join(REWARD_SECRET_KEY_FILENAME);
     let public_key_path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
+    std::fs::create_dir_all(root_dir).expect("Cannot create root dir");
     fs::write(secret_key_path, sk_to_hex(secret))?;
     fs::write(public_key_path, pk_to_hex(public))?;
     Ok(())
@@ -34,6 +35,7 @@ pub fn store_new_reward_keypair(
 /// Writes the info to disk.
 pub fn store_age_group(root_dir: &Path, age_group: AgeGroup) -> Result<()> {
     let path = root_dir.join(AGE_GROUP_FILENAME);
+    std::fs::create_dir_all(root_dir).expect("Cannot create root dir");
     fs::write(path, utils::serialise(&age_group))?;
     Ok(())
 }

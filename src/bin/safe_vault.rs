@@ -42,6 +42,8 @@ const VAULT_MODULE_NAME: &str = "safe_vault";
 /// Runs a SAFE Network vault.
 #[tokio::main]
 async fn main() {
+    register_shutdown();
+
     let mut config = Config::new();
 
     if let Some(c) = &config.completions() {
@@ -114,14 +116,6 @@ async fn main() {
     );
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    // TODO: Shutdown the vault gracefully on SIGINT (Ctrl+C).
-    /*let result = ctrlc::set_handler(move || {
-        unimplemented!();
-    });
-    if let Err(error) = result {
-        error!("Failed to set interrupt handler: {:?}", error)
-    }*/
-
     let mut rng = rand::thread_rng();
     let mut vault = match Node::new(&config, &mut rng).await {
         Ok(vault) => vault,
@@ -163,6 +157,16 @@ async fn main() {
             error!("Cannot start vault due to error: {:?}", e);
             process::exit(1);
         }
+    }
+}
+
+// Shutdown the vault (not-so-gracefully) on SIGINT (Ctrl+C).
+fn register_shutdown() {
+    let result = ctrlc::set_handler(move || {
+        panic!("Shutdown, without any completion of current work. All good at this stage of development though.")
+    });
+    if let Err(error) = result {
+        panic!("Failed to set interrupt handler: {:?}", error)
     }
 }
 
