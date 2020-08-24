@@ -27,7 +27,7 @@ pub struct AdultDuties {
 }
 
 impl AdultDuties {
-    pub fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+    pub fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let chunks = Chunks::new(node_info, &total_used_space)?;
         Ok(Self { chunks })
     }

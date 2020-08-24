@@ -56,11 +56,13 @@ impl<R: CryptoRng + Rng> Node<R> {
                 PublicKey::Bls(public)
             }
         };
-        let age_group = get_age_group(&root_dir)?.unwrap_or_else(|| {
-            let age_group = Infant;
-            store_age_group(root_dir, age_group.clone()).unwrap_or(());
+        let age_group = if let Some(age_group) = get_age_group(&root_dir)? {
             age_group
-        });
+        } else {
+            let age_group = Infant;
+            store_age_group(root_dir, &age_group)?;
+            age_group
+        };
 
         let network_api = Network::new(config).await?;
         let keys = NodeSigningKeys::new(network_api.clone());

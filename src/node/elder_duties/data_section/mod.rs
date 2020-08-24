@@ -40,15 +40,19 @@ pub struct DataSection {
 
 impl DataSection {
     ///
-    pub fn new(info: NodeInfo, total_used_space: &Rc<Cell<u64>>, routing: Network) -> Result<Self> {
+    pub fn new(
+        info: &NodeInfo,
+        total_used_space: &Rc<Cell<u64>>,
+        routing: Network,
+    ) -> Result<Self> {
         // Metadata
-        let metadata = Metadata::new(info.clone(), &total_used_space, routing.clone())?;
+        let metadata = Metadata::new(info, &total_used_space, routing.clone())?;
 
         // Rewards
         let keypair = utils::key_pair(routing.clone())?;
         let public_key_set = routing.public_key_set()?;
         let actor = TransferActor::new(keypair, public_key_set, Validator {});
-        let rewards = Rewards::new(info.keys, actor);
+        let rewards = Rewards::new(info.keys.clone(), actor);
 
         Ok(Self {
             metadata,

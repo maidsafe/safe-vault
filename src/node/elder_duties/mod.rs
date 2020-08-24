@@ -33,13 +33,13 @@ pub struct ElderDuties<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> ElderDuties<R> {
     pub fn new(
-        info: NodeInfo,
+        info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
         routing: Network,
         rng: R,
     ) -> Result<Self> {
         let prefix = routing.our_prefix().ok_or(Error::Logic)?;
-        let key_section = KeySection::new(info.clone(), routing.clone(), rng)?;
+        let key_section = KeySection::new(info, routing.clone(), rng)?;
         let data_section = DataSection::new(info, total_used_space, routing)?;
         Ok(Self {
             prefix,

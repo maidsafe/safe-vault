@@ -36,7 +36,7 @@ pub struct ClientGateway<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> ClientGateway<R> {
-    pub fn new(info: NodeInfo, routing: Network, rng: R) -> Result<Self> {
+    pub fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
         let onboarding = Onboarding::new(info.public_key().ok_or(Error::Logic)?, routing.clone());
         let client_msg_tracking = ClientMsgTracking::new(onboarding);
 

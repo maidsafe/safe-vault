@@ -22,11 +22,15 @@ impl Reading {
         Self { read, msg }
     }
 
-    pub fn get_result(&self, storage: &ChunkStorage) -> Option<MessagingDuty> {
-        let BlobRead::Get(address) = self.read;
-        if let Address::Section(_) = self.msg.most_recent_sender().address() {
-            if self.verify_msg() {
-                storage.get(address, self.msg.id(), &self.msg.origin)
+    pub fn get_result(
+        read: &BlobRead,
+        msg: &MsgEnvelope,
+        storage: &ChunkStorage,
+    ) -> Option<MessagingDuty> {
+        let BlobRead::Get(address) = read;
+        if let Address::Section(_) = msg.most_recent_sender().address() {
+            if msg.verify() {
+                storage.get(address, msg.id(), &msg.origin)
             } else {
                 error!("Accumulated signature is invalid!");
                 None

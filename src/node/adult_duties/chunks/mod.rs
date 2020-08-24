@@ -30,7 +30,7 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    pub fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+    pub fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let chunk_storage = ChunkStorage::new(node_info, total_used_space)?;
 
         Ok(Self { chunk_storage })
@@ -47,10 +47,7 @@ impl Chunks {
             Message::Query {
                 query: Query::Data(DataQuery::Blob(read)),
                 ..
-            } => {
-                let reading = Reading::new(read.clone(), msg.clone());
-                reading.get_result(&self.chunk_storage)
-            }
+            } => Reading::get_result(read, msg, &self.chunk_storage),
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -58,10 +55,7 @@ impl Chunks {
                         ..
                     },
                 ..
-            } => {
-                let writing = Writing::new(write.clone(), msg.clone());
-                writing.get_result(&mut self.chunk_storage)
-            }
+            } => Writing::get_result(write, msg, &mut self.chunk_storage),
             _ => None,
         }
     }

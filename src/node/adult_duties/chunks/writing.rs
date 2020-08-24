@@ -22,21 +22,25 @@ impl Writing {
         Self { write, msg }
     }
 
-    pub fn get_result(&self, storage: &mut ChunkStorage) -> Option<MessagingDuty> {
+    pub fn get_result(
+        write: &BlobWrite,
+        msg: &MsgEnvelope,
+        storage: &mut ChunkStorage,
+    ) -> Option<MessagingDuty> {
         use BlobWrite::*;
-        match &self.write {
+        match &write {
             New(data) => {
-                if self.verify_msg() {
-                    storage.store(&data, self.msg.id(), &self.msg.origin)
+                if msg.verify() {
+                    storage.store(&data, msg.id(), &msg.origin)
                 } else {
-                    error!("Accumulated signature for {:?} is invalid!", &self.msg.id());
+                    error!("Accumulated signature for {:?} is invalid!", &msg.id());
                     None
                 }
             }
             DeletePrivate(address) => {
-                if self.verify_msg() {
+                if msg.verify() {
                     // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
-                    storage.delete(*address, self.msg.id(), &self.msg.origin)
+                    storage.delete(*address, msg.id(), &msg.origin)
                 } else {
                     error!("Accumulated signature is invalid!");
                     None
