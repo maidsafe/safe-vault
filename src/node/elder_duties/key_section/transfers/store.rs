@@ -13,7 +13,7 @@ use std::{collections::BTreeSet, path::Path};
 
 const TRANSFERS_DB_NAME: &str = "transfers.db";
 const GROUP_CHANGES: &str = "group_changes";
-
+use log::trace;
 /// Disk storage for transfers.
 pub struct TransferStore {
     db: PickleDb,
@@ -38,11 +38,19 @@ impl TransferStore {
     }
 
     pub fn history(&self, id: &AccountId) -> Option<Vec<ReplicaEvent>> {
+        trace!("Getting History from node store");
+
+        // check list exists. If not, pickle panics
+        if !self.db.lexists(&id.to_db_key()) {
+            return None
+        }
+
         let list: Vec<ReplicaEvent> = self
             .db
             .liter(&id.to_db_key())
             .filter_map(|c| c.get_item::<ReplicaEvent>())
-            .collect();
+            .collect()
+            ;
         Some(list)
     }
 
