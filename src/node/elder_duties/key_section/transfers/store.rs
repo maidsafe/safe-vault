@@ -42,15 +42,14 @@ impl TransferStore {
 
         // check list exists. If not, pickle panics
         if !self.db.lexists(&id.to_db_key()) {
-            return None
+            return None;
         }
 
         let list: Vec<ReplicaEvent> = self
             .db
             .liter(&id.to_db_key())
             .filter_map(|c| c.get_item::<ReplicaEvent>())
-            .collect()
-            ;
+            .collect();
         Some(list)
     }
 

@@ -15,8 +15,9 @@ use crate::{
 use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
-    Blob, BlobAddress, BlobRead, BlobWrite, CmdError, Error as NdError, Message, MessageId,
-    MsgEnvelope, NodeCmd, NodeDataCmd, PublicKey, QueryResponse, Result as NdResult, MsgSender, Cmd, DebitAgreementProof, Query, DataQuery,
+    Blob, BlobAddress, BlobRead, BlobWrite, Cmd, CmdError, DataQuery, DebitAgreementProof,
+    Error as NdError, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, PublicKey,
+    Query, QueryResponse, Result as NdResult,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -74,7 +75,14 @@ impl BlobRegister {
         })
     }
 
-    pub(super) fn write(&mut self, write: BlobWrite, msg_id: MessageId, origin: MsgSender, payment: DebitAgreementProof, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
+    pub(super) fn write(
+        &mut self,
+        write: BlobWrite,
+        msg_id: MessageId,
+        origin: MsgSender,
+        payment: DebitAgreementProof,
+        proxies: Vec<MsgSender>,
+    ) -> Option<MessagingDuty> {
         use BlobWrite::*;
         match write {
             New(data) => self.store(data, msg_id, origin, payment, proxies),
@@ -82,7 +90,14 @@ impl BlobRegister {
         }
     }
 
-    fn store(&mut self, data: Blob, msg_id: MessageId, origin: MsgSender, payment: DebitAgreementProof, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
+    fn store(
+        &mut self,
+        data: Blob,
+        msg_id: MessageId,
+        origin: MsgSender,
+        payment: DebitAgreementProof,
+        proxies: Vec<MsgSender>,
+    ) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
             self.wrapping.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -138,17 +153,24 @@ impl BlobRegister {
             message: Message::Cmd {
                 cmd: Cmd::Data {
                     cmd: safe_nd::DataCmd::Blob(BlobWrite::New(data)),
-                    payment
+                    payment,
                 },
-                id: msg_id
+                id: msg_id,
             },
             origin,
-            proxies
+            proxies,
         };
         self.wrapping.send_to_adults(target_holders, &msg)
     }
 
-    fn delete(&mut self, address: BlobAddress, msg_id: MessageId, origin: MsgSender, payment: DebitAgreementProof, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
+    fn delete(
+        &mut self,
+        address: BlobAddress,
+        msg_id: MessageId,
+        origin: MsgSender,
+        payment: DebitAgreementProof,
+        proxies: Vec<MsgSender>,
+    ) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
             self.wrapping.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -179,12 +201,12 @@ impl BlobRegister {
             message: Message::Cmd {
                 cmd: Cmd::Data {
                     cmd: safe_nd::DataCmd::Blob(BlobWrite::DeletePrivate(address)),
-                    payment
+                    payment,
                 },
-                id: msg_id
+                id: msg_id,
             },
             origin,
-            proxies
+            proxies,
         };
         self.wrapping.send_to_adults(metadata.holders, &msg)
     }
@@ -315,14 +337,26 @@ impl BlobRegister {
             .collect()
     }
 
-    pub(super) fn read(&self, read: &BlobRead, msg_id: MessageId, origin: MsgSender, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
+    pub(super) fn read(
+        &self,
+        read: &BlobRead,
+        msg_id: MessageId,
+        origin: MsgSender,
+        proxies: Vec<MsgSender>,
+    ) -> Option<MessagingDuty> {
         use BlobRead::*;
         match read {
             Get(address) => self.get(*address, msg_id, origin, proxies),
         }
     }
 
-    fn get(&self, address: BlobAddress, msg_id: MessageId, origin: MsgSender, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
+    fn get(
+        &self,
+        address: BlobAddress,
+        msg_id: MessageId,
+        origin: MsgSender,
+        proxies: Vec<MsgSender>,
+    ) -> Option<MessagingDuty> {
         let query_error = |error: NdError| {
             self.wrapping.send(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
@@ -345,10 +379,10 @@ impl BlobRegister {
         let msg = MsgEnvelope {
             message: Message::Query {
                 query: Query::Data(DataQuery::Blob(BlobRead::Get(address))),
-                id: msg_id
-                },
+                id: msg_id,
+            },
             origin,
-            proxies
+            proxies,
         };
         self.wrapping.send_to_adults(metadata.holders, &msg)
     }

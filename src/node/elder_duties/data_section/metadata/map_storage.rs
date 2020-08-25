@@ -15,8 +15,8 @@ use crate::{
 };
 use safe_nd::{
     CmdError, Error as NdError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
-    MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey,
-    QueryResponse, Result as NdResult,
+    MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey, QueryResponse,
+    Result as NdResult,
 };
 use std::{
     cell::Cell,
@@ -45,7 +45,12 @@ impl MapStorage {
         Ok(Self { chunks, wrapping })
     }
 
-    pub(super) fn read(&self, read: &MapRead, msg_id: MessageId, origin: &MsgSender) -> Option<MessagingDuty> {
+    pub(super) fn read(
+        &self,
+        read: &MapRead,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<MessagingDuty> {
         use MapRead::*;
         match read {
             Get(address) => self.get(*address, msg_id, origin),

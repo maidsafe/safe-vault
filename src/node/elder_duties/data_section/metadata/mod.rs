@@ -68,27 +68,17 @@ impl Metadata {
         })
     }
 
-    pub fn process(&mut self, duty: &MetadataDuty) -> Option<NodeOperation> {
+    pub fn process(&mut self, duty: MetadataDuty) -> Option<NodeOperation> {
         use MetadataDuty::*;
         match duty {
             ProcessRead(msg) | ProcessWrite(msg) => self.process_msg(msg),
         }
     }
 
-    fn process_msg(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    fn process_msg(&mut self, msg: MsgEnvelope) -> Option<NodeOperation> {
         match &msg.message {
-            Message::Cmd {
-                ..
-            } => {
-                // TODO: remove msg.clone()
-                writing::get_result(msg.clone(), &mut self.elder_stores)
-            }
-            Message::Query {
-                ..
-            } => {
-                // TODO: remove msg.clone()
-                reading::get_result(msg.clone(), &self.elder_stores).map(|c| c.into())
-            }
+            Message::Cmd { .. } => writing::get_result(msg, &mut self.elder_stores),
+            Message::Query { .. } => reading::get_result(msg, &self.elder_stores).map(|c| c.into()),
             _ => None, // only Queries and Cmds from client is handled at Metadata
         }
     }

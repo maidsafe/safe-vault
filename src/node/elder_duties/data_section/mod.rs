@@ -64,7 +64,7 @@ impl DataSection {
     pub fn process(&mut self, duty: DataSectionDuty) -> Option<NodeOperation> {
         use DataSectionDuty::*;
         match duty {
-            RunAsMetadata(duty) => self.metadata.process(&duty),
+            RunAsMetadata(duty) => self.metadata.process(duty),
             RunAsRewards(duty) => self.rewards.process(duty),
         }
     }

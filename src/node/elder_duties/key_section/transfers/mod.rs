@@ -15,6 +15,9 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
+use log::trace;
+#[cfg(feature = "simulated-payouts")]
+use safe_nd::Transfer;
 use safe_nd::{
     Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
     NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
@@ -26,9 +29,6 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
-use log::trace;
-#[cfg(feature = "simulated-payouts")]
-use safe_nd::Transfer;
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -221,7 +221,6 @@ impl Transfers {
         msg_id: MessageId,
         origin: Address,
     ) -> Option<MessagingDuty> {
-
         trace!("Handling GetHistory");
         // validate signature
         let result = match self

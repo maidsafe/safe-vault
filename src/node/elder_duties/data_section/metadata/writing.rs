@@ -11,8 +11,10 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::{MessagingDuty, NodeOperation};
-use safe_nd::{AccountWrite, BlobWrite, DataCmd, MapWrite, MsgEnvelope, SequenceWrite, Message, Cmd, MsgSender, MessageId, DebitAgreementProof};
-
+use safe_nd::{
+    AccountWrite, BlobWrite, Cmd, DataCmd, DebitAgreementProof, MapWrite, Message, MessageId,
+    MsgEnvelope, MsgSender, SequenceWrite,
+};
 
 pub(super) fn get_result(msg: MsgEnvelope, stores: &mut ElderStores) -> Option<NodeOperation> {
     use DataCmd::*;
@@ -22,27 +24,45 @@ pub(super) fn get_result(msg: MsgEnvelope, stores: &mut ElderStores) -> Option<N
     let result = match msg.message {
         Message::Cmd {
             cmd: Cmd::Data {
-                cmd: data_cmd, payment
+                cmd: data_cmd,
+                payment,
             },
             ..
-        } => {
-            match data_cmd {
-                Blob(write) => blob(write, stores.blob_register_mut(), msg_id, msg_origin, payment, proxies),
-                Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin),
-                Sequence(write) => sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin),
-                Account(write) => account(write, stores.account_storage_mut(), msg_id, msg_origin),
-            }
-        }
-        _ => unreachable!("Logic error")
+        } => match data_cmd {
+            Blob(write) => blob(
+                write,
+                stores.blob_register_mut(),
+                msg_id,
+                msg_origin,
+                payment,
+                proxies,
+            ),
+            Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin),
+            Sequence(write) => sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin),
+            Account(write) => account(write, stores.account_storage_mut(), msg_id, msg_origin),
+        },
+        _ => unreachable!("Logic error"),
     };
     result.map(|c| c.into())
 }
 
-fn blob(write: BlobWrite, register: &mut BlobRegister, msg_id: MessageId, origin: MsgSender, payment: DebitAgreementProof, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
+fn blob(
+    write: BlobWrite,
+    register: &mut BlobRegister,
+    msg_id: MessageId,
+    origin: MsgSender,
+    payment: DebitAgreementProof,
+    proxies: Vec<MsgSender>,
+) -> Option<MessagingDuty> {
     register.write(write, msg_id, origin, payment, proxies)
 }
 
-fn map(write: MapWrite, storage: &mut MapStorage, msg_id: MessageId, origin: MsgSender) -> Option<MessagingDuty> {
+fn map(
+    write: MapWrite,
+    storage: &mut MapStorage,
+    msg_id: MessageId,
+    origin: MsgSender,
+) -> Option<MessagingDuty> {
     storage.write(write, msg_id, &origin)
 }
 
@@ -59,7 +79,7 @@ fn account(
     write: AccountWrite,
     storage: &mut AccountStorage,
     msg_id: MessageId,
-    origin: MsgSender
+    origin: MsgSender,
 ) -> Option<MessagingDuty> {
     storage.write(write, msg_id, &origin)
 }
