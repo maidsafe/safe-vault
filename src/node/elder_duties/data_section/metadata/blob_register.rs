@@ -56,7 +56,7 @@ pub(super) struct BlobRegister {
 
 impl BlobRegister {
     pub(super) fn new(
-        node_info: NodeInfo,
+        node_info: &NodeInfo,
         wrapping: ElderMsgWrapping,
         routing: Network,
     ) -> Result<Self> {

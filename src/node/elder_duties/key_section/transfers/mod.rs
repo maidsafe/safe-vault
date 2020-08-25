@@ -26,7 +26,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
-
+use log::trace;
 #[cfg(feature = "simulated-payouts")]
 use safe_nd::Transfer;
 /*
@@ -221,6 +221,8 @@ impl Transfers {
         msg_id: MessageId,
         origin: Address,
     ) -> Option<MessagingDuty> {
+
+        trace!("Handling GetHistory");
         // validate signature
         let result = match self
             .replica

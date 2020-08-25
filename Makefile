@@ -87,17 +87,29 @@ package-version-artifacts-for-deploy:
 
 	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.zip \
 		artifacts/prod/x86_64-unknown-linux-musl/release/safe_vault
+	zip -j safe_vault-latest-x86_64-unknown-linux-musl.zip \
+		artifacts/prod/x86_64-unknown-linux-musl/release/safe_vault
 	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-msvc.zip \
 		artifacts/prod/x86_64-pc-windows-msvc/release/safe_vault.exe
+	zip -j safe_vault-latest-x86_64-pc-windows-msvc.zip \
+		artifacts/prod/x86_64-pc-windows-msvc/release/safe_vault.exe
 	zip -j safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.zip \
+		artifacts/prod/x86_64-apple-darwin/release/safe_vault
+	zip -j safe_vault-latest-x86_64-apple-darwin.zip \
 		artifacts/prod/x86_64-apple-darwin/release/safe_vault
 
 	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
 		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-unknown-linux-musl.tar.gz safe_vault
+	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
+		-zcvf safe_vault-latest-x86_64-unknown-linux-musl.tar.gz safe_vault
 	tar -C artifacts/prod/x86_64-pc-windows-msvc/release \
 		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-pc-windows-msvc.tar.gz safe_vault.exe
+	tar -C artifacts/prod/x86_64-pc-windows-msvc/release \
+		-zcvf safe_vault-latest-x86_64-pc-windows-msvc.tar.gz safe_vault.exe
 	tar -C artifacts/prod/x86_64-apple-darwin/release \
 		-zcvf safe_vault-${SAFE_VAULT_VERSION}-x86_64-apple-darwin.tar.gz safe_vault
+	tar -C artifacts/prod/x86_64-apple-darwin/release \
+		-zcvf safe_vault-latest-x86_64-apple-darwin.tar.gz safe_vault
 
 	mv *.zip ${DEPLOY_PROD_PATH}
 	mv *.tar.gz ${DEPLOY_PROD_PATH}

@@ -49,15 +49,14 @@ pub struct Metadata {
 
 impl Metadata {
     pub fn new(
-        node_info: NodeInfo,
+        node_info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
         routing: Network,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
-        let account_storage =
-            AccountStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
-        let blob_register = BlobRegister::new(node_info.clone(), wrapping.clone(), routing)?;
-        let map_storage = MapStorage::new(node_info.clone(), total_used_space, wrapping.clone())?;
+        let account_storage = AccountStorage::new(node_info, total_used_space, wrapping.clone())?;
+        let blob_register = BlobRegister::new(node_info, wrapping.clone(), routing)?;
+        let map_storage = MapStorage::new(node_info, total_used_space, wrapping.clone())?;
         let sequence_storage = SequenceStorage::new(node_info, total_used_space, wrapping.clone())?;
         let elder_stores = ElderStores::new(
             account_storage,

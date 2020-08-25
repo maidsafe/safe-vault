@@ -26,7 +26,7 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) fn new(node_info: NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+    pub(crate) fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let chunks = BlobChunkStore::new(
             node_info.path(),
             node_info.max_storage_capacity,
@@ -97,13 +97,13 @@ impl ChunkStorage {
 
     pub(crate) fn get(
         &self,
-        address: BlobAddress,
+        address: &BlobAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
             .chunks
-            .get(&address)
+            .get(address)
             .map_err(|error| error.to_string().into());
         self.wrapping.send(Message::QueryResponse {
             id: MessageId::new(),

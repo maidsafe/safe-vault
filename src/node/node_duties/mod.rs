@@ -105,7 +105,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
     fn become_adult(&mut self) -> Option<NodeOperation> {
         use DutyLevel::*;
         let total_used_space = Rc::new(Cell::new(0));
-        if let Ok(duties) = AdultDuties::new(self.node_info.clone(), &total_used_space) {
+        if let Ok(duties) = AdultDuties::new(&self.node_info, &total_used_space) {
             self.duty_level = Adult(duties);
             // NB: This is wrong, shouldn't write to disk here,
             // let it be upper layer resp.
@@ -123,7 +123,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             return None;
         }
         if let Ok(duties) = ElderDuties::new(
-            self.node_info.clone(),
+            &self.node_info,
             &total_used_space,
             self.routing.clone(),
             self.rng.take()?,

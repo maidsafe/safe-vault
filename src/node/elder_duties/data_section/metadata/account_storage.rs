@@ -35,7 +35,7 @@ pub(super) struct AccountStorage {
 
 impl AccountStorage {
     pub fn new(
-        node_info: NodeInfo,
+        node_info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
         wrapping: ElderMsgWrapping,
     ) -> Result<Self> {

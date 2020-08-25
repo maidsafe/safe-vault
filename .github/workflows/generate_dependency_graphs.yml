@@ -1,0 +1,30 @@
+name: Generate and Deploy Dependency Graph
+on:
+  push:
+    branches:
+      - master
+  schedule:
+    # Every day at 1 AM
+    - cron:  '0 1 * * *'
+
+jobs:
+  generate-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2 # If you're using actions/checkout@v2 you must set persist-credentials to false in most cases for the deployment to work correctly.
+        with:
+          persist-credentials: false
+
+      - name: Install dot
+        run: sudo apt-get install graphviz
+
+      - shell: bash
+        run: ./scripts/generate_dependency_graphs
+
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@releases/v3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: png_generator # The branch the action should deploy to.
+          FOLDER: images # The folder the action should deploy.

@@ -118,3 +118,21 @@ jobs:
       - name: Run tests
         shell: bash
         run: ./scripts/tests
+
+  # list all duplicate dependencies. Note that this does not error if duplicates found
+  dependencies:
+    name: List Duplicate Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Run list duplicate dependencies script
+      - shell: bash
+        run: ./scripts/duplicate_dependency_check

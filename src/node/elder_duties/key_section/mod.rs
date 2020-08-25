@@ -46,11 +46,11 @@ pub struct KeySection<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> KeySection<R> {
-    pub fn new(info: NodeInfo, routing: Network, rng: R) -> Result<Self> {
-        let gateway = ClientGateway::new(info.clone(), routing.clone(), rng)?;
-        let replica_manager = Self::new_replica_manager(info.clone(), routing.clone())?;
+    pub fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
+        let gateway = ClientGateway::new(info, routing.clone(), rng)?;
+        let replica_manager = Self::new_replica_manager(info, routing.clone())?;
         let payments = Payments::new(info.keys.clone(), replica_manager.clone());
-        let transfers = Transfers::new(info.keys, replica_manager.clone());
+        let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
 
         Ok(Self {
@@ -122,7 +122,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     }
 
     fn new_replica_manager(
-        info: NodeInfo,
+        info: &NodeInfo,
         routing: Network,
     ) -> Result<Rc<RefCell<ReplicaManager>>> {
         let public_key_set = routing.public_key_set()?;

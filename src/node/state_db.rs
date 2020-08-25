@@ -32,9 +32,9 @@ pub fn store_new_reward_keypair(
 }
 
 /// Writes the info to disk.
-pub fn store_age_group(root_dir: &Path, age_group: AgeGroup) -> Result<()> {
+pub fn store_age_group(root_dir: &Path, age_group: &AgeGroup) -> Result<()> {
     let path = root_dir.join(AGE_GROUP_FILENAME);
-    fs::write(path, utils::serialise(&age_group))?;
+    fs::write(path, utils::serialise(age_group))?;
     Ok(())
 }
 
