@@ -6,53 +6,36 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+//! Write operations on data chunks.
+
 use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::MessagingDuty;
 use log::error;
-use safe_nd::{BlobWrite, MsgEnvelope, MsgSender};
+use safe_nd::{BlobWrite, MsgEnvelope};
 
-/// Write operations on data chunks.
-pub(super) struct Writing {
-    write: BlobWrite,
-    msg: MsgEnvelope,
-}
-
-impl Writing {
-    pub fn new(write: BlobWrite, msg: MsgEnvelope) -> Self {
-        Self { write, msg }
-    }
-
-    pub fn get_result(
-        write: &BlobWrite,
-        msg: &MsgEnvelope,
-        storage: &mut ChunkStorage,
-    ) -> Option<MessagingDuty> {
-        use BlobWrite::*;
-        match &write {
-            New(data) => {
-                if msg.verify() {
-                    storage.store(&data, msg.id(), &msg.origin)
-                } else {
-                    error!("Accumulated signature for {:?} is invalid!", &msg.id());
-                    None
-                }
-            }
-            DeletePrivate(address) => {
-                if msg.verify() {
-                    // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
-                    storage.delete(*address, msg.id(), &msg.origin)
-                } else {
-                    error!("Accumulated signature is invalid!");
-                    None
-                }
+pub(super) fn get_result(
+    write: &BlobWrite,
+    msg: &MsgEnvelope,
+    storage: &mut ChunkStorage,
+) -> Option<MessagingDuty> {
+    use BlobWrite::*;
+    match &write {
+        New(data) => {
+            if msg.verify() {
+                storage.store(&data, msg.id(), &msg.origin)
+            } else {
+                error!("Accumulated signature for {:?} is invalid!", &msg.id());
+                None
             }
         }
-    }
-
-    fn verify_msg(&self) -> bool {
-        match self.msg.most_recent_sender() {
-            MsgSender::Section { .. } => self.msg.verify(),
-            _ => false,
+        DeletePrivate(address) => {
+            if msg.verify() {
+                // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
+                storage.delete(*address, msg.id(), &msg.origin)
+            } else {
+                error!("Accumulated signature is invalid!");
+                None
+            }
         }
     }
 }

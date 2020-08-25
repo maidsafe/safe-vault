@@ -24,15 +24,13 @@ use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
-use reading::Reading;
-use safe_nd::{Cmd, ElderDuties, Message, MsgEnvelope, Query};
+use safe_nd::{ElderDuties, Message, MsgEnvelope};
 use sequence_storage::SequenceStorage;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
-use writing::Writing;
 use xor_name::XorName;
 
 /// This module is called `Metadata`
@@ -80,18 +78,16 @@ impl Metadata {
     fn process_msg(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
         match &msg.message {
             Message::Cmd {
-                cmd: Cmd::Data { cmd, .. },
                 ..
             } => {
-                let mut writing = Writing::new(cmd.clone(), msg.clone());
-                writing.get_result(&mut self.elder_stores)
+                // TODO: remove msg.clone()
+                writing::get_result(msg.clone(), &mut self.elder_stores)
             }
             Message::Query {
-                query: Query::Data(query),
                 ..
             } => {
-                let reading = Reading::new(query.clone(), msg.clone());
-                reading.get_result(&self.elder_stores).map(|c| c.into())
+                // TODO: remove msg.clone()
+                reading::get_result(msg.clone(), &self.elder_stores).map(|c| c.into())
             }
             _ => None, // only Queries and Cmds from client is handled at Metadata
         }

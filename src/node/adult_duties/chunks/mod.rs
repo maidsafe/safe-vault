@@ -12,8 +12,6 @@ mod writing;
 
 use crate::{node::node_ops::MessagingDuty, node::state_db::NodeInfo, Result};
 use chunk_storage::ChunkStorage;
-use reading::Reading;
-use writing::Writing;
 
 use log::trace;
 use safe_nd::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
@@ -47,7 +45,7 @@ impl Chunks {
             Message::Query {
                 query: Query::Data(DataQuery::Blob(read)),
                 ..
-            } => Reading::get_result(read, msg, &self.chunk_storage),
+            } => reading::get_result(read, msg, &self.chunk_storage),
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -55,7 +53,7 @@ impl Chunks {
                         ..
                     },
                 ..
-            } => Writing::get_result(write, msg, &mut self.chunk_storage),
+            } => writing::get_result(write, msg, &mut self.chunk_storage),
             _ => None,
         }
     }

@@ -16,7 +16,7 @@ use log::{info, trace, warn};
 use pickledb::PickleDb;
 use safe_nd::{
     Blob, BlobAddress, BlobRead, BlobWrite, CmdError, Error as NdError, Message, MessageId,
-    MsgEnvelope, NodeCmd, NodeDataCmd, PublicKey, QueryResponse, Result as NdResult,
+    MsgEnvelope, NodeCmd, NodeDataCmd, PublicKey, QueryResponse, Result as NdResult, MsgSender, Cmd, DebitAgreementProof, Query, DataQuery,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -74,21 +74,21 @@ impl BlobRegister {
         })
     }
 
-    pub(super) fn write(&mut self, write: BlobWrite, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub(super) fn write(&mut self, write: BlobWrite, msg_id: MessageId, origin: MsgSender, payment: DebitAgreementProof, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
         use BlobWrite::*;
         match write {
-            New(data) => self.store(data, msg),
-            DeletePrivate(address) => self.delete(address, msg),
+            New(data) => self.store(data, msg_id, origin, payment, proxies),
+            DeletePrivate(address) => self.delete(address, msg_id, origin, payment, proxies),
         }
     }
 
-    fn store(&mut self, data: Blob, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn store(&mut self, data: Blob, msg_id: MessageId, origin: MsgSender, payment: DebitAgreementProof, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
             self.wrapping.send(Message::CmdError {
                 error: CmdError::Data(error),
                 id: MessageId::new(),
-                cmd_origin: msg.origin.address(),
-                correlation_id: msg.id(),
+                cmd_origin: origin.address(),
+                correlation_id: msg_id,
             })
         };
 
@@ -130,21 +130,31 @@ impl BlobRegister {
 
         let results: Vec<_> = (&target_holders)
             .iter()
-            .map(|holder| self.set_chunk_holder(*data.address(), *holder, msg.origin.id()))
+            .map(|holder| self.set_chunk_holder(*data.address(), *holder, origin.id()))
             .filter(|res| res.is_err())
             .collect();
         if !results.is_empty() {}
-
-        self.wrapping.send_to_adults(target_holders, msg)
+        let msg = MsgEnvelope {
+            message: Message::Cmd {
+                cmd: Cmd::Data {
+                    cmd: safe_nd::DataCmd::Blob(BlobWrite::New(data)),
+                    payment
+                },
+                id: msg_id
+            },
+            origin,
+            proxies
+        };
+        self.wrapping.send_to_adults(target_holders, &msg)
     }
 
-    fn delete(&mut self, address: BlobAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn delete(&mut self, address: BlobAddress, msg_id: MessageId, origin: MsgSender, payment: DebitAgreementProof, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
         let cmd_error = |error: NdError| {
             self.wrapping.send(Message::CmdError {
                 error: CmdError::Data(error),
                 id: MessageId::new(),
-                cmd_origin: msg.origin.address(),
-                correlation_id: msg.id(),
+                cmd_origin: origin.address(),
+                correlation_id: msg_id,
             })
         };
 
@@ -154,7 +164,7 @@ impl BlobRegister {
         };
 
         if let Some(data_owner) = metadata.owner {
-            if data_owner != msg.origin.id() {
+            if data_owner != origin.id() {
                 return cmd_error(NdError::AccessDenied);
             }
         };
@@ -165,7 +175,18 @@ impl BlobRegister {
             .collect();
         if !results.is_empty() {}
 
-        self.wrapping.send_to_adults(metadata.holders, msg)
+        let msg = MsgEnvelope {
+            message: Message::Cmd {
+                cmd: Cmd::Data {
+                    cmd: safe_nd::DataCmd::Blob(BlobWrite::DeletePrivate(address)),
+                    payment
+                },
+                id: msg_id
+            },
+            origin,
+            proxies
+        };
+        self.wrapping.send_to_adults(metadata.holders, &msg)
     }
 
     fn set_chunk_holder(
@@ -294,20 +315,20 @@ impl BlobRegister {
             .collect()
     }
 
-    pub(super) fn read(&self, read: &BlobRead, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub(super) fn read(&self, read: &BlobRead, msg_id: MessageId, origin: MsgSender, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
         use BlobRead::*;
         match read {
-            Get(address) => self.get(*address, msg),
+            Get(address) => self.get(*address, msg_id, origin, proxies),
         }
     }
 
-    fn get(&self, address: BlobAddress, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn get(&self, address: BlobAddress, msg_id: MessageId, origin: MsgSender, proxies: Vec<MsgSender>) -> Option<MessagingDuty> {
         let query_error = |error: NdError| {
             self.wrapping.send(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
                 id: MessageId::new(),
-                query_origin: msg.origin.address(),
-                correlation_id: msg.id(),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
             })
         };
 
@@ -317,12 +338,19 @@ impl BlobRegister {
         };
 
         if let Some(data_owner) = metadata.owner {
-            if data_owner != msg.origin.id() {
+            if data_owner != origin.id() {
                 return query_error(NdError::AccessDenied);
             }
         };
-
-        self.wrapping.send_to_adults(metadata.holders, msg)
+        let msg = MsgEnvelope {
+            message: Message::Query {
+                query: Query::Data(DataQuery::Blob(BlobRead::Get(address))),
+                id: msg_id
+                },
+            origin,
+            proxies
+        };
+        self.wrapping.send_to_adults(metadata.holders, &msg)
     }
 
     #[allow(unused)]

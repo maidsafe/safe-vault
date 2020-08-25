@@ -15,7 +15,7 @@ use crate::{
 };
 use safe_nd::{
     CmdError, Error as NdError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
-    MapRead, MapValue, MapWrite, Message, MessageId, MsgEnvelope, MsgSender, PublicKey,
+    MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey,
     QueryResponse, Result as NdResult,
 };
 use std::{
@@ -45,19 +45,19 @@ impl MapStorage {
         Ok(Self { chunks, wrapping })
     }
 
-    pub(super) fn read(&self, read: &MapRead, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub(super) fn read(&self, read: &MapRead, msg_id: MessageId, origin: &MsgSender) -> Option<MessagingDuty> {
         use MapRead::*;
         match read {
-            Get(address) => self.get(*address, msg.id(), &msg.origin),
-            GetValue { address, ref key } => self.get_value(*address, key, msg.id(), &msg.origin),
-            GetShell(address) => self.get_shell(*address, msg.id(), &msg.origin),
-            GetVersion(address) => self.get_version(*address, msg.id(), &msg.origin),
-            ListEntries(address) => self.list_entries(*address, msg.id(), &msg.origin),
-            ListKeys(address) => self.list_keys(*address, msg.id(), &msg.origin),
-            ListValues(address) => self.list_values(*address, msg.id(), &msg.origin),
-            ListPermissions(address) => self.list_permissions(*address, msg.id(), &msg.origin),
+            Get(address) => self.get(*address, msg_id, origin),
+            GetValue { address, ref key } => self.get_value(*address, key, msg_id, origin),
+            GetShell(address) => self.get_shell(*address, msg_id, origin),
+            GetVersion(address) => self.get_version(*address, msg_id, origin),
+            ListEntries(address) => self.list_entries(*address, msg_id, origin),
+            ListKeys(address) => self.list_keys(*address, msg_id, origin),
+            ListValues(address) => self.list_values(*address, msg_id, origin),
+            ListPermissions(address) => self.list_permissions(*address, msg_id, origin),
             ListUserPermissions { address, user } => {
-                self.list_user_permissions(*address, *user, msg.id(), &msg.origin)
+                self.list_user_permissions(*address, *user, msg_id, origin)
             }
         }
     }
