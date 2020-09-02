@@ -7,5 +7,5 @@ mkdir images
 
 cargo install cargo-deps
 
-cargo deps --all-deps --include-orphans --filter safe_vault safe-nd parsec maidsafe_utilities routing mock-quic-p2p quic-p2p lru_time_cache fake_clock xor_name bls_dkg safe-network-signature-aggregator | dot -T png -Nfontname=Iosevka -Gfontname=Iosevka -o images/safe_vault_maidsafe_dependencies.png
+cargo deps --all-deps --include-orphans --filter safe_vault safe-nd routing quic-p2p lru_time_cache sn_fake_clock xor_name bls_dkg bls_signature_aggregator safe-transfers | dot -T png -Nfontname=Iosevka -Gfontname=Iosevka -o images/safe_vault_maidsafe_dependencies.png
 cargo deps | dot -T png -o images/safe_vault_all_dependencies.png
