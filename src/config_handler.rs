@@ -36,7 +36,7 @@ const CONFIG_FILE: &str = "vault.config";
 const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 18] = [
+const ARGS: [&str; 17] = [
     "wallet-address",
     "max-capacity",
     "root-dir",
@@ -47,7 +47,6 @@ const ARGS: [&str; 18] = [
     "max-msg-size-allowed",
     "idle-timeout-msec",
     "keep-alive-interval-msec",
-    "our-type",
     "first",
     "completions",
     "log-dir",
@@ -228,12 +227,9 @@ impl Config {
             self.network_config.port = Some(value.parse().unwrap());
         } else if arg == ARGS[6] {
             self.network_config.ip = Some(value.parse().unwrap());
-        } else if arg == ARGS[10] {
-            // TODO: the quic-p2p config doesn't support this value anymore.
-            // self.network_config.our_type = value.parse().unwrap();
-        } else if arg == ARGS[12] {
+        } else if arg == ARGS[11] {
             self.completions = Some(value.parse().unwrap());
-        } else if arg == ARGS[13] {
+        } else if arg == ARGS[12] {
             self.log_dir = Some(value.parse().unwrap());
         } else {
             #[cfg(not(feature = "mock_base"))]
@@ -244,7 +240,7 @@ impl Config {
                     self.network_config.idle_timeout_msec = Some(value.parse().unwrap());
                 } else if arg == ARGS[9] {
                     self.network_config.keep_alive_interval_msec = Some(value.parse().unwrap());
-                } else if arg == ARGS[16] {
+                } else if arg == ARGS[15] {
                     self.network_config.upnp_lease_duration = Some(value.parse().unwrap());
                 } else {
                     println!("ERROR");
@@ -259,13 +255,13 @@ impl Config {
     pub(crate) fn set_flag(&mut self, arg: &str, occurrences: u64) {
         if arg == ARGS[3] {
             self.verbose = occurrences;
-        } else if arg == ARGS[11] {
+        } else if arg == ARGS[10] {
             self.first = occurrences >= 1;
-        } else if arg == ARGS[14] {
+        } else if arg == ARGS[13] {
             self.update = occurrences >= 1;
-        } else if arg == ARGS[15] {
+        } else if arg == ARGS[14] {
             self.update_only = occurrences >= 1;
-        } else if arg == ARGS[17] {
+        } else if arg == ARGS[16] {
             self.local = occurrences >= 1;
         } else {
             println!("ERROR");
@@ -351,7 +347,7 @@ mod test {
     #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
-        let expected_size = 280;
+        let expected_size = 272;
         assert_eq!(
             expected_size,
             mem::size_of::<Config>(),
@@ -370,7 +366,6 @@ mod test {
             ["max-msg-size-allowed", "1"],
             ["idle-timeout-msec", "1"],
             ["keep-alive-interval-msec", "1"],
-            ["our-type", "client"],
             ["first", "None"],
             ["completions", "bash"],
             ["log-dir", "log-dir-path"],
