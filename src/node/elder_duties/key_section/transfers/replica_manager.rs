@@ -15,7 +15,7 @@ use safe_nd::{
     ReplicaEvent, Result as NdResult, SignedTransfer, TransferPropagated, TransferRegistered,
     TransferValidated,
 };
-use safe_transfers::{get_genesis, TransferReplica as Replica};
+use sn_transfers::{get_genesis, TransferReplica as Replica};
 use std::collections::BTreeSet;
 
 use routing::SectionProofChain;

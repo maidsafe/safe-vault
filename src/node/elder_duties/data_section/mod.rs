@@ -20,7 +20,7 @@ use crate::{
     utils, Network, Result,
 };
 use routing::Prefix;
-use safe_transfers::TransferActor;
+use sn_transfers::TransferActor;
 use std::{cell::Cell, rc::Rc};
 use xor_name::XorName;
 

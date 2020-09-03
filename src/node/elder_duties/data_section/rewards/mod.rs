@@ -21,7 +21,7 @@ use safe_nd::{
     AccountId, Address, ElderDuties, Error, Message, MessageId, Money, NodeQuery,
     NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
 };
-use safe_transfers::TransferActor;
+use sn_transfers::TransferActor;
 use std::collections::{BTreeSet, HashMap};
 use xor_name::XorName;
 

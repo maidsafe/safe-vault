@@ -149,7 +149,7 @@ mod test {
     use crate::Result;
     use bls::SecretKey;
     use safe_nd::{PublicKey, TransferPropagated};
-    use safe_transfers::get_genesis;
+    use sn_transfers::get_genesis;
     use tempdir::TempDir;
 
     #[test]

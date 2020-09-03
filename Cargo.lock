@@ -606,12 +606,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "data-encoding"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4d0e2d24e5ee3b23a01de38eefdcd978907890701f08ffffd4cb457ca4ee8d6"
-
-[[package]]
 name = "dbl"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -666,6 +660,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "551a778172a450d7fc12e629ca3b0428d00f6afa9a43da1b630d54604e97371c"
 dependencies = [
  "cfg-if",
+ "dirs-sys",
+]
+
+[[package]]
+name = "directories"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8fed639d60b58d0f53498ab13d26f621fd77569cc6edb031f4cc36a2ad9da0f"
+dependencies = [
  "dirs-sys",
 ]
 
@@ -881,16 +884,6 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
-
-[[package]]
-name = "fs2"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
-dependencies = [
- "libc",
- "winapi 0.3.9",
-]
 
 [[package]]
 name = "fuchsia-cprng"
@@ -1144,16 +1137,6 @@ name = "hex_fmt"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b07f60793ff0a4d9cef0f18e63b5357e06209987153a64648c972c1e5aff336f"
-
-[[package]]
-name = "hmac"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dcb5e64cda4c23119ab41ba960d1e170a774c8e4b9d9e6a9bc18aabf5e59695"
-dependencies = [
- "crypto-mac",
- "digest 0.8.1",
-]
 
 [[package]]
 name = "http"
@@ -1437,9 +1420,9 @@ dependencies = [
 
 [[package]]
 name = "lru_time_cache"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adb241df5c4caeb888755363fc95f8a896618dc0d435e9e775f7930cb099beab"
+checksum = "b540fdaf0182f58a5ecac3e5e7d0fcf9ff4f460ff9d7c121cede6d031c03bb30"
 
 [[package]]
 name = "maplit"
@@ -1679,16 +1662,6 @@ dependencies = [
  "ff",
  "group",
  "rand_core 0.5.1",
-]
-
-[[package]]
-name = "pbkdf2"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "006c038a43a45995a9670da19e67600114740e8511d4333bf97a56e66a7542d9"
-dependencies = [
- "byteorder",
- "crypto-mac",
 ]
 
 [[package]]
@@ -2206,7 +2179,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/bochaco/routing.git?branch=async-quic-p2p-api#35ecfb266c7db5b9dc331d6915a42c8ee75a2e06"
+source = "git+https://github.com/bochaco/routing.git?branch=async-quic-p2p-api#967e7154507b56c4ca488aef48142549c6cd51f4"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2215,7 +2188,6 @@ dependencies = [
  "crossbeam-channel",
  "ed25519-dalek",
  "err-derive",
- "fake_clock",
  "futures",
  "fxhash",
  "hex_fmt",
@@ -2228,6 +2200,7 @@ dependencies = [
  "rand_os",
  "rand_xorshift",
  "serde",
+ "sn_fake_clock",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
  "tokio",
@@ -2317,25 +2290,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "safe-transfers"
-version = "0.1.0"
-source = "git+https://github.com/maidsafe/safe-transfers.git#b9f6ca2a0692d8cdd413db81648f1721ffaa6db5"
-dependencies = [
- "bincode",
- "crdts",
- "itertools",
- "log",
- "rand 0.7.3",
- "safe-nd",
- "serde",
- "threshold_crypto",
- "xor_name",
-]
-
-[[package]]
 name = "safe_core"
 version = "0.42.1"
-source = "git+https://github.com/bochaco/safe_client_libs?branch=minor-changes-conn#ac8cc72b5f163155f128e28eeebdaca2594688cd"
+source = "git+https://github.com/maidsafe/safe_client_libs#e091409c618439df8dd7cfb8d9a001781d7b7309"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2343,29 +2300,25 @@ dependencies = [
  "chrono",
  "crdts",
  "crossbeam-channel",
- "data-encoding",
- "directories 2.0.2",
+ "directories 3.0.1",
  "env_logger 0.6.2",
- "fs2",
  "futures",
  "futures-util",
- "hmac",
  "lazy_static",
  "log",
  "log4rs",
  "lru",
  "miscreant",
- "pbkdf2",
  "quic-p2p 0.7.0 (git+https://github.com/maidsafe/quic-p2p)",
  "rand 0.7.3",
  "regex",
  "safe-nd",
- "safe-transfers",
  "self_encryption",
  "serde",
  "serde-value",
  "serde_json",
  "sha3",
+ "sn_transfers",
  "threshold_crypto",
  "tiny-keccak 1.5.0",
  "tokio",
@@ -2404,7 +2357,6 @@ dependencies = [
  "rand_chacha",
  "routing",
  "safe-nd",
- "safe-transfers",
  "safe_core",
  "self_update",
  "serde",
@@ -2412,6 +2364,7 @@ dependencies = [
  "sha2 0.8.2",
  "signature",
  "sn_fake_clock",
+ "sn_transfers",
  "structopt",
  "tempdir",
  "threshold_crypto",
@@ -2635,6 +2588,23 @@ name = "sn_fake_clock"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b3bb89541a5068ba2861181892745587897765ea2724b78257eb5f289de16ab"
+
+[[package]]
+name = "sn_transfers"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8138235120e51c208f6cb47319f13b5db6ce15f6fe380be00cf9a7fdffef9d58"
+dependencies = [
+ "bincode",
+ "crdts",
+ "itertools",
+ "log",
+ "rand 0.7.3",
+ "safe-nd",
+ "serde",
+ "threshold_crypto",
+ "xor_name",
+]
 
 [[package]]
 name = "socket2"

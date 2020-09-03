@@ -12,7 +12,6 @@ version = "0.24.0"
 
 [patch.crates-io]
 safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "master" }
-safe-transfers = { git = "https://github.com/maidsafe/safe-transfers.git" }
 self_encryption = { git = "https://github.com/joshuef/self_encryption.git", branch = "AllowMutGet" }
 
 [dependencies]
@@ -47,7 +46,7 @@ crdts = "4.1.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
 safe-nd = "~0.11.2"
-safe-transfers = "~0.1.0"
+sn_transfers = "~0.2.0"
 ed25519 = "1.0.1"
 signature = "1.1.0"
 tokio = { version = "~0.2.5", features = ["macros"] }
@@ -56,7 +55,7 @@ xor_name = "1.1.0"
 [dev_dependencies]
 maplit = "1.0.1"
 tempdir = "~0.3.7"
-safe_core = { git = "https://github.com/bochaco/safe_client_libs", branch = "minor-changes-conn", features = ["testing"] }
+safe_core = { git = "https://github.com/maidsafe/safe_client_libs", features = ["simulated-payouts"] }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util"] }
 futures = "~0.3.5"
 file-per-thread-logger = { git = "https://github.com/lionel1704/file-per-thread-logger", branch = "allow-uninitialized" }
@@ -66,4 +65,4 @@ name = "safe_vault"
 doc = false
 
 [features]
-simulated-payouts = ["safe-nd/simulated-payouts", "safe-transfers/simulated-payouts", "safe_core/simulated-payouts"]
+simulated-payouts = ["safe-nd/simulated-payouts", "sn_transfers/simulated-payouts", "safe_core/simulated-payouts"]

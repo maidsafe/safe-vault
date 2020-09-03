@@ -17,7 +17,7 @@ use safe_nd::{
 };
 use xor_name::XorName;
 
-use safe_transfers::{ActorEvent, TransferActor};
+use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
 use ActorEvent::*;
 

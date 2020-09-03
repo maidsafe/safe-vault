@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use safe_nd::PublicKey;
-use safe_transfers::ReplicaValidator;
+use sn_transfers::ReplicaValidator;
 
 /// Should be validating
 /// other replica groups, i.e.
