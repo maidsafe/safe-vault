@@ -23,7 +23,7 @@ use log::{error, info, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
-use routing::{event::Event as RoutingEvent, SrcLocation};
+use routing::event::Event as RoutingEvent;
 use safe_nd::{Address, MsgEnvelope, MsgSender};
 use std::fmt::{self, Display, Formatter};
 
@@ -69,27 +69,23 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     /// This is where client input is parsed.
     fn process_client_event(&mut self, event: &RoutingEvent) -> Option<NodeOperation> {
         match event {
-            RoutingEvent::MessageReceived {
-                content,
-                src: SrcLocation::Client(addr),
-                ..
-            } => {
-                let existing_client = self.client_msg_tracking.get_public_key(*addr);
+            RoutingEvent::ClientMessageReceived { content, src, .. } => {
+                let existing_client = self.client_msg_tracking.get_public_key(*src);
                 if let Some(public_key) = existing_client {
                     let msg = try_deserialize_msg(content)?;
                     info!("Deserialized client msg from {}", public_key);
                     if !validate_client_sig(&msg) {
                         return None;
                     }
-                    match self.client_msg_tracking.track_incoming(msg.id(), *addr) {
+                    match self.client_msg_tracking.track_incoming(msg.id(), *src) {
                         Some(c) => Some(c.into()),
                         None => Some(KeySectionDuty::EvaluateClientMsg(msg).into()),
                     }
                 } else {
-                    let hs = try_deserialize_handshake(content, *addr)?;
+                    let hs = try_deserialize_handshake(content, *src)?;
                     let mut rng = ChaChaRng::from_seed(self.rng.gen());
                     self.client_msg_tracking
-                        .process_handshake(hs, *addr, &mut rng)
+                        .process_handshake(hs, *src, &mut rng)
                         .map(|c| c.into())
                 }
             }

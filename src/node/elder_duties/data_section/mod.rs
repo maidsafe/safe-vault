@@ -100,7 +100,7 @@ impl DataSection {
 
     /// When a relocated node joins, a DataSection
     /// has a few different things to do, such as
-    /// pay out rewards and trigger chunk duplication.    
+    /// pay out rewards and trigger chunk duplication.
     pub fn relocated_node_joined(
         &mut self,
         old_node_id: XorName,

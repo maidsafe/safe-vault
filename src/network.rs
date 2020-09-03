@@ -10,7 +10,7 @@ use crate::node::state_db::AgeGroup;
 use crate::{Config as NodeConfig, Error, Result};
 use bytes::Bytes;
 use routing::{
-    DstLocation, EventStream, Node as RoutingNode, NodeConfig as RoutingConfig, P2pNode, PublicId,
+    DstLocation, EventStream, Node as RoutingNode, NodeConfig as RoutingConfig, PublicId,
     RoutingError, SectionProofChain, SrcLocation,
 };
 use safe_nd::PublicKey;
@@ -37,10 +37,11 @@ impl Network {
         })
     }
 
-    pub fn listen_events(&self) -> Result<EventStream> {
+    pub async fn listen_events(&self) -> Result<EventStream> {
         self.routing
             .borrow()
             .listen_events()
+            .await
             .map_err(Error::Routing)
     }
 
@@ -50,16 +51,14 @@ impl Network {
 
     pub fn public_key(&self) -> Option<PublicKey> {
         Some(PublicKey::Bls(
-            self.routing.borrow().public_key_set().ok()?.public_key(),
+            futures::executor::block_on(self.routing.borrow().public_key_set())
+                .ok()?
+                .public_key(),
         ))
     }
 
     pub fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        Ok(self.routing.borrow().public_key_set()?.clone())
-    }
-
-    pub fn is_running(&self) -> bool {
-        self.routing.borrow().is_running()
+        futures::executor::block_on(self.routing.borrow().public_key_set()).map_err(Error::Routing)
     }
 
     pub fn id(&self) -> PublicId {
@@ -71,49 +70,17 @@ impl Network {
     }
 
     pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.routing
-            .borrow_mut()
-            .our_connection_info()
+        futures::executor::block_on(self.routing.borrow_mut().our_connection_info())
             .map_err(Error::Routing)
     }
 
     pub fn our_prefix(&self) -> Option<Prefix> {
-        self.routing.borrow().our_prefix().copied()
+        futures::executor::block_on(self.routing.borrow().our_prefix())
     }
 
     pub fn matches_our_prefix(&self, name: XorName) -> bool {
-        self.routing
-            .borrow()
-            .matches_our_prefix(&XorName(name.0))
+        futures::executor::block_on(self.routing.borrow().matches_our_prefix(&XorName(name.0)))
             .unwrap_or(false)
-    }
-
-    pub fn our_elders(&self) -> Vec<P2pNode> {
-        self.routing.borrow().our_elders().cloned().collect()
-    }
-
-    pub fn our_elders_sorted_by_distance_to(&self, name: &XorName) -> Vec<P2pNode> {
-        self.routing
-            .borrow()
-            .our_elders_sorted_by_distance_to(name)
-            .into_iter()
-            .cloned()
-            .collect()
-    }
-
-    pub fn our_adults(&self) -> Vec<P2pNode> {
-        self.routing.borrow().our_adults().cloned().collect()
-    }
-
-    pub fn in_dst_location(&self, dst: &DstLocation) -> bool {
-        self.routing.borrow().in_dst_location(dst)
-    }
-
-    pub fn vote_for_user_event(&mut self, event: Vec<u8>) -> Result<()> {
-        self.routing
-            .borrow_mut()
-            .vote_for_user_event(event)
-            .map_err(Error::Routing)
     }
 
     pub async fn send_message(
@@ -140,41 +107,29 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub fn disconnect_from_client(&mut self, peer_addr: SocketAddr) -> Result<()> {
-        self.routing
-            .borrow_mut()
-            .disconnect_from_client(peer_addr)
-            .map_err(Error::Routing)
-    }
-
     pub fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
-        self.routing
-            .borrow()
-            .secret_key_share()
+        futures::executor::block_on(self.routing.borrow().secret_key_share())
             .map_err(Error::Routing)
-            .map(|c| c.clone())
     }
 
     pub fn our_history(&self) -> Option<SectionProofChain> {
-        self.routing.borrow().our_history().cloned()
+        futures::executor::block_on(self.routing.borrow().our_history())
     }
 
     pub fn our_index(&self) -> Result<usize> {
-        self.routing.borrow().our_index().map_err(Error::Routing)
+        futures::executor::block_on(self.routing.borrow().our_index()).map_err(Error::Routing)
     }
 
     pub fn our_elder_names(&self) -> BTreeSet<XorName> {
-        self.routing
-            .borrow()
-            .our_elders()
+        futures::executor::block_on(self.routing.borrow().our_elders())
+            .iter()
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<BTreeSet<_>>()
     }
 
     pub fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
-        self.routing
-            .borrow()
-            .our_elders()
+        futures::executor::block_on(self.routing.borrow().our_elders())
+            .iter()
             .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
             .collect::<Vec<_>>()
     }
@@ -183,12 +138,14 @@ impl Network {
         &self,
         name: &XorName,
     ) -> Vec<(XorName, SocketAddr)> {
-        self.routing
-            .borrow_mut()
-            .our_elders_sorted_by_distance_to(&XorName(name.0))
-            .into_iter()
-            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
-            .collect::<Vec<_>>()
+        futures::executor::block_on(
+            self.routing
+                .borrow_mut()
+                .our_elders_sorted_by_distance_to(&XorName(name.0)),
+        )
+        .into_iter()
+        .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
+        .collect::<Vec<_>>()
     }
 
     pub fn our_elder_names_sorted_by_distance_to(
@@ -196,23 +153,27 @@ impl Network {
         name: &XorName,
         count: usize,
     ) -> Vec<XorName> {
-        self.routing
-            .borrow()
-            .our_elders_sorted_by_distance_to(&XorName(name.0))
-            .into_iter()
-            .take(count)
-            .map(|p2p_node| XorName(p2p_node.name().0))
-            .collect::<Vec<_>>()
+        futures::executor::block_on(
+            self.routing
+                .borrow()
+                .our_elders_sorted_by_distance_to(&XorName(name.0)),
+        )
+        .into_iter()
+        .take(count)
+        .map(|p2p_node| XorName(p2p_node.name().0))
+        .collect::<Vec<_>>()
     }
 
     pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
-        self.routing
-            .borrow()
-            .our_adults_sorted_by_distance_to(&XorName(name.0))
-            .into_iter()
-            .take(count)
-            .map(|p2p_node| XorName(p2p_node.name().0))
-            .collect::<Vec<_>>()
+        futures::executor::block_on(
+            self.routing
+                .borrow()
+                .our_adults_sorted_by_distance_to(&XorName(name.0)),
+        )
+        .into_iter()
+        .take(count)
+        .map(|p2p_node| XorName(p2p_node.name().0))
+        .collect::<Vec<_>>()
     }
 
     pub fn is_elder(&self) -> bool {
@@ -224,14 +185,11 @@ impl Network {
     }
 
     fn our_duties(&self) -> AgeGroup {
-        if self.routing.borrow().is_elder() {
+        if futures::executor::block_on(self.routing.borrow().is_elder()) {
             AgeGroup::Elder
-        } else if self
-            .routing
-            .borrow()
-            .our_adults()
-            .map(|c| c.name())
-            .any(|x| *x == *self.routing.borrow().name())
+        } else if futures::executor::block_on(self.routing.borrow().our_adults())
+            .iter()
+            .any(|adult| *adult.name() == *self.routing.borrow().name())
         {
             AgeGroup::Adult
         } else {

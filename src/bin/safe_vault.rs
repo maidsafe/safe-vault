@@ -114,14 +114,6 @@ async fn main() {
     );
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    // TODO: Shutdown the vault gracefully on SIGINT (Ctrl+C).
-    /*let result = ctrlc::set_handler(move || {
-        unimplemented!();
-    });
-    if let Err(error) = result {
-        error!("Failed to set interrupt handler: {:?}", error)
-    }*/
-
     let mut rng = rand::thread_rng();
     let mut vault = match Node::new(&config, &mut rng).await {
         Ok(vault) => vault,

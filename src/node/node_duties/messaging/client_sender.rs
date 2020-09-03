@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{node::node_ops::MessagingDuty, utils, Network};
-use log::{info, warn};
+use log::warn;
 use safe_nd::{Address, HandshakeResponse, MsgEnvelope};
 use serde::Serialize;
 use std::{
@@ -43,16 +43,6 @@ impl ClientSender {
         hs: &HandshakeResponse,
     ) -> Option<MessagingDuty> {
         self.send_any_to_client(recipient, hs).await
-    }
-
-    pub fn disconnect(&mut self, peer_addr: SocketAddr) -> Option<MessagingDuty> {
-        if let Err(err) = self.routing.disconnect_from_client(peer_addr) {
-            warn!("{}: Could not disconnect client: {:?}", self, err);
-        }
-
-        info!("{}: Disconnected from {}", self, peer_addr);
-
-        None
     }
 
     async fn send_any_to_client<T: Serialize>(

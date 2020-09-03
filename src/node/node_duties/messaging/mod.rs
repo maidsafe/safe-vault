@@ -43,7 +43,7 @@ impl Messaging {
             SendHandshake { address, response } => {
                 self.client_sender.handshake(address, &response).await
             }
-            DisconnectClient(address) => self.client_sender.disconnect(address),
+            DisconnectClient(_address) => None, // TODO: self.client_sender.disconnect(address),
         };
 
         result.map(|c| c.into())

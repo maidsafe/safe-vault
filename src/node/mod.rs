@@ -28,7 +28,7 @@ use crate::{
 use bls::SecretKey;
 use log::info;
 use rand::{CryptoRng, Rng};
-use routing::{event::Event, SrcLocation};
+use routing::event::Event;
 use safe_nd::PublicKey;
 use std::{
     fmt::{self, Display, Formatter},
@@ -118,20 +118,18 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
-        let mut event_stream = self.network_api.listen_events()?;
+        let mut event_stream = self.network_api.listen_events().await?;
+        let info = self.network_api.our_connection_info().unwrap();
+        info!("Listening for routing events at: {}", info);
         while let Some(event) = event_stream.next().await {
             info!("New event received from the Network: {:?}", event);
-            if let Event::MessageReceived {
-                src: SrcLocation::Client(_),
-                ..
-            } = event
-            {
-                self.process_while_any(Some(GatewayDuty::ProcessClientEvent(event).into()))
-                    .await;
+            let duty = if let Event::ClientMessageReceived { .. } = event {
+                info!("Event from client peer: {:?}", event);
+                GatewayDuty::ProcessClientEvent(event).into()
             } else {
-                self.process_while_any(Some(NodeDuty::ProcessNetworkEvent(event).into()))
-                    .await;
-            }
+                NodeDuty::ProcessNetworkEvent(event).into()
+            };
+            self.process_while_any(Some(duty)).await;
         }
 
         Ok(())
