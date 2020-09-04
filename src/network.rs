@@ -32,6 +32,7 @@ impl Network {
         node_config.transport_config = config.network_config().clone();
         node_config.network_params.recommended_section_size = 500;
         let routing = RoutingNode::new(node_config).await?;
+
         Ok(Self {
             routing: Rc::new(RefCell::new(routing)),
         })
@@ -63,6 +64,10 @@ impl Network {
 
     pub fn id(&self) -> PublicId {
         *self.routing.borrow().id()
+    }
+
+    pub fn is_genesis(&self) -> bool {
+        self.routing.borrow().is_genesis()
     }
 
     pub fn name(&self) -> XorName {

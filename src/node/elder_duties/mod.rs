@@ -23,6 +23,7 @@ use std::{
     rc::Rc,
 };
 use xor_name::XorName;
+use log::trace;
 
 /// Duties carried out by an Elder node.
 pub struct ElderDuties<R: CryptoRng + Rng> {
@@ -58,6 +59,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
 
     /// Processing of any Elder duty.
     pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
+        trace!("Processing elder duty");
         use ElderDuty::*;
         match duty {
             ProcessNewMember(name) => self.new_node_joined(name),

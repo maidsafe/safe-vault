@@ -2129,7 +2129,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/bochaco/routing.git?branch=async-quic-p2p-api#240e852209443469499b84438dafbf85c212527f"
+source = "git+https://github.com/bochaco/routing.git?branch=async-quic-p2p-api#5bbd3a00c2e09972ffffbcb28ca2443c5e5c706c"
 dependencies = [
  "bincode",
  "bls_dkg",

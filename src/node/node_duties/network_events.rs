@@ -29,6 +29,8 @@ impl NetworkEvents {
     pub fn process(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
         use ElderDuty::*;
         use NodeDuty::*;
+
+        trace!("Processing Routing Event: {:?}", event);
         match event {
             RoutingEvent::PromotedToAdult => {
                 info!("Node promoted to Adult");
