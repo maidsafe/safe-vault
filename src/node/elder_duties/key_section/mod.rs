@@ -27,6 +27,7 @@ use routing::{Prefix, RoutingError};
 use safe_nd::AccountId;
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 use xor_name::XorName;
+use log::trace;
 
 /// A Key Section interfaces with clients,
 /// who are essentially a public key,
@@ -112,6 +113,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     }
 
     pub fn process(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
+        trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
             EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg),

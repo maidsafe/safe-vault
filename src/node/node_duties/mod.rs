@@ -20,7 +20,7 @@ use crate::node::{
     state_db::NodeInfo,
 };
 use crate::Network;
-use log::{info, warn};
+use log::{info, warn, trace};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
@@ -50,15 +50,23 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
 impl<R: CryptoRng + Rng> NodeDuties<R> {
     pub fn new(node_info: NodeInfo, routing: Network, rng: R) -> Self {
         let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
+        let is_genesis = &routing.is_genesis();
+
         let messaging = Messaging::new(routing.clone());
-        Self {
+        let mut duties = Self {
             node_info,
             duty_level: DutyLevel::Infant,
             network_events,
             messaging,
             routing,
             rng: Some(rng),
+        };
+
+        if *is_genesis {
+            duties.become_elder();
         }
+
+        duties
     }
 
     pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
@@ -71,15 +79,20 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
 
     pub fn elder_duties(&mut self) -> Option<&mut ElderDuties<R>> {
         use DutyLevel::*;
-        match &mut self.duty_level {
+
+        let level = match &mut self.duty_level {
             Elder(ref mut duties) => Some(duties),
             _ => None,
-        }
+        };
+
+        info!("Checking duty level: are we an Elder? {:?}", level.is_some());
+
+        level
     }
 
     pub async fn process(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
-        info!("Processing: {:?}", duty);
+        info!("Processing Node Duty: {:?}", duty);
         match duty {
             RegisterWallet(wallet) => self.register_wallet(wallet),
             BecomeAdult => self.become_adult(),
@@ -103,6 +116,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
     }
 
     fn become_adult(&mut self) -> Option<NodeOperation> {
+        trace!("Becoming Adult");
         use DutyLevel::*;
         let total_used_space = Rc::new(Cell::new(0));
         if let Ok(duties) = AdultDuties::new(&self.node_info, &total_used_space) {
@@ -116,6 +130,8 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
     }
 
     fn become_elder(&mut self) -> Option<NodeOperation> {
+        trace!("Becoming Elder");
+
         use DutyLevel::*;
         let total_used_space = Rc::new(Cell::new(0));
         info!("Attempting to assume Elder duties..");
