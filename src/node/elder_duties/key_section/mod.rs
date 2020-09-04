@@ -23,6 +23,7 @@ use crate::{
     Network, Result,
 };
 use log::trace;
+use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::{Prefix, RoutingError};
 use sn_data_types::PublicKey;
