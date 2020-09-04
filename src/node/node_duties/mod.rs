@@ -85,7 +85,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             _ => None,
         };
 
-        info!("Checking duty level: are we an Elder?", level.is_some());
+        info!("Checking duty level: are we an Elder? {:?}", level.is_some());
 
         level
     }
