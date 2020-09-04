@@ -16,6 +16,7 @@ use crate::{
     Error, Network, Result,
 };
 use log::trace;
+use log::trace;
 use rand::{CryptoRng, Rng};
 use sn_routing::Prefix;
 use std::{
