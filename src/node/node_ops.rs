@@ -18,6 +18,7 @@ use serde::export::Formatter;
 use std::fmt::Debug;
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
+use quic_p2p::SendStream;
 
 /// Internal messages are what is passed along
 /// within a node, between the entry point and
@@ -154,6 +155,7 @@ pub enum MessagingDuty {
     SendHandshake {
         address: SocketAddr,
         response: HandshakeResponse,
+        // response_stream: SendStream
     },
     /// The key section might also disonnect a client.
     DisconnectClient(SocketAddr),

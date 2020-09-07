@@ -17,6 +17,7 @@ use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
+use quic_p2p::SendStream;
 
 /// Tracks incoming and outgoingg messages
 /// between client and network.
@@ -43,9 +44,10 @@ impl ClientMsgTracking {
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
+        stream: &mut SendStream,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
-        self.onboarding.process(handshake, peer_addr, rng)
+        self.onboarding.process(handshake, peer_addr, stream, rng)
     }
 
     // pub fn remove_client(&mut self, peer_addr: SocketAddr) {
