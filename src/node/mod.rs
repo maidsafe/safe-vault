@@ -55,15 +55,15 @@ impl<R: CryptoRng + Rng> Node<R> {
             None => {
                 let secret = SecretKey::random();
                 let public = secret.public_key();
-                store_new_reward_keypair(root_dir, &secret, &public)?;
+                store_new_reward_keypair(root_dir, &secret, &public).await?;
                 PublicKey::Bls(public)
             }
         };
-        let age_group = if let Some(age_group) = get_age_group(&root_dir)? {
+        let age_group = if let Some(age_group) = get_age_group(&root_dir).await? {
             age_group
         } else {
             let age_group = Infant;
-            store_age_group(root_dir, &age_group)?;
+            store_age_group(root_dir, &age_group).await?;
             age_group
         };
 

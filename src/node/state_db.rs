@@ -10,41 +10,41 @@ use crate::{node::keys::NodeSigningKeys, utils, Error, Result};
 use bls::{self, serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
     path::{Path, PathBuf},
 };
+use tokio::fs;
 
 const AGE_GROUP_FILENAME: &str = "age_group";
 const REWARD_PUBLIC_KEY_FILENAME: &str = "reward_public_key";
 const REWARD_SECRET_KEY_FILENAME: &str = "reward_secret_key";
 
 /// Writes the public and secret key to different locations at disk.
-pub fn store_new_reward_keypair(
+pub async fn store_new_reward_keypair(
     root_dir: &Path,
     secret: &SecretKey,
     public: &PublicKey,
 ) -> Result<()> {
     let secret_key_path = root_dir.join(REWARD_SECRET_KEY_FILENAME);
     let public_key_path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
-    fs::write(secret_key_path, sk_to_hex(secret))?;
-    fs::write(public_key_path, pk_to_hex(public))?;
+    fs::write(secret_key_path, sk_to_hex(secret)).await?;
+    fs::write(public_key_path, pk_to_hex(public)).await?;
     Ok(())
 }
 
 /// Writes the info to disk.
-pub fn store_age_group(root_dir: &Path, age_group: &AgeGroup) -> Result<()> {
+pub async fn store_age_group(root_dir: &Path, age_group: &AgeGroup) -> Result<()> {
     let path = root_dir.join(AGE_GROUP_FILENAME);
-    fs::write(path, utils::serialise(age_group))?;
+    fs::write(path, utils::serialise(age_group)).await?;
     Ok(())
 }
 
 /// Returns Some(AgeGroup) or None if file doesn't exist.
-pub fn get_age_group(root_dir: &Path) -> Result<Option<AgeGroup>> {
+pub async fn get_age_group(root_dir: &Path) -> Result<Option<AgeGroup>> {
     let path = root_dir.join(AGE_GROUP_FILENAME);
     if !path.is_file() {
         return Ok(None);
     }
-    let contents = fs::read(path)?;
+    let contents = fs::read(path).await?;
     Ok(Some(bincode::deserialize(&contents)?))
 }
 
