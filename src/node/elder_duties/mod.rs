@@ -70,7 +70,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
                 age,
             } => self.relocated_node_joined(old_node_id, new_node_id, age),
             ProcessElderChange { prefix, .. } => self.elders_changed(prefix),
-            RunAsKeySection(duty) => self.key_section.process(duty),
+            RunAsKeySection(mut the_key_duty) => self.key_section.process(&mut the_key_duty),
             RunAsDataSection(duty) => self.data_section.process(duty),
         }
     }

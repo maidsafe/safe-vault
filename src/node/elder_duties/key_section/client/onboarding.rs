@@ -8,7 +8,7 @@
 
 use crate::node::node_ops::MessagingDuty;
 use crate::{utils, Network};
-use log::{debug, info, trace};
+use log::{debug, info, trace, error};
 use rand::{CryptoRng, Rng};
 use safe_nd::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
 use std::{
@@ -16,6 +16,7 @@ use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
+use quic_p2p::SendStream;
 
 /// A client is defined as a public key
 /// used by a specific socket address.
@@ -61,11 +62,12 @@ impl Onboarding {
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
+        stream: &mut SendStream,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
         match handshake {
-            HandshakeRequest::Bootstrap(client_key) => self.try_bootstrap(peer_addr, &client_key),
-            HandshakeRequest::Join(client_key) => self.try_join(peer_addr, client_key, rng),
+            HandshakeRequest::Bootstrap(client_key) => self.try_bootstrap(peer_addr, &client_key, stream),
+            HandshakeRequest::Join(client_key) => self.try_join(peer_addr, client_key, stream, rng),
             HandshakeRequest::ChallengeResult(signature) => {
                 self.receive_challenge_response(peer_addr, &signature)
             }
@@ -85,6 +87,7 @@ impl Onboarding {
         &self,
         peer_addr: SocketAddr,
         client_key: &PublicKey,
+        stream: &mut SendStream
     ) -> Option<MessagingDuty> {
         if !self.shall_bootstrap(&peer_addr) {
             info!(
@@ -113,10 +116,22 @@ impl Onboarding {
                 closest_known_elders
             }
         };
-        Some(MessagingDuty::SendHandshake {
-            address: peer_addr,
-            response: HandshakeResponse::Join(elders),
-        })
+        let bytes = utils::serialise(&HandshakeResponse::Join(elders));
+        // Hmmmm, what to do about this response.... we don't need a duty response here?
+        let res = futures::executor::block_on(stream.respond(&bytes));
+
+        match res {
+            Ok(()) => info!("message sent!!!! via send stream"),
+            Err(error) => error!("Some issue sendstreaming {:?}", error)
+        };
+
+
+        None
+        // Some(MessagingDuty::SendHandshake {
+        //     address: peer_addr,
+        //     response: HandshakeResponse::Join(elders),
+        //     // response_stream: *stream
+        // })
     }
 
     /// Handles a received join request from a client.
@@ -124,6 +139,7 @@ impl Onboarding {
         &mut self,
         peer_addr: SocketAddr,
         client_key: PublicKey,
+        stream: &mut SendStream,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
         if self.clients.contains_key(&peer_addr) {
@@ -147,10 +163,25 @@ impl Onboarding {
                     .insert(peer_addr, (challenge.clone(), client_key));
                 challenge
             };
-            Some(MessagingDuty::SendHandshake {
-                address: peer_addr,
-                response: HandshakeResponse::Challenge(self.node_id, challenge),
-            })
+
+            let bytes = utils::serialise(&HandshakeResponse::Challenge(self.node_id, challenge));
+
+
+            // Hmmmm, what to do about this response.... we don't need a duty response here?
+            let res = futures::executor::block_on(stream.respond(&bytes));
+
+            match res {
+                Ok(()) => info!("message sent!!!! via send stream"),
+                Err(error) => error!("Some issue sendstreaming {:?}", error)
+            };
+
+
+            None
+            // Some(MessagingDuty::SendHandshake {
+            //     address: peer_addr,
+            //     response: HandshakeResponse::Challenge(self.node_id, challenge),
+            //     // response_stream: *stream
+            // })
         } else {
             debug!(
                 "Client {} ({}) wants to join us but we are not its client handler",

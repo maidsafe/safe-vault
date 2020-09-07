@@ -166,7 +166,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             }
             RunAsElder(duty) => {
                 info!("Running as Elder: {:?}", duty);
-                self.duties.elder_duties()?.process(duty)
+                self.duties.elder_duties()?.process( duty)
             }
             RunAsNode(duty) => {
                 info!("Running as Node: {:?}", duty);

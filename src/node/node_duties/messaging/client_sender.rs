@@ -14,6 +14,7 @@ use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
+use quic_p2p::SendStream;
 
 /// Sending of messages to clients.
 pub(super) struct ClientSender {
@@ -40,7 +41,7 @@ impl ClientSender {
     pub async fn handshake(
         &mut self,
         recipient: SocketAddr,
-        hs: &HandshakeResponse,
+        hs: &HandshakeResponse
     ) -> Option<MessagingDuty> {
         self.send_any_to_client(recipient, hs).await
     }

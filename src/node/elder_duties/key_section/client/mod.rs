@@ -49,7 +49,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         Ok(gateway)
     }
 
-    pub fn process(&mut self, cmd: &GatewayDuty) -> Option<NodeOperation> {
+    pub fn process(&mut self, cmd: &mut GatewayDuty) -> Option<NodeOperation> {
         use GatewayDuty::*;
         match cmd {
             FindClientFor(msg) => self.try_find_client(msg).map(|c| c.into()),
@@ -67,9 +67,9 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     }
 
     /// This is where client input is parsed.
-    fn process_client_event(&mut self, event: &RoutingEvent) -> Option<NodeOperation> {
+    fn process_client_event(&mut self, event: &mut RoutingEvent) -> Option<NodeOperation> {
         match event {
-            RoutingEvent::ClientMessageReceived { content, src, .. } => {
+            RoutingEvent::ClientMessageReceived { content, src, stream, .. } => {
                 let existing_client = self.client_msg_tracking.get_public_key(*src);
                 if let Some(public_key) = existing_client {
                     let msg = try_deserialize_msg(content)?;
@@ -85,7 +85,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                     let hs = try_deserialize_handshake(content, *src)?;
                     let mut rng = ChaChaRng::from_seed(self.rng.gen());
                     self.client_msg_tracking
-                        .process_handshake(hs, *src, &mut rng)
+                        .process_handshake(hs, *src, &mut *stream, &mut rng)
                         .map(|c| c.into())
                 }
             }

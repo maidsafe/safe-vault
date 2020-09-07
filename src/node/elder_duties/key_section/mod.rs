@@ -48,7 +48,7 @@ pub struct KeySection<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> KeySection<R> {
     pub fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
-        let gateway = ClientGateway::new(info, routing.clone(), rng)?;
+        let mut gateway = ClientGateway::new(info, routing.clone(), rng)?;
         let replica_manager = Self::new_replica_manager(info, routing.clone())?;
         let payments = Payments::new(info.keys.clone(), replica_manager.clone());
         let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
@@ -112,12 +112,12 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         None
     }
 
-    pub fn process(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
+    pub fn process(&mut self, duty: &mut KeySectionDuty) -> Option<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
             EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg),
-            RunAsGateway(duty) => self.gateway.process(&duty),
+            RunAsGateway(duty) => self.gateway.process(duty),
             RunAsPayment(duty) => self.payments.process(&duty),
             RunAsTransfers(duty) => self.transfers.process(&duty),
         }
