@@ -117,7 +117,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         use KeySectionDuty::*;
         match duty {
             EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg),
-            RunAsGateway(duty) => self.gateway.process(&mut duty),
+            RunAsGateway(duty) => self.gateway.process(duty),
             RunAsPayment(duty) => self.payments.process(&duty),
             RunAsTransfers(duty) => self.transfers.process(&duty),
         }

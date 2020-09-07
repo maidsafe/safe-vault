@@ -8,7 +8,7 @@
 
 use crate::node::node_ops::MessagingDuty;
 use crate::{utils, Network};
-use log::{debug, info, trace};
+use log::{debug, info, trace, error};
 use rand::{CryptoRng, Rng};
 use safe_nd::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
 use std::{
@@ -117,8 +117,14 @@ impl Onboarding {
             }
         };
         let bytes = utils::serialise(&HandshakeResponse::Join(elders));
+        // Hmmmm, what to do about this response.... we don't need a duty response here?
+        let res = futures::executor::block_on(stream.respond(&bytes));
 
-        let _ = stream.respond(&bytes);
+        match res {
+            Ok(()) => info!("message sent!!!! via send stream"),
+            Err(error) => error!("Some issue sendstreaming {:?}", error)
+        };
+
 
         None
         // Some(MessagingDuty::SendHandshake {
@@ -162,7 +168,13 @@ impl Onboarding {
 
 
             // Hmmmm, what to do about this response.... we don't need a duty response here?
-            let _ = stream.respond(&bytes);
+            let res = futures::executor::block_on(stream.respond(&bytes));
+
+            match res {
+                Ok(()) => info!("message sent!!!! via send stream"),
+                Err(error) => error!("Some issue sendstreaming {:?}", error)
+            };
+
 
             None
             // Some(MessagingDuty::SendHandshake {
