@@ -112,7 +112,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         None
     }
 
-    pub fn process(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
+    pub fn process(&mut self, duty: &mut KeySectionDuty) -> Option<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
