@@ -59,7 +59,7 @@ const ARGS: [&str; 17] = [
 /// Vault configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, StructOpt)]
 #[structopt(rename_all = "kebab-case", bin_name = "safe_vault")]
-// #[structopt(raw(global_settings = "&[structopt::clap::AppSettings::ColoredHelp]"))] FIXME: raw() was removed in structopt 0.3
+#[structopt(global_settings = &[structopt::clap::AppSettings::ColoredHelp])]
 pub struct Config {
     /// The address to be credited when this vault farms SafeCoin.
     /// A hex formatted BLS public key.
