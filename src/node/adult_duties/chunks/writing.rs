@@ -11,7 +11,7 @@
 use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::MessagingDuty;
 use log::error;
-use safe_nd::{BlobWrite, MsgEnvelope};
+use sn_data_types::{BlobWrite, MsgEnvelope};
 
 pub(super) fn get_result(
     write: &BlobWrite,

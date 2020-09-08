@@ -24,7 +24,7 @@ use log::{info, trace, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
-use safe_nd::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
+use sn_data_types::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
 use std::{cell::Cell, rc::Rc};
 
 #[allow(clippy::large_enum_variant)]
@@ -106,7 +106,8 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
     }
 
     fn register_wallet(&mut self, wallet: PublicKey) -> Option<NodeOperation> {
-        let wrapping = NodeMsgWrapping::new(self.node_info.keys(), safe_nd::NodeDuties::NodeConfig);
+        let wrapping =
+            NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
         wrapping
             .send(Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {

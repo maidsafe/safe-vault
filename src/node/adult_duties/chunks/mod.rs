@@ -14,7 +14,7 @@ use crate::{node::node_ops::MessagingDuty, node::state_db::NodeInfo, Result};
 use chunk_storage::ChunkStorage;
 
 use log::trace;
-use safe_nd::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
+use sn_data_types::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
 
 use std::{
     cell::Cell,

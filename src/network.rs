@@ -13,7 +13,7 @@ use routing::{
     DstLocation, EventStream, Node as RoutingNode, NodeConfig as RoutingConfig, PublicId,
     RoutingError, SectionProofChain, SrcLocation,
 };
-use safe_nd::PublicKey;
+use sn_data_types::PublicKey;
 use std::collections::BTreeSet;
 use std::{cell::RefCell, net::SocketAddr, rc::Rc};
 use xor_name::{Prefix, XorName};

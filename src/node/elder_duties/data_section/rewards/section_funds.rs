@@ -11,7 +11,7 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation},
 };
-use safe_nd::{
+use sn_data_types::{
     AccountId, DebitAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, Result,
     TransferValidated,
 };
@@ -241,7 +241,7 @@ impl SectionFunds {
             panic!("You failed to implement the logic correctly. Go back to the drawing desk.")
         }
 
-        use safe_nd::ReplicaEvent::*;
+        use sn_data_types::ReplicaEvent::*;
         // Set the next actor to be our current.
         self.actor = self.state.next_actor.take().unwrap();
         // We checked above that next_actor was some,
@@ -249,13 +249,13 @@ impl SectionFunds {
         // (which we don't really have reason for here)
 
         // Credit the transfer to the new actor.
-        match self
-            .actor
-            .synch(vec![TransferPropagated(safe_nd::TransferPropagated {
+        match self.actor.synch(vec![TransferPropagated(
+            sn_data_types::TransferPropagated {
                 debit_proof: credit,
                 debiting_replicas: self.actor.id(),
                 crediting_replica_sig: dummy_sig(),
-            })]) {
+            },
+        )]) {
             Ok(Some(event)) => self.apply(TransfersSynched(event))?,
             Ok(None) => (),
             Err(error) => return Err(error),
@@ -285,7 +285,7 @@ impl SectionFunds {
 }
 
 use bls::SecretKeyShare;
-use safe_nd::SignatureShare;
+use sn_data_types::SignatureShare;
 fn dummy_sig() -> SignatureShare {
     let dummy_shares = SecretKeyShare::default();
     let dummy_sig = dummy_shares.sign("DUMMY MSG");

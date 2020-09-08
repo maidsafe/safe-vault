@@ -12,7 +12,7 @@ use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
 use routing::event::Event as RoutingEvent;
-use safe_nd::{MsgEnvelope, PublicKey};
+use sn_data_types::{MsgEnvelope, PublicKey};
 use xor_name::XorName;
 
 /// Maps events from the transport layer

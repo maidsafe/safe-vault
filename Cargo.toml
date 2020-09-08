@@ -11,8 +11,9 @@ repository = "https://github.com/maidsafe/safe_vault"
 version = "0.24.0"
 
 [patch.crates-io]
-safe-nd = { git = "https://github.com/maidsafe/safe-nd.git", branch = "master" }
-safe-transfers = { git = "https://github.com/maidsafe/safe-transfers.git" }
+# sn_data_types = { path = "../safe-nd" }
+sn_data_types = { git = "https://github.com/maidsafe/sn_data_types.git", branch = "master" }
+sn_transfers = { git = "https://github.com/maidsafe/sn_transfers.git" }
 self_encryption = { git = "https://github.com/joshuef/self_encryption.git", branch = "AllowMutGet" }
 
 [dependencies]
@@ -33,11 +34,11 @@ lazy_static = "1"
 log = "~0.4.7"
 pickledb = "~0.4.0"
 quick-error = "1.2.2"
-quic-p2p = { git = "https://github.com/bochaco/quic-p2p", branch = "fix-msg-hdr-length", features = ["upnp"] }
+qp2p = { git = "https://github.com/maidsafe/qp2p", branch = "master", features = ["upnp"] }
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
 #routing = { path="../routing" }
-routing = { git = "https://github.com/Yoga07/routing", branch = "update-quic" }
+routing = { git = "https://github.com/joshuef/routing", branch = "update-quic" }
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
@@ -45,12 +46,11 @@ structopt = "~0.3.17"
 bls = { package = "threshold_crypto", version = "~0.4.0" }
 tiny-keccak = "1.5.0"
 unwrap = "1.2.1"
-crdts = "4.1.0"
+crdts = "4.2.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-safe-nd = "~0.11.2"
+sn_data_types = "~0.11.12"
 sn_transfers = "~0.2.0"
-safe-transfers = "~0.1.0"
 ed25519 = "1.0.1"
 signature = "1.1.0"
 tokio = { version = "~0.2.5", features = ["macros"] }
@@ -59,7 +59,7 @@ xor_name = "1.1.0"
 [dev_dependencies]
 maplit = "1.0.1"
 tempdir = "~0.3.7"
-safe_core = { git = "https://github.com/bochaco/safe_client_libs", features = ["testing"], branch = "minor-changes-conn" }
+safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util"] }
 futures = "~0.3.5"
 file-per-thread-logger = { git = "https://github.com/lionel1704/file-per-thread-logger", branch = "allow-uninitialized" }
@@ -69,4 +69,4 @@ name = "safe_vault"
 doc = false
 
 [features]
-simulated-payouts = ["safe-nd/simulated-payouts", "sn_transfers/simulated-payouts", "safe_core/simulated-payouts"]
+simulated-payouts = ["sn_data_types/simulated-payouts", "sn_transfers/simulated-payouts", "safe_core/simulated-payouts"]

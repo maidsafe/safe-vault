@@ -9,7 +9,7 @@
 use crate::node::node_ops::{NodeOperation, PaymentDuty, TransferDuty};
 use crate::Network;
 use log::info;
-use safe_nd::{Cmd, Message, MsgEnvelope, MsgSender, Query};
+use sn_data_types::{Cmd, Message, MsgEnvelope, MsgSender, Query};
 
 /// Evaluates msgs sent directly from a client,
 /// i.e. not remote msgs from the network.

@@ -13,7 +13,7 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
-use safe_nd::{
+use sn_data_types::{
     Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,
     PublicKey, QueryResponse, Result as NdResult,
 };
