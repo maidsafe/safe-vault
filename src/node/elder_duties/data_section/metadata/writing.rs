@@ -11,7 +11,7 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::{MessagingDuty, NodeOperation};
-use safe_nd::{
+use sn_data_types::{
     AccountWrite, BlobWrite, Cmd, DataCmd, DebitAgreementProof, MapWrite, Message, MessageId,
     MsgEnvelope, MsgSender, SequenceWrite,
 };

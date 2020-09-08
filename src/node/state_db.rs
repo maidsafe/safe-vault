@@ -90,7 +90,7 @@ impl NodeInfo {
         self.root_dir.as_path()
     }
 
-    pub fn public_key(&self) -> Option<safe_nd::PublicKey> {
+    pub fn public_key(&self) -> Option<sn_data_types::PublicKey> {
         self.keys.public_key()
     }
 

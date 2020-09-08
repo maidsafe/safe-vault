@@ -13,7 +13,7 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::MessagingDuty;
-use safe_nd::{
+use sn_data_types::{
     AccountRead, BlobRead, DataQuery, MapRead, Message, MessageId, MsgEnvelope, MsgSender, Query,
     SequenceRead,
 };

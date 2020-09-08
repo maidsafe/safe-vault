@@ -17,7 +17,7 @@ use crate::{
     node::node_ops::{MessagingDuty, NodeOperation, RewardDuty},
 };
 use log::{info, warn};
-use safe_nd::{
+use sn_data_types::{
     AccountId, Address, ElderDuties, Error, Message, MessageId, Money, NodeQuery,
     NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
 };

@@ -9,7 +9,7 @@
 use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::MessagingDuty;
 use log::error;
-use safe_nd::{Address, BlobRead, MsgEnvelope};
+use sn_data_types::{Address, BlobRead, MsgEnvelope};
 
 /// Read operations on data chunks.
 

@@ -24,8 +24,8 @@ use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
-use safe_nd::{ElderDuties, Message, MsgEnvelope};
 use sequence_storage::SequenceStorage;
+use sn_data_types::{ElderDuties, Message, MsgEnvelope};
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},

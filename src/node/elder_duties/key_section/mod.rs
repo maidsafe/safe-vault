@@ -25,7 +25,7 @@ use crate::{
 use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::{Prefix, RoutingError};
-use safe_nd::AccountId;
+use sn_data_types::AccountId;
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 use xor_name::XorName;
 

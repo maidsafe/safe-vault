@@ -9,7 +9,7 @@
 use crate::{node::node_ops::MessagingDuty, utils, Network};
 use log::{error, info};
 use routing::{DstLocation, SrcLocation};
-use safe_nd::{Address, MsgEnvelope};
+use sn_data_types::{Address, MsgEnvelope};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 

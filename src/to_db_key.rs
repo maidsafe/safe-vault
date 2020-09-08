@@ -7,8 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::utils;
-use safe_nd::{BlobAddress, ClientPublicId, MapAddress, PublicId, PublicKey, SequenceAddress};
 use serde::{de::DeserializeOwned, Serialize};
+use sn_data_types::{
+    BlobAddress, ClientPublicId, MapAddress, PublicId, PublicKey, SequenceAddress,
+};
 use xor_name::XorName;
 
 pub(crate) trait ToDbKey: Serialize {
@@ -38,7 +40,7 @@ mod test {
     use super::*;
     use crate::Result;
     use bls::SecretKey;
-    use safe_nd::PublicKey;
+    use sn_data_types::PublicKey;
 
     #[test]
     fn to_from_db_key() -> Result<()> {

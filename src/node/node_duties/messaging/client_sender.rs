@@ -8,9 +8,9 @@
 
 use crate::{node::node_ops::MessagingDuty, utils, Network};
 use log::warn;
-use quic_p2p::SendStream;
-use safe_nd::{Address, HandshakeResponse, MsgEnvelope};
+use qp2p::SendStream;
 use serde::Serialize;
+use sn_data_types::{Address, HandshakeResponse, MsgEnvelope};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,

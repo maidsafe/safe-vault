@@ -98,7 +98,7 @@
 - Update to latest routing
 - Update dependencies: routing, safe-nd and mock-quic-p2p
 - improve error message and avoid duplicate consensus
-- pull routing and quic_p2p with separate client channel
+- pull routing and qp2p with separate client channel
 - Merge pull request #939 from jeanphilippeD/client_channel
 - use latest version of self_update
 - Update version to 0.20.1

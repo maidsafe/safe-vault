@@ -14,12 +14,12 @@ use crate::{
 };
 use log::{info, trace, warn};
 use pickledb::PickleDb;
-use safe_nd::{
+use serde::{Deserialize, Serialize};
+use sn_data_types::{
     Blob, BlobAddress, BlobRead, BlobWrite, Cmd, CmdError, DataQuery, DebitAgreementProof,
     Error as NdError, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, PublicKey,
     Query, QueryResponse, Result as NdResult,
 };
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
@@ -152,7 +152,7 @@ impl BlobRegister {
         let msg = MsgEnvelope {
             message: Message::Cmd {
                 cmd: Cmd::Data {
-                    cmd: safe_nd::DataCmd::Blob(BlobWrite::New(data)),
+                    cmd: sn_data_types::DataCmd::Blob(BlobWrite::New(data)),
                     payment,
                 },
                 id: msg_id,
@@ -200,7 +200,7 @@ impl BlobRegister {
         let msg = MsgEnvelope {
             message: Message::Cmd {
                 cmd: Cmd::Data {
-                    cmd: safe_nd::DataCmd::Blob(BlobWrite::DeletePrivate(address)),
+                    cmd: sn_data_types::DataCmd::Blob(BlobWrite::DeletePrivate(address)),
                     payment,
                 },
                 id: msg_id,

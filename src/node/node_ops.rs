@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 #[cfg(feature = "simulated-payouts")]
-use safe_nd::Transfer;
+use sn_data_types::Transfer;
 
-use quic_p2p::SendStream;
+use qp2p::SendStream;
 use routing::{event::Event as RoutingEvent, Prefix};
-use safe_nd::{
+use serde::export::Formatter;
+use sn_data_types::{
     AccountId, Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
     ReplicaEvent, SignedTransfer, TransferValidated,
 };
-use serde::export::Formatter;
 use std::fmt::Debug;
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
@@ -533,29 +533,31 @@ pub enum TransferCmd {
     RegisterSectionPayout(DebitAgreementProof),
 }
 
-impl From<safe_nd::TransferCmd> for TransferCmd {
-    fn from(cmd: safe_nd::TransferCmd) -> Self {
+impl From<sn_data_types::TransferCmd> for TransferCmd {
+    fn from(cmd: sn_data_types::TransferCmd) -> Self {
         match cmd {
             #[cfg(feature = "simulated-payouts")]
-            safe_nd::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
-            safe_nd::TransferCmd::ValidateTransfer(signed_transfer) => {
+            sn_data_types::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
+            sn_data_types::TransferCmd::ValidateTransfer(signed_transfer) => {
                 Self::ValidateTransfer(signed_transfer)
             }
-            safe_nd::TransferCmd::RegisterTransfer(debit_agreement) => {
+            sn_data_types::TransferCmd::RegisterTransfer(debit_agreement) => {
                 Self::RegisterTransfer(debit_agreement)
             }
         }
     }
 }
 
-impl From<safe_nd::TransferQuery> for TransferQuery {
-    fn from(cmd: safe_nd::TransferQuery) -> Self {
+impl From<sn_data_types::TransferQuery> for TransferQuery {
+    fn from(cmd: sn_data_types::TransferQuery) -> Self {
         match cmd {
-            safe_nd::TransferQuery::GetReplicaKeys(transfer) => Self::GetReplicaKeys(transfer),
-            safe_nd::TransferQuery::GetBalance(signed_transfer) => {
+            sn_data_types::TransferQuery::GetReplicaKeys(transfer) => {
+                Self::GetReplicaKeys(transfer)
+            }
+            sn_data_types::TransferQuery::GetBalance(signed_transfer) => {
                 Self::GetBalance(signed_transfer)
             }
-            safe_nd::TransferQuery::GetHistory { at, since_version } => {
+            sn_data_types::TransferQuery::GetHistory { at, since_version } => {
                 Self::GetHistory { at, since_version }
             }
         }

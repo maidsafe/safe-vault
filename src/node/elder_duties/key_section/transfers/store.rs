@@ -8,7 +8,7 @@
 
 use crate::{node::state_db::Init, to_db_key::from_db_key, utils, Error, Result, ToDbKey};
 use pickledb::PickleDb;
-use safe_nd::{AccountId, ReplicaEvent};
+use sn_data_types::{AccountId, ReplicaEvent};
 use std::{collections::BTreeSet, path::Path};
 
 const TRANSFERS_DB_NAME: &str = "transfers.db";
@@ -148,7 +148,7 @@ mod test {
     use super::*;
     use crate::Result;
     use bls::SecretKey;
-    use safe_nd::{PublicKey, TransferPropagated};
+    use sn_data_types::{PublicKey, TransferPropagated};
     use sn_transfers::get_genesis;
     use tempdir::TempDir;
 
@@ -197,7 +197,7 @@ mod test {
     }
 
     use bls::SecretKeyShare;
-    use safe_nd::SignatureShare;
+    use sn_data_types::SignatureShare;
     fn dummy_sig() -> SignatureShare {
         let dummy_shares = SecretKeyShare::default();
         let dummy_sig = dummy_shares.sign("DUMMY MSG");

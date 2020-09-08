@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::{Chunk, ChunkId};
-use safe_nd::{Blob, BlobAddress};
+use sn_data_types::{Blob, BlobAddress};
 
 impl Chunk for Blob {
     type Id = BlobAddress;

@@ -13,11 +13,12 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
-use safe_nd::{
+use sn_data_types::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
-    Sequence, SequenceAction, SequenceAddress, SequenceEntry, SequenceIndex, SequenceOwner,
-    SequencePermissions, SequencePrivatePermissions, SequencePublicPermissions, SequenceRead,
-    SequenceUser, SequenceWrite, SequenceWriteOp,
+    Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp, SequenceEntry, SequenceIndex,
+    SequencePermissions, SequencePolicy, SequencePolicyWriteOp, SequencePrivatePermissions,
+    SequencePrivatePolicy, SequencePublicPermissions, SequencePublicPolicy, SequenceRead,
+    SequenceUser, SequenceWrite,
 };
 use std::{
     cell::Cell,
@@ -61,7 +62,8 @@ impl SequenceStorage {
             GetUserPermissions { address, user } => {
                 self.get_user_permissions(*address, *user, msg_id, &origin)
             }
-            GetPermissions(address) => self.get_permissions(*address, msg_id, &origin),
+            GetPublicPolicy(address) => self.get_public_policy(*address, msg_id, &origin),
+            GetPrivatePolicy(address) => self.get_private_policy(*address, msg_id, &origin),
         }
     }
 
@@ -76,13 +78,8 @@ impl SequenceStorage {
             New(data) => self.store(&data, msg_id, origin),
             Edit(operation) => self.edit(operation, msg_id, origin),
             Delete(address) => self.delete(address, msg_id, origin),
-            SetOwner(operation) => self.set_owner(operation, msg_id, origin),
-            SetPublicPermissions(operation) => {
-                self.set_public_permissions(operation, msg_id, origin)
-            }
-            SetPrivatePermissions(operation) => {
-                self.set_private_permissions(operation, msg_id, origin)
-            }
+            SetPublicPolicy(operation) => self.set_public_permissions(operation, msg_id, origin),
+            SetPrivatePolicy(operation) => self.set_private_permissions(operation, msg_id, origin),
         }
     }
 
@@ -151,7 +148,13 @@ impl SequenceStorage {
                 if sequence.address().is_pub() {
                     Err(NdError::InvalidOperation)
                 } else {
-                    sequence.check_is_last_owner(origin.id())
+                    let version = sequence.policy_version();
+                    let policy = sequence.private_policy(version)?;
+                    if policy.owner != origin.id() {
+                        Err(NdError::InvalidOwners)
+                    } else {
+                        Ok(())
+                    }
                 }
             })
             .and_then(|_| {
@@ -194,7 +197,7 @@ impl SequenceStorage {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| match sequence.last_entry() {
-                Some(entry) => Ok((sequence.entries_index() - 1, entry.to_vec())),
+                Some(entry) => Ok((sequence.len() - 1, entry.to_vec())),
                 None => Err(NdError::NoSuchEntry),
             });
         self.wrapping.send(Message::QueryResponse {
@@ -214,8 +217,15 @@ impl SequenceStorage {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
-                let index = sequence.owners_index() - 1;
-                sequence.owner(index).cloned().ok_or(NdError::InvalidOwners)
+                let version = sequence.policy_version() - 1;
+
+                if sequence.is_pub() {
+                    let policy = sequence.public_policy(version)?;
+                    Ok(policy.owner)
+                } else {
+                    let policy = sequence.private_policy(version)?;
+                    Ok(policy.owner)
+                }
             });
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceOwner(result),
@@ -235,8 +245,8 @@ impl SequenceStorage {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
-                let index = sequence.permissions_index() - 1;
-                sequence.user_permissions(user, index)
+                let index = sequence.policy_version() - 1;
+                sequence.permissions(user, index)
             });
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequenceUserPermissions(result),
@@ -246,7 +256,7 @@ impl SequenceStorage {
         })
     }
 
-    fn get_permissions(
+    fn get_public_policy(
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
@@ -255,16 +265,47 @@ impl SequenceStorage {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
-                let index = sequence.permissions_index() - 1;
+                let index = sequence.policy_version() - 1;
                 let res = if sequence.is_pub() {
-                    SequencePermissions::from(sequence.pub_permissions(index)?.clone())
+                    let policy = sequence.public_policy(index)?;
+                    policy.clone()
                 } else {
-                    SequencePermissions::from(sequence.private_permissions(index)?.clone())
+                    return Err(NdError::from(
+                        "Cannot get public policy of private sequence.",
+                    ));
                 };
                 Ok(res)
             });
         self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetSequencePermissions(result),
+            response: QueryResponse::GetSequencePublicPolicy(result),
+            id: MessageId::new(),
+            query_origin: origin.address(),
+            correlation_id: msg_id,
+        })
+    }
+
+    fn get_private_policy(
+        &self,
+        address: SequenceAddress,
+        msg_id: MessageId,
+        origin: &MsgSender,
+    ) -> Option<MessagingDuty> {
+        let result = self
+            .get_chunk(address, SequenceAction::Read, origin)
+            .and_then(|sequence| {
+                let index = sequence.policy_version() - 1;
+                let res = if !sequence.is_pub() {
+                    let policy = sequence.private_policy(index)?;
+                    policy.clone()
+                } else {
+                    return Err(NdError::from(
+                        "Cannot get private policy of public sequence.",
+                    ));
+                };
+                Ok(res)
+            });
+        self.wrapping.send(Message::QueryResponse {
+            response: QueryResponse::GetSequencePrivatePolicy(result),
             id: MessageId::new(),
             query_origin: origin.address(),
             correlation_id: msg_id,
@@ -273,17 +314,17 @@ impl SequenceStorage {
 
     fn set_public_permissions(
         &mut self,
-        write_op: SequenceWriteOp<SequencePublicPermissions>,
+        write_op: SequencePolicyWriteOp<SequencePublicPolicy>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let address = write_op.address;
         let result = self.edit_chunk(
             address,
-            SequenceAction::ManagePermissions,
+            SequenceAction::Admin,
             origin,
             move |mut sequence| {
-                sequence.apply_crdt_pub_perms_op(write_op.crdt_op)?;
+                sequence.apply_public_policy_op(write_op)?;
                 Ok(sequence)
             },
         );
@@ -292,45 +333,45 @@ impl SequenceStorage {
 
     fn set_private_permissions(
         &mut self,
-        write_op: SequenceWriteOp<SequencePrivatePermissions>,
+        write_op: SequencePolicyWriteOp<SequencePrivatePolicy>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let address = write_op.address;
         let result = self.edit_chunk(
             address,
-            SequenceAction::ManagePermissions,
+            SequenceAction::Admin,
             origin,
             move |mut sequence| {
-                sequence.apply_crdt_private_perms_op(write_op.crdt_op)?;
+                sequence.apply_private_policy_op(write_op)?;
                 Ok(sequence)
             },
         );
         self.ok_or_error(result, msg_id, origin)
     }
 
-    fn set_owner(
-        &mut self,
-        write_op: SequenceWriteOp<SequenceOwner>,
-        msg_id: MessageId,
-        origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
-        let address = write_op.address;
-        let result = self.edit_chunk(
-            address,
-            SequenceAction::ManagePermissions,
-            origin,
-            move |mut sequence| {
-                sequence.apply_crdt_owner_op(write_op.crdt_op);
-                Ok(sequence)
-            },
-        );
-        self.ok_or_error(result, msg_id, &origin)
-    }
+    // fn set_owner(
+    //     &mut self,
+    //     write_op: SequenceDataWriteOp<SequenceOwner>,
+    //     msg_id: MessageId,
+    //     origin: &MsgSender,
+    // ) -> Option<MessagingDuty> {
+    //     let address = write_op.address;
+    //     let result = self.edit_chunk(
+    //         address,
+    //         SequenceAction::Admin,
+    //         origin,
+    //         move |mut sequence| {
+    //             sequence.apply_crdt_owner_op(write_op.crdt_op);
+    //             Ok(sequence)
+    //         },
+    //     );
+    //     self.ok_or_error(result, msg_id, &origin)
+    // }
 
     fn edit(
         &mut self,
-        write_op: SequenceWriteOp<SequenceEntry>,
+        write_op: SequenceDataWriteOp<SequenceEntry>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
@@ -340,7 +381,7 @@ impl SequenceStorage {
             SequenceAction::Append,
             origin,
             move |mut sequence| {
-                sequence.apply_crdt_op(write_op.crdt_op);
+                sequence.apply_data_op(write_op);
                 Ok(sequence)
             },
         );

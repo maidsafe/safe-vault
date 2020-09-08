@@ -12,8 +12,8 @@ use bytes::Bytes;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
-use safe_nd::{BlsKeypairShare, Keypair};
 use serde::{de::DeserializeOwned, Serialize};
+use sn_data_types::{BlsKeypairShare, Keypair};
 use std::{fs, path::Path};
 use unwrap::unwrap;
 

@@ -17,8 +17,8 @@ use crate::{
 };
 use log::trace;
 #[cfg(feature = "simulated-payouts")]
-use safe_nd::Transfer;
-use safe_nd::{
+use sn_data_types::Transfer;
+use sn_data_types::{
     Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
     NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
     NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse, ReplicaEvent,

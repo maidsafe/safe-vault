@@ -13,7 +13,7 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
-use safe_nd::{
+use sn_data_types::{
     CmdError, Error as NdError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
     MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey, QueryResponse,
     Result as NdResult,

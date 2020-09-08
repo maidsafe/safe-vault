@@ -10,7 +10,7 @@ use super::store::TransferStore;
 use crate::Result;
 use bls::{PublicKeySet, SecretKeyShare};
 use log::info;
-use safe_nd::{
+use sn_data_types::{
     AccountId, DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey, PublicKey,
     ReplicaEvent, Result as NdResult, SignedTransfer, TransferPropagated, TransferRegistered,
     TransferValidated,
@@ -24,7 +24,7 @@ use {
     crate::node::node_ops::MessagingDuty,
     bls::{SecretKey, SecretKeySet},
     rand::thread_rng,
-    safe_nd::{Signature, SignatureShare, Transfer},
+    sn_data_types::{Signature, SignatureShare, Transfer},
 };
 
 /// Manages an instance of an AT2 Replica,

@@ -8,7 +8,7 @@
 
 use bytes::Bytes;
 use log::info;
-use safe_nd::{HandshakeRequest, Message, MsgEnvelope, MsgSender};
+use sn_data_types::{HandshakeRequest, Message, MsgEnvelope, MsgSender};
 use std::net::SocketAddr;
 
 /*

@@ -49,14 +49,14 @@ quick_error! {
             from()
         }
         /// NetworkData error.
-        NetworkData(error: safe_nd::Error) {
+        NetworkData(error: sn_data_types::Error) {
             cause(error)
             description(error.description())
             display("NetworkData error: {}", error)
             from()
         }
         /// NetworkData Entry error.
-        NetworkDataEntry(error: safe_nd::EntryError) {
+        NetworkDataEntry(error: sn_data_types::EntryError) {
             display("NetworkData Entry error: {:?}", error)
             from()
         }

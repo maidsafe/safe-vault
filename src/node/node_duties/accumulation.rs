@@ -8,7 +8,7 @@
 
 use crate::utils;
 use log::{error, info};
-use safe_nd::{BlsProof, MessageId, MsgEnvelope, MsgSender, Proof, SignatureShare};
+use sn_data_types::{BlsProof, MessageId, MsgEnvelope, MsgSender, Proof, SignatureShare};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 type RequestInfo = (MsgEnvelope, MsgSender, Vec<SignatureShare>);
@@ -119,7 +119,8 @@ impl Accumulation {
             // Replace the Node with the Section.
             let mut msg = msg;
             let _ = msg.proxies.pop();
-            Some(msg.with_proxy(sender))
+            msg.add_proxy(sender);
+            Some(msg)
         // beware that we might have to forgo the proxies vector
         // and instead just have a most recent proxy, if we are seeing
         // different order on the proxies on the msgs to be accumulated

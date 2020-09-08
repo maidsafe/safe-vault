@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::{Chunk, ChunkId};
-use safe_nd::{Map, MapAddress};
+use sn_data_types::{Map, MapAddress};
 
 impl Chunk for Map {
     type Id = MapAddress;

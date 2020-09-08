@@ -8,8 +8,10 @@
 
 use crate::{utils, Network};
 use bls::PublicKeySet;
-use safe_nd::{BlsProof, BlsProofShare, Ed25519Proof, Proof, PublicKey, Signature, SignatureShare};
 use serde::Serialize;
+use sn_data_types::{
+    BlsProof, BlsProofShare, Ed25519Proof, Proof, PublicKey, Signature, SignatureShare,
+};
 
 #[derive(Clone)]
 pub struct NodeSigningKeys {

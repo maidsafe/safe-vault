@@ -12,7 +12,7 @@ use crate::config_handler::write_connection_info;
 use crate::{Command, Config, Node};
 use crossbeam_channel::Sender;
 use file_per_thread_logger::{self as logger, FormatFn};
-use quic_p2p::Config as NetworkConfig;
+use qp2p::Config as NetworkConfig;
 use routing::NodeConfig as RoutingConfig;
 use std::io::Write;
 use std::net::SocketAddr;

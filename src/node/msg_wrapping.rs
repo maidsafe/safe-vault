@@ -8,7 +8,7 @@
 
 use crate::{node::keys::NodeSigningKeys, node::node_ops::MessagingDuty, utils};
 use log::info;
-use safe_nd::{
+use sn_data_types::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
     NodeDuties,
 };
@@ -157,6 +157,9 @@ impl MsgWrapping {
 
     fn set_proxy(&self, msg: &MsgEnvelope) -> MsgEnvelope {
         // origin signs the message, while proxies sign the envelope
-        msg.with_proxy(self.sign(msg))
+        let mut msg = msg.clone();
+        msg.add_proxy(self.sign(&msg));
+
+        msg
     }
 }

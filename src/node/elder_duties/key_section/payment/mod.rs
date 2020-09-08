@@ -13,7 +13,7 @@ use crate::{
     node::node_ops::{NodeOperation, PaymentDuty},
     utils,
 };
-use safe_nd::{
+use sn_data_types::{
     Cmd, CmdError, ElderDuties, Error, Message, Money, MsgEnvelope, PublicKey, Result,
     TransferError,
 };
