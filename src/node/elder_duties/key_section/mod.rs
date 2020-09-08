@@ -22,12 +22,12 @@ use crate::{
     node::state_db::NodeInfo,
     Network, Result,
 };
+use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::{Prefix, RoutingError};
 use safe_nd::AccountId;
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 use xor_name::XorName;
-use log::trace;
 
 /// A Key Section interfaces with clients,
 /// who are essentially a public key,

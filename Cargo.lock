@@ -1231,6 +1231,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "igd"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fd32c880165b2f776af0b38d206d1cabaebcf46c166ac6ae004a5d45f7d48ef"
+dependencies = [
+ "attohttpc",
+ "bytes 0.5.6",
+ "futures",
+ "http",
+ "hyper",
+ "log",
+ "rand 0.7.3",
+ "tokio",
+ "url",
+ "xmltree",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1651,6 +1669,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59698ea79df9bf77104aefd39cc3ec990cb9693fb59c3b0a70ddf2646fdffb4b"
+dependencies = [
+ "base64 0.12.3",
+ "once_cell",
+ "regex",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1787,23 +1816,47 @@ dependencies = [
 [[package]]
 name = "quic-p2p"
 version = "0.7.0"
-source = "git+https://github.com/maidsafe/quic-p2p.git#c8bc722895860cea475a1709e361c57f33a52642"
+source = "git+https://github.com/bochaco/quic-p2p?branch=fix-msg-hdr-length#9a18a7b965db525b73049df14fc7edad83f606ea"
 dependencies = [
- "base64 0.10.1",
+ "base64 0.12.3",
  "bincode",
  "bytes 0.5.6",
  "crossbeam-channel",
- "directories 1.0.2",
+ "directories 2.0.2",
  "err-derive",
  "futures",
- "igd",
+ "igd 0.11.1",
  "log",
  "quinn",
- "rcgen",
+ "rcgen 0.8.5",
  "rustls 0.17.0",
  "serde",
  "serde_json",
- "structopt",
+ "structopt 0.3.17",
+ "tokio",
+ "unwrap",
+ "webpki",
+]
+
+[[package]]
+name = "quic-p2p"
+version = "0.7.0"
+source = "git+https://github.com/maidsafe/quic-p2p.git#51ad625dcddce035d3826f675455b603a192e833"
+dependencies = [
+ "base64 0.12.3",
+ "bincode",
+ "bytes 0.5.6",
+ "crossbeam-channel",
+ "directories 2.0.2",
+ "err-derive",
+ "futures",
+ "log",
+ "quinn",
+ "rcgen 0.8.5",
+ "rustls 0.17.0",
+ "serde",
+ "serde_json",
+ "structopt 0.3.17",
  "tokio",
  "unwrap",
  "webpki",
@@ -1823,14 +1876,14 @@ dependencies = [
  "directories 1.0.2",
  "err-derive",
  "futures",
- "igd",
+ "igd 0.10.2",
  "log",
  "quinn",
- "rcgen",
+ "rcgen 0.7.0",
  "rustls 0.17.0",
  "serde",
  "serde_json",
- "structopt",
+ "structopt 0.2.18",
  "tokio",
  "unwrap",
  "webpki",
@@ -2016,7 +2069,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6d6cbbf5f43710b9242a4897f4671a469198e2d826d9df043fc16e046f45d8a"
 dependencies = [
  "chrono",
- "pem",
+ "pem 0.6.1",
+ "ring",
+ "yasna",
+]
+
+[[package]]
+name = "rcgen"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4974f7e96ee51fa3c90c3022e02c3a7117e71cb2a84518a55e44360135200c25"
+dependencies = [
+ "chrono",
+ "pem 0.8.1",
  "ring",
  "yasna",
 ]
@@ -2129,7 +2194,7 @@ dependencies = [
 [[package]]
 name = "routing"
 version = "0.37.0"
-source = "git+https://github.com/bochaco/routing.git?branch=async-quic-p2p-api#5bbd3a00c2e09972ffffbcb28ca2443c5e5c706c"
+source = "git+https://github.com/Yoga07/routing?branch=update-quic#a65d880df5342cd73fb3d86662d40464b0f17cfe"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2144,7 +2209,7 @@ dependencies = [
  "itertools",
  "log",
  "lru_time_cache",
- "quic-p2p 0.7.0 (git+https://github.com/maidsafe/quic-p2p.git)",
+ "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p?branch=fix-msg-hdr-length)",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rand_os",
@@ -2321,7 +2386,7 @@ dependencies = [
  "log",
  "maplit",
  "pickledb",
- "quic-p2p 0.7.0 (git+https://github.com/maidsafe/quic-p2p.git)",
+ "quic-p2p 0.7.0 (git+https://github.com/bochaco/quic-p2p?branch=fix-msg-hdr-length)",
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",
@@ -2336,7 +2401,7 @@ dependencies = [
  "signature",
  "sn_fake_clock",
  "sn_transfers",
- "structopt",
+ "structopt 0.3.17",
  "tempdir",
  "threshold_crypto",
  "tiny-keccak 1.5.0",
@@ -2604,7 +2669,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16c2cdbf9cc375f15d1b4141bc48aeef444806655cd0e904207edc8d68d86ed7"
 dependencies = [
  "clap",
- "structopt-derive",
+ "structopt-derive 0.2.18",
+]
+
+[[package]]
+name = "structopt"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6cc388d94ffabf39b5ed5fadddc40147cb21e605f53db6f8f36a625d27489ac5"
+dependencies = [
+ "clap",
+ "lazy_static",
+ "structopt-derive 0.4.10",
 ]
 
 [[package]]
@@ -2617,6 +2693,19 @@ dependencies = [
  "proc-macro2 0.4.30",
  "quote 0.6.13",
  "syn 0.15.44",
+]
+
+[[package]]
+name = "structopt-derive"
+version = "0.4.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e2513111825077552a6751dfad9e11ce0fba07d7276a3943a037d7e93e64c5f"
+dependencies = [
+ "heck",
+ "proc-macro-error",
+ "proc-macro2 1.0.19",
+ "quote 1.0.7",
+ "syn 1.0.38",
 ]
 
 [[package]]

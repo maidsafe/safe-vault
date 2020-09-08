@@ -15,6 +15,7 @@ use crate::{
     node::state_db::NodeInfo,
     Error, Network, Result,
 };
+use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::Prefix;
 use std::{
@@ -23,7 +24,6 @@ use std::{
     rc::Rc,
 };
 use xor_name::XorName;
-use log::trace;
 
 /// Duties carried out by an Elder node.
 pub struct ElderDuties<R: CryptoRng + Rng> {
