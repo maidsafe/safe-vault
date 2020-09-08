@@ -33,15 +33,15 @@ lazy_static = "1"
 log = "~0.4.7"
 pickledb = "~0.4.0"
 quick-error = "1.2.2"
-quic-p2p = { git = "https://github.com/maidsafe/quic-p2p.git", branch = "master" }
+quic-p2p = { git = "https://github.com/bochaco/quic-p2p", branch = "fix-msg-hdr-length", features = ["upnp"] }
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
-# routing = { path="../routing" }
-routing = { git = "https://github.com/bochaco/routing.git", branch = "async-quic-p2p-api" }
+#routing = { path="../routing" }
+routing = { git = "https://github.com/Yoga07/routing", branch = "update-quic" }
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
-structopt = "~0.2.18"
+structopt = "~0.3.17"
 bls = { package = "threshold_crypto", version = "~0.4.0" }
 tiny-keccak = "1.5.0"
 unwrap = "1.2.1"

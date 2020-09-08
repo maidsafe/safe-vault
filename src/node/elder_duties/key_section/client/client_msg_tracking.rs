@@ -10,6 +10,7 @@ pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_m
 pub use super::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
 use log::{error, info, warn};
+use quic_p2p::SendStream;
 use rand::{CryptoRng, Rng};
 use safe_nd::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
 use std::{
@@ -17,7 +18,6 @@ use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
-use quic_p2p::SendStream;
 
 /// Tracks incoming and outgoingg messages
 /// between client and network.

@@ -20,7 +20,7 @@ use crate::node::{
     state_db::NodeInfo,
 };
 use crate::Network;
-use log::{info, warn, trace};
+use log::{info, trace, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
@@ -85,7 +85,10 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             _ => None,
         };
 
-        info!("Checking duty level: are we an Elder? {:?}", level.is_some());
+        info!(
+            "Checking duty level: are we an Elder? {:?}",
+            level.is_some()
+        );
 
         level
     }
