@@ -9,7 +9,9 @@
 pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_msg};
 pub use super::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
-use log::{error, info, warn};
+use crate::utils;
+use log::{error, info, trace, warn};
+use qp2p::SendStream;
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
 use sn_routing::event::SendStream;
@@ -23,7 +25,8 @@ use std::{
 /// between client and network.
 pub struct ClientMsgTracking {
     onboarding: Onboarding,
-    tracked_incoming: HashMap<MessageId, SocketAddr>,
+    tracked_streams: HashMap<PublicKey, Vec<SendStream>>,
+    tracked_incoming: HashMap<MessageId, (SocketAddr, SendStream)>,
     tracked_outgoing: HashMap<MessageId, MsgEnvelope>,
 }
 
@@ -31,6 +34,7 @@ impl ClientMsgTracking {
     pub fn new(onboarding: Onboarding) -> Self {
         Self {
             onboarding,
+            tracked_streams: Default::default(),
             tracked_incoming: Default::default(),
             tracked_outgoing: Default::default(),
         }
@@ -44,10 +48,36 @@ impl ClientMsgTracking {
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
-        stream: &mut SendStream,
+        stream: SendStream,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
-        self.onboarding.process(handshake, peer_addr, stream, rng)
+        let mut the_stream = stream;
+        let duty = self
+            .onboarding
+            .process(handshake, peer_addr, &mut the_stream, rng);
+
+        // client has been onboarded or already exists
+        if duty.is_none() {
+            if let Some(pk) = self.get_public_key(peer_addr) {
+                let mut updated_streams = vec![];
+                let pk = pk.clone();
+
+                // let's append to any existing known streams for this PK
+                if let Some(current_streams_for_pk) = self.tracked_streams.remove(&pk) {
+                    updated_streams = current_streams_for_pk;
+                }
+
+                updated_streams.push(the_stream);
+                let _ = self.tracked_streams.insert(pk, updated_streams);
+            } else {
+                warn!(
+                    "No PK found for onboarded peer at address : {:?}",
+                    peer_addr
+                );
+            }
+        }
+
+        duty
     }
 
     // pub fn remove_client(&mut self, peer_addr: SocketAddr) {
@@ -57,13 +87,17 @@ impl ClientMsgTracking {
     ///
     pub fn track_incoming(
         &mut self,
-        msg_id: MessageId,
+        msg: &Message,
         client_address: SocketAddr,
+        stream: SendStream,
     ) -> Option<MessagingDuty> {
+        let msg_id = msg.id();
+
         // We could have received a group decision containing a client msg,
         // before receiving the msg from that client directly.
         if let Some(msg) = self.tracked_outgoing.remove(&msg_id) {
             warn!("Tracking incoming: Prior group decision on msg found.");
+
             return Some(MessagingDuty::SendToClient {
                 address: client_address,
                 msg,
@@ -71,7 +105,7 @@ impl ClientMsgTracking {
         }
 
         if let Entry::Vacant(ve) = self.tracked_incoming.entry(msg_id) {
-            let _ = ve.insert(client_address);
+            let _ = ve.insert((client_address, stream));
             None
         } else {
             info!(
@@ -95,10 +129,11 @@ impl ClientMsgTracking {
                 //return Err(Error::InvalidOperation);
             }
         };
-        let correlation_id = match msg.message {
-            Message::Event { correlation_id, .. }
-            | Message::CmdError { correlation_id, .. }
-            | Message::QueryResponse { correlation_id, .. } => correlation_id,
+        let (is_query_response, correlation_id) = match msg.message {
+            Message::Event { correlation_id, .. } | Message::CmdError { correlation_id, .. } => {
+                (false, correlation_id)
+            }
+            Message::QueryResponse { correlation_id, .. } => (true, correlation_id),
             _ => {
                 error!(
                     "{} for message-id {:?}, Invalid message for client.",
@@ -109,24 +144,64 @@ impl ClientMsgTracking {
                 //return Err(Error::InvalidOperation);
             }
         };
-        let client_address = match self.tracked_incoming.remove(&correlation_id) {
-            Some(address) => address,
+
+        trace!("Message outgoing, correlates to {:?}", correlation_id);
+        // Query responses are sent on the stream from the connection.
+        // Events/CmdErrors are sent to the held stream from the bootstrap process.
+        match self.tracked_incoming.remove(&correlation_id) {
+            Some((peer_addr, mut stream)) => {
+                if is_query_response {
+                    trace!("Sending QueryResponse on request's stream");
+                    send_message_on_stream(&msg, &mut stream)
+                } else {
+                    trace!("Attempting to use bootstrap stream");
+                    if let Some(pk) = self.get_public_key(peer_addr) {
+                        let pk = pk.clone();
+                        // get the streams and ownership
+                        if let Some(streams) = self.tracked_streams.remove(&pk) {
+                            let mut used_streams = vec![];
+                            for mut stream in streams {
+                                // send to each registered stream for that PK
+                                send_message_on_stream(&msg, &mut stream);
+                                used_streams.push(stream);
+                            }
+
+                            let _ = self.tracked_streams.insert(pk, used_streams);
+                        } else {
+                            error!("Could not find stream for Message response")
+                        }
+                    } else {
+                        error!("Could not find PublicKey for Message response")
+                    }
+                }
+            }
             None => {
                 info!(
-                    "{} for message-id {:?}, Unable to find the client to respond to.",
-                    self, correlation_id
-                );
+                        "{} for message-id {:?}, Unable to find client message to respond to. The message may have already been sent to the client previously.",
+                        self, correlation_id
+                    );
+
                 let _ = self.tracked_outgoing.insert(correlation_id, msg.clone());
                 return None;
-                //return Err(Error::NoSuchKey);
             }
-        };
-
-        Some(MessagingDuty::SendToClient {
-            address: client_address,
-            msg: msg.clone(),
-        })
+        }
+        None
     }
+}
+
+fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) {
+    trace!("Senging message on stream");
+    let bytes = utils::serialise(message);
+
+    let res = futures::executor::block_on(stream.send(bytes));
+
+    match res {
+        Ok(()) => info!("Message sent successfully to client via stream"),
+        Err(error) => error!(
+            "There was an error sending client message on the stream:  {:?}",
+            error
+        ),
+    };
 }
 
 impl Display for ClientMsgTracking {

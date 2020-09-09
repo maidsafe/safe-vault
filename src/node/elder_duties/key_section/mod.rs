@@ -112,12 +112,12 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         None
     }
 
-    pub fn process(&mut self, duty: &mut KeySectionDuty) -> Option<NodeOperation> {
+    pub fn process_as_key_section(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
             EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg),
-            RunAsGateway(duty) => self.gateway.process(duty),
+            RunAsGateway(duty) => self.gateway.process_as_gateway(duty),
             RunAsPayment(duty) => self.payments.process(&duty),
             RunAsTransfers(duty) => self.transfers.process(&duty),
         }

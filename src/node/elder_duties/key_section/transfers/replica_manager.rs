@@ -10,6 +10,9 @@ use super::store::TransferStore;
 use crate::Result;
 use bls::{PublicKeySet, SecretKeyShare};
 use log::info;
+#[cfg(feature = "simulated-payouts")]
+use log::trace;
+
 use sn_data_types::{
     DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey, PublicKey,
     ReplicaEvent, Result as NdResult, SignedTransfer, TransferPropagated, TransferRegistered,
@@ -317,6 +320,7 @@ impl ReplicaManager {
 #[cfg(feature = "simulated-payouts")]
 impl ReplicaManager {
     pub fn credit_without_proof(&mut self, transfer: Transfer) -> Option<MessagingDuty> {
+        trace!("Performing credit without proof");
         self.replica.credit_without_proof(transfer.clone());
         let dummy_msg = "DUMMY MSG";
         let mut rng = thread_rng();

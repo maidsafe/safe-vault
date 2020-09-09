@@ -19,7 +19,7 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Error, Network, Result,
 };
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
@@ -49,10 +49,10 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         Ok(gateway)
     }
 
-    pub fn process(&mut self, cmd: &mut GatewayDuty) -> Option<NodeOperation> {
+    pub fn process_as_gateway(&mut self, cmd: GatewayDuty) -> Option<NodeOperation> {
         use GatewayDuty::*;
         match cmd {
-            FindClientFor(msg) => self.try_find_client(msg).map(|c| c.into()),
+            FindClientFor(msg) => self.try_find_client(&msg).map(|c| c.into()),
             ProcessClientEvent(event) => self.process_client_event(event),
         }
     }
@@ -67,27 +67,31 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     }
 
     /// This is where client input is parsed.
-    fn process_client_event(&mut self, event: &mut RoutingEvent) -> Option<NodeOperation> {
+    fn process_client_event(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
         match event {
             RoutingEvent::ClientMessageReceived {
                 content, src, send, ..
             } => {
-                let existing_client = self.client_msg_tracking.get_public_key(*src);
+                let existing_client = self.client_msg_tracking.get_public_key(src);
                 if let Some(public_key) = existing_client {
-                    let msg = try_deserialize_msg(content)?;
+                    let msg = try_deserialize_msg(&content)?;
                     info!("Deserialized client msg from {}", public_key);
+                    trace!("Deserialized client msg is {:?}", msg.message);
                     if !validate_client_sig(&msg) {
                         return None;
                     }
-                    match self.client_msg_tracking.track_incoming(msg.id(), *src) {
+                    match self
+                        .client_msg_tracking
+                        .track_incoming(&msg.message, src, send)
+                    {
                         Some(c) => Some(c.into()),
                         None => Some(KeySectionDuty::EvaluateClientMsg(msg).into()),
                     }
                 } else {
-                    let hs = try_deserialize_handshake(content, *src)?;
+                    let hs = try_deserialize_handshake(&content, src)?;
                     let mut rng = ChaChaRng::from_seed(self.rng.gen());
                     self.client_msg_tracking
-                        .process_handshake(hs, *src, &mut *send, &mut rng)
+                        .process_handshake(hs, src, send, &mut rng)
                         .map(|c| c.into())
                 }
             }

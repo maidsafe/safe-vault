@@ -128,11 +128,6 @@ impl Onboarding {
         };
 
         None
-        // Some(MessagingDuty::SendHandshake {
-        //     address: peer_addr,
-        //     response: HandshakeResponse::Join(elders),
-        //     // response_stream: *stream
-        // })
     }
 
     /// Handles a received join request from a client.
@@ -167,7 +162,7 @@ impl Onboarding {
 
             let bytes = utils::serialise(&HandshakeResponse::Challenge(self.node_id, challenge));
 
-            // Hmmmm, what to do about this response.... we don't need a duty response here?
+            // Q: Hmmmm, what to do about this response.... do we need a duty response here?
             let res = futures::executor::block_on(stream.send(bytes));
 
             match res {
@@ -176,11 +171,6 @@ impl Onboarding {
             };
 
             None
-        // Some(MessagingDuty::SendHandshake {
-        //     address: peer_addr,
-        //     response: HandshakeResponse::Challenge(self.node_id, challenge),
-        //     // response_stream: *stream
-        // })
         } else {
             debug!(
                 "Client {} ({}) wants to join us but we are not its client handler",

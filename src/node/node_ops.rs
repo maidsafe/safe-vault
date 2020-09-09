@@ -9,6 +9,10 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
+<<<<<<< HEAD
+=======
+use routing::{event::Event as RoutingEvent, Prefix};
+>>>>>>> fix(msgs): updates to use qp2p streams
 use serde::export::Formatter;
 use sn_data_types::{
     Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
@@ -154,7 +158,6 @@ pub enum MessagingDuty {
     SendHandshake {
         address: SocketAddr,
         response: HandshakeResponse,
-        // response_stream: SendStream
     },
     /// The key section might also disonnect a client.
     DisconnectClient(SocketAddr),

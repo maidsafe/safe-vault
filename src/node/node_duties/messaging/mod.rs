@@ -40,9 +40,7 @@ impl Messaging {
             SendToNode(msg) => self.network_sender.send_to_node(msg).await,
             SendToSection(msg) => self.network_sender.send_to_network(msg).await,
             SendToAdults { targets, msg } => self.network_sender.send_to_nodes(targets, &msg).await,
-            SendHandshake { address, response } => {
-                self.client_sender.handshake(address, &response).await
-            }
+            SendHandshake { .. } => None,       // unreachable?
             DisconnectClient(_address) => None, // TODO: self.client_sender.disconnect(address),
         };
 
