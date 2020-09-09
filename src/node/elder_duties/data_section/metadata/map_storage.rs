@@ -41,7 +41,8 @@ impl MapStorage {
             node_info.max_storage_capacity,
             Rc::clone(total_used_space),
             node_info.init_mode,
-        ).await?;
+        )
+        .await?;
         Ok(Self { chunks, wrapping })
     }
 
@@ -62,7 +63,8 @@ impl MapStorage {
             ListValues(address) => self.list_values(*address, msg_id, origin).await,
             ListPermissions(address) => self.list_permissions(*address, msg_id, origin).await,
             ListUserPermissions { address, user } => {
-                self.list_user_permissions(*address, *user, msg_id, origin).await
+                self.list_user_permissions(*address, *user, msg_id, origin)
+                    .await
             }
         }
     }
@@ -82,12 +84,18 @@ impl MapStorage {
                 user,
                 ref permissions,
                 version,
-            } => self.set_user_permissions(address, user, permissions, version, msg_id, origin).await,
+            } => {
+                self.set_user_permissions(address, user, permissions, version, msg_id, origin)
+                    .await
+            }
             DelUserPermissions {
                 address,
                 user,
                 version,
-            } => self.delete_user_permissions(address, user, version, msg_id, origin).await,
+            } => {
+                self.delete_user_permissions(address, user, version, msg_id, origin)
+                    .await
+            }
             Edit { address, changes } => self.edit_entries(address, changes, msg_id, origin).await,
         }
     }
@@ -104,7 +112,8 @@ impl MapStorage {
     ) -> Option<NdResult<Map>> {
         Some(
             self.chunks
-                .get(&address).await
+                .get(&address)
+                .await
                 .map_err(|e| match e {
                     ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
                     error => error.to_string().into(),
@@ -126,20 +135,22 @@ impl MapStorage {
     {
         let result = self
             .chunks
-            .get(address).await
+            .get(address)
+            .await
             .map_err(|e| match e {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
                 error => error.to_string().into(),
             })
             .and_then(mutation_fn);
-        
+
         if let Ok(ref map) = result {
-            let result_inner = self.chunks
-                .put(&map).await
+            let result_inner = self
+                .chunks
+                .put(&map)
+                .await
                 .map_err(|error| error.to_string().into());
             self.ok_or_error(result_inner, msg_id, &origin)
-        }
-        else {
+        } else {
             self.ok_or_error(result.map(|_| ()), msg_id, &origin)
         }
     }
@@ -155,7 +166,8 @@ impl MapStorage {
             Err(NdError::DataExists)
         } else {
             self.chunks
-                .put(&data).await
+                .put(&data)
+                .await
                 .map_err(|error| error.to_string().into())
         };
         self.ok_or_error(result, msg_id, origin)
@@ -169,21 +181,22 @@ impl MapStorage {
     ) -> Option<MessagingDuty> {
         let result = self
             .chunks
-            .get(&address).await
+            .get(&address)
+            .await
             .map_err(|e| match e {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
                 error => error.to_string().into(),
             })
             .and_then(|map| map.check_is_owner(origin.id()));
 
-        if let Ok(_) = result {
+        if result.is_ok() {
             let result_inner = self
                 .chunks
-                .delete(&address).await
+                .delete(&address)
+                .await
                 .map_err(|error| error.to_string().into());
             self.ok_or_error(result_inner, msg_id, origin)
-        }
-        else {
+        } else {
             self.ok_or_error(result, msg_id, origin)
         }
     }
@@ -202,7 +215,8 @@ impl MapStorage {
             data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.set_user_permissions(user, permissions.clone(), version)?;
             Ok(data)
-        }).await
+        })
+        .await
     }
 
     /// Delete Map user permissions.
@@ -218,7 +232,8 @@ impl MapStorage {
             data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.del_user_permissions(user, version)?;
             Ok(data)
-        }).await
+        })
+        .await
     }
 
     /// Edit Map.
@@ -232,7 +247,8 @@ impl MapStorage {
         self.edit_chunk(&address, origin, msg_id, move |mut data| {
             data.mutate_entries(actions, origin.id())?;
             Ok(data)
-        }).await
+        })
+        .await
     }
 
     /// Get entire Map.
@@ -259,7 +275,8 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(&address, origin, MapAction::Read).await?
+            .get_chunk(&address, origin, MapAction::Read)
+            .await?
             .map(|data| data.shell());
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetMapShell(result),
@@ -277,7 +294,8 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(&address, origin, MapAction::Read).await?
+            .get_chunk(&address, origin, MapAction::Read)
+            .await?
             .map(|data| data.version());
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetMapVersion(result),
@@ -324,7 +342,8 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(&address, origin, MapAction::Read).await?
+            .get_chunk(&address, origin, MapAction::Read)
+            .await?
             .map(|data| data.keys());
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapKeys(result),
@@ -382,7 +401,8 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(&address, origin, MapAction::Read).await?
+            .get_chunk(&address, origin, MapAction::Read)
+            .await?
             .map(|data| data.permissions());
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapPermissions(result),
@@ -401,7 +421,8 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(&address, origin, MapAction::Read).await?
+            .get_chunk(&address, origin, MapAction::Read)
+            .await?
             .and_then(|data| data.user_permissions(user).map(MapPermissionSet::clone));
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::ListMapUserPermissions(result),

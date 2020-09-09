@@ -147,7 +147,9 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             &total_used_space,
             self.routing.clone(),
             self.rng.take()?,
-        ).await {
+        )
+        .await
+        {
             let mut duties = duties;
             let op = duties.initiate();
             self.duty_level = Elder(duties);

@@ -16,7 +16,10 @@ use sn_data_types::{
     MsgEnvelope, MsgSender, SequenceWrite,
 };
 
-pub(super) async fn get_result(msg: MsgEnvelope, stores: &mut ElderStores) -> Option<NodeOperation> {
+pub(super) async fn get_result(
+    msg: MsgEnvelope,
+    stores: &mut ElderStores,
+) -> Option<NodeOperation> {
     use DataCmd::*;
     let msg_id = msg.id();
     let msg_origin = msg.origin;
@@ -38,8 +41,12 @@ pub(super) async fn get_result(msg: MsgEnvelope, stores: &mut ElderStores) -> Op
                 proxies,
             ),
             Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin).await,
-            Sequence(write) => sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await,
-            Account(write) => account(write, stores.account_storage_mut(), msg_id, msg_origin).await,
+            Sequence(write) => {
+                sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await
+            }
+            Account(write) => {
+                account(write, stores.account_storage_mut(), msg_id, msg_origin).await
+            }
         },
         _ => unreachable!("Logic error"),
     };

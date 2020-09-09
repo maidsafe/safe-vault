@@ -26,13 +26,17 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) async fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+    pub(crate) async fn new(
+        node_info: &NodeInfo,
+        total_used_space: &Rc<Cell<u64>>,
+    ) -> Result<Self> {
         let chunks = BlobChunkStore::new(
             node_info.path(),
             node_info.max_storage_capacity,
             Rc::clone(total_used_space),
             node_info.init_mode,
-        ).await?;
+        )
+        .await?;
         let wrapping = AdultMsgWrapping::new(node_info.keys(), AdultDuties::ChunkStorage);
         Ok(Self { chunks, wrapping })
     }
@@ -91,7 +95,8 @@ impl ChunkStorage {
             return Err(NdError::DataExists);
         }
         self.chunks
-            .put(&data).await
+            .put(&data)
+            .await
             .map_err(|error| error.to_string().into())
     }
 
@@ -103,7 +108,8 @@ impl ChunkStorage {
     ) -> Option<MessagingDuty> {
         let result = self
             .chunks
-            .get(address).await
+            .get(address)
+            .await
             .map_err(|error| error.to_string().into());
         self.wrapping.send(Message::QueryResponse {
             id: MessageId::new(),
@@ -150,7 +156,8 @@ impl ChunkStorage {
         let result = match self.chunks.get(&address).await {
             Ok(Blob::Private(_)) => self
                 .chunks
-                .delete(&address).await
+                .delete(&address)
+                .await
                 .map_err(|error| error.to_string().into()),
             Ok(_) => {
                 error!(

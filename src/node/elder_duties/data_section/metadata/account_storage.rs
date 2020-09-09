@@ -44,7 +44,8 @@ impl AccountStorage {
             node_info.max_storage_capacity,
             Rc::clone(total_used_space),
             node_info.init_mode,
-        ).await?;
+        )
+        .await?;
         Ok(Self { chunks, wrapping })
     }
 
@@ -67,7 +68,8 @@ impl AccountStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .account(&origin.id(), address).await
+            .account(&origin.id(), address)
+            .await
             .map(Account::into_data_and_signature);
         self.wrapping.send(Message::QueryResponse {
             id: MessageId::new(),
@@ -102,8 +104,9 @@ impl AccountStorage {
             Err(NdError::InvalidOwners)
         } else {
             // also check the signature
-            self
-                .chunks.put(account).await
+            self.chunks
+                .put(account)
+                .await
                 .map_err(|error| error.to_string().into())
         };
         self.ok_or_error(result, msg_id, &origin)
@@ -115,10 +118,9 @@ impl AccountStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        
-        let result = 
-            self.account(&origin.id(), updated_account.address()).await
-            .map_err(|e| NdError::from(e));
+        let result = self
+            .account(&origin.id(), updated_account.address())
+            .await;
 
         if let Ok(existing_account) = result {
             let result_inner;
@@ -129,7 +131,9 @@ impl AccountStorage {
             } else {
                 // also check the signature
                 result_inner = self
-                    .chunks.put(&updated_account).await
+                    .chunks
+                    .put(&updated_account)
+                    .await
                     .map_err(|e| e.to_string().into())
             }
             self.ok_or_error(result_inner, msg_id, &origin)
@@ -140,7 +144,8 @@ impl AccountStorage {
 
     async fn account(&self, requester_pub_key: &PublicKey, address: &XorName) -> NdResult<Account> {
         self.chunks
-            .get(address).await
+            .get(address)
+            .await
             .map_err(|e| match e {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,
                 error => error.to_string().into(),

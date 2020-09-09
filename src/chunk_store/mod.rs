@@ -24,8 +24,8 @@ use error::{Error, Result};
 use log::trace;
 use sn_data_types::{Account, Blob, Map, Sequence};
 use std::{
-    fs::Metadata,
     cell::Cell,
+    fs::Metadata,
     marker::PhantomData,
     path::{Path, PathBuf},
     rc::Rc,
@@ -140,7 +140,9 @@ impl<T: Chunk> ChunkStore<T> {
     ///
     /// If the data file can't be accessed, it returns `Error::NoSuchChunk`.
     pub async fn get(&self, id: &T::Id) -> Result<T> {
-        let mut file = File::open(self.file_path(id)?).await.map_err(|_| Error::NoSuchChunk)?;
+        let mut file = File::open(self.file_path(id)?)
+            .await
+            .map_err(|_| Error::NoSuchChunk)?;
         let mut contents = vec![];
         let _ = file.read_to_end(&mut contents).await?;
         let chunk = bincode::deserialize::<T>(&contents)?;
@@ -155,7 +157,8 @@ impl<T: Chunk> ChunkStore<T> {
     /// Tests if a data chunk has been previously stored under `id`.
     pub async fn has(&self, id: &T::Id) -> bool {
         if let Ok(path) = self.file_path(id) {
-            fs::metadata(path).await
+            fs::metadata(path)
+                .await
                 .as_ref()
                 .map(Metadata::is_file)
                 .unwrap_or(false)
@@ -171,8 +174,9 @@ impl<T: Chunk> ChunkStore<T> {
             Ok(entries) => {
                 entries
                     .filter_map(|entry| to_chunk_id(&entry.ok()?))
-                    .collect().await
-            },
+                    .collect()
+                    .await
+            }
             Err(_) => Vec::new(),
         }
     }

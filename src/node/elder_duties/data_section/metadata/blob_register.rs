@@ -61,8 +61,10 @@ impl BlobRegister {
         wrapping: ElderMsgWrapping,
         routing: Network,
     ) -> Result<Self> {
-        let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode).await?;
-        let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode).await?;
+        let metadata =
+            utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode).await?;
+        let holders =
+            utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode).await?;
         let full_adults =
             utils::new_db(node_info.path(), FULL_ADULTS_DB_NAME, node_info.init_mode).await?;
 

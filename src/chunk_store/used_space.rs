@@ -8,15 +8,10 @@
 
 use super::error::{Error, Result};
 use crate::node::state_db::Init;
-use std::{
-    cell::Cell,
-    io::SeekFrom,
-    path::Path,
-    rc::Rc,
-};
+use std::{cell::Cell, io::SeekFrom, path::Path, rc::Rc};
 use tokio::{
     fs::{File, OpenOptions},
-    io::{ AsyncReadExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt},
 };
 
 const USED_SPACE_FILENAME: &str = "used_space";
@@ -43,7 +38,8 @@ impl UsedSpace {
             .read(true)
             .write(true)
             .create(true)
-            .open(dir.as_ref().join(USED_SPACE_FILENAME)).await?;
+            .open(dir.as_ref().join(USED_SPACE_FILENAME))
+            .await?;
         let local_value = if init_mode == Init::Load {
             let mut buffer = vec![];
             let _ = local_record.read_to_end(&mut buffer).await?;
@@ -87,7 +83,6 @@ impl UsedSpace {
     }
 
     async fn record_new_values(&mut self, total: u64, local: u64) -> Result<()> {
-
         self.local_record.set_len(0).await?;
         let _ = self.local_record.seek(SeekFrom::Start(0)).await?;
 

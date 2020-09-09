@@ -52,10 +52,12 @@ impl Metadata {
         routing: Network,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
-        let account_storage = AccountStorage::new(node_info, total_used_space, wrapping.clone()).await?;
+        let account_storage =
+            AccountStorage::new(node_info, total_used_space, wrapping.clone()).await?;
         let blob_register = BlobRegister::new(node_info, wrapping.clone(), routing).await?;
         let map_storage = MapStorage::new(node_info, total_used_space, wrapping.clone()).await?;
-        let sequence_storage = SequenceStorage::new(node_info, total_used_space, wrapping.clone()).await?;
+        let sequence_storage =
+            SequenceStorage::new(node_info, total_used_space, wrapping.clone()).await?;
         let elder_stores = ElderStores::new(
             account_storage,
             blob_register,
@@ -78,7 +80,9 @@ impl Metadata {
     async fn process_msg(&mut self, msg: MsgEnvelope) -> Option<NodeOperation> {
         match &msg.message {
             Message::Cmd { .. } => writing::get_result(msg, &mut self.elder_stores).await,
-            Message::Query { .. } => reading::get_result(msg, &self.elder_stores).await.map(|c| c.into()),
+            Message::Query { .. } => reading::get_result(msg, &self.elder_stores)
+                .await
+                .map(|c| c.into()),
             _ => None, // only Queries and Cmds from client is handled at Metadata
         }
     }
