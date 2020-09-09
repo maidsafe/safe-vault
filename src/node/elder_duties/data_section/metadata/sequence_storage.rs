@@ -16,9 +16,8 @@ use crate::{
 use sn_data_types::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
     Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp, SequenceEntry, SequenceIndex,
-    SequencePermissions, SequencePolicy, SequencePolicyWriteOp, SequencePrivatePermissions,
-    SequencePrivatePolicy, SequencePublicPermissions, SequencePublicPolicy, SequenceRead,
-    SequenceUser, SequenceWrite,
+    SequencePolicyWriteOp, SequencePrivatePolicy, SequencePublicPolicy, SequenceRead, SequenceUser,
+    SequenceWrite,
 };
 use std::{
     cell::Cell,
@@ -381,7 +380,7 @@ impl SequenceStorage {
             SequenceAction::Append,
             origin,
             move |mut sequence| {
-                sequence.apply_data_op(write_op);
+                sequence.apply_data_op(write_op)?;
                 Ok(sequence)
             },
         );

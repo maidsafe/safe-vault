@@ -34,7 +34,7 @@ lazy_static = "1"
 log = "~0.4.7"
 pickledb = "~0.4.0"
 quick-error = "1.2.2"
-qp2p = { git = "https://github.com/maidsafe/qp2p", branch = "master", features = ["upnp"] }
+qp2p = { git = "https://github.com/maidsafe/qp2p.git", branch = "master" }
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
 #routing = { path="../routing" }

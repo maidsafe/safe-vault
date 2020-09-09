@@ -47,7 +47,7 @@ impl Network {
     }
 
     pub fn our_name(&self) -> XorName {
-        XorName(self.routing.borrow().id().name().0)
+        XorName(self.name().0)
     }
 
     pub fn public_key(&self) -> Option<PublicKey> {
@@ -63,7 +63,7 @@ impl Network {
     }
 
     pub fn id(&self) -> PublicId {
-        *self.routing.borrow().id()
+        futures::executor::block_on(self.routing.borrow().id())
     }
 
     pub fn is_genesis(&self) -> bool {
@@ -71,7 +71,7 @@ impl Network {
     }
 
     pub fn name(&self) -> XorName {
-        *self.routing.borrow().name()
+        futures::executor::block_on(self.routing.borrow().name())
     }
 
     pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
@@ -194,7 +194,7 @@ impl Network {
             AgeGroup::Elder
         } else if futures::executor::block_on(self.routing.borrow().our_adults())
             .iter()
-            .any(|adult| *adult.name() == *self.routing.borrow().name())
+            .any(|adult| *adult.name() == self.name())
         {
             AgeGroup::Adult
         } else {

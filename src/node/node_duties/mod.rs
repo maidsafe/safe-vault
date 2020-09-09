@@ -50,23 +50,16 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
 impl<R: CryptoRng + Rng> NodeDuties<R> {
     pub fn new(node_info: NodeInfo, routing: Network, rng: R) -> Self {
         let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
-        let is_genesis = &routing.is_genesis();
 
         let messaging = Messaging::new(routing.clone());
-        let mut duties = Self {
+        Self {
             node_info,
             duty_level: DutyLevel::Infant,
             network_events,
             messaging,
             routing,
             rng: Some(rng),
-        };
-
-        if *is_genesis {
-            duties.become_elder();
         }
-
-        duties
     }
 
     pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {

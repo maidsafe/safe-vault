@@ -23,7 +23,6 @@ use crate::{
     Network, Result,
 };
 use log::trace;
-use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::{Prefix, RoutingError};
 use sn_data_types::PublicKey;
@@ -49,7 +48,7 @@ pub struct KeySection<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> KeySection<R> {
     pub fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
-        let mut gateway = ClientGateway::new(info, routing.clone(), rng)?;
+        let gateway = ClientGateway::new(info, routing.clone(), rng)?;
         let replica_manager = Self::new_replica_manager(info, routing.clone())?;
         let payments = Payments::new(info.keys.clone(), replica_manager.clone());
         let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());

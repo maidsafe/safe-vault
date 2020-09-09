@@ -9,7 +9,6 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
-use qp2p::SendStream;
 use routing::{event::Event as RoutingEvent, Prefix};
 use serde::export::Formatter;
 use sn_data_types::{

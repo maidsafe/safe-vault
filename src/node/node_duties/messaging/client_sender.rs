@@ -8,7 +8,6 @@
 
 use crate::{node::node_ops::MessagingDuty, utils, Network};
 use log::warn;
-use qp2p::SendStream;
 use serde::Serialize;
 use sn_data_types::{Address, HandshakeResponse, MsgEnvelope};
 use std::{
