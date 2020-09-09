@@ -14,10 +14,11 @@ use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{BlsKeypairShare, Keypair};
-use std::{fs, path::Path};
+use std::path::Path;
+use tokio::fs;
 use unwrap::unwrap;
 
-pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
+pub(crate) async fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
     db_name: N,
     init_mode: Init,
@@ -25,7 +26,7 @@ pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     let db_path = db_dir.as_ref().join(db_name);
     if init_mode == Init::New {
         trace!("Creating database at {}", db_path.display());
-        fs::create_dir_all(db_dir)?;
+        fs::create_dir_all(db_dir).await?;
         let mut db = PickleDb::new_bin(db_path, PickleDbDumpPolicy::AutoDump);
         // Write then delete a value to ensure DB file is actually written to disk.
         db.set("", &"")?;

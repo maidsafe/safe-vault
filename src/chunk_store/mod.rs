@@ -24,12 +24,16 @@ use error::{Error, Result};
 use log::trace;
 use sn_data_types::{Account, Blob, Map, Sequence};
 use std::{
+    fs::Metadata,
     cell::Cell,
-    fs::{self, DirEntry, File, Metadata},
-    io::{Read, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
     rc::Rc,
+};
+use tokio::{
+    fs::{self, DirEntry, File},
+    io::{AsyncReadExt, AsyncWriteExt},
+    stream::StreamExt,
 };
 use used_space::UsedSpace;
 
@@ -65,7 +69,7 @@ where
     ///
     /// The maximum storage space is defined by `max_capacity`.  This specifies the max usable by
     /// _all_ `ChunkStores`, not per `ChunkStore`.
-    pub fn new<P: AsRef<Path>>(
+    pub async fn new<P: AsRef<Path>>(
         root: P,
         max_capacity: u64,
         total_used_space: Rc<Cell<u64>>,
@@ -74,11 +78,11 @@ where
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 
         match init_mode {
-            Init::New => Self::create_new_root(&dir)?,
+            Init::New => Self::create_new_root(&dir).await?,
             Init::Load => trace!("Loading ChunkStore at {}", dir.display()),
         }
 
-        let used_space = UsedSpace::new(&dir, total_used_space, init_mode)?;
+        let used_space = UsedSpace::new(&dir, total_used_space, init_mode).await?;
         Ok(ChunkStore {
             dir,
             max_capacity,
@@ -89,14 +93,14 @@ where
 }
 
 impl<T: Chunk> ChunkStore<T> {
-    fn create_new_root(root: &Path) -> Result<()> {
+    async fn create_new_root(root: &Path) -> Result<()> {
         trace!("Creating ChunkStore at {}", root.display());
-        fs::create_dir_all(root)?;
+        fs::create_dir_all(root).await?;
 
         // Verify that chunk files can be created.
         let temp_file_path = root.join("0".repeat(MAX_CHUNK_FILE_NAME_LENGTH));
-        let _ = File::create(&temp_file_path)?;
-        fs::remove_file(temp_file_path)?;
+        let _ = File::create(&temp_file_path).await?;
+        fs::remove_file(temp_file_path).await?;
 
         Ok(())
     }
@@ -107,7 +111,7 @@ impl<T: Chunk> ChunkStore<T> {
     /// an IO error, it returns `Error::Io`.
     ///
     /// If a chunk with the same id already exists, it will be overwritten.
-    pub fn put(&mut self, chunk: &T) -> Result<()> {
+    pub async fn put(&mut self, chunk: &T) -> Result<()> {
         let serialised_chunk = utils::serialise(chunk);
         let consumed_space = serialised_chunk.len() as u64;
         if self.used_space.total().saturating_add(consumed_space) > self.max_capacity {
@@ -117,28 +121,28 @@ impl<T: Chunk> ChunkStore<T> {
         let file_path = self.file_path(chunk.id())?;
         let _ = self.do_delete(&file_path);
 
-        let mut file = File::create(&file_path)?;
-        file.write_all(&serialised_chunk)?;
-        file.sync_data()?;
+        let mut file = File::create(&file_path).await?;
+        file.write_all(&serialised_chunk).await?;
+        file.sync_data().await?;
 
-        self.used_space.increase(consumed_space)
+        self.used_space.increase(consumed_space).await
     }
 
     /// Deletes the data chunk stored under `id`.
     ///
     /// If the data doesn't exist, it does nothing and returns `Ok`.  In the case of an IO error, it
     /// returns `Error::Io`.
-    pub fn delete(&mut self, id: &T::Id) -> Result<()> {
-        self.do_delete(&self.file_path(id)?)
+    pub async fn delete(&mut self, id: &T::Id) -> Result<()> {
+        self.do_delete(&self.file_path(id)?).await
     }
 
     /// Returns a data chunk previously stored under `id`.
     ///
     /// If the data file can't be accessed, it returns `Error::NoSuchChunk`.
-    pub fn get(&self, id: &T::Id) -> Result<T> {
-        let mut file = File::open(self.file_path(id)?).map_err(|_| Error::NoSuchChunk)?;
+    pub async fn get(&self, id: &T::Id) -> Result<T> {
+        let mut file = File::open(self.file_path(id)?).await.map_err(|_| Error::NoSuchChunk)?;
         let mut contents = vec![];
-        let _ = file.read_to_end(&mut contents)?;
+        let _ = file.read_to_end(&mut contents).await?;
         let chunk = bincode::deserialize::<T>(&contents)?;
         // Check it's the requested chunk variant.
         if chunk.id() == id {
@@ -149,9 +153,9 @@ impl<T: Chunk> ChunkStore<T> {
     }
 
     /// Tests if a data chunk has been previously stored under `id`.
-    pub fn has(&self, id: &T::Id) -> bool {
+    pub async fn has(&self, id: &T::Id) -> bool {
         if let Ok(path) = self.file_path(id) {
-            fs::metadata(path)
+            fs::metadata(path).await
                 .as_ref()
                 .map(Metadata::is_file)
                 .unwrap_or(false)
@@ -162,20 +166,21 @@ impl<T: Chunk> ChunkStore<T> {
 
     /// Lists all keys of currently stored data.
     #[cfg_attr(not(test), allow(unused))]
-    pub fn keys(&self) -> Vec<T::Id> {
-        fs::read_dir(&self.dir)
-            .map(|entries| {
+    pub async fn keys(&self) -> Vec<T::Id> {
+        match fs::read_dir(&self.dir).await {
+            Ok(entries) => {
                 entries
                     .filter_map(|entry| to_chunk_id(&entry.ok()?))
-                    .collect()
-            })
-            .unwrap_or_else(|_| Vec::new())
+                    .collect().await
+            },
+            Err(_) => Vec::new(),
+        }
     }
 
-    fn do_delete(&mut self, file_path: &Path) -> Result<()> {
-        if let Ok(metadata) = fs::metadata(file_path) {
-            self.used_space.decrease(metadata.len())?;
-            fs::remove_file(file_path).map_err(From::from)
+    async fn do_delete(&mut self, file_path: &Path) -> Result<()> {
+        if let Ok(metadata) = fs::metadata(file_path).await {
+            self.used_space.decrease(metadata.len()).await?;
+            fs::remove_file(file_path).await.map_err(From::from)
         } else {
             Ok(())
         }

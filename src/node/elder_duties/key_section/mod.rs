@@ -47,9 +47,9 @@ pub struct KeySection<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> KeySection<R> {
-    pub fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
-        let mut gateway = ClientGateway::new(info, routing.clone(), rng)?;
-        let replica_manager = Self::new_replica_manager(info, routing.clone())?;
+    pub async fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
+        let gateway = ClientGateway::new(info, routing.clone(), rng)?;
+        let replica_manager = Self::new_replica_manager(info, routing.clone()).await?;
         let payments = Payments::new(info.keys.clone(), replica_manager.clone());
         let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
@@ -123,7 +123,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         }
     }
 
-    fn new_replica_manager(
+    async fn new_replica_manager(
         info: &NodeInfo,
         routing: Network,
     ) -> Result<Rc<RefCell<ReplicaManager>>> {
@@ -131,7 +131,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let secret_key_share = routing.secret_key_share()?;
         let key_index = routing.our_index()?;
         let proof_chain = routing.our_history().ok_or(RoutingError::InvalidState)?;
-        let store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
+        let store = TransferStore::new(info.root_dir.clone(), info.init_mode).await?;
         let replica_manager = ReplicaManager::new(
             store,
             &secret_key_share,

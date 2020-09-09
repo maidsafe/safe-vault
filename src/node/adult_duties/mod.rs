@@ -27,17 +27,17 @@ pub struct AdultDuties {
 }
 
 impl AdultDuties {
-    pub fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
-        let chunks = Chunks::new(node_info, &total_used_space)?;
+    pub async fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+        let chunks = Chunks::new(node_info, &total_used_space).await?;
         Ok(Self { chunks })
     }
 
-    pub fn process(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
+    pub async fn process(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
         use AdultDuty::*;
         use ChunkDuty::*;
         let RunAsChunks(chunk_duty) = duty;
         let result = match chunk_duty {
-            ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg),
+            ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
         };
 
         result.map(|c| c.into())

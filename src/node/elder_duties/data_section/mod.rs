@@ -40,13 +40,13 @@ pub struct DataSection {
 
 impl DataSection {
     ///
-    pub fn new(
+    pub async fn new(
         info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
         routing: Network,
     ) -> Result<Self> {
         // Metadata
-        let metadata = Metadata::new(info, &total_used_space, routing.clone())?;
+        let metadata = Metadata::new(info, &total_used_space, routing.clone()).await?;
 
         // Rewards
         let keypair = utils::key_pair(routing.clone())?;
@@ -61,10 +61,10 @@ impl DataSection {
         })
     }
 
-    pub fn process(&mut self, duty: DataSectionDuty) -> Option<NodeOperation> {
+    pub async fn process(&mut self, duty: DataSectionDuty) -> Option<NodeOperation> {
         use DataSectionDuty::*;
         match duty {
-            RunAsMetadata(duty) => self.metadata.process(duty),
+            RunAsMetadata(duty) => self.metadata.process(duty).await,
             RunAsRewards(duty) => self.rewards.process(duty),
         }
     }

@@ -33,15 +33,15 @@ pub struct ElderDuties<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> ElderDuties<R> {
-    pub fn new(
+    pub async fn new(
         info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
         routing: Network,
         rng: R,
     ) -> Result<Self> {
         let prefix = routing.our_prefix().ok_or(Error::Logic)?;
-        let key_section = KeySection::new(info, routing.clone(), rng)?;
-        let data_section = DataSection::new(info, total_used_space, routing)?;
+        let key_section = KeySection::new(info, routing.clone(), rng).await?;
+        let data_section = DataSection::new(info, total_used_space, routing).await?;
         Ok(Self {
             prefix,
             key_section,
@@ -58,7 +58,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     }
 
     /// Processing of any Elder duty.
-    pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
+    pub async fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
         trace!("Processing elder duty");
         use ElderDuty::*;
         match duty {
@@ -71,7 +71,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
             } => self.relocated_node_joined(old_node_id, new_node_id, age),
             ProcessElderChange { prefix, .. } => self.elders_changed(prefix),
             RunAsKeySection(mut the_key_duty) => self.key_section.process(&mut the_key_duty),
-            RunAsDataSection(duty) => self.data_section.process(duty),
+            RunAsDataSection(duty) => self.data_section.process(duty).await,
         }
     }
 

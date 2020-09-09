@@ -28,13 +28,13 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    pub fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
-        let chunk_storage = ChunkStorage::new(node_info, total_used_space)?;
+    pub async fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+        let chunk_storage = ChunkStorage::new(node_info, total_used_space).await?;
 
         Ok(Self { chunk_storage })
     }
 
-    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub async fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         trace!(
             "{}: Received ({:?} from src {:?}",
             self,
@@ -45,7 +45,7 @@ impl Chunks {
             Message::Query {
                 query: Query::Data(DataQuery::Blob(read)),
                 ..
-            } => reading::get_result(read, msg, &self.chunk_storage),
+            } => reading::get_result(read, msg, &self.chunk_storage).await,
             Message::Cmd {
                 cmd:
                     Cmd::Data {
@@ -53,7 +53,7 @@ impl Chunks {
                         ..
                     },
                 ..
-            } => writing::get_result(write, msg, &mut self.chunk_storage),
+            } => writing::get_result(write, msg, &mut self.chunk_storage).await,
             _ => None,
         }
     }

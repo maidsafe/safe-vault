@@ -10,10 +10,13 @@ use super::error::{Error, Result};
 use crate::node::state_db::Init;
 use std::{
     cell::Cell,
-    fs::{File, OpenOptions},
-    io::{Read, Seek, SeekFrom},
+    io::SeekFrom,
     path::Path,
     rc::Rc,
+};
+use tokio::{
+    fs::{File, OpenOptions},
+    io::{ AsyncReadExt, AsyncWriteExt},
 };
 
 const USED_SPACE_FILENAME: &str = "used_space";
@@ -31,7 +34,7 @@ pub(super) struct UsedSpace {
 }
 
 impl UsedSpace {
-    pub fn new<T: AsRef<Path>>(
+    pub async fn new<T: AsRef<Path>>(
         dir: T,
         total_used_space: Rc<Cell<u64>>,
         init_mode: Init,
@@ -40,14 +43,16 @@ impl UsedSpace {
             .read(true)
             .write(true)
             .create(true)
-            .open(dir.as_ref().join(USED_SPACE_FILENAME))?;
+            .open(dir.as_ref().join(USED_SPACE_FILENAME)).await?;
         let local_value = if init_mode == Init::Load {
             let mut buffer = vec![];
-            let _ = local_record.read_to_end(&mut buffer)?;
+            let _ = local_record.read_to_end(&mut buffer).await?;
             // TODO - if this can't be parsed, we should consider emptying `dir` of any chunks.
             bincode::deserialize::<u64>(&buffer)?
         } else {
-            bincode::serialize_into(&mut local_record, &0_u64)?;
+            let mut bytes = Vec::<u8>::new();
+            bincode::serialize_into(&mut bytes, &0_u64)?;
+            local_record.write_all(&bytes).await?;
             0
         };
         Ok(Self {
@@ -62,7 +67,7 @@ impl UsedSpace {
         self.total_value.get()
     }
 
-    pub fn increase(&mut self, consumed: u64) -> Result<()> {
+    pub async fn increase(&mut self, consumed: u64) -> Result<()> {
         let new_total = self
             .total_value
             .get()
@@ -72,19 +77,24 @@ impl UsedSpace {
             .local_value
             .checked_add(consumed)
             .ok_or(Error::NotEnoughSpace)?;
-        self.record_new_values(new_total, new_local)
+        self.record_new_values(new_total, new_local).await
     }
 
-    pub fn decrease(&mut self, released: u64) -> Result<()> {
+    pub async fn decrease(&mut self, released: u64) -> Result<()> {
         let new_total = self.total_value.get().saturating_sub(released);
         let new_local = self.local_value.saturating_sub(released);
-        self.record_new_values(new_total, new_local)
+        self.record_new_values(new_total, new_local).await
     }
 
-    fn record_new_values(&mut self, total: u64, local: u64) -> Result<()> {
-        self.local_record.set_len(0)?;
-        let _ = self.local_record.seek(SeekFrom::Start(0))?;
-        bincode::serialize_into(&self.local_record, &local)?;
+    async fn record_new_values(&mut self, total: u64, local: u64) -> Result<()> {
+
+        self.local_record.set_len(0).await?;
+        let _ = self.local_record.seek(SeekFrom::Start(0)).await?;
+
+        let mut contents = Vec::<u8>::new();
+        bincode::serialize_into(&mut contents, &local)?;
+        self.local_record.write_all(&contents).await?;
+
         self.total_value.set(total);
         self.local_value = local;
         Ok(())

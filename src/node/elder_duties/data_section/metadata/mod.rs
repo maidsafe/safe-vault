@@ -46,16 +46,16 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn new(
+    pub async fn new(
         node_info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
         routing: Network,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
-        let account_storage = AccountStorage::new(node_info, total_used_space, wrapping.clone())?;
-        let blob_register = BlobRegister::new(node_info, wrapping.clone(), routing)?;
-        let map_storage = MapStorage::new(node_info, total_used_space, wrapping.clone())?;
-        let sequence_storage = SequenceStorage::new(node_info, total_used_space, wrapping.clone())?;
+        let account_storage = AccountStorage::new(node_info, total_used_space, wrapping.clone()).await?;
+        let blob_register = BlobRegister::new(node_info, wrapping.clone(), routing).await?;
+        let map_storage = MapStorage::new(node_info, total_used_space, wrapping.clone()).await?;
+        let sequence_storage = SequenceStorage::new(node_info, total_used_space, wrapping.clone()).await?;
         let elder_stores = ElderStores::new(
             account_storage,
             blob_register,
@@ -68,17 +68,17 @@ impl Metadata {
         })
     }
 
-    pub fn process(&mut self, duty: MetadataDuty) -> Option<NodeOperation> {
+    pub async fn process(&mut self, duty: MetadataDuty) -> Option<NodeOperation> {
         use MetadataDuty::*;
         match duty {
-            ProcessRead(msg) | ProcessWrite(msg) => self.process_msg(msg),
+            ProcessRead(msg) | ProcessWrite(msg) => self.process_msg(msg).await,
         }
     }
 
-    fn process_msg(&mut self, msg: MsgEnvelope) -> Option<NodeOperation> {
+    async fn process_msg(&mut self, msg: MsgEnvelope) -> Option<NodeOperation> {
         match &msg.message {
-            Message::Cmd { .. } => writing::get_result(msg, &mut self.elder_stores),
-            Message::Query { .. } => reading::get_result(msg, &self.elder_stores).map(|c| c.into()),
+            Message::Cmd { .. } => writing::get_result(msg, &mut self.elder_stores).await,
+            Message::Query { .. } => reading::get_result(msg, &self.elder_stores).await.map(|c| c.into()),
             _ => None, // only Queries and Cmds from client is handled at Metadata
         }
     }

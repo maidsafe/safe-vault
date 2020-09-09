@@ -18,7 +18,7 @@ use sn_data_types::{
     SequenceRead,
 };
 
-pub(super) fn get_result(msg: MsgEnvelope, stores: &ElderStores) -> Option<MessagingDuty> {
+pub(super) async fn get_result(msg: MsgEnvelope, stores: &ElderStores) -> Option<MessagingDuty> {
     use DataQuery::*;
     let msg_id = msg.id();
     let origin = msg.origin;
@@ -29,9 +29,9 @@ pub(super) fn get_result(msg: MsgEnvelope, stores: &ElderStores) -> Option<Messa
             ..
         } => match &data_query {
             Blob(read) => blob(read, stores.blob_register(), msg_id, origin, proxies),
-            Map(read) => map(read, stores.map_storage(), msg_id, origin),
-            Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin),
-            Account(read) => account(read, stores.account_storage(), msg_id, origin),
+            Map(read) => map(read, stores.map_storage(), msg_id, origin).await,
+            Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin).await,
+            Account(read) => account(read, stores.account_storage(), msg_id, origin).await,
         },
         _ => unreachable!("Logic error"),
     }
@@ -47,29 +47,29 @@ fn blob(
     register.read(read, msg_id, origin, proxies) // since the data is sent on to adults, the entire msg is passed in
 }
 
-fn map(
+async fn map(
     read: &MapRead,
     storage: &MapStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Option<MessagingDuty> {
-    storage.read(read, msg_id, &origin) // map data currently stay at elders, so the msg is not needed
+    storage.read(read, msg_id, &origin).await // map data currently stay at elders, so the msg is not needed
 }
 
-fn sequence(
+async fn sequence(
     read: &SequenceRead,
     storage: &SequenceStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Option<MessagingDuty> {
-    storage.read(read, msg_id, &origin) // sequence data currently stay at elders, so the msg is not needed
+    storage.read(read, msg_id, &origin).await // sequence data currently stay at elders, so the msg is not needed
 }
 
-fn account(
+async fn account(
     read: &AccountRead,
     storage: &AccountStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Option<MessagingDuty> {
-    storage.read(read, msg_id, &origin) // account data currently stay at elders, so the msg is not needed
+    storage.read(read, msg_id, &origin).await // account data currently stay at elders, so the msg is not needed
 }

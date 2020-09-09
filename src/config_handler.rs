@@ -13,12 +13,14 @@ use log::{debug, Level};
 use routing::TransportConfig as NetworkConfig;
 use serde::{Deserialize, Serialize};
 use std::{
-    fs::{self, File},
-    io::{self, BufReader},
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
 };
 use structopt::StructOpt;
+use tokio::{
+    fs::{self, File},
+    io::{self, AsyncWriteExt},
+};
 use unwrap::unwrap;
 
 lazy_static! {
@@ -105,8 +107,8 @@ pub struct Config {
 impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default vault config file location,
     /// and overrides values with any equivalent command line args.
-    pub fn new() -> Self {
-        let mut config = match Self::read_from_file() {
+    pub async fn new() -> Self {
+        let mut config = match Self::read_from_file().await {
             Ok(Some(config)) => config,
             Ok(None) | Err(_) => Default::default(),
         };
@@ -269,24 +271,17 @@ impl Config {
     }
 
     /// Reads the default vault config file.
-    fn read_from_file() -> Result<Option<Config>> {
+    async fn read_from_file() -> Result<Option<Config>> {
         let path = project_dirs()?.config_dir().join(CONFIG_FILE);
 
-        match File::open(&path) {
-            Ok(file) => {
-                debug!("Reading settings from {}", path.display());
-                let reader = BufReader::new(file);
-                let config = serde_json::from_reader(reader)?;
-                Ok(config)
-            }
-            Err(error) => {
-                if error.kind() == std::io::ErrorKind::NotFound {
-                    debug!("No config file available at {}", path.display());
-                    Ok(None)
-                } else {
-                    Err(error.into())
-                }
-            }
+        if path.is_file() {
+            debug!("Reading settings from {}", path.display());
+            let contents = fs::read(&path).await?;
+            let config = serde_json::from_slice(&contents)?;
+            Ok(config)
+        } else {
+            debug!("No config file available at {}", path.display());
+            Ok(None)
         }
     }
 
@@ -306,22 +301,24 @@ impl Config {
 /// Writes connection info to file for use by clients.
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn write_connection_info(peer_addr: &SocketAddr) -> Result<PathBuf> {
-    write_file(CONNECTION_INFO_FILE, peer_addr)
+pub async fn write_connection_info(peer_addr: &SocketAddr) -> Result<PathBuf> {
+    write_file(CONNECTION_INFO_FILE, peer_addr).await
 }
 
-fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<PathBuf>
+async fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<PathBuf>
 where
     T: Serialize,
 {
     let project_dirs = project_dirs()?;
     let dir = project_dirs.config_dir();
-    fs::create_dir_all(dir)?;
+    fs::create_dir_all(dir).await?;
 
     let path = dir.join(file);
-    let mut file = File::create(&path)?;
-    serde_json::to_writer_pretty(&mut file, config)?;
-    file.sync_all()?;
+    let mut file = File::create(&path).await?;
+    let contents = serde_json::to_vec_pretty(config)?;
+
+    file.write_all(&contents).await?;
+    file.sync_all().await?;
 
     Ok(path)
 }
@@ -413,13 +410,13 @@ mod test {
     }
 
     #[ignore]
-    #[test]
-    fn parse_sample_config_file() {
+    #[tokio::test]
+    async fn parse_sample_config_file() {
         let path = Path::new("installer/common/sample.vault.config").to_path_buf();
-        let mut file = unwrap!(File::open(&path), "Error opening {}:", path.display());
+        let mut file = unwrap!(File::open(&path).await, "Error opening {}:", path.display());
         let mut encoded_contents = String::new();
         let _ = unwrap!(
-            file.read_to_string(&mut encoded_contents),
+            file.read_to_string(&mut encoded_contents).await,
             "Error reading {}:",
             path.display()
         );

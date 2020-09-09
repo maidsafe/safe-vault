@@ -33,7 +33,7 @@ pub(super) struct SequenceStorage {
 }
 
 impl SequenceStorage {
-    pub(super) fn new(
+    pub(super) async fn new(
         node_info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
         wrapping: ElderMsgWrapping,
@@ -43,11 +43,11 @@ impl SequenceStorage {
             node_info.max_storage_capacity,
             Rc::clone(total_used_space),
             node_info.init_mode,
-        )?;
+        ).await?;
         Ok(Self { chunks, wrapping })
     }
 
-    pub(super) fn read(
+    pub(super) async fn read(
         &self,
         read: &SequenceRead,
         msg_id: MessageId,
@@ -55,19 +55,19 @@ impl SequenceStorage {
     ) -> Option<MessagingDuty> {
         use SequenceRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, &origin),
-            GetRange { address, range } => self.get_range(*address, *range, msg_id, &origin),
-            GetLastEntry(address) => self.get_last_entry(*address, msg_id, &origin),
-            GetOwner(address) => self.get_owner(*address, msg_id, &origin),
+            Get(address) => self.get(*address, msg_id, &origin).await,
+            GetRange { address, range } => self.get_range(*address, *range, msg_id, &origin).await,
+            GetLastEntry(address) => self.get_last_entry(*address, msg_id, &origin).await,
+            GetOwner(address) => self.get_owner(*address, msg_id, &origin).await,
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, msg_id, &origin)
+                self.get_user_permissions(*address, *user, msg_id, &origin).await
             }
-            GetPublicPolicy(address) => self.get_public_policy(*address, msg_id, &origin),
-            GetPrivatePolicy(address) => self.get_private_policy(*address, msg_id, &origin),
+            GetPublicPolicy(address) => self.get_public_policy(*address, msg_id, &origin).await,
+            GetPrivatePolicy(address) => self.get_private_policy(*address, msg_id, &origin).await,
         }
     }
 
-    pub(super) fn write(
+    pub(super) async fn write(
         &mut self,
         write: SequenceWrite,
         msg_id: MessageId,
@@ -75,37 +75,37 @@ impl SequenceStorage {
     ) -> Option<MessagingDuty> {
         use SequenceWrite::*;
         match write {
-            New(data) => self.store(&data, msg_id, origin),
-            Edit(operation) => self.edit(operation, msg_id, origin),
-            Delete(address) => self.delete(address, msg_id, origin),
-            SetPublicPolicy(operation) => self.set_public_permissions(operation, msg_id, origin),
-            SetPrivatePolicy(operation) => self.set_private_permissions(operation, msg_id, origin),
+            New(data) => self.store(&data, msg_id, origin).await,
+            Edit(operation) => self.edit(operation, msg_id, origin).await,
+            Delete(address) => self.delete(address, msg_id, origin).await,
+            SetPublicPolicy(operation) => self.set_public_permissions(operation, msg_id, origin).await,
+            SetPrivatePolicy(operation) => self.set_private_permissions(operation, msg_id, origin).await,
         }
     }
 
-    fn store(
+    async fn store(
         &mut self,
         data: &Sequence,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        let result = if self.chunks.has(data.address()) {
+        let result = if self.chunks.has(data.address()).await {
             Err(NdError::DataExists)
         } else {
             self.chunks
-                .put(&data)
+                .put(&data).await
                 .map_err(|error| error.to_string().into())
         };
         self.ok_or_error(result, msg_id, &origin)
     }
 
-    fn get(
+    async fn get(
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        let result = self.get_chunk(address, SequenceAction::Read, origin);
+        let result = self.get_chunk(address, SequenceAction::Read, origin).await;
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetSequence(result),
             id: MessageId::new(),
@@ -114,14 +114,14 @@ impl SequenceStorage {
         })
     }
 
-    fn get_chunk(
+    async fn get_chunk(
         &self,
         address: SequenceAddress,
         action: SequenceAction,
         origin: &MsgSender,
     ) -> Result<Sequence, NdError> {
         //let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
-        let data = self.chunks.get(&address).map_err(|error| match error {
+        let data = self.chunks.get(&address).await.map_err(|error| match error {
             ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
             _ => error.to_string().into(),
         })?;
@@ -129,7 +129,7 @@ impl SequenceStorage {
         Ok(data)
     }
 
-    fn delete(
+    async fn delete(
         &mut self,
         address: SequenceAddress,
         msg_id: MessageId,
@@ -138,7 +138,7 @@ impl SequenceStorage {
         //let requester_pk = *utils::own_key(&requester)?;
         let result = self
             .chunks
-            .get(&address)
+            .get(&address).await
             .map_err(|error| match error {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
                 error => error.to_string().into(),
@@ -156,17 +156,22 @@ impl SequenceStorage {
                         Ok(())
                     }
                 }
-            })
-            .and_then(|_| {
-                self.chunks
-                    .delete(&address)
-                    .map_err(|error| error.to_string().into())
             });
+        
+        if let Ok(_) = result {
+            let result_inner = self.chunks
+                .delete(&address).await
+                .map_err(|error| error.to_string().into());
+            self.ok_or_error(result_inner, msg_id, &origin)
+        }
+        else {
+            self.ok_or_error(result, msg_id, &origin)
+        }
 
-        self.ok_or_error(result, msg_id, &origin)
+
     }
 
-    fn get_range(
+    async fn get_range(
         &self,
         address: SequenceAddress,
         range: (SequenceIndex, SequenceIndex),
@@ -174,7 +179,7 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SequenceAction::Read, origin)
+            .get_chunk(address, SequenceAction::Read, origin).await
             .and_then(|sequence| {
                 sequence
                     .in_range(range.0, range.1)
@@ -188,14 +193,14 @@ impl SequenceStorage {
         })
     }
 
-    fn get_last_entry(
+    async fn get_last_entry(
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SequenceAction::Read, origin)
+            .get_chunk(address, SequenceAction::Read, origin).await
             .and_then(|sequence| match sequence.last_entry() {
                 Some(entry) => Ok((sequence.len() - 1, entry.to_vec())),
                 None => Err(NdError::NoSuchEntry),
@@ -208,14 +213,14 @@ impl SequenceStorage {
         })
     }
 
-    fn get_owner(
+    async fn get_owner(
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SequenceAction::Read, origin)
+            .get_chunk(address, SequenceAction::Read, origin).await
             .and_then(|sequence| {
                 let version = sequence.policy_version() - 1;
 
@@ -235,7 +240,7 @@ impl SequenceStorage {
         })
     }
 
-    fn get_user_permissions(
+    async fn get_user_permissions(
         &self,
         address: SequenceAddress,
         user: SequenceUser,
@@ -243,7 +248,7 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SequenceAction::Read, origin)
+            .get_chunk(address, SequenceAction::Read, origin).await
             .and_then(|sequence| {
                 let index = sequence.policy_version() - 1;
                 sequence.permissions(user, index)
@@ -256,14 +261,14 @@ impl SequenceStorage {
         })
     }
 
-    fn get_public_policy(
+    async fn get_public_policy(
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SequenceAction::Read, origin)
+            .get_chunk(address, SequenceAction::Read, origin).await
             .and_then(|sequence| {
                 let index = sequence.policy_version() - 1;
                 let res = if sequence.is_pub() {
@@ -284,14 +289,14 @@ impl SequenceStorage {
         })
     }
 
-    fn get_private_policy(
+    async fn get_private_policy(
         &self,
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .get_chunk(address, SequenceAction::Read, origin)
+            .get_chunk(address, SequenceAction::Read, origin).await
             .and_then(|sequence| {
                 let index = sequence.policy_version() - 1;
                 let res = if !sequence.is_pub() {
@@ -312,7 +317,7 @@ impl SequenceStorage {
         })
     }
 
-    fn set_public_permissions(
+    async fn set_public_permissions(
         &mut self,
         write_op: SequencePolicyWriteOp<SequencePublicPolicy>,
         msg_id: MessageId,
@@ -327,11 +332,11 @@ impl SequenceStorage {
                 sequence.apply_public_policy_op(write_op)?;
                 Ok(sequence)
             },
-        );
+        ).await;
         self.ok_or_error(result, msg_id, &origin)
     }
 
-    fn set_private_permissions(
+    async fn set_private_permissions(
         &mut self,
         write_op: SequencePolicyWriteOp<SequencePrivatePolicy>,
         msg_id: MessageId,
@@ -346,7 +351,7 @@ impl SequenceStorage {
                 sequence.apply_private_policy_op(write_op)?;
                 Ok(sequence)
             },
-        );
+        ).await;
         self.ok_or_error(result, msg_id, origin)
     }
 
@@ -369,7 +374,7 @@ impl SequenceStorage {
     //     self.ok_or_error(result, msg_id, &origin)
     // }
 
-    fn edit(
+    async fn edit(
         &mut self,
         write_op: SequenceDataWriteOp<SequenceEntry>,
         msg_id: MessageId,
@@ -381,14 +386,14 @@ impl SequenceStorage {
             SequenceAction::Append,
             origin,
             move |mut sequence| {
-                sequence.apply_data_op(write_op);
+                sequence.apply_data_op(write_op)?;
                 Ok(sequence)
             },
-        );
+        ).await;
         self.ok_or_error(result, msg_id, origin)
     }
 
-    fn edit_chunk<F>(
+    async fn edit_chunk<F>(
         &mut self,
         address: SequenceAddress,
         action: SequenceAction,
@@ -398,13 +403,11 @@ impl SequenceStorage {
     where
         F: FnOnce(Sequence) -> NdResult<Sequence>,
     {
-        self.get_chunk(address, action, origin)
-            .and_then(write_fn)
-            .and_then(move |sequence| {
-                self.chunks
-                    .put(&sequence)
-                    .map_err(|error| error.to_string().into())
-            })
+        let chunk = self.get_chunk(address, action, origin).await?;
+        let sequence = write_fn(chunk)?;
+        self.chunks
+            .put(&sequence).await
+            .map_err(|error| error.to_string().into())
     }
 
     fn ok_or_error<T>(

@@ -77,7 +77,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             max_storage_capacity: config.max_capacity(),
         };
 
-        let mut duties = NodeDuties::new(node_info, network_api.clone(), rng);
+        let mut duties = NodeDuties::new(node_info, network_api.clone(), rng).await;
 
         use AgeGroup::*;
         let _ = match age_group {
@@ -162,11 +162,11 @@ impl<R: CryptoRng + Rng> Node<R> {
         match duty {
             RunAsAdult(duty) => {
                 info!("Running as Adult: {:?}", duty);
-                self.duties.adult_duties()?.process(&duty)
+                self.duties.adult_duties()?.process(&duty).await
             }
             RunAsElder(duty) => {
                 info!("Running as Elder: {:?}", duty);
-                self.duties.elder_duties()?.process(duty)
+                self.duties.elder_duties()?.process(duty).await
             }
             RunAsNode(duty) => {
                 info!("Running as Node: {:?}", duty);

@@ -56,15 +56,15 @@ pub(super) struct BlobRegister {
 }
 
 impl BlobRegister {
-    pub(super) fn new(
+    pub(super) async fn new(
         node_info: &NodeInfo,
         wrapping: ElderMsgWrapping,
         routing: Network,
     ) -> Result<Self> {
-        let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode)?;
-        let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode)?;
+        let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode).await?;
+        let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode).await?;
         let full_adults =
-            utils::new_db(node_info.path(), FULL_ADULTS_DB_NAME, node_info.init_mode)?;
+            utils::new_db(node_info.path(), FULL_ADULTS_DB_NAME, node_info.init_mode).await?;
 
         Ok(Self {
             metadata,

@@ -13,7 +13,7 @@ use sn_data_types::{Address, BlobRead, MsgEnvelope};
 
 /// Read operations on data chunks.
 
-pub(super) fn get_result(
+pub(super) async fn get_result(
     read: &BlobRead,
     msg: &MsgEnvelope,
     storage: &ChunkStorage,
@@ -21,7 +21,7 @@ pub(super) fn get_result(
     let BlobRead::Get(address) = read;
     if let Address::Section(_) = msg.most_recent_sender().address() {
         if msg.verify() {
-            storage.get(address, msg.id(), &msg.origin)
+            storage.get(address, msg.id(), &msg.origin).await
         } else {
             error!("Accumulated signature is invalid!");
             None

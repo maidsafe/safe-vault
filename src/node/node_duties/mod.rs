@@ -48,7 +48,7 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> NodeDuties<R> {
-    pub fn new(node_info: NodeInfo, routing: Network, rng: R) -> Self {
+    pub async fn new(node_info: NodeInfo, routing: Network, rng: R) -> Self {
         let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
         let is_genesis = &routing.is_genesis();
 
@@ -63,7 +63,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         };
 
         if *is_genesis {
-            duties.become_elder();
+            duties.become_elder().await;
         }
 
         duties
@@ -98,8 +98,8 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         info!("Processing Node Duty: {:?}", duty);
         match duty {
             RegisterWallet(wallet) => self.register_wallet(wallet),
-            BecomeAdult => self.become_adult(),
-            BecomeElder => self.become_elder(),
+            BecomeAdult => self.become_adult().await,
+            BecomeElder => self.become_elder().await,
             ProcessMessaging(duty) => self.messaging.process(duty).await,
             ProcessNetworkEvent(event) => self.network_events.process(event),
         }
@@ -119,11 +119,11 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             .map(|c| c.into())
     }
 
-    fn become_adult(&mut self) -> Option<NodeOperation> {
+    async fn become_adult(&mut self) -> Option<NodeOperation> {
         trace!("Becoming Adult");
         use DutyLevel::*;
         let total_used_space = Rc::new(Cell::new(0));
-        if let Ok(duties) = AdultDuties::new(&self.node_info, &total_used_space) {
+        if let Ok(duties) = AdultDuties::new(&self.node_info, &total_used_space).await {
             self.duty_level = Adult(duties);
             // NB: This is wrong, shouldn't write to disk here,
             // let it be upper layer resp.
@@ -133,7 +133,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         None
     }
 
-    fn become_elder(&mut self) -> Option<NodeOperation> {
+    async fn become_elder(&mut self) -> Option<NodeOperation> {
         trace!("Becoming Elder");
 
         use DutyLevel::*;
@@ -147,7 +147,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             &total_used_space,
             self.routing.clone(),
             self.rng.take()?,
-        ) {
+        ).await {
             let mut duties = duties;
             let op = duties.initiate();
             self.duty_level = Elder(duties);

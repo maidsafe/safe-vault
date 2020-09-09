@@ -42,7 +42,7 @@ const VAULT_MODULE_NAME: &str = "safe_vault";
 /// Runs a SAFE Network vault.
 #[tokio::main]
 async fn main() {
-    let mut config = Config::new();
+    let mut config = Config::new().await;
 
     if let Some(c) = &config.completions() {
         match c.parse::<clap::Shell>() {
@@ -136,7 +136,7 @@ async fn main() {
             );
 
             if config.is_first() {
-                unwrap!(write_connection_info(&our_conn_info));
+                unwrap!(write_connection_info(&our_conn_info).await);
             }
         }
         Err(e) => {

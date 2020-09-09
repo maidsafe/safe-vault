@@ -26,24 +26,24 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+    pub(crate) async fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
         let chunks = BlobChunkStore::new(
             node_info.path(),
             node_info.max_storage_capacity,
             Rc::clone(total_used_space),
             node_info.init_mode,
-        )?;
+        ).await?;
         let wrapping = AdultMsgWrapping::new(node_info.keys(), AdultDuties::ChunkStorage);
         Ok(Self { chunks, wrapping })
     }
 
-    pub(crate) fn store(
+    pub(crate) async fn store(
         &mut self,
         data: &Blob,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        if let Err(error) = self.try_store(data) {
+        if let Err(error) = self.try_store(data).await {
             return self
                 .wrapping
                 .error(CmdError::Data(error), msg_id, &origin.address());
@@ -52,14 +52,14 @@ impl ChunkStorage {
     }
 
     #[allow(unused)]
-    pub(crate) fn take_duplicate(
+    pub(crate) async fn take_duplicate(
         &mut self,
         data: &Blob,
         msg_id: MessageId,
         origin: &MsgSender,
         accumulated_signature: &Signature,
     ) -> Option<MessagingDuty> {
-        let message = match self.try_store(data) {
+        let message = match self.try_store(data).await {
             Ok(()) => Message::NodeEvent {
                 event: NodeEvent::DuplicationComplete {
                     chunk: *data.address(),
@@ -81,8 +81,8 @@ impl ChunkStorage {
         self.wrapping.send(message)
     }
 
-    fn try_store(&mut self, data: &Blob) -> NdResult<()> {
-        if self.chunks.has(data.address()) {
+    async fn try_store(&mut self, data: &Blob) -> NdResult<()> {
+        if self.chunks.has(data.address()).await {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
@@ -91,11 +91,11 @@ impl ChunkStorage {
             return Err(NdError::DataExists);
         }
         self.chunks
-            .put(&data)
+            .put(&data).await
             .map_err(|error| error.to_string().into())
     }
 
-    pub(crate) fn get(
+    pub(crate) async fn get(
         &self,
         address: &BlobAddress,
         msg_id: MessageId,
@@ -103,7 +103,7 @@ impl ChunkStorage {
     ) -> Option<MessagingDuty> {
         let result = self
             .chunks
-            .get(address)
+            .get(address).await
             .map_err(|error| error.to_string().into());
         self.wrapping.send(Message::QueryResponse {
             id: MessageId::new(),
@@ -136,21 +136,21 @@ impl ChunkStorage {
     //     })
     // }
 
-    pub(crate) fn delete(
+    pub(crate) async fn delete(
         &mut self,
         address: BlobAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        if !self.chunks.has(&address) {
+        if !self.chunks.has(&address).await {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
             return None;
         }
 
-        let result = match self.chunks.get(&address) {
+        let result = match self.chunks.get(&address).await {
             Ok(Blob::Private(_)) => self
                 .chunks
-                .delete(&address)
+                .delete(&address).await
                 .map_err(|error| error.to_string().into()),
             Ok(_) => {
                 error!(

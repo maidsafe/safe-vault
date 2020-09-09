@@ -20,9 +20,9 @@ pub struct TransferStore {
 }
 
 impl TransferStore {
-    pub fn new<R: AsRef<Path>>(root_dir: R, init_mode: Init) -> Result<Self> {
+    pub async fn new<R: AsRef<Path>>(root_dir: R, init_mode: Init) -> Result<Self> {
         Ok(Self {
-            db: utils::new_db(root_dir, TRANSFERS_DB_NAME, init_mode)?,
+            db: utils::new_db(root_dir, TRANSFERS_DB_NAME, init_mode).await?,
         })
     }
 

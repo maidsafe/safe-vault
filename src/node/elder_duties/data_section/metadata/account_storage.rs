@@ -34,7 +34,7 @@ pub(super) struct AccountStorage {
 }
 
 impl AccountStorage {
-    pub fn new(
+    pub async fn new(
         node_info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
         wrapping: ElderMsgWrapping,
@@ -44,11 +44,11 @@ impl AccountStorage {
             node_info.max_storage_capacity,
             Rc::clone(total_used_space),
             node_info.init_mode,
-        )?;
+        ).await?;
         Ok(Self { chunks, wrapping })
     }
 
-    pub(super) fn read(
+    pub(super) async fn read(
         &self,
         read: &AccountRead,
         msg_id: MessageId,
@@ -56,18 +56,18 @@ impl AccountStorage {
     ) -> Option<MessagingDuty> {
         use AccountRead::*;
         match read {
-            Get(ref address) => self.get(address, msg_id, origin),
+            Get(ref address) => self.get(address, msg_id, origin).await,
         }
     }
 
-    fn get(
+    async fn get(
         &self,
         address: &XorName,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
         let result = self
-            .account(&origin.id(), address)
+            .account(&origin.id(), address).await
             .map(Account::into_data_and_signature);
         self.wrapping.send(Message::QueryResponse {
             id: MessageId::new(),
@@ -77,7 +77,7 @@ impl AccountStorage {
         })
     }
 
-    pub(super) fn write(
+    pub(super) async fn write(
         &mut self,
         write: AccountWrite,
         msg_id: MessageId,
@@ -85,56 +85,62 @@ impl AccountStorage {
     ) -> Option<MessagingDuty> {
         use AccountWrite::*;
         match write {
-            New(ref account) => self.create(account, msg_id, &origin),
-            Update(updated_account) => self.update(&updated_account, msg_id, &origin),
+            New(ref account) => self.create(account, msg_id, &origin).await,
+            Update(updated_account) => self.update(&updated_account, msg_id, &origin).await,
         }
     }
 
-    fn create(
+    async fn create(
         &mut self,
         account: &Account,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        let result = if self.chunks.has(account.address()) {
+        let result = if self.chunks.has(account.address()).await {
             Err(NdError::LoginPacketExists)
         } else if account.owner() != &origin.id() {
             Err(NdError::InvalidOwners)
         } else {
             // also check the signature
-            self.chunks
-                .put(account)
+            self
+                .chunks.put(account).await
                 .map_err(|error| error.to_string().into())
         };
         self.ok_or_error(result, msg_id, &origin)
     }
 
-    fn update(
+    async fn update(
         &mut self,
         updated_account: &Account,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        let result = self
-            .account(&origin.id(), updated_account.address())
-            .and_then(|existing_account| {
-                if !updated_account.size_is_valid() {
-                    Err(NdError::ExceededSize)
-                } else if updated_account.owner() != existing_account.owner() {
-                    Err(NdError::InvalidOwners)
-                } else {
-                    // also check the signature
-                    self.chunks
-                        .put(&updated_account)
-                        .map_err(|err| err.to_string().into())
-                }
-            });
-        self.ok_or_error(result, msg_id, &origin)
+        
+        let result = 
+            self.account(&origin.id(), updated_account.address()).await
+            .map_err(|e| NdError::from(e));
+
+        if let Ok(existing_account) = result {
+            let result_inner;
+            if !updated_account.size_is_valid() {
+                result_inner = Err(NdError::ExceededSize)
+            } else if updated_account.owner() != existing_account.owner() {
+                result_inner = Err(NdError::InvalidOwners)
+            } else {
+                // also check the signature
+                result_inner = self
+                    .chunks.put(&updated_account).await
+                    .map_err(|e| e.to_string().into())
+            }
+            self.ok_or_error(result_inner, msg_id, &origin)
+        } else {
+            self.ok_or_error(result.map(|_| ()), msg_id, &origin)
+        }
     }
 
-    fn account(&self, requester_pub_key: &PublicKey, address: &XorName) -> NdResult<Account> {
+    async fn account(&self, requester_pub_key: &PublicKey, address: &XorName) -> NdResult<Account> {
         self.chunks
-            .get(address)
+            .get(address).await
             .map_err(|e| match e {
                 ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,
                 error => error.to_string().into(),

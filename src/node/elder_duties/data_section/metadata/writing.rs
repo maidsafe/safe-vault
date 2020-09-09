@@ -16,7 +16,7 @@ use sn_data_types::{
     MsgEnvelope, MsgSender, SequenceWrite,
 };
 
-pub(super) fn get_result(msg: MsgEnvelope, stores: &mut ElderStores) -> Option<NodeOperation> {
+pub(super) async fn get_result(msg: MsgEnvelope, stores: &mut ElderStores) -> Option<NodeOperation> {
     use DataCmd::*;
     let msg_id = msg.id();
     let msg_origin = msg.origin;
@@ -37,9 +37,9 @@ pub(super) fn get_result(msg: MsgEnvelope, stores: &mut ElderStores) -> Option<N
                 payment,
                 proxies,
             ),
-            Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin),
-            Sequence(write) => sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin),
-            Account(write) => account(write, stores.account_storage_mut(), msg_id, msg_origin),
+            Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin).await,
+            Sequence(write) => sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await,
+            Account(write) => account(write, stores.account_storage_mut(), msg_id, msg_origin).await,
         },
         _ => unreachable!("Logic error"),
     };
@@ -57,29 +57,29 @@ fn blob(
     register.write(write, msg_id, origin, payment, proxies)
 }
 
-fn map(
+async fn map(
     write: MapWrite,
     storage: &mut MapStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Option<MessagingDuty> {
-    storage.write(write, msg_id, &origin)
+    storage.write(write, msg_id, &origin).await
 }
 
-fn sequence(
+async fn sequence(
     write: SequenceWrite,
     storage: &mut SequenceStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Option<MessagingDuty> {
-    storage.write(write, msg_id, &origin)
+    storage.write(write, msg_id, &origin).await
 }
 
-fn account(
+async fn account(
     write: AccountWrite,
     storage: &mut AccountStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Option<MessagingDuty> {
-    storage.write(write, msg_id, &origin)
+    storage.write(write, msg_id, &origin).await
 }
