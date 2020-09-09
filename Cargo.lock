@@ -1875,7 +1875,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.8.1"
-source = "git+https://github.com/maidsafe/qp2p#06fb27f7a24d4030029d1739746f18344c7b65b2"
+source = "git+https://github.com/maidsafe/qp2p.git#033f70f1e4af811385c241aa84fe8f554e38a4a9"
 dependencies = [
  "base64 0.12.3",
  "bincode",
