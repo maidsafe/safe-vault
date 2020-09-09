@@ -62,7 +62,7 @@ impl Onboarding {
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
-        stream: &mut SendStream,
+        stream: SendStream,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
         match handshake {
@@ -89,7 +89,7 @@ impl Onboarding {
         &self,
         peer_addr: SocketAddr,
         client_key: &PublicKey,
-        stream: &mut SendStream,
+        mut stream: SendStream,
     ) -> Option<MessagingDuty> {
         if !self.shall_bootstrap(&peer_addr) {
             info!(
@@ -140,7 +140,7 @@ impl Onboarding {
         &mut self,
         peer_addr: SocketAddr,
         client_key: PublicKey,
-        stream: &mut SendStream,
+        mut stream: SendStream,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
         if self.clients.contains_key(&peer_addr) {

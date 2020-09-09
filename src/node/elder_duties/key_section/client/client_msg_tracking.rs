@@ -18,12 +18,13 @@ use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
+use crate::utils;
 
 /// Tracks incoming and outgoingg messages
 /// between client and network.
 pub struct ClientMsgTracking {
     onboarding: Onboarding,
-    tracked_incoming: HashMap<MessageId, SocketAddr>,
+    tracked_incoming: HashMap<MessageId, SendStream>,
     tracked_outgoing: HashMap<MessageId, MsgEnvelope>,
 }
 
@@ -44,7 +45,7 @@ impl ClientMsgTracking {
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
-        stream: &mut SendStream,
+        stream: SendStream,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
         self.onboarding.process(handshake, peer_addr, stream, rng)
@@ -59,6 +60,7 @@ impl ClientMsgTracking {
         &mut self,
         msg_id: MessageId,
         client_address: SocketAddr,
+        stream: SendStream,
     ) -> Option<MessagingDuty> {
         // We could have received a group decision containing a client msg,
         // before receiving the msg from that client directly.
@@ -71,7 +73,7 @@ impl ClientMsgTracking {
         }
 
         if let Entry::Vacant(ve) = self.tracked_incoming.entry(msg_id) {
-            let _ = ve.insert(client_address);
+            let _ = ve.insert(stream);
             None
         } else {
             info!(
@@ -109,8 +111,8 @@ impl ClientMsgTracking {
                 //return Err(Error::InvalidOperation);
             }
         };
-        let client_address = match self.tracked_incoming.remove(&correlation_id) {
-            Some(address) => address,
+        let mut client_response_stream = match self.tracked_incoming.remove(&correlation_id) {
+            Some(stream) => stream,
             None => {
                 info!(
                     "{} for message-id {:?}, Unable to find the client to respond to.",
@@ -122,10 +124,21 @@ impl ClientMsgTracking {
             }
         };
 
-        Some(MessagingDuty::SendToClient {
-            address: client_address,
-            msg: msg.clone(),
-        })
+        let bytes = utils::serialise(&msg);
+        // Hmmmm, what to do about this response.... we don't need a duty response here?
+        let res = futures::executor::block_on(client_response_stream.send(bytes));
+
+        match res {
+            Ok(()) => info!("message sent to client!!!! via send stream"),
+            Err(error) => error!("Some issue sendstreaming {:?}", error),
+        };
+
+        None
+        
+        // Some(MessagingDuty::SendToClient {
+        //     address: client_address,
+        //     msg: msg.clone(),
+        // })
     }
 }
 
