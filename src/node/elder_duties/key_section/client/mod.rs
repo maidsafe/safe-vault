@@ -19,7 +19,7 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Error, Network, Result,
 };
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
@@ -76,6 +76,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                 if let Some(public_key) = existing_client {
                     let msg = try_deserialize_msg(&content)?;
                     info!("Deserialized client msg from {}", public_key);
+                    trace!("Deserialized client msg is {:?}" msg.message);
                     if !validate_client_sig(&msg) {
                         return None;
                     }
