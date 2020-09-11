@@ -26,6 +26,7 @@ use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
 use std::{cell::Cell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 #[allow(clippy::large_enum_variant)]
 pub enum DutyLevel<R: CryptoRng + Rng> {
@@ -115,7 +116,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
     fn become_adult(&mut self) -> Option<NodeOperation> {
         trace!("Becoming Adult");
         use DutyLevel::*;
-        let total_used_space = Rc::new(Cell::new(0));
+        let total_used_space = Arc::new(Mutex::new(0));
         if let Ok(duties) = AdultDuties::new(&self.node_info, &total_used_space) {
             self.duty_level = Adult(duties);
             // NB: This is wrong, shouldn't write to disk here,
@@ -130,7 +131,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         trace!("Becoming Elder");
 
         use DutyLevel::*;
-        let total_used_space = Rc::new(Cell::new(0));
+        let total_used_space = Arc::new(Mutex::new(0));
         info!("Attempting to assume Elder duties..");
         if matches!(self.duty_level, Elder(_)) {
             return None;

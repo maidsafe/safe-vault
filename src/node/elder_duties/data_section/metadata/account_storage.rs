@@ -22,6 +22,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use std::sync::{Arc, Mutex};
 use xor_name::XorName;
 
 /// Operations over the data type Account.
@@ -36,13 +37,13 @@ pub(super) struct AccountStorage {
 impl AccountStorage {
     pub fn new(
         node_info: &NodeInfo,
-        total_used_space: &Rc<Cell<u64>>,
+        total_used_space: &Arc<Mutex<u64>>,
         wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
         let chunks = AccountChunkStore::new(
             node_info.path(),
             node_info.max_storage_capacity,
-            Rc::clone(total_used_space),
+            Arc::clone(total_used_space),
             node_info.init_mode,
         )?;
         Ok(Self { chunks, wrapping })

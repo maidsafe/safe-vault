@@ -18,6 +18,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use std::sync::{Arc, Mutex};
 
 /// Storage of data chunks.
 pub(crate) struct ChunkStorage {
@@ -26,11 +27,11 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+    pub(crate) fn new(node_info: &NodeInfo, total_used_space: &Arc<Mutex<u64>>) -> Result<Self> {
         let chunks = BlobChunkStore::new(
             node_info.path(),
             node_info.max_storage_capacity,
-            Rc::clone(total_used_space),
+            Arc::clone(total_used_space),
             node_info.init_mode,
         )?;
         let wrapping = AdultMsgWrapping::new(node_info.keys(), AdultDuties::ChunkStorage);

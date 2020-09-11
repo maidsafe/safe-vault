@@ -15,6 +15,7 @@ use std::{
     path::Path,
     rc::Rc,
 };
+use std::sync::{Arc, Mutex};
 
 const USED_SPACE_FILENAME: &str = "used_space";
 
@@ -23,7 +24,7 @@ const USED_SPACE_FILENAME: &str = "used_space";
 #[derive(Debug)]
 pub(super) struct UsedSpace {
     // Total space consumed by all `ChunkStore`s including this one.
-    total_value: Rc<Cell<u64>>,
+    total_value: Arc<Mutex<u64>>,
     // Space consumed by this one `ChunkStore`.
     local_value: u64,
     // File used to maintain on-disk record of `local_value`.
@@ -33,7 +34,7 @@ pub(super) struct UsedSpace {
 impl UsedSpace {
     pub fn new<T: AsRef<Path>>(
         dir: T,
-        total_used_space: Rc<Cell<u64>>,
+        total_used_space: Arc<Mutex<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
         let mut local_record = OpenOptions::new()
@@ -59,13 +60,13 @@ impl UsedSpace {
 
     /// Returns the total space consumed by all `ChunkStore`s including this one.
     pub fn total(&self) -> u64 {
-        self.total_value.get()
+        *self.total_value.lock().unwrap()
     }
 
     pub fn increase(&mut self, consumed: u64) -> Result<()> {
         let new_total = self
             .total_value
-            .get()
+            .lock().unwrap()
             .checked_add(consumed)
             .ok_or(Error::NotEnoughSpace)?;
         let new_local = self
@@ -76,7 +77,7 @@ impl UsedSpace {
     }
 
     pub fn decrease(&mut self, released: u64) -> Result<()> {
-        let new_total = self.total_value.get().saturating_sub(released);
+        let new_total = self.total_value.lock().unwrap().saturating_sub(released);
         let new_local = self.local_value.saturating_sub(released);
         self.record_new_values(new_total, new_local)
     }
@@ -85,7 +86,7 @@ impl UsedSpace {
         self.local_record.set_len(0)?;
         let _ = self.local_record.seek(SeekFrom::Start(0))?;
         bincode::serialize_into(&self.local_record, &local)?;
-        self.total_value.set(total);
+        self.total_value = Arc::new(Mutex::new(total));
         self.local_value = local;
         Ok(())
     }

@@ -9,18 +9,19 @@
 mod client;
 
 use crate::config_handler::write_connection_info;
-use crate::{Command, Config, Node};
+use crate::{Command, Config, Node, utils};
 use crossbeam_channel::Sender;
 use file_per_thread_logger::{self as logger, FormatFn};
 use sn_routing::{NodeConfig as RoutingConfig, TransportConfig as NetworkConfig};
 use std::io::Write;
 use std::net::SocketAddr;
-use std::thread::{self, JoinHandle};
+use std::thread;
+use tokio::task::JoinHandle;
 
 #[allow(unused)]
 #[derive(Default)]
 struct Network {
-    vaults: Vec<(Sender<Command>, JoinHandle<()>)>,
+    vaults: Vec<(Sender<Command>, JoinHandle<Result<(), i32>>)>,
 }
 
 fn init_logging() {
@@ -34,7 +35,7 @@ fn init_logging() {
             record.args()
         )
     };
-    logger::initialize_with_formatter("", formatter);
+    // logger::initialize_with_formatter("", formatter);
     // logger::allow_uninitialized();
 }
 
@@ -43,18 +44,23 @@ impl Network {
         let path = std::path::Path::new("vaults");
         std::fs::remove_dir_all(&path).unwrap_or(()); // Delete vaults directory if it exists;
         std::fs::create_dir_all(&path).expect("Cannot create vaults directory");
-        init_logging();
+        // init_logging();
         logger::allow_uninitialized();
         let mut vaults = Vec::new();
         let genesis_info: SocketAddr = "127.0.0.1:12000".parse().unwrap();
         let mut node_config = Config::default();
+        node_config.set_flag("verbose", 2);
         node_config.set_flag("local", 1);
+        node_config.set_log_dir(path);
         node_config.listen_on_loopback();
+        utils::init_logging(&node_config);
         let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
         let mut genesis_config = node_config.clone();
-        let handle = std::thread::Builder::new()
-            .name("vault-genesis".to_string())
-            .spawn(move || {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        // let handle = std::thread::Builder::new()
+        //     .name("vault-genesis".to_string())
+        let handle = runtime
+            .spawn(async move {
                 // init_logging();
                 genesis_config.set_flag("first", 1);
                 let path = path.join("genesis-vault");
@@ -67,23 +73,24 @@ impl Network {
                 routing_config.transport_config = genesis_config.network_config().clone();
 
                 let mut node =
-                    futures::executor::block_on(Node::new(&genesis_config, rand::thread_rng()))
+                    Node::new(&genesis_config, rand::rngs::OsRng::default()).await
                         .expect("Unable to start vault Node");
                 let our_conn_info = node
                     .our_connection_info()
                     .expect("Could not get genesis info");
                 let _ = write_connection_info(&our_conn_info).unwrap();
-                let _ = futures::executor::block_on(node.run());
-            })
-            .unwrap();
+                let _ = node.run().await.unwrap();
+                Ok(())
+            });
         vaults.push((command_tx, handle));
         for i in 1..no_of_vaults {
             thread::sleep(std::time::Duration::from_secs(30));
             let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
             let mut vault_config = node_config.clone();
-            let handle = std::thread::Builder::new()
-                .name(format!("vault-{}", i))
-                .spawn(move || {
+            // let handle = std::thread::Builder::new()
+            //     .name(format!("vault-{}", i))
+            let handle = runtime
+                .spawn(async move {
                     // init_logging();
                     let vault_path = path.join(format!("vault-{}", i));
                     println!("Starting new vault: {:?}", &vault_path);
@@ -98,12 +105,15 @@ impl Network {
                     let mut routing_config = RoutingConfig::default();
                     routing_config.transport_config = vault_config.network_config().clone();
 
+                    // let mut node =
+                    //     futures::executor::block_on(Node::new(&vault_config, rand::thread_rng()))
+                    //         .expect("Unable to start vault Node");
+                    let rng = rand::rngs::OsRng::default();
                     let mut node =
-                        futures::executor::block_on(Node::new(&vault_config, rand::thread_rng()))
-                            .expect("Unable to start vault Node");
-                    let _ = futures::executor::block_on(node.run());
-                })
-                .unwrap();
+                        Node::new(&vault_config, rng).await.unwrap();
+                    let _ = node.run().await.unwrap();
+                    Ok(())
+                });
             vaults.push((command_tx, handle));
         }
         Self { vaults }

@@ -32,6 +32,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use std::sync::{Arc, Mutex};
 use xor_name::XorName;
 
 /// This module is called `Metadata`
@@ -50,7 +51,7 @@ impl Metadata {
     pub fn new(
         node_info: &NodeInfo,
         dbs: ChunkHolderDbs,
-        total_used_space: &Rc<Cell<u64>>,
+        total_used_space: &Arc<Mutex<u64>>,
         routing: Network,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);

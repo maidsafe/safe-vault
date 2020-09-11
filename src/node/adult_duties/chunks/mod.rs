@@ -21,6 +21,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use std::sync::{Arc, Mutex};
 
 /// Operations on data chunks.
 pub(crate) struct Chunks {
@@ -28,7 +29,7 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    pub fn new(node_info: &NodeInfo, total_used_space: &Rc<Cell<u64>>) -> Result<Self> {
+    pub fn new(node_info: &NodeInfo, total_used_space: &Arc<Mutex<u64>>) -> Result<Self> {
         let chunk_storage = ChunkStorage::new(node_info, total_used_space)?;
 
         Ok(Self { chunk_storage })

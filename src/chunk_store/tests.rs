@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::{cell::Cell, path::Path, rc::Rc, u64};
 use tempdir::TempDir;
 use unwrap::unwrap;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct Data {
@@ -88,22 +89,22 @@ fn successful_put() {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Rc::new(Cell::new(0));
+    let used_space = Arc::new(Mutex::new(0));
     let mut chunk_store = unwrap!(ChunkStore::<Data>::new(
         root.path(),
         u64::MAX,
-        Rc::clone(&used_space),
+        Arc::clone(&used_space),
         Init::New
     ));
 
     let mut put = |data: &Data, size| {
-        let used_space_before = used_space.get();
+        let used_space_before = used_space.lock().unwrap();
         assert!(!chunk_store.has(&data.id));
         unwrap!(chunk_store.put(data));
-        let used_space_after = used_space.get();
-        assert_eq!(used_space_after, used_space_before + size);
+        let used_space_after = used_space.lock().unwrap();
+        assert_eq!(*used_space_after, *used_space_before + size);
         assert!(chunk_store.has(&data.id));
-        assert!(used_space_after <= chunks.total_size);
+        assert!(*used_space_after <= chunks.total_size);
     };
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate().rev() {
@@ -115,7 +116,7 @@ fn successful_put() {
             size,
         );
     }
-    assert_eq!(used_space.get(), chunks.total_size);
+    assert_eq!(*used_space.lock().unwrap(), chunks.total_size);
 
     let mut keys = chunk_store.keys();
     keys.sort();
@@ -132,7 +133,7 @@ fn failed_put_when_not_enough_space() {
     let mut rng = new_rng();
     let root = temp_dir();
     let capacity = 32;
-    let used_space = Rc::new(Cell::new(0));
+    let used_space = Arc::new(Mutex::new(0));
     let mut chunk_store = unwrap!(ChunkStore::new(
         root.path(),
         capacity,
@@ -160,21 +161,21 @@ fn delete() {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Rc::new(Cell::new(0));
+    let used_space = Arc::new(Mutex::new(0));
     let mut chunk_store = unwrap!(ChunkStore::new(
         root.path(),
         u64::MAX,
-        Rc::clone(&used_space),
+        Arc::clone(&used_space),
         Init::New
     ));
 
     let mut put_and_delete = |data: &Data, size| {
         unwrap!(chunk_store.put(data));
-        assert_eq!(used_space.get(), size);
+        assert_eq!(*used_space.lock().unwrap(), size);
         assert!(chunk_store.has(&data.id));
         unwrap!(chunk_store.delete(&data.id));
         assert!(!chunk_store.has(&data.id));
-        assert_eq!(used_space.get(), 0);
+        assert_eq!(*used_space.lock().unwrap(), 0);
     };
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate() {
@@ -194,11 +195,11 @@ fn put_and_get_value_should_be_same() {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Rc::new(Cell::new(0));
+    let used_space = Arc::new(Mutex::new(0));
     let mut chunk_store = unwrap!(ChunkStore::new(
         root.path(),
         u64::MAX,
-        Rc::clone(&used_space),
+        Arc::clone(&used_space),
         Init::New
     ));
 
@@ -221,11 +222,11 @@ fn overwrite_value() {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Rc::new(Cell::new(0));
+    let used_space = Arc::new(Mutex::new(0));
     let mut chunk_store = unwrap!(ChunkStore::new(
         root.path(),
         u64::MAX,
-        Rc::clone(&used_space),
+        Arc::clone(&used_space),
         Init::New
     ));
 
@@ -234,7 +235,7 @@ fn overwrite_value() {
             id: Id(0),
             value: data.clone(),
         }));
-        assert_eq!(used_space.get(), size);
+        assert_eq!(*used_space.lock().unwrap(), size);
         let retrieved_data = unwrap!(chunk_store.get(&Id(0)));
         assert_eq!(data, retrieved_data.value);
     }
@@ -243,7 +244,7 @@ fn overwrite_value() {
 #[test]
 fn get_fails_when_key_does_not_exist() {
     let root = temp_dir();
-    let used_space = Rc::new(Cell::new(0));
+    let used_space = Arc::new(Mutex::new(0));
     let chunk_store: ChunkStore<Data> = unwrap!(ChunkStore::new(
         root.path(),
         u64::MAX,
@@ -264,7 +265,7 @@ fn keys() {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Rc::new(Cell::new(0));
+    let used_space = Arc::new(Mutex::new(0));
     let mut chunk_store = unwrap!(ChunkStore::new(
         root.path(),
         u64::MAX,

@@ -29,6 +29,7 @@ use sn_data_types::PublicKey;
 use sn_routing::{Error, Prefix};
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 use xor_name::XorName;
+use std::sync::{Arc, Mutex};
 
 /// A Key Section interfaces with clients,
 /// who are essentially a public key,
@@ -43,7 +44,7 @@ pub struct KeySection<R: CryptoRng + Rng> {
     payments: Payments,
     transfers: Transfers,
     msg_analysis: ClientMsgAnalysis,
-    replica_manager: Rc<RefCell<ReplicaManager>>,
+    replica_manager: Arc<Mutex<ReplicaManager>>,
     routing: Network,
 }
 
@@ -79,7 +80,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let sec_key_share = self.routing.secret_key_share().ok()?;
         let proof_chain = self.routing.our_history()?;
         let index = self.routing.our_index().ok()?;
-        match self.replica_manager.borrow_mut().update_replica_keys(
+        match self.replica_manager.lock().unwrap().update_replica_keys(
             sec_key_share,
             index,
             pub_key_set,
@@ -100,14 +101,14 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             let xorname: XorName = key.into();
             !prefix.matches(&XorName(xorname.0))
         };
-        let all_keys = self.replica_manager.borrow_mut().all_keys()?;
+        let all_keys = self.replica_manager.lock().unwrap().all_keys()?;
         let accounts = all_keys
             .iter()
             .filter(|key| not_matching(**key))
             .copied()
             .collect::<BTreeSet<PublicKey>>();
         self.replica_manager
-            .borrow_mut()
+            .lock().unwrap()
             .drop_accounts(&accounts)
             .ok()?;
         None
@@ -127,7 +128,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     fn new_replica_manager(
         info: &NodeInfo,
         routing: Network,
-    ) -> Result<Rc<RefCell<ReplicaManager>>> {
+    ) -> Result<Arc<Mutex<ReplicaManager>>> {
         let public_key_set = routing.public_key_set()?;
         let secret_key_share = routing.secret_key_share()?;
         let key_index = routing.our_index()?;
@@ -140,6 +141,6 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             &public_key_set,
             proof_chain,
         )?;
-        Ok(Rc::new(RefCell::new(replica_manager)))
+        Ok(Arc::new(Mutex::new(replica_manager)))
     }
 }

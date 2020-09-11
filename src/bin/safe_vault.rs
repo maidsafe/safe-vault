@@ -29,7 +29,7 @@
 
 use flexi_logger::{DeferredNow, Logger};
 use log::{self, error, info, Record};
-use safe_vault::{self, write_connection_info, Config, Node};
+use safe_vault::{self, write_connection_info, Config, Node, utils};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
@@ -64,32 +64,7 @@ async fn main() {
         config.listen_on_loopback();
     }
 
-    // Custom formatter for logs
-    let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
-        write!(
-            writer,
-            "{} {} [{}:{}] {}",
-            record.level(),
-            clock.now().to_rfc3339(),
-            record.file().unwrap_or_default(),
-            record.line().unwrap_or_default(),
-            record.args()
-        )
-    };
-
-    let level_filter = config.verbose().to_level_filter();
-    let module_log_filter = format!("{}={}", VAULT_MODULE_NAME, level_filter.to_string());
-    let logger = Logger::with_env_or_str(module_log_filter)
-        .format(do_format)
-        .suppress_timestamp();
-
-    let _ = if let Some(log_dir) = config.log_dir() {
-        logger.log_to_file().directory(log_dir)
-    } else {
-        logger
-    }
-    .start()
-    .expect("Error when initialising logger");
+    utils::init_logging(&config);
 
     if config.update() || config.update_only() {
         match update() {

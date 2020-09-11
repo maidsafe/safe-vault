@@ -24,6 +24,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use std::sync::{Arc, Mutex};
 use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
@@ -36,7 +37,7 @@ pub struct ElderDuties<R: CryptoRng + Rng> {
 impl<R: CryptoRng + Rng> ElderDuties<R> {
     pub fn new(
         info: &NodeInfo,
-        total_used_space: &Rc<Cell<u64>>,
+        total_used_space: &Arc<Mutex<u64>>,
         network: Network,
         rng: R,
     ) -> Result<Self> {

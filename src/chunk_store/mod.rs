@@ -32,6 +32,7 @@ use std::{
     rc::Rc,
 };
 use used_space::UsedSpace;
+use std::sync::{Arc, Mutex};
 
 const CHUNK_STORE_DIR: &str = "chunks";
 
@@ -68,7 +69,7 @@ where
     pub fn new<P: AsRef<Path>>(
         root: P,
         max_capacity: u64,
-        total_used_space: Rc<Cell<u64>>,
+        total_used_space: Arc<Mutex<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());

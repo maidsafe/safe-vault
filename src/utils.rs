@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Network, Result};
+//! Utilities
+
+use crate::{node::state_db::Init, Network, Result, config_handler::Config};
 use bls::{self, serde_impl::SerdeSecret};
 use bytes::Bytes;
 use log::{error, trace};
@@ -16,6 +18,11 @@ use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{BlsKeypairShare, Keypair};
 use std::{fs, path::Path};
 use unwrap::unwrap;
+use flexi_logger::{DeferredNow, Logger};
+use std::io::Write;
+use log::Record;
+
+const VAULT_MODULE_NAME: &str = "safe_vault";
 
 /// Specifies whether to try loading cached data from disk, or to just construct a new instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,9 +82,32 @@ pub(crate) fn key_pair(routing: Network) -> Result<Keypair> {
     }))
 }
 
-/// Command that the user can send to a running node to control its execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Command {
-    /// Shutdown the vault
-    Shutdown,
+/// Initialize logging
+pub fn init_logging(config: &Config) {
+    // Custom formatter for logs
+    let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
+        write!(
+            writer,
+            "{} {} [{}:{}] {}",
+            record.level(),
+            clock.now().to_rfc3339(),
+            record.file().unwrap_or_default(),
+            record.line().unwrap_or_default(),
+            record.args()
+        )
+    };
+
+    let level_filter = config.verbose().to_level_filter();
+    let module_log_filter = format!("{}={}", VAULT_MODULE_NAME, level_filter.to_string());
+    let logger = Logger::with_env_or_str(module_log_filter)
+        .format(do_format)
+        .suppress_timestamp();
+
+    let _ = if let Some(log_dir) = config.log_dir() {
+        logger.log_to_file().directory(log_dir)
+    } else {
+        logger
+    }
+    .start()
+    .expect("Error when initialising logger");
 }

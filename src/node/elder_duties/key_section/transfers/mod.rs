@@ -29,6 +29,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use std::sync::{Arc, Mutex};
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -58,12 +59,12 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.
 pub struct Transfers {
-    replica: Rc<RefCell<ReplicaManager>>,
+    replica: Arc<Mutex<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
 }
 
 impl Transfers {
-    pub fn new(keys: NodeSigningKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
+    pub fn new(keys: NodeSigningKeys, replica: Arc<Mutex<ReplicaManager>>) -> Self {
         let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Transfer);
         Self { replica, wrapping }
     }
@@ -76,7 +77,7 @@ impl Transfers {
         self.wrapping
             .send(Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(PublicKey::Bls(
-                    self.replica.borrow_mut().replicas_pk_set()?.public_key(),
+                    self.replica.lock().unwrap().replicas_pk_set()?.public_key(),
                 ))),
                 id: MessageId::new(),
             })
@@ -132,7 +133,7 @@ impl Transfers {
             // Cmd to simulate a farming payout
             SimulatePayout(transfer) => self
                 .replica
-                .borrow_mut()
+                .lock().unwrap()
                 .credit_without_proof(transfer.clone()),
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin)
@@ -153,7 +154,7 @@ impl Transfers {
     /// state of existing Replicas in the group.
     fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Option<NodeMessagingDuty> {
         // We must be able to initiate the replica, otherwise this node cannot function.
-        match self.replica.borrow_mut().initiate(events) {
+        match self.replica.lock().unwrap().initiate(events) {
             Ok(()) => None,
             Err(e) => panic!(e), // Temporary brittle solution before lazy messaging impl.
         }
@@ -161,7 +162,7 @@ impl Transfers {
 
     /// Get all the events of the Replica.
     fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<NodeMessagingDuty> {
-        let result = match self.replica.borrow().all_events() {
+        let result = match self.replica.lock().unwrap().all_events() {
             None => Err(Error::NoSuchData),
             Some(events) => Ok(events),
         };
@@ -183,7 +184,7 @@ impl Transfers {
         origin: Address,
     ) -> Option<NodeMessagingDuty> {
         // validate signature
-        let result = match self.replica.borrow().replicas_pk_set() {
+        let result = match self.replica.lock().unwrap().replicas_pk_set() {
             None => Err(Error::NoSuchKey),
             Some(keys) => Ok(keys),
         };
@@ -204,7 +205,7 @@ impl Transfers {
         // validate signature
         let result = self
             .replica
-            .borrow()
+            .lock().unwrap()
             .balance(wallet_id)
             .ok_or(Error::NoSuchBalance);
         self.wrapping.send(Message::QueryResponse {
@@ -226,7 +227,7 @@ impl Transfers {
         // validate signature
         let result = match self
             .replica
-            .borrow()
+            .lock().unwrap()
             .history(wallet_id) // since_version
         {
             None => Ok(vec![]),
@@ -250,7 +251,7 @@ impl Transfers {
         origin: Address,
     ) -> Option<NodeMessagingDuty> {
         debug!("Validating a transfer from msg_id: {:?}", msg_id);
-        let message = match self.replica.borrow_mut().validate(transfer) {
+        let message = match self.replica.lock().unwrap().validate(transfer) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::Event {
                 event: Event::TransferValidated {
@@ -279,7 +280,7 @@ impl Transfers {
         msg_id: MessageId,
         origin: Address,
     ) -> Option<NodeMessagingDuty> {
-        let message = match self.replica.borrow_mut().validate(transfer) {
+        let message = match self.replica.lock().unwrap().validate(transfer) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(event),
@@ -307,7 +308,7 @@ impl Transfers {
         use NodeCmd::*;
         use NodeTransferCmd::*;
 
-        match self.replica.borrow_mut().register(proof) {
+        match self.replica.lock().unwrap().register(proof) {
             Ok(None) => None,
             Ok(Some(event)) => self.wrapping.send(Message::NodeCmd {
                 cmd: Transfers(PropagateTransfer(event.debit_proof)),
@@ -333,7 +334,7 @@ impl Transfers {
     ) -> Option<NodeMessagingDuty> {
         use NodeTransferError::*;
         // We will just validate the proofs and then apply the event.
-        let message = match self.replica.borrow_mut().receive_propagated(proof) {
+        let message = match self.replica.lock().unwrap().receive_propagated(proof) {
             Ok(_) => return None,
             Err(err) => Message::NodeCmdError {
                 error: NodeCmdError::Transfers(TransferPropagation(err)),
@@ -348,7 +349,7 @@ impl Transfers {
     #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
     pub fn pay(&mut self, transfer: Transfer) {
-        self.replica.borrow_mut().debit_without_proof(transfer)
+        self.replica.lock().unwrap().debit_without_proof(transfer)
     }
 }
 
