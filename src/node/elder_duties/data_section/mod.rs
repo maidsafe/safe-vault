@@ -23,6 +23,7 @@ use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use std::{cell::Cell, rc::Rc};
 use xor_name::XorName;
+use std::sync::{Arc, Mutex};
 
 /// A DataSection is responsible for
 /// the storage and retrieval of data,
@@ -42,7 +43,7 @@ impl DataSection {
     ///
     pub fn new(
         info: &NodeInfo,
-        total_used_space: &Rc<Cell<u64>>,
+        total_used_space: &Arc<Mutex<u64>>,
         network: Network,
     ) -> Result<Self> {
         // Metadata

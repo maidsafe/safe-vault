@@ -22,6 +22,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use std::sync::{Arc, Mutex};
 
 /// An Elder in a KeySection is responsible for
 /// data payment, and will receive write
@@ -32,12 +33,12 @@ use std::{
 /// which would be a section closest to the data
 /// (where it is then handled by Elders with Metadata duties).
 pub struct Payments {
-    replica: Rc<RefCell<ReplicaManager>>,
+    replica: Arc<Mutex<ReplicaManager>>,
     wrapping: ElderMsgWrapping,
 }
 
 impl Payments {
-    pub fn new(keys: NodeSigningKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
+    pub fn new(keys: NodeSigningKeys, replica: Arc<Mutex<ReplicaManager>>) -> Self {
         let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Payment);
         Self { replica, wrapping }
     }
@@ -119,15 +120,15 @@ impl Payments {
         result.map(|c| c.into())
     }
 
-    fn section_wallet_id(&self) -> Result<PublicKey> {
-        match self.replica.borrow().replicas_pk_set() {
+    fn section_account_id(&self) -> Result<PublicKey> {
+        match self.replica.lock().unwrap().replicas_pk_set() {
             Some(keys) => Ok(PublicKey::Bls(keys.public_key())),
             None => Err(Error::NoSuchKey),
         }
     }
 
-    fn replica_mut(&mut self) -> RefMut<ReplicaManager> {
-        self.replica.borrow_mut()
+    fn replica_mut(&mut self) -> std::sync::MutexGuard<ReplicaManager> {
+        self.replica.lock().unwrap()
     }
 }
 

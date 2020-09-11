@@ -24,6 +24,7 @@ use std::{
     fmt::{self, Display, Formatter},
     rc::Rc,
 };
+use std::sync::{Arc, Mutex};
 
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
@@ -34,13 +35,13 @@ pub(super) struct SequenceStorage {
 impl SequenceStorage {
     pub(super) fn new(
         node_info: &NodeInfo,
-        total_used_space: &Rc<Cell<u64>>,
+        total_used_space: &Arc<Mutex<u64>>,
         wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
         let chunks = SequenceChunkStore::new(
             node_info.path(),
             node_info.max_storage_capacity,
-            Rc::clone(total_used_space),
+            Arc::clone(total_used_space),
             node_info.init_mode,
         )?;
         Ok(Self { chunks, wrapping })

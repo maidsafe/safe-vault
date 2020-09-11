@@ -35,7 +35,8 @@ mod error;
 mod network;
 mod node;
 mod to_db_key;
-mod utils;
+
+pub mod utils;
 
 #[cfg(test)]
 mod tests;

@@ -17,11 +17,12 @@ use sn_routing::{
 use std::collections::BTreeSet;
 use std::{cell::RefCell, net::SocketAddr, rc::Rc};
 use xor_name::{Prefix, XorName};
+use std::sync::{Arc, Mutex};
 
 ///
 #[derive(Clone)]
 pub struct Network {
-    routing: Rc<RefCell<RoutingNode>>,
+    routing: Arc<Mutex<RoutingNode>>,
 }
 
 #[allow(missing_docs)]
@@ -35,10 +36,17 @@ impl Network {
 
         Ok((
             Self {
-                routing: Rc::new(RefCell::new(routing)),
+                routing: Arc::new(Mutex::new(routing)),
             },
             event_stream,
         ))
+    }
+
+    pub async fn listen_events(&self) -> Result<EventStream> {
+        futures::executor::block_on(self.routing
+            .lock().unwrap()
+            .listen_events())
+            .map_err(Error::Routing)
     }
 
     pub fn our_name(&self) -> XorName {
@@ -47,39 +55,39 @@ impl Network {
 
     pub fn public_key(&self) -> Option<PublicKey> {
         Some(PublicKey::Bls(
-            futures::executor::block_on(self.routing.borrow().public_key_set())
+            futures::executor::block_on(self.routing.lock().unwrap().public_key_set())
                 .ok()?
                 .public_key(),
         ))
     }
 
     pub fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        futures::executor::block_on(self.routing.borrow().public_key_set()).map_err(Error::Routing)
+        futures::executor::block_on(self.routing.lock().unwrap().public_key_set()).map_err(Error::Routing)
     }
 
     pub fn id(&self) -> PublicId {
-        futures::executor::block_on(self.routing.borrow().id())
+        futures::executor::block_on(self.routing.lock().unwrap().id())
     }
 
     pub fn is_genesis(&self) -> bool {
-        self.routing.borrow().is_genesis()
+        self.routing.lock().unwrap().is_genesis()
     }
 
     pub fn name(&self) -> XorName {
-        futures::executor::block_on(self.routing.borrow().name())
+        futures::executor::block_on(self.routing.lock().unwrap().name())
     }
 
     pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        futures::executor::block_on(self.routing.borrow_mut().our_connection_info())
+        futures::executor::block_on(self.routing.lock().unwrap().our_connection_info())
             .map_err(Error::Routing)
     }
 
     pub fn our_prefix(&self) -> Option<Prefix> {
-        futures::executor::block_on(self.routing.borrow().our_prefix())
+        futures::executor::block_on(self.routing.lock().unwrap().our_prefix())
     }
 
     pub fn matches_our_prefix(&self, name: XorName) -> bool {
-        futures::executor::block_on(self.routing.borrow().matches_our_prefix(&XorName(name.0)))
+        futures::executor::block_on(self.routing.lock().unwrap().matches_our_prefix(&XorName(name.0)))
             .unwrap_or(false)
     }
 
@@ -89,10 +97,10 @@ impl Network {
         dst: DstLocation,
         content: Bytes,
     ) -> Result<(), RoutingError> {
-        self.routing
-            .borrow_mut()
-            .send_message(src, dst, content)
-            .await
+        futures::executor::block_on(self.routing
+            .lock().unwrap()
+            .send_message(src, dst, content))
+        // Ok(())
     }
 
     pub async fn send_message_to_client(
@@ -100,35 +108,34 @@ impl Network {
         peer_addr: SocketAddr,
         msg: Bytes,
     ) -> Result<()> {
-        self.routing
-            .borrow_mut()
-            .send_message_to_client(peer_addr, msg)
-            .await
+        futures::executor::block_on(self.routing
+            .lock().unwrap()
+            .send_message_to_client(peer_addr, msg))
             .map_err(Error::Routing)
     }
 
     pub fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
-        futures::executor::block_on(self.routing.borrow().secret_key_share())
+        futures::executor::block_on(self.routing.lock().unwrap().secret_key_share())
             .map_err(Error::Routing)
     }
 
     pub fn our_history(&self) -> Option<SectionProofChain> {
-        futures::executor::block_on(self.routing.borrow().our_history())
+        futures::executor::block_on(self.routing.lock().unwrap().our_history())
     }
 
     pub fn our_index(&self) -> Result<usize> {
-        futures::executor::block_on(self.routing.borrow().our_index()).map_err(Error::Routing)
+        futures::executor::block_on(self.routing.lock().unwrap().our_index()).map_err(Error::Routing)
     }
 
     pub fn our_elder_names(&self) -> BTreeSet<XorName> {
-        futures::executor::block_on(self.routing.borrow().our_elders())
+        futures::executor::block_on(self.routing.lock().unwrap().our_elders())
             .iter()
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<BTreeSet<_>>()
     }
 
     pub fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
-        futures::executor::block_on(self.routing.borrow().our_elders())
+        futures::executor::block_on(self.routing.lock().unwrap().our_elders())
             .iter()
             .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
             .collect::<Vec<_>>()
@@ -140,7 +147,7 @@ impl Network {
     ) -> Vec<(XorName, SocketAddr)> {
         futures::executor::block_on(
             self.routing
-                .borrow_mut()
+                .lock().unwrap()
                 .our_elders_sorted_by_distance_to(&XorName(name.0)),
         )
         .into_iter()
@@ -155,7 +162,7 @@ impl Network {
     ) -> Vec<XorName> {
         futures::executor::block_on(
             self.routing
-                .borrow()
+                .lock().unwrap()
                 .our_elders_sorted_by_distance_to(&XorName(name.0)),
         )
         .into_iter()
@@ -167,7 +174,7 @@ impl Network {
     pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
         futures::executor::block_on(
             self.routing
-                .borrow()
+                .lock().unwrap()
                 .our_adults_sorted_by_distance_to(&XorName(name.0)),
         )
         .into_iter()
@@ -185,9 +192,9 @@ impl Network {
     }
 
     fn our_duties(&self) -> AgeGroup {
-        if futures::executor::block_on(self.routing.borrow().is_elder()) {
+        if futures::executor::block_on(self.routing.lock().unwrap().is_elder()) {
             AgeGroup::Elder
-        } else if futures::executor::block_on(self.routing.borrow().our_adults())
+        } else if futures::executor::block_on(self.routing.lock().unwrap().our_adults())
             .iter()
             .any(|adult| *adult.name() == self.name())
         {
