@@ -118,9 +118,7 @@ impl AccountStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<MessagingDuty> {
-        let result = self
-            .account(&origin.id(), updated_account.address())
-            .await;
+        let result = self.account(&origin.id(), updated_account.address()).await;
 
         if let Ok(existing_account) = result {
             let result_inner;

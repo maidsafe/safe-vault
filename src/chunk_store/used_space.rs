@@ -8,10 +8,11 @@
 
 use super::error::{Error, Result};
 use crate::node::state_db::Init;
-use std::{cell::Cell, io::SeekFrom, path::Path, rc::Rc};
+use std::{io::SeekFrom, path::Path, sync::Arc};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
+    sync::RwLock
 };
 
 const USED_SPACE_FILENAME: &str = "used_space";
@@ -19,19 +20,16 @@ const USED_SPACE_FILENAME: &str = "used_space";
 /// This holds a record (in-memory and on-disk) of the space used by a single `ChunkStore`, and also
 /// an in-memory record of the total space used by all `ChunkStore`s.
 #[derive(Debug)]
-pub(super) struct UsedSpace {
-    // Total space consumed by all `ChunkStore`s including this one.
-    total_value: Rc<Cell<u64>>,
+pub(super) struct LocalUsedSpace {
     // Space consumed by this one `ChunkStore`.
     local_value: u64,
     // File used to maintain on-disk record of `local_value`.
     local_record: File,
 }
 
-impl UsedSpace {
+impl LocalUsedSpace {
     pub async fn new<T: AsRef<Path>>(
         dir: T,
-        total_used_space: Rc<Cell<u64>>,
         init_mode: Init,
     ) -> Result<Self> {
         let mut local_record = OpenOptions::new()
@@ -52,37 +50,41 @@ impl UsedSpace {
             0
         };
         Ok(Self {
-            total_value: total_used_space,
             local_value,
             local_record,
         })
     }
 
-    /// Returns the total space consumed by all `ChunkStore`s including this one.
-    pub fn total(&self) -> u64 {
-        self.total_value.get()
-    }
-
     pub async fn increase(&mut self, consumed: u64) -> Result<()> {
-        let new_total = self
-            .total_value
-            .get()
-            .checked_add(consumed)
-            .ok_or(Error::NotEnoughSpace)?;
+        // let mut total = self.total_value.write().await;
+        // let new_total = total
+        //   .checked_add(consumed)
+        //    .ok_or(Error::NotEnoughSpace)?;
         let new_local = self
             .local_value
             .checked_add(consumed)
             .ok_or(Error::NotEnoughSpace)?;
-        self.record_new_values(new_total, new_local).await
+
+        // *total = new_total;
+        // TODO: implement some monotonic version counter on local value
+        // so old writes dont overwrite new ones
+        self.local_value = new_local;
+        self.record_new_values(new_local).await
     }
 
     pub async fn decrease(&mut self, released: u64) -> Result<()> {
-        let new_total = self.total_value.get().saturating_sub(released);
+        // let mut total = self.total_value.write().await;
+        // let new_total = total.saturating_sub(released);
         let new_local = self.local_value.saturating_sub(released);
-        self.record_new_values(new_total, new_local).await
+
+        //* total = new_total;
+        // TODO: implement some monotonic version counter on local value
+        // so old writes dont overwrite new ones
+        self.local_value = new_local;
+        self.record_new_values(new_local).await
     }
 
-    async fn record_new_values(&mut self, total: u64, local: u64) -> Result<()> {
+    async fn record_new_values(&mut self, local: u64) -> Result<()> {
         self.local_record.set_len(0).await?;
         let _ = self.local_record.seek(SeekFrom::Start(0)).await?;
 
@@ -90,7 +92,7 @@ impl UsedSpace {
         bincode::serialize_into(&mut contents, &local)?;
         self.local_record.write_all(&contents).await?;
 
-        self.total_value.set(total);
+        //self.total_value.set(total);
         self.local_value = local;
         Ok(())
     }
