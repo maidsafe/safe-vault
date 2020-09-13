@@ -7,20 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::{error::Error as ChunkStoreError, MapChunkStore},
+    chunk_store::{error::Error as ChunkStoreError, MapChunkStore, UsedSpace},
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
     Result,
 };
-use futures::lock::Mutex;
 use sn_data_types::{
     CmdError, Error as NdError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
     MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey, QueryResponse,
     Result as NdResult,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
 
 /// Operations over the data type Map.
 pub(super) struct MapStorage {
@@ -29,17 +27,12 @@ pub(super) struct MapStorage {
 }
 
 impl MapStorage {
-    pub(super) fn new(
+    pub(super) async fn new(
         node_info: &NodeInfo,
-        total_used_space: &Arc<Mutex<u64>>,
+        used_space: UsedSpace,
         wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
-        let chunks = MapChunkStore::new(
-            node_info.path(),
-            node_info.max_storage_capacity,
-            Arc::clone(total_used_space),
-            node_info.init_mode,
-        )?;
+        let chunks = MapChunkStore::new(node_info.path(), used_space, node_info.init_mode).await?;
         Ok(Self { chunks, wrapping })
     }
 

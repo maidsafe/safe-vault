@@ -7,19 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
+    chunk_store::{error::Error as ChunkStoreError, AccountChunkStore, UsedSpace},
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
     Result,
 };
-use futures::lock::Mutex;
 use sn_data_types::{
     Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,
     PublicKey, QueryResponse, Result as NdResult,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
 use xor_name::XorName;
 
 /// Operations over the data type Account.
@@ -32,17 +30,13 @@ pub(super) struct AccountStorage {
 }
 
 impl AccountStorage {
-    pub fn new(
+    pub async fn new(
         node_info: &NodeInfo,
-        total_used_space: &Arc<Mutex<u64>>,
+        used_space: UsedSpace,
         wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
-        let chunks = AccountChunkStore::new(
-            node_info.path(),
-            node_info.max_storage_capacity,
-            Arc::clone(total_used_space),
-            node_info.init_mode,
-        )?;
+        let chunks =
+            AccountChunkStore::new(node_info.path(), used_space, node_info.init_mode).await?;
         Ok(Self { chunks, wrapping })
     }
 

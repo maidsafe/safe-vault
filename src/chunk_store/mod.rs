@@ -21,17 +21,16 @@ mod used_space;
 use crate::{utils, utils::Init};
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
-use futures::lock::Mutex;
 use log::trace;
 use sn_data_types::{Account, Blob, Map, Sequence};
-use std::sync::Arc;
 use std::{
     fs::{self, DirEntry, File, Metadata},
     io::{Read, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
 };
-use used_space::UsedSpace;
+use used_space::StoreId;
+pub use used_space::UsedSpace;
 
 const CHUNK_STORE_DIR: &str = "chunks";
 
@@ -48,8 +47,8 @@ pub(crate) type AccountChunkStore = ChunkStore<Account>;
 pub(crate) struct ChunkStore<T: Chunk> {
     dir: PathBuf,
     // Maximum space allowed for all `ChunkStore`s to consume.
-    max_capacity: u64,
     used_space: UsedSpace,
+    id: StoreId,
     _phantom: PhantomData<T>,
 }
 
@@ -65,10 +64,9 @@ where
     ///
     /// The maximum storage space is defined by `max_capacity`.  This specifies the max usable by
     /// _all_ `ChunkStores`, not per `ChunkStore`.
-    pub fn new<P: AsRef<Path>>(
+    pub async fn new<P: AsRef<Path>>(
         root: P,
-        max_capacity: u64,
-        total_used_space: Arc<Mutex<u64>>,
+        used_space: UsedSpace,
         init_mode: Init,
     ) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
@@ -78,11 +76,11 @@ where
             Init::Load => trace!("Loading ChunkStore at {}", dir.display()),
         }
 
-        let used_space = UsedSpace::new(&dir, total_used_space, init_mode)?;
+        let id = used_space.add_local_store(&dir, init_mode).await?;
         Ok(ChunkStore {
             dir,
-            max_capacity,
             used_space,
+            id,
             _phantom: PhantomData,
         })
     }
@@ -115,9 +113,6 @@ impl<T: Chunk> ChunkStore<T> {
         println!("max : {:?}", self.max_capacity);
         println!("use space total : {:?}", self.used_space.total().await);
 
-        if self.used_space.total().await.saturating_add(consumed_space) > self.max_capacity {
-            return Err(Error::NotEnoughSpace);
-        }
 
         // self.used_space.increase(consumed_space);
 
@@ -128,7 +123,7 @@ impl<T: Chunk> ChunkStore<T> {
         file.write_all(&serialised_chunk)?;
         file.sync_data()?;
 
-        self.used_space.increase(consumed_space).await?;
+        self.used_space.increase(self.id, consumed_space).await?;
         println!(
             "use space total after adddddddd: {:?}",
             self.used_space.total().await
@@ -193,7 +188,7 @@ impl<T: Chunk> ChunkStore<T> {
     async fn do_delete(&mut self, file_path: &Path) -> Result<()> {
         if let Ok(metadata) = fs::metadata(file_path) {
             println!("deleting and freeing up space: {:?}", metadata.len());
-            self.used_space.decrease(metadata.len()).await?;
+            self.used_space.decrease(self.id, metadata.len()).await?;
             fs::remove_file(file_path).map_err(From::from)
         } else {
             Ok(())

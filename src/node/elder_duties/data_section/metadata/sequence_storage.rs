@@ -7,13 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore},
+    chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore, UsedSpace},
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
     Result,
 };
-use futures::lock::Mutex;
 use sn_data_types::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
     Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp, SequenceEntry, SequenceIndex,
@@ -21,7 +20,6 @@ use sn_data_types::{
     SequenceWrite,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
 
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
@@ -30,17 +28,13 @@ pub(super) struct SequenceStorage {
 }
 
 impl SequenceStorage {
-    pub(super) fn new(
+    pub(super) async fn new(
         node_info: &NodeInfo,
-        total_used_space: &Arc<Mutex<u64>>,
+        used_space: UsedSpace,
         wrapping: ElderMsgWrapping,
     ) -> Result<Self> {
-        let chunks = SequenceChunkStore::new(
-            node_info.path(),
-            node_info.max_storage_capacity,
-            Arc::clone(total_used_space),
-            node_info.init_mode,
-        )?;
+        let chunks =
+            SequenceChunkStore::new(node_info.path(), used_space, node_info.init_mode).await?;
         Ok(Self { chunks, wrapping })
     }
 

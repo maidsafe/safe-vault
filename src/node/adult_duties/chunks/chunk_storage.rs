@@ -6,16 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub use crate::chunk_store::UsedSpace;
 use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty};
 use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
-use futures::lock::Mutex;
 use log::{error, info};
 use sn_data_types::{
     AdultDuties, Blob, BlobAddress, CmdError, Error as NdError, Message, MessageId, MsgSender,
     NodeCmdError, NodeDataError, NodeEvent, QueryResponse, Result as NdResult, Signature,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
 
 /// Storage of data chunks.
 pub(crate) struct ChunkStorage {
@@ -24,13 +23,8 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) fn new(node_info: &NodeInfo, total_used_space: &Arc<Mutex<u64>>) -> Result<Self> {
-        let chunks = BlobChunkStore::new(
-            node_info.path(),
-            node_info.max_storage_capacity,
-            Arc::clone(total_used_space),
-            node_info.init_mode,
-        )?;
+    pub(crate) async fn new(node_info: &NodeInfo, used_space: UsedSpace) -> Result<Self> {
+        let chunks = BlobChunkStore::new(node_info.path(), used_space, node_info.init_mode).await?;
         let wrapping = AdultMsgWrapping::new(node_info.keys(), AdultDuties::ChunkStorage);
         Ok(Self { chunks, wrapping })
     }

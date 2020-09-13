@@ -16,18 +16,17 @@ use chunk_storage::ChunkStorage;
 use log::trace;
 use sn_data_types::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
 
-use futures::lock::Mutex;
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
 
 /// Operations on data chunks.
 pub(crate) struct Chunks {
     chunk_storage: ChunkStorage,
 }
+pub use chunk_storage::UsedSpace;
 
 impl Chunks {
-    pub fn new(node_info: &NodeInfo, total_used_space: &Arc<Mutex<u64>>) -> Result<Self> {
-        let chunk_storage = ChunkStorage::new(node_info, total_used_space)?;
+    pub async fn new(node_info: &NodeInfo, used_space: UsedSpace) -> Result<Self> {
+        let chunk_storage = ChunkStorage::new(node_info, used_space).await?;
 
         Ok(Self { chunk_storage })
     }

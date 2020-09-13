@@ -16,6 +16,7 @@ mod writing;
 
 use crate::{
     capacity::ChunkHolderDbs,
+    chunk_store::UsedSpace,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MetadataDuty, NodeOperation},
     node::state_db::NodeInfo,
@@ -24,12 +25,10 @@ use crate::{
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
-use futures::lock::Mutex;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
 use sn_data_types::{ElderDuties, Message, MsgEnvelope};
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
 use xor_name::XorName;
 
 /// This module is called `Metadata`
@@ -45,17 +44,19 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn new(
+    pub async fn new(
         node_info: &NodeInfo,
         dbs: ChunkHolderDbs,
-        total_used_space: &Arc<Mutex<u64>>,
+        used_space: UsedSpace,
         routing: Network,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
-        let account_storage = AccountStorage::new(node_info, total_used_space, wrapping.clone())?;
+        let account_storage =
+            AccountStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
         let blob_register = BlobRegister::new(dbs, wrapping.clone(), routing)?;
-        let map_storage = MapStorage::new(node_info, total_used_space, wrapping.clone())?;
-        let sequence_storage = SequenceStorage::new(node_info, total_used_space, wrapping.clone())?;
+        let map_storage = MapStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
+        let sequence_storage =
+            SequenceStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
         let elder_stores = ElderStores::new(
             account_storage,
             blob_register,
