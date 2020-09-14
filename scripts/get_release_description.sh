@@ -26,7 +26,7 @@ tar.gz: TAR_WIN_CHECKSUM
 ```
 
 ## Related Links
-* [SAFE CLI and Authenticator daemon](https://github.com/maidsafe/safe-api/releases/latest/)
+* [SAFE CLI and Authenticator daemon](https://github.com/maidsafe/sn_api/releases/latest/)
 * [SAFE Browser](https://github.com/maidsafe/safe_browser/releases/)
 EOF
 

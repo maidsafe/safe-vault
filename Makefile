@@ -14,7 +14,7 @@ build:
 	mkdir artifacts
 ifeq ($(UNAME_S),Linux)
 	docker run --name "safe-vault-build-${UUID}" \
-		-v "${PWD}":/usr/src/safe-cli:Z \
+		-v "${PWD}":/usr/src/sn_cli:Z \
 		-u ${USER_ID}:${GROUP_ID} \
 		maidsafe/safe-vault-build:build \
 		cargo build --release
