@@ -23,6 +23,7 @@ use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
 use log::trace;
 use sn_data_types::{Account, Blob, Map, Sequence};
+use std::sync::{Arc, Mutex};
 use std::{
     fs::{self, DirEntry, File, Metadata},
     io::{Read, Write},
@@ -30,7 +31,6 @@ use std::{
     path::{Path, PathBuf},
 };
 use used_space::UsedSpace;
-use std::sync::{Arc, Mutex};
 
 const CHUNK_STORE_DIR: &str = "chunks";
 

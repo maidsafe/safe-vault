@@ -65,7 +65,10 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
                 old_node_id,
                 new_node_id,
                 age,
-            } => self.relocated_node_joined(old_node_id, new_node_id, age).await,
+            } => {
+                self.relocated_node_joined(old_node_id, new_node_id, age)
+                    .await
+            }
             ProcessElderChange { prefix, .. } => self.elders_changed(prefix).await,
             RunAsKeySection(mut the_key_duty) => self.key_section.process(&mut the_key_duty).await,
             RunAsDataSection(duty) => self.data_section.process(duty).await,
@@ -85,7 +88,8 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         age: u8,
     ) -> Option<NodeOperation> {
         self.data_section
-            .relocated_node_joined(old_node_id, new_node_id, age).await
+            .relocated_node_joined(old_node_id, new_node_id, age)
+            .await
     }
 
     ///

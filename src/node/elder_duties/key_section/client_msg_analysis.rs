@@ -49,8 +49,7 @@ impl ClientMsgAnalysis {
             })
         };
 
-        let shall_process =
-            || is_data_write() && from_client();
+        let shall_process = || is_data_write() && from_client();
 
         if !shall_process() && self.is_dst_for(msg).await && self.is_elder().await {
             return None;
@@ -95,7 +94,9 @@ impl ClientMsgAnalysis {
     }
 
     async fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
-        self.routing.matches_our_prefix(msg.destination().xorname()).await
+        self.routing
+            .matches_our_prefix(msg.destination().xorname())
+            .await
     }
 
     async fn is_elder(&self) -> bool {

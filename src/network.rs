@@ -16,8 +16,8 @@ use sn_routing::{
 };
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
-use xor_name::{Prefix, XorName};
 use std::sync::{Arc, Mutex};
+use xor_name::{Prefix, XorName};
 
 ///
 #[derive(Clone)]
@@ -44,7 +44,8 @@ impl Network {
 
     pub async fn listen_events(&self) -> Result<EventStream> {
         self.routing
-            .lock().unwrap()
+            .lock()
+            .unwrap()
             .listen_events()
             .await
             .map_err(Error::Routing)
@@ -56,7 +57,10 @@ impl Network {
 
     pub async fn public_key(&self) -> Option<PublicKey> {
         Some(PublicKey::Bls(
-            self.routing.lock().unwrap().public_key_set()
+            self.routing
+                .lock()
+                .unwrap()
+                .public_key_set()
                 .await
                 .ok()?
                 .public_key(),
@@ -64,7 +68,12 @@ impl Network {
     }
 
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.routing.lock().unwrap().public_key_set().await.map_err(Error::Routing)
+        self.routing
+            .lock()
+            .unwrap()
+            .public_key_set()
+            .await
+            .map_err(Error::Routing)
     }
 
     pub async fn id(&self) -> PublicId {
@@ -80,7 +89,10 @@ impl Network {
     }
 
     pub async fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.routing.lock().unwrap().our_connection_info()
+        self.routing
+            .lock()
+            .unwrap()
+            .our_connection_info()
             .await
             .map_err(Error::Routing)
     }
@@ -90,7 +102,11 @@ impl Network {
     }
 
     pub async fn matches_our_prefix(&self, name: XorName) -> bool {
-        self.routing.lock().unwrap().matches_our_prefix(&XorName(name.0)).await
+        self.routing
+            .lock()
+            .unwrap()
+            .matches_our_prefix(&XorName(name.0))
+            .await
             .unwrap_or(false)
     }
 
@@ -101,8 +117,10 @@ impl Network {
         content: Bytes,
     ) -> Result<(), RoutingError> {
         self.routing
-            .lock().unwrap()
-            .send_message(src, dst, content).await
+            .lock()
+            .unwrap()
+            .send_message(src, dst, content)
+            .await
         // Ok(())
     }
 
@@ -112,14 +130,19 @@ impl Network {
         msg: Bytes,
     ) -> Result<()> {
         self.routing
-            .lock().unwrap()
-            .send_message_to_client(peer_addr, msg).await
+            .lock()
+            .unwrap()
+            .send_message_to_client(peer_addr, msg)
+            .await
             .map_err(Error::Routing)
     }
 
     pub async fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
-        self.routing.lock().unwrap().secret_key_share()
-        .await
+        self.routing
+            .lock()
+            .unwrap()
+            .secret_key_share()
+            .await
             .map_err(Error::Routing)
     }
 
@@ -128,11 +151,19 @@ impl Network {
     }
 
     pub async fn our_index(&self) -> Result<usize> {
-        self.routing.lock().unwrap().our_index().await.map_err(Error::Routing)
+        self.routing
+            .lock()
+            .unwrap()
+            .our_index()
+            .await
+            .map_err(Error::Routing)
     }
 
     pub async fn our_elder_names(&self) -> BTreeSet<XorName> {
-        self.routing.lock().unwrap().our_elders()
+        self.routing
+            .lock()
+            .unwrap()
+            .our_elders()
             .await
             .iter()
             .map(|p2p_node| XorName(p2p_node.name().0))
@@ -140,7 +171,10 @@ impl Network {
     }
 
     pub async fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
-        self.routing.lock().unwrap().our_elders()
+        self.routing
+            .lock()
+            .unwrap()
+            .our_elders()
             .await
             .iter()
             .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
@@ -151,13 +185,14 @@ impl Network {
         &self,
         name: &XorName,
     ) -> Vec<(XorName, SocketAddr)> {
-            self.routing
-                .lock().unwrap()
-                .our_elders_sorted_by_distance_to(&XorName(name.0))
-        .await
-        .into_iter()
-        .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
-        .collect::<Vec<_>>()
+        self.routing
+            .lock()
+            .unwrap()
+            .our_elders_sorted_by_distance_to(&XorName(name.0))
+            .await
+            .into_iter()
+            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
+            .collect::<Vec<_>>()
     }
 
     pub async fn our_elder_names_sorted_by_distance_to(
@@ -165,25 +200,31 @@ impl Network {
         name: &XorName,
         count: usize,
     ) -> Vec<XorName> {
-            self.routing
-                .lock().unwrap()
-                .our_elders_sorted_by_distance_to(&XorName(name.0))
-        .await
-        .into_iter()
-        .take(count)
-        .map(|p2p_node| XorName(p2p_node.name().0))
-        .collect::<Vec<_>>()
+        self.routing
+            .lock()
+            .unwrap()
+            .our_elders_sorted_by_distance_to(&XorName(name.0))
+            .await
+            .into_iter()
+            .take(count)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
     }
 
-    pub async fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
-            self.routing
-                .lock().unwrap()
-                .our_adults_sorted_by_distance_to(&XorName(name.0))
-                .await
-        .into_iter()
-        .take(count)
-        .map(|p2p_node| XorName(p2p_node.name().0))
-        .collect::<Vec<_>>()
+    pub async fn our_adults_sorted_by_distance_to(
+        &self,
+        name: &XorName,
+        count: usize,
+    ) -> Vec<XorName> {
+        self.routing
+            .lock()
+            .unwrap()
+            .our_adults_sorted_by_distance_to(&XorName(name.0))
+            .await
+            .into_iter()
+            .take(count)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
     }
 
     pub async fn is_elder(&self) -> bool {
@@ -198,7 +239,11 @@ impl Network {
         let our_name = self.name().await;
         if self.routing.lock().unwrap().is_elder().await {
             AgeGroup::Elder
-        } else if self.routing.lock().unwrap().our_adults()
+        } else if self
+            .routing
+            .lock()
+            .unwrap()
+            .our_adults()
             .await
             .iter()
             .any(|adult| *adult.name() == our_name)

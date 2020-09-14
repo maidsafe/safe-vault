@@ -47,7 +47,9 @@ impl ClientMsgTracking {
         stream: &mut SendStream,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
-        self.onboarding.process(handshake, peer_addr, stream, rng).await
+        self.onboarding
+            .process(handshake, peer_addr, stream, rng)
+            .await
     }
 
     // pub fn remove_client(&mut self, peer_addr: SocketAddr) {

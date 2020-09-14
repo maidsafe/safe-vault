@@ -14,9 +14,7 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
-use std::{
-    fmt::{self, Display, Formatter}
-};
+use std::fmt::{self, Display, Formatter};
 use std::sync::{Arc, Mutex};
 
 /// The main duty of an Adult node is

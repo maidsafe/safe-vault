@@ -13,9 +13,7 @@ use sn_data_types::{
     AdultDuties, Blob, BlobAddress, CmdError, Error as NdError, Message, MessageId, MsgSender,
     NodeCmdError, NodeDataError, NodeEvent, QueryResponse, Result as NdResult, Signature,
 };
-use std::{
-    fmt::{self, Display, Formatter},
-};
+use std::fmt::{self, Display, Formatter};
 use std::sync::{Arc, Mutex};
 
 /// Storage of data chunks.
@@ -104,12 +102,14 @@ impl ChunkStorage {
             .chunks
             .get(address)
             .map_err(|error| error.to_string().into());
-        self.wrapping.send(Message::QueryResponse {
-            id: MessageId::new(),
-            response: QueryResponse::GetBlob(result),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                id: MessageId::new(),
+                response: QueryResponse::GetBlob(result),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     // pub(crate) fn get_for_duplciation(

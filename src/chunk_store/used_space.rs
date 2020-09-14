@@ -8,12 +8,12 @@
 
 use super::error::{Error, Result};
 use crate::node::state_db::Init;
+use std::sync::{Arc, Mutex};
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Seek, SeekFrom},
     path::Path,
 };
-use std::sync::{Arc, Mutex};
 
 const USED_SPACE_FILENAME: &str = "used_space";
 
@@ -64,7 +64,8 @@ impl UsedSpace {
     pub fn increase(&mut self, consumed: u64) -> Result<()> {
         let new_total = self
             .total_value
-            .lock().unwrap()
+            .lock()
+            .unwrap()
             .checked_add(consumed)
             .ok_or(Error::NotEnoughSpace)?;
         let new_local = self
