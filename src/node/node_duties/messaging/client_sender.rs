@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{node::node_ops::MessagingDuty, utils, Network};
-use log::warn;
+use log::{info, warn, trace};
 use qp2p::SendStream;
 use serde::Serialize;
 use sn_data_types::{Address, HandshakeResponse, MsgEnvelope};
@@ -31,6 +31,7 @@ impl ClientSender {
         recipient: SocketAddr,
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
+        trace!("Attempting to send at clientSender");
         match msg.destination() {
             Address::Node(_) => Some(MessagingDuty::SendToNode(msg.clone())),
             Address::Section(_) => Some(MessagingDuty::SendToSection(msg.clone())),
@@ -51,6 +52,8 @@ impl ClientSender {
         recipient: SocketAddr,
         msg: &T,
     ) -> Option<MessagingDuty> {
+
+        trace!("Sending to any client");
         let bytes = utils::serialise(msg);
         if let Err(e) = self.routing.send_message_to_client(recipient, bytes).await {
             warn!(

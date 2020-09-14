@@ -12,7 +12,7 @@ use crate::node::node_ops::{
     TransferCmd, TransferDuty, TransferQuery,
 };
 use crate::Network;
-use log::error;
+use log::{error, trace};
 use sn_data_types::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
     NodeDuties, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
@@ -80,8 +80,11 @@ impl NetworkMsgAnalysis {
         };
 
         if destined_for_network() {
+            trace!("message destined for our network");
             Some(MessagingDuty::SendToSection(msg.clone())) // Forwards without stamping the duty (was not processed).
         } else {
+            trace!("message NOOOOTTTT destined for our network");
+
             None
         }
     }

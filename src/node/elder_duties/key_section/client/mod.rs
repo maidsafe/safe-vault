@@ -58,6 +58,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     }
 
     fn try_find_client(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+        trace!(">>>>>>>>>>>Attempting to find client for msg {:?}", msg.message);
         if let Address::Client(xorname) = &msg.destination() {
             if self.routing.matches_our_prefix(*xorname) {
                 return self.client_msg_tracking.match_outgoing(msg);
@@ -76,11 +77,11 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                 if let Some(public_key) = existing_client {
                     let msg = try_deserialize_msg(&content)?;
                     info!("Deserialized client msg from {}", public_key);
-                    trace!("Deserialized client msg is {:?}" msg.message);
+                    trace!("Deserialized client msg is {:?}", msg.message);
                     if !validate_client_sig(&msg) {
                         return None;
                     }
-                    match self.client_msg_tracking.track_incoming(msg.id(), src, send) {
+                    match self.client_msg_tracking.track_incoming(&msg.message, src, send) {
                         Some(c) => Some(c.into()),
                         None => Some(KeySectionDuty::EvaluateClientMsg(msg).into()),
                     }
