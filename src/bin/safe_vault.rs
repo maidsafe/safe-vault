@@ -28,7 +28,7 @@
 )]
 
 use log::{self, error, info};
-use safe_vault::{self, write_connection_info, Config, Node, utils};
+use safe_vault::{self, utils, write_connection_info, Config, Node};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};

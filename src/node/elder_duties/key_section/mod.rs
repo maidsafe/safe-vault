@@ -28,8 +28,8 @@ use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
 use sn_routing::{Error, Prefix};
 use std::collections::BTreeSet;
-use xor_name::XorName;
 use std::sync::{Arc, Mutex};
+use xor_name::XorName;
 
 /// A Key Section interfaces with clients,
 /// who are essentially a public key,
@@ -108,7 +108,8 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             .copied()
             .collect::<BTreeSet<PublicKey>>();
         self.replica_manager
-            .lock().unwrap()
+            .lock()
+            .unwrap()
             .drop_accounts(&accounts)
             .ok()?;
         None

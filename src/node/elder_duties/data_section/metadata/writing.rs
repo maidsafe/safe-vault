@@ -16,7 +16,10 @@ use sn_data_types::{
     MsgEnvelope, MsgSender, SequenceWrite,
 };
 
-pub(super) async fn get_result(msg: MsgEnvelope, stores: &mut ElderStores) -> Option<NodeOperation> {
+pub(super) async fn get_result(
+    msg: MsgEnvelope,
+    stores: &mut ElderStores,
+) -> Option<NodeOperation> {
     use DataCmd::*;
     let msg_id = msg.id();
     let msg_origin = msg.origin;
@@ -29,14 +32,17 @@ pub(super) async fn get_result(msg: MsgEnvelope, stores: &mut ElderStores) -> Op
             },
             ..
         } => match data_cmd {
-            Blob(write) => blob(
-                write,
-                stores.blob_register_mut(),
-                msg_id,
-                msg_origin,
-                payment,
-                proxies,
-            ).await,
+            Blob(write) => {
+                blob(
+                    write,
+                    stores.blob_register_mut(),
+                    msg_id,
+                    msg_origin,
+                    payment,
+                    proxies,
+                )
+                .await
+            }
             Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin),
             Sequence(write) => sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin),
             Account(write) => account(write, stores.account_storage_mut(), msg_id, msg_origin),
@@ -54,7 +60,9 @@ async fn blob(
     payment: DebitAgreementProof,
     proxies: Vec<MsgSender>,
 ) -> Option<NodeMessagingDuty> {
-    register.write(write, msg_id, origin, payment, proxies).await
+    register
+        .write(write, msg_id, origin, payment, proxies)
+        .await
 }
 
 fn map(

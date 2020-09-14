@@ -16,9 +16,7 @@ use chunk_storage::ChunkStorage;
 use log::trace;
 use sn_data_types::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
 
-use std::{
-    fmt::{self, Display, Formatter},
-};
+use std::fmt::{self, Display, Formatter};
 use std::sync::{Arc, Mutex};
 
 /// Operations on data chunks.

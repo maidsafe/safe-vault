@@ -69,7 +69,9 @@ impl Onboarding {
             HandshakeRequest::Bootstrap(client_key) => {
                 self.try_bootstrap(peer_addr, &client_key, stream).await
             }
-            HandshakeRequest::Join(client_key) => self.try_join(peer_addr, client_key, stream, rng).await,
+            HandshakeRequest::Join(client_key) => {
+                self.try_join(peer_addr, client_key, stream, rng).await
+            }
             HandshakeRequest::ChallengeResult(signature) => {
                 self.receive_challenge_response(peer_addr, &signature)
             }
@@ -107,7 +109,8 @@ impl Onboarding {
         } else {
             let closest_known_elders = self
                 .routing
-                .our_elder_addresses_sorted_by_distance_to(&(*client_key).into()).await;
+                .our_elder_addresses_sorted_by_distance_to(&(*client_key).into())
+                .await;
             if closest_known_elders.is_empty() {
                 trace!(
                     "{}: No closest known elders in any section we know of",

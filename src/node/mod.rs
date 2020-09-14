@@ -116,7 +116,10 @@ impl<R: CryptoRng + Rng> Node<R> {
 
     /// Returns our connection info.
     pub async fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.network_api.our_connection_info().await.map_err(From::from)
+        self.network_api
+            .our_connection_info()
+            .await
+            .map_err(From::from)
     }
 
     /// Returns whether routing node is in elder state.

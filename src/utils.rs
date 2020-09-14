@@ -8,19 +8,19 @@
 
 //! Utilities
 
-use crate::{node::state_db::Init, Network, Result, config_handler::Config};
+use crate::{config_handler::Config, node::state_db::Init, Network, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use bytes::Bytes;
+use flexi_logger::{DeferredNow, Logger};
+use log::Record;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{BlsKeypairShare, Keypair};
+use std::io::Write;
 use std::{fs, path::Path};
 use unwrap::unwrap;
-use flexi_logger::{DeferredNow, Logger};
-use std::io::Write;
-use log::Record;
 
 const VAULT_MODULE_NAME: &str = "safe_vault";
 
@@ -110,19 +110,22 @@ pub fn init_logging(config: &Config) {
     // };
 
     let logger = env_logger::builder()
-    .format(|buf, record| {
-        let style = buf.default_level_style(record.level());
-        let handle = std::thread::current();
-        writeln!(
-            buf,
-            "[{:?} {} {}:{:?}] {}",
-            handle.name().unwrap_or(""),
-            style.value(record.level()),
-            record.file().unwrap_or(""),
-            record.line().unwrap_or(0),
-            record.args()
-        )
-    }).build();
+        .format(|buf, record| {
+            let style = buf.default_level_style(record.level());
+            let handle = std::thread::current();
+            writeln!(
+                buf,
+                "[{:?} {} {}:{:?}] {}",
+                handle.name().unwrap_or(""),
+                style.value(record.level()),
+                record.file().unwrap_or(""),
+                record.line().unwrap_or(0),
+                record.args()
+            )
+        })
+        .build();
 
-    async_log::Logger::wrap(logger, || 5433).start(config.verbose().to_level_filter()).unwrap_or(());
+    async_log::Logger::wrap(logger, || 5433)
+        .start(config.verbose().to_level_filter())
+        .unwrap_or(());
 }

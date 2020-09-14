@@ -66,12 +66,14 @@ impl AccountStorage {
         let result = self
             .account(&origin.id(), address)
             .map(Account::into_data_and_signature);
-        self.wrapping.send(Message::QueryResponse {
-            id: MessageId::new(),
-            response: QueryResponse::GetAccount(result),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                id: MessageId::new(),
+                response: QueryResponse::GetAccount(result),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     pub(super) async fn write(
@@ -83,7 +85,7 @@ impl AccountStorage {
         use AccountWrite::*;
         match write {
             New(ref account) => self.create(account, msg_id, &origin).await,
-            Update(updated_account) => self.update(&updated_account, msg_id, &origin),
+            Update(updated_account) => self.update(&updated_account, msg_id, &origin).await,
         }
     }
 
@@ -106,7 +108,7 @@ impl AccountStorage {
         self.ok_or_error(result, msg_id, &origin).await
     }
 
-    fn update(
+    async fn update(
         &mut self,
         updated_account: &Account,
         msg_id: MessageId,
@@ -152,12 +154,15 @@ impl AccountStorage {
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
         if let Err(error) = result {
-            return self.wrapping.send(Message::CmdError {
-                id: MessageId::new(),
-                error: CmdError::Data(error),
-                correlation_id: msg_id,
-                cmd_origin: origin.address(),
-            }).await;
+            return self
+                .wrapping
+                .send(Message::CmdError {
+                    id: MessageId::new(),
+                    error: CmdError::Data(error),
+                    correlation_id: msg_id,
+                    cmd_origin: origin.address(),
+                })
+                .await;
         }
         None
     }

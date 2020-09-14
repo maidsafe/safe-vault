@@ -225,19 +225,21 @@ impl MapStorage {
     }
 
     /// Get entire Map.
-    fn get(
+    async fn get(
         &self,
         address: MapAddress,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
         let result = self.get_chunk(&address, origin, MapAction::Read)?;
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetMap(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        })
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetMap(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     /// Get Map shell.

@@ -25,7 +25,12 @@ impl NodeSigningKeys {
 
     pub async fn public_key(&self) -> Option<PublicKey> {
         let index = self.routing.our_index().await.ok()?;
-        let share = self.routing.public_key_set().await.ok()?.public_key_share(index);
+        let share = self
+            .routing
+            .public_key_set()
+            .await
+            .ok()?
+            .public_key_share(index);
         Some(PublicKey::BlsShare(share))
     }
 

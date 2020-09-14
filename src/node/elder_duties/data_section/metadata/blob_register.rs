@@ -72,7 +72,8 @@ impl BlobRegister {
         use BlobWrite::*;
         match write {
             New(data) => self.store(data, msg_id, origin, payment, proxies).await,
-            DeletePrivate(address) => self.delete(address, msg_id, origin, payment, proxies),        }
+            DeletePrivate(address) => self.delete(address, msg_id, origin, payment, proxies).await,
+        }
     }
 
     async fn store(
@@ -101,7 +102,15 @@ impl BlobRegister {
                     trace!("{}: All good, {:?}, chunk already exists.", self, data);
                     return None;
                 } else {
-                    return cmd_error(NdError::DataExists);
+                    return self
+                        .wrapping
+                        .send(Message::CmdError {
+                            error: CmdError::Data(NdError::DataExists),
+                            id: MessageId::new(),
+                            cmd_origin: origin.address(),
+                            correlation_id: msg_id,
+                        })
+                        .await;
                 }
             } else {
                 let mut existing_holders = metadata.holders;
@@ -148,10 +157,10 @@ impl BlobRegister {
             origin,
             proxies,
         };
-        self.wrapping.send_to_adults(target_holders, &msg)
+        self.wrapping.send_to_adults(target_holders, &msg).await
     }
 
-    fn delete(
+    async fn delete(
         &mut self,
         address: BlobAddress,
         msg_id: MessageId,
@@ -170,12 +179,12 @@ impl BlobRegister {
 
         let metadata = match self.get_metadata_for(address) {
             Ok(metadata) => metadata,
-            Err(error) => return cmd_error(error),
+            Err(error) => return cmd_error(error).await,
         };
 
         if let Some(data_owner) = metadata.owner {
             if data_owner != origin.id() {
-                return cmd_error(NdError::AccessDenied);
+                return cmd_error(NdError::AccessDenied).await;
             }
         };
 
@@ -196,7 +205,7 @@ impl BlobRegister {
             origin,
             proxies,
         };
-        self.wrapping.send_to_adults(metadata.holders, &msg)
+        self.wrapping.send_to_adults(metadata.holders, &msg).await
     }
 
     fn set_chunk_holder(
@@ -313,8 +322,9 @@ impl BlobRegister {
     ) -> Vec<NodeOperation> {
         use NodeCmd::*;
         use NodeDataCmd::*;
-
-        self.get_new_holders_for_chunk(&address)
+        let mut node_ops = Vec::new();
+        let messages = self
+            .get_new_holders_for_chunk(&address)
             .await
             .into_iter()
             .map(|new_holder| {
@@ -331,11 +341,16 @@ impl BlobRegister {
                     id: message_id,
                 }
             })
-            .filter_map(|message| self.wrapping.send(message).map(|c| c.into()))
-            .collect()
+            .collect::<Vec<_>>();
+        for message in messages {
+            if let Some(op) = self.wrapping.send(message).await.map(|c| c.into()) {
+                node_ops.push(op);
+            }
+        }
+        node_ops
     }
 
-    pub(super) fn read(
+    pub(super) async fn read(
         &self,
         read: &BlobRead,
         msg_id: MessageId,
@@ -344,11 +359,11 @@ impl BlobRegister {
     ) -> Option<NodeMessagingDuty> {
         use BlobRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin, proxies),
+            Get(address) => self.get(*address, msg_id, origin, proxies).await,
         }
     }
 
-    fn get(
+    async fn get(
         &self,
         address: BlobAddress,
         msg_id: MessageId,
@@ -366,7 +381,7 @@ impl BlobRegister {
 
         let metadata = match self.get_metadata_for(address) {
             Ok(metadata) => metadata,
-            Err(error) => return query_error(error),
+            Err(error) => return query_error(error).await,
         };
 
         if let Some(data_owner) = metadata.owner {
@@ -382,7 +397,7 @@ impl BlobRegister {
             origin,
             proxies,
         };
-        self.wrapping.send_to_adults(metadata.holders, &msg)
+        self.wrapping.send_to_adults(metadata.holders, &msg).await
     }
 
     #[allow(unused)]
@@ -510,12 +525,16 @@ impl BlobRegister {
     // Used to fetch the list of holders for a new chunk.
     async fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let take = CHUNK_ADULT_COPY_COUNT;
-        let mut closest_adults = self.routing.our_adults_sorted_by_distance_to(&target, take).await;
+        let mut closest_adults = self
+            .routing
+            .our_adults_sorted_by_distance_to(&target, take)
+            .await;
         if closest_adults.len() < CHUNK_COPY_COUNT {
             let take = CHUNK_COPY_COUNT - closest_adults.len();
             let mut closest_elders = self
                 .routing
-                .our_elder_names_sorted_by_distance_to(&target, take).await;
+                .our_elder_names_sorted_by_distance_to(&target, take)
+                .await;
             closest_adults.append(&mut closest_elders);
             closest_adults
         } else {

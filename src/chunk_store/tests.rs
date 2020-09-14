@@ -14,10 +14,10 @@ use super::{
 use crate::{utils::Init, ToDbKey};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 use std::{path::Path, u64};
 use tempdir::TempDir;
 use unwrap::unwrap;
-use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct Data {

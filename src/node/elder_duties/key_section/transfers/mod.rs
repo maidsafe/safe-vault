@@ -129,7 +129,8 @@ impl Transfers {
             // Cmd to simulate a farming payout
             SimulatePayout(transfer) => self
                 .replica
-                .lock().unwrap()
+                .lock()
+                .unwrap()
                 .credit_without_proof(transfer.clone()),
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin)

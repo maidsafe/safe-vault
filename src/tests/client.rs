@@ -8,8 +8,8 @@
 
 use super::Network;
 use safe_core::client::{
-    exported_tests as client_tests, blob_apis::exported_tests as blob_tests, map_apis::exported_tests as map_tests,
-    sequence_apis::exported_tests as sequence_tests,
+    blob_apis::exported_tests as blob_tests, exported_tests as client_tests,
+    map_apis::exported_tests as map_tests, sequence_apis::exported_tests as sequence_tests,
 };
 use std::sync::Once;
 
