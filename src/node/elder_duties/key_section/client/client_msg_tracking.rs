@@ -9,7 +9,7 @@
 pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_msg};
 pub use super::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use qp2p::SendStream;
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
@@ -25,7 +25,7 @@ use crate::utils;
 pub struct ClientMsgTracking {
     onboarding: Onboarding,
     tracked_streams: HashMap<PublicKey, Vec<SendStream>>,
-    tracked_incoming: HashMap<MessageId, SendStream>,
+    tracked_incoming: HashMap<MessageId, (SocketAddr, SendStream)>,
     tracked_outgoing: HashMap<MessageId, MsgEnvelope>,
 }
 
@@ -110,10 +110,10 @@ impl ClientMsgTracking {
         }
 
 
-
+        // TODO: we don't always need to track incoming. CMDs should _not_ be tracked.
 
         if let Entry::Vacant(ve) = self.tracked_incoming.entry(msg_id) {
-            let _ = ve.insert(stream);
+            let _ = ve.insert((client_address, stream));
             None
         } else {
             info!(
@@ -137,10 +137,10 @@ impl ClientMsgTracking {
                 //return Err(Error::InvalidOperation);
             }
         };
-        let correlation_id = match msg.message {
+        let ( is_query_response, correlation_id) = match msg.message {
             Message::Event { correlation_id, .. }
-            | Message::CmdError { correlation_id, .. }
-            | Message::QueryResponse { correlation_id, .. } => correlation_id,
+            | Message::CmdError { correlation_id, .. } => (false, correlation_id),
+            Message::QueryResponse { correlation_id, .. } => ( true, correlation_id ), 
             _ => {
                 error!(
                     "{} for message-id {:?}, Invalid message for client.",
@@ -153,26 +153,70 @@ impl ClientMsgTracking {
         };
 
         warn!("!!!!!!!!!!!!!!OUTGOING MESSAGE W/ CORRELATION ID::: {:?}", correlation_id);
-        let mut client_response_stream = match self.tracked_incoming.remove(&correlation_id) {
-            Some(stream) => stream,
-            // TODO: how do we know the client stream to send events on... any and all streams!?
-            // IF CMDERror eg.... or EVENT
-            // Hmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-            None => {
-                info!(
-                    "{} for message-id {:?}, Unable to find client message to respond to. The message may have already been sent to the client.",
-                    self, correlation_id
-                );
+        // if is_query_response {
+            trace!("Finding stream for QueryResponse");
 
-                // let message = msg
+            // Currently Query responses are sent on the stream from the connection. Events are sent to the held stream from the bootstrap process.
+            
+            match self.tracked_incoming.remove(&correlation_id) {
+                Some((peer_addr, mut stream)) => {
+                    if is_query_response {
+                        send_message_on_stream(&msg, &mut stream)
 
-                let _ = self.tracked_outgoing.insert(correlation_id, msg.clone());
-                return None;
-                //return Err(Error::NoSuchKey);
+                    }
+                    else {
+                        if let Some(pk) = self.get_public_key(peer_addr) {
+                            let pk = pk.clone();
+                            // get the streams and ownership
+                            if let Some( streams) = self.tracked_streams.remove(&pk) {
+                                let mut used_streams = vec!();
+                                for mut stream in streams {
+                                    // send to each registered stream for that PK
+                                    send_message_on_stream(&msg, &mut stream);
+                                    used_streams.push(stream);
+                                    
+                                }
+
+                                let _ = self.tracked_streams.insert(pk, used_streams);
+                            }
+                            else {
+                                error!("Could not find stream for Message response")
+                            }
+                        }
+                        else {
+                            error!("Could not find PublicKey for Message response")
+                        }
+                    }
+                },
+                // TODO: how do we know the client stream to send events on... any and all streams!?
+                // IF CMDERror eg.... or EVENT
+                // Hmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+                None => {
+                    info!(
+                        "{} for message-id {:?}, Unable to find client message to respond to. The message may have already been sent to the client.",
+                        self, correlation_id
+                    );
+    
+                    // let message = msg
+    
+                    let _ = self.tracked_outgoing.insert(correlation_id, msg.clone());
+                    return None;
+                    //return Err(Error::NoSuchKey);
+                }
             }
-        };
 
-        send_message_on_stream(&msg, client_response_stream);
+            // if let Some(stream) = client_response_stream {
+
+            //     send_message_on_stream(&msg, client_response_stream);
+            // }
+            // else {
+            //     error!("Could not find stream for Message response")
+            // }
+        // }
+        // else {
+            
+        // }
+
 
         None
         
@@ -186,7 +230,7 @@ impl ClientMsgTracking {
 }
 
 // TODO: asyncify
-fn send_message_on_stream(message: &MsgEnvelope, mut stream: SendStream) {
+fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) {
 
     warn!("Senging message on streammmmmmmmmmmmmmmmmmmmmmmm");
     let bytes = utils::serialise(message);
