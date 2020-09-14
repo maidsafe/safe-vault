@@ -17,6 +17,7 @@ sn_transfers = { git = "https://github.com/maidsafe/sn_transfers.git" }
 self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", branch = "master" }
 
 [dependencies]
+async-log = "2.0.0"
 base64 = "~0.10.1"
 # Ensure bincode version is identical to that in SAFE Client Libs and SAFE Network Data.
 bincode = "1.2.1"
@@ -24,6 +25,7 @@ bytes = { version = "~0.5.4", features = ["serde"] }
 crossbeam-channel = "~0.4.2"
 ctrlc = "3.1.3"
 directories = "2.0.1"
+env_logger = "0.7.1"
 sn_fake_clock = "~0.4.0"
 flexi_logger = "~0.14.8"
 futures = "~0.3.5"

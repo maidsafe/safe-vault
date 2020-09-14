@@ -18,11 +18,7 @@ use crate::{
 use log::trace;
 use rand::{CryptoRng, Rng};
 use sn_routing::Prefix;
-use std::{
-    cell::Cell,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{self, Display, Formatter};
 use std::sync::{Arc, Mutex};
 use xor_name::XorName;
 
@@ -34,15 +30,15 @@ pub struct ElderDuties<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> ElderDuties<R> {
-    pub fn new(
+    pub async fn new(
         info: &NodeInfo,
         total_used_space: &Arc<Mutex<u64>>,
         routing: Network,
         rng: R,
     ) -> Result<Self> {
-        let prefix = routing.our_prefix().ok_or(Error::Logic)?;
-        let key_section = KeySection::new(info, routing.clone(), rng)?;
-        let data_section = DataSection::new(info, total_used_space, routing)?;
+        let prefix = routing.our_prefix().await.ok_or(Error::Logic)?;
+        let key_section = KeySection::new(info, routing.clone(), rng).await?;
+        let data_section = DataSection::new(info, total_used_space, routing).await?;
         Ok(Self {
             prefix,
             key_section,
@@ -59,20 +55,20 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     }
 
     /// Processing of any Elder duty.
-    pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
+    pub async fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
         trace!("Processing elder duty");
         use ElderDuty::*;
         match duty {
             ProcessNewMember(name) => self.new_node_joined(name),
-            ProcessLostMember { name, age } => self.member_left(name, age),
+            ProcessLostMember { name, age } => self.member_left(name, age).await,
             ProcessRelocatedMember {
                 old_node_id,
                 new_node_id,
                 age,
-            } => self.relocated_node_joined(old_node_id, new_node_id, age),
-            ProcessElderChange { prefix, .. } => self.elders_changed(prefix),
-            RunAsKeySection(mut the_key_duty) => self.key_section.process(&mut the_key_duty),
-            RunAsDataSection(duty) => self.data_section.process(duty),
+            } => self.relocated_node_joined(old_node_id, new_node_id, age).await,
+            ProcessElderChange { prefix, .. } => self.elders_changed(prefix).await,
+            RunAsKeySection(mut the_key_duty) => self.key_section.process(&mut the_key_duty).await,
+            RunAsDataSection(duty) => self.data_section.process(duty).await,
         }
     }
 
@@ -82,33 +78,33 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     }
 
     ///
-    fn relocated_node_joined(
+    async fn relocated_node_joined(
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
         age: u8,
     ) -> Option<NodeOperation> {
         self.data_section
-            .relocated_node_joined(old_node_id, new_node_id, age)
+            .relocated_node_joined(old_node_id, new_node_id, age).await
     }
 
     ///
-    fn member_left(&mut self, node_id: XorName, age: u8) -> Option<NodeOperation> {
-        self.data_section.member_left(node_id, age)
+    async fn member_left(&mut self, node_id: XorName, age: u8) -> Option<NodeOperation> {
+        self.data_section.member_left(node_id, age).await
     }
 
     ///
-    fn elders_changed(&mut self, prefix: Prefix) -> Option<NodeOperation> {
+    async fn elders_changed(&mut self, prefix: Prefix) -> Option<NodeOperation> {
         let mut ops = vec![
-            self.key_section.elders_changed(),
-            self.data_section.elders_changed(),
+            self.key_section.elders_changed().await,
+            self.data_section.elders_changed().await,
         ];
 
         if prefix != self.prefix {
             // section has split!
             self.prefix = prefix;
             ops.push(self.key_section.section_split(prefix));
-            ops.push(self.data_section.section_split(prefix));
+            ops.push(self.data_section.section_split(prefix).await);
         }
 
         Some(ops.into())

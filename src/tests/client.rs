@@ -7,10 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Network;
-#[cfg(feature = "simulated-payouts")]
-use safe_core::client::exported_tests as client_tests;
 use safe_core::client::{
-    blob_apis::exported_tests as blob_tests, map_apis::exported_tests as map_tests,
+    exported_tests as client_tests, blob_apis::exported_tests as blob_tests, map_apis::exported_tests as map_tests,
     sequence_apis::exported_tests as sequence_tests,
 };
 use std::sync::Once;

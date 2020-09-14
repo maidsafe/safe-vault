@@ -40,14 +40,14 @@ impl ClientMsgTracking {
         self.onboarding.get_public_key(peer_addr)
     }
 
-    pub fn process_handshake<G: CryptoRng + Rng>(
+    pub async fn process_handshake<G: CryptoRng + Rng>(
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
         stream: &mut SendStream,
         rng: &mut G,
     ) -> Option<MessagingDuty> {
-        self.onboarding.process(handshake, peer_addr, stream, rng)
+        self.onboarding.process(handshake, peer_addr, stream, rng).await
     }
 
     // pub fn remove_client(&mut self, peer_addr: SocketAddr) {

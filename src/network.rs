@@ -15,7 +15,7 @@ use sn_routing::{
     NodeConfig as RoutingConfig, PublicId, SectionProofChain, SrcLocation,
 };
 use std::collections::BTreeSet;
-use std::{cell::RefCell, net::SocketAddr, rc::Rc};
+use std::net::SocketAddr;
 use xor_name::{Prefix, XorName};
 use std::sync::{Arc, Mutex};
 
@@ -43,51 +43,54 @@ impl Network {
     }
 
     pub async fn listen_events(&self) -> Result<EventStream> {
-        futures::executor::block_on(self.routing
+        self.routing
             .lock().unwrap()
-            .listen_events())
+            .listen_events()
+            .await
             .map_err(Error::Routing)
     }
 
-    pub fn our_name(&self) -> XorName {
-        XorName(self.name().0)
+    pub async fn our_name(&self) -> XorName {
+        XorName(self.name().await.0)
     }
 
-    pub fn public_key(&self) -> Option<PublicKey> {
+    pub async fn public_key(&self) -> Option<PublicKey> {
         Some(PublicKey::Bls(
-            futures::executor::block_on(self.routing.lock().unwrap().public_key_set())
+            self.routing.lock().unwrap().public_key_set()
+                .await
                 .ok()?
                 .public_key(),
         ))
     }
 
-    pub fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        futures::executor::block_on(self.routing.lock().unwrap().public_key_set()).map_err(Error::Routing)
+    pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+        self.routing.lock().unwrap().public_key_set().await.map_err(Error::Routing)
     }
 
-    pub fn id(&self) -> PublicId {
-        futures::executor::block_on(self.routing.lock().unwrap().id())
+    pub async fn id(&self) -> PublicId {
+        self.routing.lock().unwrap().id().await
     }
 
     pub fn is_genesis(&self) -> bool {
         self.routing.lock().unwrap().is_genesis()
     }
 
-    pub fn name(&self) -> XorName {
-        futures::executor::block_on(self.routing.lock().unwrap().name())
+    pub async fn name(&self) -> XorName {
+        self.routing.lock().unwrap().name().await
     }
 
-    pub fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        futures::executor::block_on(self.routing.lock().unwrap().our_connection_info())
+    pub async fn our_connection_info(&mut self) -> Result<SocketAddr> {
+        self.routing.lock().unwrap().our_connection_info()
+            .await
             .map_err(Error::Routing)
     }
 
-    pub fn our_prefix(&self) -> Option<Prefix> {
-        futures::executor::block_on(self.routing.lock().unwrap().our_prefix())
+    pub async fn our_prefix(&self) -> Option<Prefix> {
+        self.routing.lock().unwrap().our_prefix().await
     }
 
-    pub fn matches_our_prefix(&self, name: XorName) -> bool {
-        futures::executor::block_on(self.routing.lock().unwrap().matches_our_prefix(&XorName(name.0)))
+    pub async fn matches_our_prefix(&self, name: XorName) -> bool {
+        self.routing.lock().unwrap().matches_our_prefix(&XorName(name.0)).await
             .unwrap_or(false)
     }
 
@@ -97,9 +100,9 @@ impl Network {
         dst: DstLocation,
         content: Bytes,
     ) -> Result<(), RoutingError> {
-        futures::executor::block_on(self.routing
+        self.routing
             .lock().unwrap()
-            .send_message(src, dst, content))
+            .send_message(src, dst, content).await
         // Ok(())
     }
 
@@ -108,95 +111,97 @@ impl Network {
         peer_addr: SocketAddr,
         msg: Bytes,
     ) -> Result<()> {
-        futures::executor::block_on(self.routing
+        self.routing
             .lock().unwrap()
-            .send_message_to_client(peer_addr, msg))
+            .send_message_to_client(peer_addr, msg).await
             .map_err(Error::Routing)
     }
 
-    pub fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
-        futures::executor::block_on(self.routing.lock().unwrap().secret_key_share())
+    pub async fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
+        self.routing.lock().unwrap().secret_key_share()
+        .await
             .map_err(Error::Routing)
     }
 
-    pub fn our_history(&self) -> Option<SectionProofChain> {
-        futures::executor::block_on(self.routing.lock().unwrap().our_history())
+    pub async fn our_history(&self) -> Option<SectionProofChain> {
+        self.routing.lock().unwrap().our_history().await
     }
 
-    pub fn our_index(&self) -> Result<usize> {
-        futures::executor::block_on(self.routing.lock().unwrap().our_index()).map_err(Error::Routing)
+    pub async fn our_index(&self) -> Result<usize> {
+        self.routing.lock().unwrap().our_index().await.map_err(Error::Routing)
     }
 
-    pub fn our_elder_names(&self) -> BTreeSet<XorName> {
-        futures::executor::block_on(self.routing.lock().unwrap().our_elders())
+    pub async fn our_elder_names(&self) -> BTreeSet<XorName> {
+        self.routing.lock().unwrap().our_elders()
+            .await
             .iter()
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<BTreeSet<_>>()
     }
 
-    pub fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
-        futures::executor::block_on(self.routing.lock().unwrap().our_elders())
+    pub async fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
+        self.routing.lock().unwrap().our_elders()
+            .await
             .iter()
             .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
             .collect::<Vec<_>>()
     }
 
-    pub fn our_elder_addresses_sorted_by_distance_to(
+    pub async fn our_elder_addresses_sorted_by_distance_to(
         &self,
         name: &XorName,
     ) -> Vec<(XorName, SocketAddr)> {
-        futures::executor::block_on(
             self.routing
                 .lock().unwrap()
-                .our_elders_sorted_by_distance_to(&XorName(name.0)),
-        )
+                .our_elders_sorted_by_distance_to(&XorName(name.0))
+        .await
         .into_iter()
         .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
         .collect::<Vec<_>>()
     }
 
-    pub fn our_elder_names_sorted_by_distance_to(
+    pub async fn our_elder_names_sorted_by_distance_to(
         &self,
         name: &XorName,
         count: usize,
     ) -> Vec<XorName> {
-        futures::executor::block_on(
             self.routing
                 .lock().unwrap()
-                .our_elders_sorted_by_distance_to(&XorName(name.0)),
-        )
+                .our_elders_sorted_by_distance_to(&XorName(name.0))
+        .await
         .into_iter()
         .take(count)
         .map(|p2p_node| XorName(p2p_node.name().0))
         .collect::<Vec<_>>()
     }
 
-    pub fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
-        futures::executor::block_on(
+    pub async fn our_adults_sorted_by_distance_to(&self, name: &XorName, count: usize) -> Vec<XorName> {
             self.routing
                 .lock().unwrap()
-                .our_adults_sorted_by_distance_to(&XorName(name.0)),
-        )
+                .our_adults_sorted_by_distance_to(&XorName(name.0))
+                .await
         .into_iter()
         .take(count)
         .map(|p2p_node| XorName(p2p_node.name().0))
         .collect::<Vec<_>>()
     }
 
-    pub fn is_elder(&self) -> bool {
-        matches!(self.our_duties(), AgeGroup::Elder)
+    pub async fn is_elder(&self) -> bool {
+        matches!(self.our_duties().await, AgeGroup::Elder)
     }
 
-    pub fn is_adult(&self) -> bool {
-        matches!(self.our_duties(), AgeGroup::Adult)
+    pub async fn is_adult(&self) -> bool {
+        matches!(self.our_duties().await, AgeGroup::Adult)
     }
 
-    fn our_duties(&self) -> AgeGroup {
-        if futures::executor::block_on(self.routing.lock().unwrap().is_elder()) {
+    async fn our_duties(&self) -> AgeGroup {
+        let our_name = self.name().await;
+        if self.routing.lock().unwrap().is_elder().await {
             AgeGroup::Elder
-        } else if futures::executor::block_on(self.routing.lock().unwrap().our_adults())
+        } else if self.routing.lock().unwrap().our_adults()
+            .await
             .iter()
-            .any(|adult| *adult.name() == self.name())
+            .any(|adult| *adult.name() == our_name)
         {
             AgeGroup::Adult
         } else {

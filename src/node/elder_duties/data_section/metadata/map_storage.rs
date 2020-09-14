@@ -18,11 +18,7 @@ use sn_data_types::{
     MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey, QueryResponse,
     Result as NdResult,
 };
-use std::{
-    cell::Cell,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{self, Display, Formatter};
 use std::sync::{Arc, Mutex};
 
 /// Operations over the data type Map.

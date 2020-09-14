@@ -19,11 +19,7 @@ use sn_data_types::{
     SequencePolicyWriteOp, SequencePrivatePolicy, SequencePublicPolicy, SequenceRead, SequenceUser,
     SequenceWrite,
 };
-use std::{
-    cell::Cell,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{self, Display, Formatter};
 use std::sync::{Arc, Mutex};
 
 /// Operations over the data type Sequence.

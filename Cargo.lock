@@ -120,6 +120,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
+name = "async-log"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac39aabd463ad2b1fadb34c22f48e5d160fa60b7cd69a426362e71bde49ebb6d"
+dependencies = [
+ "async-log-attributes",
+ "backtrace",
+ "log",
+]
+
+[[package]]
+name = "async-log-attributes"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da97f8e61b19a72f67d8932de8b0905f7d41a1d7b9501b9938c7755f96f6362d"
+dependencies = [
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "syn 0.15.44",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2331,6 +2353,7 @@ dependencies = [
 name = "safe_vault"
 version = "0.24.0"
 dependencies = [
+ "async-log",
  "base64 0.10.1",
  "bincode",
  "bytes 0.5.6",
@@ -2340,6 +2363,7 @@ dependencies = [
  "directories 2.0.2",
  "ed25519",
  "ed25519-dalek",
+ "env_logger 0.7.1",
  "file-per-thread-logger",
  "flexi_logger",
  "futures",

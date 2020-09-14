@@ -75,7 +75,7 @@ impl BlobRegister {
         })
     }
 
-    pub(super) fn write(
+    pub(super) async fn write(
         &mut self,
         write: BlobWrite,
         msg_id: MessageId,
@@ -85,12 +85,11 @@ impl BlobRegister {
     ) -> Option<MessagingDuty> {
         use BlobWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, origin, payment, proxies),
-            DeletePrivate(address) => self.delete(address, msg_id, origin, payment, proxies),
-        }
+            New(data) => self.store(data, msg_id, origin, payment, proxies).await,
+            DeletePrivate(address) => self.delete(address, msg_id, origin, payment, proxies),        }
     }
 
-    fn store(
+    async fn store(
         &mut self,
         data: Blob,
         msg_id: MessageId,
@@ -98,7 +97,8 @@ impl BlobRegister {
         payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
     ) -> Option<MessagingDuty> {
-        let cmd_error = |error: NdError| {
+        
+        fn cmd_error(error: NdError) {
             self.wrapping.send(Message::CmdError {
                 error: CmdError::Data(error),
                 id: MessageId::new(),
@@ -121,6 +121,7 @@ impl BlobRegister {
                 let mut existing_holders = metadata.holders;
                 let closest_holders = self
                     .get_holders_for_chunk(data.name())
+                    .await
                     .iter()
                     .cloned()
                     .collect::<BTreeSet<_>>();
@@ -136,6 +137,7 @@ impl BlobRegister {
             }
         } else {
             self.get_holders_for_chunk(data.name())
+                .await
                 .iter()
                 .cloned()
                 .collect::<BTreeSet<_>>()
@@ -293,23 +295,21 @@ impl BlobRegister {
         Ok(())
     }
 
-    pub(super) fn duplicate_chunks(&mut self, holder: XorName) -> Option<NodeOperation> {
+    pub(super) async fn duplicate_chunks(&mut self, holder: XorName) -> Option<NodeOperation> {
         trace!("Duplicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder) {
             Ok(chunks) => chunks,
             _ => return None,
         };
-        let cmds: Vec<_> = chunks_stored
-            .into_iter()
-            .map(|(address, holders)| self.get_duplication_msgs(address, holders))
-            .flatten()
-            .collect();
-
+        let mut cmds = Vec::new();
+        for (address, holders) in chunks_stored {
+            cmds.extend(self.get_duplication_msgs(address, holders).await);
+        }
         Some(cmds.into())
     }
 
-    fn get_duplication_msgs(
+    async fn get_duplication_msgs(
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
@@ -318,6 +318,7 @@ impl BlobRegister {
         use NodeDataCmd::*;
 
         self.get_new_holders_for_chunk(&address)
+            .await
             .into_iter()
             .map(|new_holder| {
                 let mut hash_bytes = Vec::new();
@@ -488,14 +489,14 @@ impl BlobRegister {
 
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
-    fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
+    async fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let take = CHUNK_ADULT_COPY_COUNT;
-        let mut closest_adults = self.routing.our_adults_sorted_by_distance_to(&target, take);
+        let mut closest_adults = self.routing.our_adults_sorted_by_distance_to(&target, take).await;
         if closest_adults.len() < CHUNK_COPY_COUNT {
             let take = CHUNK_COPY_COUNT - closest_adults.len();
             let mut closest_elders = self
                 .routing
-                .our_elder_names_sorted_by_distance_to(&target, take);
+                .our_elder_names_sorted_by_distance_to(&target, take).await;
             closest_adults.append(&mut closest_elders);
             closest_adults
         } else {
@@ -505,9 +506,10 @@ impl BlobRegister {
 
     // Returns `XorName`s of the new target holders for an Blob chunk.
     // Used to fetch the additional list of holders for existing chunks.
-    fn get_new_holders_for_chunk(&self, target: &BlobAddress) -> BTreeSet<XorName> {
+    async fn get_new_holders_for_chunk(&self, target: &BlobAddress) -> BTreeSet<XorName> {
         let closest_holders = self
             .get_holders_for_chunk(target.name())
+            .await
             .iter()
             .cloned()
             .collect::<BTreeSet<_>>();

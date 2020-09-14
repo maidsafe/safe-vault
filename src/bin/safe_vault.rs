@@ -27,8 +27,7 @@
     unused_results
 )]
 
-use flexi_logger::{DeferredNow, Logger};
-use log::{self, error, info, Record};
+use log::{self, error, info};
 use safe_vault::{self, write_connection_info, Config, Node, utils};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process};
@@ -37,7 +36,6 @@ use unwrap::unwrap;
 
 const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP is enabled in your router's settings and try again. \
                                 Note that not all routers are supported in this testnet. Visit https://safenetforum.org for more information.";
-const VAULT_MODULE_NAME: &str = "safe_vault";
 
 /// Runs a SAFE Network vault.
 #[tokio::main]

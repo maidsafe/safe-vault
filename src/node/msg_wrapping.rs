@@ -51,8 +51,8 @@ impl NodeMsgWrapping {
         Self { inner }
     }
 
-    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
-        self.inner.send(message)
+    pub async fn send(&self, message: Message) -> Option<MessagingDuty> {
+        self.inner.send(message).await
     }
 }
 
@@ -62,8 +62,8 @@ impl AdultMsgWrapping {
         Self { inner }
     }
 
-    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
-        self.inner.send(message)
+    pub async fn send(&self, message: Message) -> Option<MessagingDuty> {
+        self.inner.send(message).await
     }
 
     pub fn error(
@@ -82,21 +82,21 @@ impl ElderMsgWrapping {
         Self { inner }
     }
 
-    pub fn forward(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
-        let msg = self.inner.set_proxy(&msg);
+    pub async fn forward(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+        let msg = self.inner.set_proxy(&msg).await;
         Some(MessagingDuty::SendToSection(msg))
     }
 
-    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
-        self.inner.send(message)
+    pub async fn send(&self, message: Message) -> Option<MessagingDuty> {
+        self.inner.send(message).await
     }
 
-    pub fn send_to_adults(
+    pub async fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
-        self.inner.send_to_adults(targets, msg)
+        self.inner.send_to_adults(targets, msg).await
     }
 
     pub fn error(
@@ -114,8 +114,8 @@ impl MsgWrapping {
         Self { keys, duty }
     }
 
-    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
-        let origin = self.sign(&message);
+    pub async fn send(&self, message: Message) -> Option<MessagingDuty> {
+        let origin = self.sign(&message).await;
         let msg = MsgEnvelope {
             message,
             origin,
@@ -124,12 +124,12 @@ impl MsgWrapping {
         Some(MessagingDuty::SendToSection(msg))
     }
 
-    pub fn send_to_adults(
+    pub async fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
-        let msg = self.set_proxy(&msg);
+        let msg = self.set_proxy(&msg).await;
         Some(MessagingDuty::SendToAdults { targets, msg })
     }
 
@@ -148,17 +148,17 @@ impl MsgWrapping {
         })
     }
 
-    fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
+    async fn sign<T: Serialize>(&self, data: &T) -> MsgSender {
         MsgSender::Node {
             duty: self.duty,
-            proof: self.keys.produce_proof(&utils::serialise(data)),
+            proof: self.keys.produce_proof(&utils::serialise(data)).await,
         }
     }
 
-    fn set_proxy(&self, msg: &MsgEnvelope) -> MsgEnvelope {
+    async fn set_proxy(&self, msg: &MsgEnvelope) -> MsgEnvelope {
         // origin signs the message, while proxies sign the envelope
         let mut msg = msg.clone();
-        msg.add_proxy(self.sign(&msg));
+        msg.add_proxy(self.sign(&msg).await);
 
         msg
     }

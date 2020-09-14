@@ -22,11 +22,11 @@ impl ClientMsgAnalysis {
         Self { routing }
     }
 
-    pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
         info!("Evaluation of client msg envelope: {:?}", msg);
-        if let Some(duty) = self.try_data_payment(msg) {
+        if let Some(duty) = self.try_data_payment(msg).await {
             Some(duty.into())
-        } else if let Some(duty) = self.try_transfers(msg) {
+        } else if let Some(duty) = self.try_transfers(msg).await {
             Some(duty.into())
         } else {
             None
@@ -39,7 +39,7 @@ impl ClientMsgAnalysis {
     /// The reason for this is that the payment request is already signed
     /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
-    fn try_data_payment(&self, msg: &MsgEnvelope) -> Option<PaymentDuty> {
+    async fn try_data_payment(&self, msg: &MsgEnvelope) -> Option<PaymentDuty> {
         let from_client = || matches!(msg.origin, MsgSender::Client { .. });
 
         let is_data_write = || {
@@ -50,26 +50,24 @@ impl ClientMsgAnalysis {
         };
 
         let shall_process =
-            |msg| is_data_write() && from_client() && self.is_dst_for(msg) && self.is_elder();
+            || is_data_write() && from_client();
 
-        if !shall_process(msg) {
+        if !shall_process() && self.is_dst_for(msg).await && self.is_elder().await {
             return None;
         }
 
         Some(PaymentDuty::ProcessPayment(msg.clone())) // TODO: Fix these for type safety
     }
 
-    fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
+    async fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
         let from_client = || matches!(msg.origin, MsgSender::Client { .. });
-
-        let shall_process = |msg| from_client() && self.is_dst_for(msg) && self.is_elder();
 
         let duty = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
                 ..
             } => {
-                if !shall_process(msg) {
+                if !(from_client() && self.is_dst_for(msg).await && self.is_elder().await) {
                     return None;
                 }
                 TransferDuty::ProcessCmd {
@@ -82,7 +80,7 @@ impl ClientMsgAnalysis {
                 query: Query::Transfer(query),
                 ..
             } => {
-                if !shall_process(msg) {
+                if !(from_client() && self.is_dst_for(msg).await && self.is_elder().await) {
                     return None;
                 }
                 TransferDuty::ProcessQuery {
@@ -96,11 +94,11 @@ impl ClientMsgAnalysis {
         Some(duty)
     }
 
-    fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
-        self.routing.matches_our_prefix(msg.destination().xorname())
+    async fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
+        self.routing.matches_our_prefix(msg.destination().xorname()).await
     }
 
-    fn is_elder(&self) -> bool {
-        self.routing.is_elder()
+    async fn is_elder(&self) -> bool {
+        self.routing.is_elder().await
     }
 }

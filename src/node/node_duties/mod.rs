@@ -25,7 +25,6 @@ use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
-use std::{cell::Cell, rc::Rc};
 use std::sync::{Arc, Mutex};
 
 #[allow(clippy::large_enum_variant)]

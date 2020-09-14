@@ -24,11 +24,7 @@ use sn_data_types::{
     NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse, ReplicaEvent,
     SignedTransfer, TransferError,
 };
-use std::{
-    cell::RefCell,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{self, Display, Formatter};
 use std::sync::{Arc, Mutex};
 /*
 Transfers is the layer that manages
