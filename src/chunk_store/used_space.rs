@@ -9,11 +9,9 @@
 use super::error::{Error, Result};
 use crate::utils::Init;
 use std::{
-    cell::Cell,
     fs::{File, OpenOptions},
     io::{Read, Seek, SeekFrom},
     path::Path,
-    rc::Rc,
 };
 use std::sync::{Arc, Mutex};
 

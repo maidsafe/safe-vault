@@ -14,9 +14,7 @@ use sn_data_types::{
     NodeCmdError, NodeDataError, NodeEvent, QueryResponse, Result as NdResult, Signature,
 };
 use std::{
-    cell::Cell,
     fmt::{self, Display, Formatter},
-    rc::Rc,
 };
 use std::sync::{Arc, Mutex};
 
@@ -53,7 +51,7 @@ impl ChunkStorage {
     }
 
     #[allow(unused)]
-    pub(crate) fn take_duplicate(
+    pub(crate) async fn take_duplicate(
         &mut self,
         data: &Blob,
         msg_id: MessageId,
@@ -79,7 +77,7 @@ impl ChunkStorage {
                 cmd_origin: origin.address(),
             },
         };
-        self.wrapping.send(message)
+        self.wrapping.send(message).await
     }
 
     fn try_store(&mut self, data: &Blob) -> NdResult<()> {
@@ -96,7 +94,7 @@ impl ChunkStorage {
             .map_err(|error| error.to_string().into())
     }
 
-    pub(crate) fn get(
+    pub(crate) async fn get(
         &self,
         address: &BlobAddress,
         msg_id: MessageId,
@@ -111,7 +109,7 @@ impl ChunkStorage {
             response: QueryResponse::GetBlob(result),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
     // pub(crate) fn get_for_duplciation(

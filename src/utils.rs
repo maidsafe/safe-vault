@@ -69,11 +69,11 @@ pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> T {
 
 // NB: needs to allow for nodes not having a key share yet?
 pub(crate) fn key_pair(routing: Network) -> Result<Keypair> {
-    let index = routing.our_index()?;
-    let bls_secret_key = routing.secret_key_share()?;
+    let index = routing.our_index().await?;
+    let bls_secret_key = routing.secret_key_share().await?;
     let secret = SerdeSecret(bls_secret_key.clone());
     let public = bls_secret_key.public_key_share();
-    let public_key_set = routing.public_key_set()?;
+    let public_key_set = routing.public_key_set().await?;
     Ok(Keypair::BlsShare(BlsKeypairShare {
         index,
         secret,
@@ -84,30 +84,45 @@ pub(crate) fn key_pair(routing: Network) -> Result<Keypair> {
 
 /// Initialize logging
 pub fn init_logging(config: &Config) {
-    // Custom formatter for logs
-    let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
-        write!(
-            writer,
-            "{} {} [{}:{}] {}",
-            record.level(),
-            clock.now().to_rfc3339(),
-            record.file().unwrap_or_default(),
-            record.line().unwrap_or_default(),
+    // // Custom formatter for logs
+    // let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
+    //     write!(
+    //         writer,
+    //         "{} {} [{}:{}] {}",
+    //         record.level(),
+    //         clock.now().to_rfc3339(),
+    //         record.file().unwrap_or_default(),
+    //         record.line().unwrap_or_default(),
+    //         record.args()
+    //     )
+    // };
+
+    // let level_filter = config.verbose().to_level_filter();
+    // let module_log_filter = format!("{}={}", VAULT_MODULE_NAME, level_filter.to_string());
+    // let logger = Logger::with_env_or_str(module_log_filter)
+    //     .format(do_format)
+    //     .suppress_timestamp();
+
+    // let logger = if let Some(log_dir) = config.log_dir() {
+    //     logger.log_to_file().directory(log_dir)
+    // } else {
+    //     logger
+    // };
+
+    let logger = env_logger::builder()
+    .format(|buf, record| {
+        let style = buf.default_level_style(record.level());
+        let handle = std::thread::current();
+        writeln!(
+            buf,
+            "[{:?} {} {}:{:?}] {}",
+            handle.name().unwrap_or(""),
+            style.value(record.level()),
+            record.file().unwrap_or(""),
+            record.line().unwrap_or(0),
             record.args()
         )
-    };
+    }).build();
 
-    let level_filter = config.verbose().to_level_filter();
-    let module_log_filter = format!("{}={}", VAULT_MODULE_NAME, level_filter.to_string());
-    let logger = Logger::with_env_or_str(module_log_filter)
-        .format(do_format)
-        .suppress_timestamp();
-
-    let _ = if let Some(log_dir) = config.log_dir() {
-        logger.log_to_file().directory(log_dir)
-    } else {
-        logger
-    }
-    .start()
-    .expect("Error when initialising logger");
+    async_log::Logger::wrap(logger, || 5433).start(config.verbose().to_level_filter()).unwrap_or(());
 }

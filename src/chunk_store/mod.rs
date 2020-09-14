@@ -24,12 +24,10 @@ use error::{Error, Result};
 use log::trace;
 use sn_data_types::{Account, Blob, Map, Sequence};
 use std::{
-    cell::Cell,
     fs::{self, DirEntry, File, Metadata},
     io::{Read, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
-    rc::Rc,
 };
 use used_space::UsedSpace;
 use std::sync::{Arc, Mutex};

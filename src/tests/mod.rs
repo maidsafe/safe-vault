@@ -6,37 +6,24 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#![allow(unused)]
+
+#[cfg(feature = "simulated-payouts")]
 mod client;
 
 use crate::config_handler::write_connection_info;
 use crate::{Command, Config, Node, utils};
 use crossbeam_channel::Sender;
-use file_per_thread_logger::{self as logger, FormatFn};
 use sn_routing::{NodeConfig as RoutingConfig, TransportConfig as NetworkConfig};
 use std::io::Write;
+use file_per_thread_logger::{self as logger};
 use std::net::SocketAddr;
 use std::thread;
 use tokio::task::JoinHandle;
 
-#[allow(unused)]
 #[derive(Default)]
 struct Network {
     vaults: Vec<(Sender<Command>, JoinHandle<Result<(), i32>>)>,
-}
-
-fn init_logging() {
-    let formatter: FormatFn = |writer, record| {
-        writeln!(
-            writer,
-            "{} [{}:{}] {}",
-            record.level(),
-            record.file().unwrap_or_default(),
-            record.line().unwrap_or_default(),
-            record.args()
-        )
-    };
-    // logger::initialize_with_formatter("", formatter);
-    // logger::allow_uninitialized();
 }
 
 impl Network {
@@ -56,11 +43,11 @@ impl Network {
         utils::init_logging(&node_config);
         let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
         let mut genesis_config = node_config.clone();
-        let runtime = tokio::runtime::Runtime::new().unwrap();
         // let handle = std::thread::Builder::new()
         //     .name("vault-genesis".to_string())
-        let handle = runtime
-            .spawn(async move {
+        let handle = tokio::spawn({
+        // let handle = runtime
+        //     .spawn(async move {
                 // init_logging();
                 genesis_config.set_flag("first", 1);
                 let path = path.join("genesis-vault");
@@ -80,17 +67,14 @@ impl Network {
                     .expect("Could not get genesis info");
                 let _ = write_connection_info(&our_conn_info).unwrap();
                 let _ = node.run().await.unwrap();
-                Ok(())
+                futures::future::ok::<(), i32>(())
             });
         vaults.push((command_tx, handle));
         for i in 1..no_of_vaults {
             thread::sleep(std::time::Duration::from_secs(30));
             let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
             let mut vault_config = node_config.clone();
-            // let handle = std::thread::Builder::new()
-            //     .name(format!("vault-{}", i))
-            let handle = runtime
-                .spawn(async move {
+            let handle = tokio::spawn({
                     // init_logging();
                     let vault_path = path.join(format!("vault-{}", i));
                     println!("Starting new vault: {:?}", &vault_path);
@@ -112,7 +96,7 @@ impl Network {
                     let mut node =
                         Node::new(&vault_config, rng).await.unwrap();
                     let _ = node.run().await.unwrap();
-                    Ok(())
+                    futures::future::ok::<(), i32>(())
                 });
             vaults.push((command_tx, handle));
         }

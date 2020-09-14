@@ -27,7 +27,7 @@ use log::trace;
 use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
 use sn_routing::{Error, Prefix};
-use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 use std::sync::{Arc, Mutex};
 
@@ -49,9 +49,9 @@ pub struct KeySection<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> KeySection<R> {
-    pub fn new(info: &NodeInfo, rate_limit: RateLimit, routing: Network, rng: R) -> Result<Self> {
+    pub async fn new(info: &NodeInfo, rate_limit: RateLimit, routing: Network, rng: R) -> Result<Self> {
         let gateway = ClientGateway::new(info, routing.clone(), rng)?;
-        let replica_manager = Self::new_replica_manager(info, routing.clone())?;
+        let replica_manager = Self::new_replica_manager(info, routing.clone()).await?;
         let payments = Payments::new(info.keys.clone(), rate_limit, replica_manager.clone());
         let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
@@ -75,11 +75,11 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     }
 
     // Update our replica with the latest keys
-    pub fn elders_changed(&mut self) -> Option<NodeOperation> {
-        let pub_key_set = self.routing.public_key_set().ok()?;
-        let sec_key_share = self.routing.secret_key_share().ok()?;
-        let proof_chain = self.routing.our_history()?;
-        let index = self.routing.our_index().ok()?;
+    pub async fn elders_changed(&mut self) -> Option<NodeOperation> {
+        let pub_key_set = self.routing.public_key_set().await.ok()?;
+        let sec_key_share = self.routing.secret_key_share().await.ok()?;
+        let proof_chain = self.routing.our_history().await?;
+        let index = self.routing.our_index().await.ok()?;
         match self.replica_manager.lock().unwrap().update_replica_keys(
             sec_key_share,
             index,
@@ -114,25 +114,25 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         None
     }
 
-    pub fn process_key_section_duty(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
+    pub async fn process_key_section_duty(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
-            EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg),
-            RunAsGateway(duty) => self.gateway.process_as_gateway(duty),
-            RunAsPayment(duty) => self.payments.process_payment_duty(&duty),
+            EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg).await,
+            RunAsGateway(duty) => self.gateway.process_as_gateway(duty).await,
+            RunAsPayment(duty) => self.payments.process_payment_duty(&duty).await,
             RunAsTransfers(duty) => self.transfers.process_transfer_duty(&duty),
         }
     }
 
-    fn new_replica_manager(
+    async fn new_replica_manager(
         info: &NodeInfo,
         routing: Network,
     ) -> Result<Arc<Mutex<ReplicaManager>>> {
-        let public_key_set = routing.public_key_set()?;
-        let secret_key_share = routing.secret_key_share()?;
-        let key_index = routing.our_index()?;
-        let proof_chain = routing.our_history().ok_or(Error::InvalidState)?;
+        let public_key_set = routing.public_key_set().await?;
+        let secret_key_share = routing.secret_key_share().await?;
+        let key_index = routing.our_index().await?;
+        let proof_chain = routing.our_history().await.ok_or(Error::InvalidState)?;
         let store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
         let replica_manager = ReplicaManager::new(
             store,

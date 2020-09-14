@@ -17,9 +17,7 @@ use log::trace;
 use sn_data_types::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
 
 use std::{
-    cell::Cell,
     fmt::{self, Display, Formatter},
-    rc::Rc,
 };
 use std::sync::{Arc, Mutex};
 
@@ -35,7 +33,7 @@ impl Chunks {
         Ok(Self { chunk_storage })
     }
 
-    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
+    pub async fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         trace!(
             "{}: Received ({:?} from src {:?}",
             self,
@@ -46,7 +44,7 @@ impl Chunks {
             Message::Query {
                 query: Query::Data(DataQuery::Blob(read)),
                 ..
-            } => reading::get_result(read, msg, &self.chunk_storage),
+            } => reading::get_result(read, msg, &self.chunk_storage).await,
             Message::Cmd {
                 cmd:
                     Cmd::Data {

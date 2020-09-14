@@ -17,11 +17,7 @@ use sn_data_types::{
     Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,
     PublicKey, QueryResponse, Result as NdResult,
 };
-use std::{
-    cell::Cell,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{self, Display, Formatter};
 use std::sync::{Arc, Mutex};
 use xor_name::XorName;
 
@@ -49,7 +45,7 @@ impl AccountStorage {
         Ok(Self { chunks, wrapping })
     }
 
-    pub(super) fn read(
+    pub(super) async fn read(
         &self,
         read: &AccountRead,
         msg_id: MessageId,
@@ -57,11 +53,11 @@ impl AccountStorage {
     ) -> Option<NodeMessagingDuty> {
         use AccountRead::*;
         match read {
-            Get(ref address) => self.get(address, msg_id, origin),
+            Get(ref address) => self.get(address, msg_id, origin).await,
         }
     }
 
-    fn get(
+    async fn get(
         &self,
         address: &XorName,
         msg_id: MessageId,
@@ -75,10 +71,10 @@ impl AccountStorage {
             response: QueryResponse::GetAccount(result),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
-    pub(super) fn write(
+    pub(super) async fn write(
         &mut self,
         write: AccountWrite,
         msg_id: MessageId,
@@ -86,12 +82,12 @@ impl AccountStorage {
     ) -> Option<NodeMessagingDuty> {
         use AccountWrite::*;
         match write {
-            New(ref account) => self.create(account, msg_id, &origin),
+            New(ref account) => self.create(account, msg_id, &origin).await,
             Update(updated_account) => self.update(&updated_account, msg_id, &origin),
         }
     }
 
-    fn create(
+    async fn create(
         &mut self,
         account: &Account,
         msg_id: MessageId,
@@ -107,7 +103,7 @@ impl AccountStorage {
                 .put(account)
                 .map_err(|error| error.to_string().into())
         };
-        self.ok_or_error(result, msg_id, &origin)
+        self.ok_or_error(result, msg_id, &origin).await
     }
 
     fn update(
@@ -130,7 +126,7 @@ impl AccountStorage {
                         .map_err(|err| err.to_string().into())
                 }
             });
-        self.ok_or_error(result, msg_id, &origin)
+        self.ok_or_error(result, msg_id, &origin).await
     }
 
     fn account(&self, requester_pub_key: &PublicKey, address: &XorName) -> NdResult<Account> {
@@ -149,7 +145,7 @@ impl AccountStorage {
             })
     }
 
-    fn ok_or_error(
+    async fn ok_or_error(
         &self,
         result: NdResult<()>,
         msg_id: MessageId,
@@ -161,7 +157,7 @@ impl AccountStorage {
                 error: CmdError::Data(error),
                 correlation_id: msg_id,
                 cmd_origin: origin.address(),
-            });
+            }).await;
         }
         None
     }

@@ -17,11 +17,7 @@ use crate::{
 use sn_data_types::{
     Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
 };
-use std::{
-    cell::{RefCell, RefMut},
-    fmt::{self, Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{self, Display, Formatter};
 use std::sync::{Arc, Mutex};
 
 /// An Elder in a KeySection is responsible for
@@ -53,14 +49,14 @@ impl Payments {
     }
 
     // The code in this method is a bit messy, needs to be cleaned up.
-    pub fn process_payment_duty(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
+    pub async fn process_payment_duty(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
         use PaymentDuty::*;
         match duty {
-            ProcessPayment(msg) => self.process_payment(msg),
+            ProcessPayment(msg) => self.process_payment(msg).await,
         }
     }
 
-    fn process_payment(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    async fn process_payment(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
         let (payment, num_bytes) = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { payment, cmd },
@@ -118,7 +114,7 @@ impl Payments {
                 }
                 // consider having the section actor be
                 // informed of this transfer as well..
-                self.wrapping.forward(msg)
+                self.wrapping.forward(msg).await
             }
             Err(error) => self.wrapping.error(
                 CmdError::Transfer(TransferRegistration(error)),

@@ -58,7 +58,7 @@ impl Onboarding {
     //     }
     // }
 
-    pub fn onboard_client<G: CryptoRng + Rng>(
+    pub async fn onboard_client<G: CryptoRng + Rng>(
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
@@ -67,9 +67,9 @@ impl Onboarding {
     ) -> Result<()> {
         match handshake {
             HandshakeRequest::Bootstrap(client_key) => {
-                self.try_bootstrap(peer_addr, &client_key, stream)
+                self.try_bootstrap(peer_addr, &client_key, stream).await
             }
-            HandshakeRequest::Join(client_key) => self.try_join(peer_addr, client_key, stream, rng),
+            HandshakeRequest::Join(client_key) => self.try_join(peer_addr, client_key, stream, rng).await,
             HandshakeRequest::ChallengeResult(signature) => {
                 self.receive_challenge_response(peer_addr, &signature)
             }
@@ -85,7 +85,7 @@ impl Onboarding {
         true
     }
 
-    fn try_bootstrap(
+    async fn try_bootstrap(
         &self,
         peer_addr: SocketAddr,
         client_key: &PublicKey,
@@ -102,12 +102,12 @@ impl Onboarding {
             "{}: Trying to bootstrap..: {} on {}",
             self, client_key, peer_addr
         );
-        let elders = if self.routing.matches_our_prefix((*client_key).into()) {
-            self.routing.our_elder_addresses()
+        let elders = if self.routing.matches_our_prefix((*client_key).into()).await {
+            self.routing.our_elder_addresses().await
         } else {
             let closest_known_elders = self
                 .routing
-                .our_elder_addresses_sorted_by_distance_to(&(*client_key).into());
+                .our_elder_addresses_sorted_by_distance_to(&(*client_key).into()).await;
             if closest_known_elders.is_empty() {
                 trace!(
                     "{}: No closest known elders in any section we know of",
@@ -132,7 +132,7 @@ impl Onboarding {
     }
 
     /// Handles a received join request from a client.
-    fn try_join<G: CryptoRng + Rng>(
+    async fn try_join<G: CryptoRng + Rng>(
         &mut self,
         peer_addr: SocketAddr,
         client_key: PublicKey,
@@ -150,7 +150,7 @@ impl Onboarding {
             "{}: Trying to join..: {} on {}",
             self, client_key, peer_addr
         );
-        if self.routing.matches_our_prefix(client_key.into()) {
+        if self.routing.matches_our_prefix(client_key.into()).await {
             let challenge = if let Some((challenge, _)) = self.client_candidates.get(&peer_addr) {
                 challenge.clone()
             } else {

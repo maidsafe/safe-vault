@@ -15,9 +15,7 @@ use crate::{
     Result,
 };
 use std::{
-    cell::Cell,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
+    fmt::{self, Display, Formatter}
 };
 use std::sync::{Arc, Mutex};
 
@@ -33,12 +31,12 @@ impl AdultDuties {
         Ok(Self { chunks })
     }
 
-    pub fn process_adult_duty(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
+    pub async fn process_adult_duty(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
         use AdultDuty::*;
         use ChunkDuty::*;
         let RunAsChunks(chunk_duty) = duty;
         let result = match chunk_duty {
-            ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg),
+            ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
         };
 
         result.map(|c| c.into())
