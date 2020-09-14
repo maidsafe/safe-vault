@@ -15,7 +15,7 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{MessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
-use log::{debug,trace};
+use log::{debug,info, trace};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
@@ -249,6 +249,7 @@ impl Transfers {
         msg_id: MessageId,
         origin: Address,
     ) -> Option<MessagingDuty> {
+        info!("Validating a transfer...... for msg_id: {:?}", msg_id);
         let message = match self.replica.borrow_mut().validate(transfer) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::Event {

@@ -151,6 +151,8 @@ impl ClientMsgTracking {
                 //return Err(Error::InvalidOperation);
             }
         };
+
+        warn!("!!!!!!!!!!!!!!OUTGOING MESSAGE W/ CORRELATION ID::: {:?}", correlation_id);
         let mut client_response_stream = match self.tracked_incoming.remove(&correlation_id) {
             Some(stream) => stream,
             // TODO: how do we know the client stream to send events on... any and all streams!?
@@ -158,9 +160,12 @@ impl ClientMsgTracking {
             // Hmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
             None => {
                 info!(
-                    "{} for message-id {:?}, Unable to find the client to respond to.",
+                    "{} for message-id {:?}, Unable to find client message to respond to. The message may have already been sent to the client.",
                     self, correlation_id
                 );
+
+                // let message = msg
+
                 let _ = self.tracked_outgoing.insert(correlation_id, msg.clone());
                 return None;
                 //return Err(Error::NoSuchKey);
@@ -182,6 +187,8 @@ impl ClientMsgTracking {
 
 // TODO: asyncify
 fn send_message_on_stream(message: &MsgEnvelope, mut stream: SendStream) {
+
+    warn!("Senging message on streammmmmmmmmmmmmmmmmmmmmmmm");
     let bytes = utils::serialise(message);
     // Hmmmm, what to do about this response.... we don't need a duty response here?
     let res = futures::executor::block_on(stream.send(bytes));
