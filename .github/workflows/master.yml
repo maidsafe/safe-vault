@@ -225,7 +225,7 @@ jobs:
           asset_content_type: application/zip
         if: startsWith(steps.commit_message.outputs.commit_message, 'Version change')
 
-  # Not publishing to crates.io since the routing dependency points to a git repository.
+  # Not publishing to crates.io since the sn_routing dependency points to a git repository.
   # publish:
   #   name: Publish
   #   needs: deploy

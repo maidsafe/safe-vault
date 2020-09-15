@@ -126,7 +126,7 @@ impl Chunks {
 
     // fn public_key(&self) -> Option<PublicKey> {
     //     Some(
-    //         self.routing_node
+    //         self.sn_routing_node
     //             .borrow()
     //             .public_key_set()
     //             .ok()?

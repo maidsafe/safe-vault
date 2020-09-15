@@ -13,7 +13,7 @@ use crate::{Command, Config, Node};
 use crossbeam_channel::Sender;
 use file_per_thread_logger::{self as logger, FormatFn};
 use qp2p::Config as NetworkConfig;
-use routing::NodeConfig as RoutingConfig;
+use sn_routing::NodeConfig as SNRoutingConfig;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::thread::{self, JoinHandle};
@@ -63,9 +63,9 @@ impl Network {
                 genesis_config.set_root_dir(&path);
                 genesis_config.listen_on_loopback();
 
-                let mut routing_config = RoutingConfig::default();
-                routing_config.first = genesis_config.is_first();
-                routing_config.transport_config = genesis_config.network_config().clone();
+                let mut sn_routing_config = SNRoutingConfig::default();
+                sn_routing_config.first = genesis_config.is_first();
+                sn_routing_config.transport_config = genesis_config.network_config().clone();
 
                 let mut node =
                     futures::executor::block_on(Node::new(&genesis_config, rand::thread_rng()))
@@ -96,8 +96,8 @@ impl Network {
                     vault_config.set_network_config(network_config);
                     vault_config.listen_on_loopback();
 
-                    let mut routing_config = RoutingConfig::default();
-                    routing_config.transport_config = vault_config.network_config().clone();
+                    let mut sn_routing_config = SNRoutingConfig::default();
+                    sn_routing_config.transport_config = vault_config.network_config().clone();
 
                     let mut node =
                         futures::executor::block_on(Node::new(&vault_config, rand::thread_rng()))

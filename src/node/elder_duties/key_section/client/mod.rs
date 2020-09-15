@@ -23,8 +23,8 @@ use log::{error, info, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
-use routing::event::Event as RoutingEvent;
 use sn_data_types::{Address, MsgEnvelope, MsgSender};
+use sn_routing::event::Event as SNRoutingEvent;
 use std::fmt::{self, Display, Formatter};
 
 /// A client gateway routes messages
@@ -32,18 +32,19 @@ use std::fmt::{self, Display, Formatter};
 pub struct ClientGateway<R: CryptoRng + Rng> {
     client_msg_tracking: ClientMsgTracking,
     rng: R,
-    routing: Network,
+    sn_routing: Network,
 }
 
 impl<R: CryptoRng + Rng> ClientGateway<R> {
-    pub fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
-        let onboarding = Onboarding::new(info.public_key().ok_or(Error::Logic)?, routing.clone());
+    pub fn new(info: &NodeInfo, sn_routing: Network, rng: R) -> Result<Self> {
+        let onboarding =
+            Onboarding::new(info.public_key().ok_or(Error::Logic)?, sn_routing.clone());
         let client_msg_tracking = ClientMsgTracking::new(onboarding);
 
         let gateway = Self {
             client_msg_tracking,
             rng,
-            routing,
+            sn_routing,
         };
 
         Ok(gateway)
@@ -59,7 +60,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
 
     fn try_find_client(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
         if let Address::Client(xorname) = &msg.destination() {
-            if self.routing.matches_our_prefix(*xorname) {
+            if self.sn_routing.matches_our_prefix(*xorname) {
                 return self.client_msg_tracking.match_outgoing(msg);
             }
         }
@@ -67,9 +68,9 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     }
 
     /// This is where client input is parsed.
-    fn process_client_event(&mut self, event: &mut RoutingEvent) -> Option<NodeOperation> {
+    fn process_client_event(&mut self, event: &mut SNRoutingEvent) -> Option<NodeOperation> {
         match event {
-            RoutingEvent::ClientMessageReceived {
+            SNRoutingEvent::ClientMessageReceived {
                 content, src, send, ..
             } => {
                 let existing_client = self.client_msg_tracking.get_public_key(*src);

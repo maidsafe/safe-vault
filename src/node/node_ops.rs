@@ -10,12 +10,12 @@
 use sn_data_types::Transfer;
 
 use qp2p::SendStream;
-use routing::{event::Event as RoutingEvent, Prefix};
 use serde::export::Formatter;
 use sn_data_types::{
     AccountId, Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
     ReplicaEvent, SignedTransfer, TransferValidated,
 };
+use sn_routing::{event::Event as SNRoutingEvent, Prefix};
 use std::fmt::Debug;
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
@@ -105,7 +105,7 @@ pub enum NodeDuty {
     /// Sending messages on to the network.
     ProcessMessaging(MessagingDuty),
     /// Receiving and processing events from the network.
-    ProcessNetworkEvent(RoutingEvent),
+    ProcessNetworkEvent(SNRoutingEvent),
 }
 
 impl Into<NodeOperation> for NodeDuty {
@@ -316,7 +316,7 @@ pub enum GatewayDuty {
     FindClientFor(MsgEnvelope),
     /// Incoming events from clients are parsed
     /// at the Gateway, and forwarded to other modules.
-    ProcessClientEvent(RoutingEvent),
+    ProcessClientEvent(SNRoutingEvent),
 }
 
 impl Into<NodeOperation> for GatewayDuty {

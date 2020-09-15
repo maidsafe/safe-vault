@@ -43,22 +43,22 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
     duty_level: DutyLevel<R>,
     network_events: NetworkEvents,
     messaging: Messaging,
-    routing: Network,
+    sn_routing: Network,
     rng: Option<R>,
 }
 
 impl<R: CryptoRng + Rng> NodeDuties<R> {
-    pub fn new(node_info: NodeInfo, routing: Network, rng: R) -> Self {
-        let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
-        let is_genesis = &routing.is_genesis();
+    pub fn new(node_info: NodeInfo, sn_routing: Network, rng: R) -> Self {
+        let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(sn_routing.clone()));
+        let is_genesis = &sn_routing.is_genesis();
 
-        let messaging = Messaging::new(routing.clone());
+        let messaging = Messaging::new(sn_routing.clone());
         let mut duties = Self {
             node_info,
             duty_level: DutyLevel::Infant,
             network_events,
             messaging,
-            routing,
+            sn_routing,
             rng: Some(rng),
         };
 
@@ -145,7 +145,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         if let Ok(duties) = ElderDuties::new(
             &self.node_info,
             &total_used_space,
-            self.routing.clone(),
+            self.sn_routing.clone(),
             self.rng.take()?,
         ) {
             let mut duties = duties;

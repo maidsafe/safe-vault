@@ -24,8 +24,8 @@ use crate::{
 };
 use log::trace;
 use rand::{CryptoRng, Rng};
-use routing::{Prefix, RoutingError};
 use sn_data_types::AccountId;
+use sn_routing::{Prefix, SNRoutingError};
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 use xor_name::XorName;
 
@@ -34,7 +34,7 @@ use xor_name::XorName;
 /// (hence the name Key Section), used by
 /// a specific socket address.
 /// The Gateway deals with onboarding (handshakes etc)
-/// and routing messages back and forth to clients.
+/// and sn_routing messages back and forth to clients.
 /// Payments deals with the payment for data writes,
 /// while transfers deals with sending money between keys.
 pub struct KeySection<R: CryptoRng + Rng> {
@@ -43,16 +43,16 @@ pub struct KeySection<R: CryptoRng + Rng> {
     transfers: Transfers,
     msg_analysis: ClientMsgAnalysis,
     replica_manager: Rc<RefCell<ReplicaManager>>,
-    routing: Network,
+    sn_routing: Network,
 }
 
 impl<R: CryptoRng + Rng> KeySection<R> {
-    pub fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
-        let mut gateway = ClientGateway::new(info, routing.clone(), rng)?;
-        let replica_manager = Self::new_replica_manager(info, routing.clone())?;
+    pub fn new(info: &NodeInfo, sn_routing: Network, rng: R) -> Result<Self> {
+        let mut gateway = ClientGateway::new(info, sn_routing.clone(), rng)?;
+        let replica_manager = Self::new_replica_manager(info, sn_routing.clone())?;
         let payments = Payments::new(info.keys.clone(), replica_manager.clone());
         let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
-        let msg_analysis = ClientMsgAnalysis::new(routing.clone());
+        let msg_analysis = ClientMsgAnalysis::new(sn_routing.clone());
 
         Ok(Self {
             gateway,
@@ -60,7 +60,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             transfers,
             msg_analysis,
             replica_manager,
-            routing,
+            sn_routing,
         })
     }
 
@@ -74,10 +74,10 @@ impl<R: CryptoRng + Rng> KeySection<R> {
 
     // Update our replica with the latest keys
     pub fn elders_changed(&mut self) -> Option<NodeOperation> {
-        let pub_key_set = self.routing.public_key_set().ok()?;
-        let sec_key_share = self.routing.secret_key_share().ok()?;
-        let proof_chain = self.routing.our_history()?;
-        let index = self.routing.our_index().ok()?;
+        let pub_key_set = self.sn_routing.public_key_set().ok()?;
+        let sec_key_share = self.sn_routing.secret_key_share().ok()?;
+        let proof_chain = self.sn_routing.our_history()?;
+        let index = self.sn_routing.our_index().ok()?;
         match self.replica_manager.borrow_mut().update_replica_keys(
             sec_key_share,
             index,
@@ -125,12 +125,14 @@ impl<R: CryptoRng + Rng> KeySection<R> {
 
     fn new_replica_manager(
         info: &NodeInfo,
-        routing: Network,
+        sn_routing: Network,
     ) -> Result<Rc<RefCell<ReplicaManager>>> {
-        let public_key_set = routing.public_key_set()?;
-        let secret_key_share = routing.secret_key_share()?;
-        let key_index = routing.our_index()?;
-        let proof_chain = routing.our_history().ok_or(RoutingError::InvalidState)?;
+        let public_key_set = sn_routing.public_key_set()?;
+        let secret_key_share = sn_routing.secret_key_share()?;
+        let key_index = sn_routing.our_index()?;
+        let proof_chain = sn_routing
+            .our_history()
+            .ok_or(SNRoutingError::InvalidState)?;
         let store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
         let replica_manager = ReplicaManager::new(
             store,

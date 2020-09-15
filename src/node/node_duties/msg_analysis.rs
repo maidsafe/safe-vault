@@ -26,14 +26,14 @@ use xor_name::XorName;
 /// i.e. not msgs sent directly from a client.
 pub struct NetworkMsgAnalysis {
     accumulation: Accumulation,
-    routing: Network,
+    sn_routing: Network,
 }
 
 impl NetworkMsgAnalysis {
-    pub fn new(routing: Network) -> Self {
+    pub fn new(sn_routing: Network) -> Self {
         Self {
             accumulation: Accumulation::new(),
-            routing,
+            sn_routing,
         }
     }
 
@@ -75,7 +75,7 @@ impl NetworkMsgAnalysis {
         use Address::*;
         let destined_for_network = || match msg.destination() {
             Client(address) => !self.self_is_handler_for(&address),
-            Node(address) => address != self.routing.our_name(),
+            Node(address) => address != self.sn_routing.our_name(),
             Section(address) => !self.self_is_handler_for(&address),
         };
 
@@ -404,7 +404,7 @@ impl NetworkMsgAnalysis {
                 } => {
                     // This comparison is a good example of the need to use `lazy messaging`,
                     // as to handle that the expected public key is not the same as the current.
-                    if public_key == &self.routing.public_key()? {
+                    if public_key == &self.sn_routing.public_key()? {
                         Some(TransferDuty::ProcessQuery {
                             query: TransferQuery::GetReplicaEvents,
                             msg_id: *id,
@@ -468,14 +468,14 @@ impl NetworkMsgAnalysis {
     }
 
     fn self_is_handler_for(&self, address: &XorName) -> bool {
-        self.routing.matches_our_prefix(*address)
+        self.sn_routing.matches_our_prefix(*address)
     }
 
     fn is_elder(&self) -> bool {
-        self.routing.is_elder()
+        self.sn_routing.is_elder()
     }
 
     fn is_adult(&self) -> bool {
-        self.routing.is_adult()
+        self.sn_routing.is_adult()
     }
 }

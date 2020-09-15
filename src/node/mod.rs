@@ -28,8 +28,8 @@ use crate::{
 use bls::SecretKey;
 use log::info;
 use rand::{CryptoRng, Rng};
-use routing::event::Event;
 use sn_data_types::PublicKey;
+use sn_routing::event::Event;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -109,7 +109,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         self.network_api.our_connection_info().map_err(From::from)
     }
 
-    /// Returns whether routing node is in elder state.
+    /// Returns whether sn_routing node is in elder state.
     pub fn is_elder(&mut self) -> bool {
         self.network_api.is_elder()
     }
@@ -120,7 +120,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     pub async fn run(&mut self) -> Result<()> {
         let mut event_stream = self.network_api.listen_events().await?;
         let info = self.network_api.our_connection_info().unwrap();
-        info!("Listening for routing events at: {}", info);
+        info!("Listening for sn_routing events at: {}", info);
         while let Some(event) = event_stream.next().await {
             info!("New event received from the Network: {:?}", event);
             let duty = if let Event::ClientMessageReceived { .. } = event {

@@ -60,9 +60,9 @@ quick_error! {
             display("NetworkData Entry error: {:?}", error)
             from()
         }
-        /// Routing error.
-        Routing(error: routing::RoutingError) {
-            display("Routing error: {:?}", error)
+        /// SNRouting error.
+        SNRouting(error: sn_routing::SNRoutingError) {
+            display("sn_routing error: {:?}", error)
             from()
         }
         ///

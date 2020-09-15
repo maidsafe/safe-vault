@@ -15,17 +15,21 @@ use sn_data_types::{
 
 #[derive(Clone)]
 pub struct NodeSigningKeys {
-    routing: Network,
+    sn_routing: Network,
 }
 
 impl NodeSigningKeys {
-    pub fn new(routing: Network) -> Self {
-        Self { routing }
+    pub fn new(sn_routing: Network) -> Self {
+        Self { sn_routing }
     }
 
     pub fn public_key(&self) -> Option<PublicKey> {
-        let index = self.routing.our_index().ok()?;
-        let share = self.routing.public_key_set().ok()?.public_key_share(index);
+        let index = self.sn_routing.our_index().ok()?;
+        let share = self
+            .sn_routing
+            .public_key_set()
+            .ok()?
+            .public_key_share(index);
         Some(PublicKey::BlsShare(share))
     }
 
@@ -67,7 +71,7 @@ impl NodeSigningKeys {
     }
 
     fn public_key_set(&self) -> Option<PublicKeySet> {
-        Some(self.routing.public_key_set().ok()?)
+        Some(self.sn_routing.public_key_set().ok()?)
     }
 
     /// Creates a detached Ed25519 signature of `data`.
@@ -78,8 +82,8 @@ impl NodeSigningKeys {
 
     /// Creates a detached BLS signature share of `data` if the `self` holds a BLS keypair share.
     fn sign_using_bls<T: AsRef<[u8]>>(&self, data: &T) -> Option<Signature> {
-        let index = self.routing.our_index().ok()?;
-        let bls_secret_key = self.routing.secret_key_share().ok()?;
+        let index = self.sn_routing.our_index().ok()?;
+        let bls_secret_key = self.sn_routing.secret_key_share().ok()?;
         Some(Signature::BlsShare(SignatureShare {
             index,
             share: bls_secret_key.sign(data),

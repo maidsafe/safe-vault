@@ -51,7 +51,7 @@ pub(super) struct BlobRegister {
     holders: PickleDb,
     #[allow(unused)]
     full_adults: PickleDb,
-    routing: Network,
+    sn_routing: Network,
     wrapping: ElderMsgWrapping,
 }
 
@@ -59,7 +59,7 @@ impl BlobRegister {
     pub(super) fn new(
         node_info: &NodeInfo,
         wrapping: ElderMsgWrapping,
-        routing: Network,
+        sn_routing: Network,
     ) -> Result<Self> {
         let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode)?;
         let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode)?;
@@ -70,7 +70,7 @@ impl BlobRegister {
             metadata,
             holders,
             full_adults,
-            routing,
+            sn_routing,
             wrapping,
         })
     }
@@ -490,11 +490,13 @@ impl BlobRegister {
     // Used to fetch the list of holders for a new chunk.
     fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         let take = CHUNK_ADULT_COPY_COUNT;
-        let mut closest_adults = self.routing.our_adults_sorted_by_distance_to(&target, take);
+        let mut closest_adults = self
+            .sn_routing
+            .our_adults_sorted_by_distance_to(&target, take);
         if closest_adults.len() < CHUNK_COPY_COUNT {
             let take = CHUNK_COPY_COUNT - closest_adults.len();
             let mut closest_elders = self
-                .routing
+                .sn_routing
                 .our_elder_names_sorted_by_distance_to(&target, take);
             closest_adults.append(&mut closest_elders);
             closest_adults

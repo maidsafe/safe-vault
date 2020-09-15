@@ -19,7 +19,7 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Network, Result,
 };
-use routing::Prefix;
+use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use std::{cell::Cell, rc::Rc};
 use xor_name::XorName;
@@ -34,8 +34,8 @@ pub struct DataSection {
     /// Rewards for performing storage
     /// services to the network.
     rewards: Rewards,
-    /// The routing layer.
-    routing: Network,
+    /// The sn_routing layer.
+    sn_routing: Network,
 }
 
 impl DataSection {
@@ -43,21 +43,21 @@ impl DataSection {
     pub fn new(
         info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        routing: Network,
+        sn_routing: Network,
     ) -> Result<Self> {
         // Metadata
-        let metadata = Metadata::new(info, &total_used_space, routing.clone())?;
+        let metadata = Metadata::new(info, &total_used_space, sn_routing.clone())?;
 
         // Rewards
-        let keypair = utils::key_pair(routing.clone())?;
-        let public_key_set = routing.public_key_set()?;
+        let keypair = utils::key_pair(sn_routing.clone())?;
+        let public_key_set = sn_routing.public_key_set()?;
         let actor = TransferActor::new(keypair, public_key_set, Validator {});
         let rewards = Rewards::new(info.keys.clone(), actor);
 
         Ok(Self {
             metadata,
             rewards,
-            routing,
+            sn_routing,
         })
     }
 
@@ -71,8 +71,8 @@ impl DataSection {
 
     // Transition the section funds account to the new key.
     pub fn elders_changed(&mut self) -> Option<NodeOperation> {
-        let pub_key_set = self.routing.public_key_set().ok()?;
-        let keypair = utils::key_pair(self.routing.clone()).ok()?;
+        let pub_key_set = self.sn_routing.public_key_set().ok()?;
+        let keypair = utils::key_pair(self.sn_routing.clone()).ok()?;
         let actor = TransferActor::new(keypair, pub_key_set, Validator {});
         self.rewards.transition(actor)
     }
@@ -89,7 +89,7 @@ impl DataSection {
         self.rewards.remove(to_remove);
 
         // Then payout rewards to all the Elders.
-        let elders = self.routing.our_elder_names();
+        let elders = self.sn_routing.our_elder_names();
         self.rewards.payout_rewards(elders)
     }
 

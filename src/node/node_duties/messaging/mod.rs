@@ -23,9 +23,9 @@ pub struct Messaging {
 }
 
 impl Messaging {
-    pub fn new(routing: Network) -> Self {
-        let client_sender = ClientSender::new(routing.clone());
-        let network_sender = NetworkSender::new(routing);
+    pub fn new(sn_routing: Network) -> Self {
+        let client_sender = ClientSender::new(sn_routing.clone());
+        let network_sender = NetworkSender::new(sn_routing);
         Self {
             client_sender,
             network_sender,

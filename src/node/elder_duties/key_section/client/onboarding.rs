@@ -28,17 +28,17 @@ use std::{
 /// the Elders of this section.
 pub struct Onboarding {
     node_id: PublicKey,
-    routing: Network,
+    sn_routing: Network,
     clients: HashMap<SocketAddr, PublicKey>,
     // Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicKey)>,
 }
 
 impl Onboarding {
-    pub fn new(node_id: PublicKey, routing: Network) -> Self {
+    pub fn new(node_id: PublicKey, sn_routing: Network) -> Self {
         Self {
             node_id,
-            routing,
+            sn_routing,
             clients: HashMap::<SocketAddr, PublicKey>::new(),
             client_candidates: Default::default(),
         }
@@ -102,11 +102,11 @@ impl Onboarding {
             "{}: Trying to bootstrap..: {} on {}",
             self, client_key, peer_addr
         );
-        let elders = if self.routing.matches_our_prefix((*client_key).into()) {
-            self.routing.our_elder_addresses()
+        let elders = if self.sn_routing.matches_our_prefix((*client_key).into()) {
+            self.sn_routing.our_elder_addresses()
         } else {
             let closest_known_elders = self
-                .routing
+                .sn_routing
                 .our_elder_addresses_sorted_by_distance_to(&(*client_key).into());
             if closest_known_elders.is_empty() {
                 trace!(
@@ -154,7 +154,7 @@ impl Onboarding {
             "{}: Trying to join..: {} on {}",
             self, client_key, peer_addr
         );
-        if self.routing.matches_our_prefix(client_key.into()) {
+        if self.sn_routing.matches_our_prefix(client_key.into()) {
             let challenge = if let Some((challenge, _)) = self.client_candidates.get(&peer_addr) {
                 challenge.clone()
             } else {

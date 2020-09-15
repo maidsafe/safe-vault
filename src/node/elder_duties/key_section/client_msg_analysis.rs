@@ -14,12 +14,12 @@ use sn_data_types::{Cmd, Message, MsgEnvelope, MsgSender, Query};
 /// Evaluates msgs sent directly from a client,
 /// i.e. not remote msgs from the network.
 pub struct ClientMsgAnalysis {
-    routing: Network,
+    sn_routing: Network,
 }
 
 impl ClientMsgAnalysis {
-    pub fn new(routing: Network) -> Self {
-        Self { routing }
+    pub fn new(sn_routing: Network) -> Self {
+        Self { sn_routing }
     }
 
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
@@ -97,10 +97,11 @@ impl ClientMsgAnalysis {
     }
 
     fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
-        self.routing.matches_our_prefix(msg.destination().xorname())
+        self.sn_routing
+            .matches_our_prefix(msg.destination().xorname())
     }
 
     fn is_elder(&self) -> bool {
-        self.routing.is_elder()
+        self.sn_routing.is_elder()
     }
 }

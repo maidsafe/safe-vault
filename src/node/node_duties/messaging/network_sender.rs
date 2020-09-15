@@ -8,29 +8,29 @@
 
 use crate::{node::node_ops::MessagingDuty, utils, Network};
 use log::{error, info};
-use routing::{DstLocation, SrcLocation};
 use sn_data_types::{Address, MsgEnvelope};
+use sn_routing::{DstLocation, SrcLocation};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// Sending of msgs to other nodes in the network.
 pub(super) struct NetworkSender {
-    routing: Network,
+    sn_routing: Network,
 }
 
 impl NetworkSender {
-    pub fn new(routing: Network) -> Self {
-        Self { routing }
+    pub fn new(sn_routing: Network) -> Self {
+        Self { sn_routing }
     }
 
     pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
-        let name = *self.routing.id().name();
+        let name = *self.sn_routing.id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
             Address::Section(_) => return Some(MessagingDuty::SendToSection(msg)),
             Address::Client(_) => return None,
         };
-        self.routing
+        self.sn_routing
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
             .await
             .map_or_else(
@@ -50,9 +50,9 @@ impl NetworkSender {
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
     ) -> Option<MessagingDuty> {
-        let name = *self.routing.id().name();
+        let name = *self.sn_routing.id().name();
         for target in targets {
-            self.routing
+            self.sn_routing
                 .send_message(
                     SrcLocation::Node(name),
                     DstLocation::Node(XorName(target.0)),
@@ -72,14 +72,14 @@ impl NetworkSender {
     }
 
     pub async fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
-        let name = *self.routing.id().name();
+        let name = *self.sn_routing.id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
             Address::Client(xorname) | Address::Section(xorname) => {
                 DstLocation::Section(XorName(xorname.0))
             }
         };
-        self.routing
+        self.sn_routing
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
             .await
             .map_or_else(

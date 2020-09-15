@@ -11,8 +11,8 @@ use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
-use routing::event::Event as RoutingEvent;
 use sn_data_types::{MsgEnvelope, PublicKey};
+use sn_routing::event::Event as SNRoutingEvent;
 use xor_name::XorName;
 
 /// Maps events from the transport layer
@@ -26,21 +26,21 @@ impl NetworkEvents {
         Self { analysis }
     }
 
-    pub fn process(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
+    pub fn process(&mut self, event: SNRoutingEvent) -> Option<NodeOperation> {
         use ElderDuty::*;
         use NodeDuty::*;
 
-        trace!("Processing Routing Event: {:?}", event);
+        trace!("Processing sn_routing Event: {:?}", event);
         match event {
-            RoutingEvent::PromotedToAdult => {
+            SNRoutingEvent::PromotedToAdult => {
                 info!("Node promoted to Adult");
                 Some(BecomeAdult.into())
             }
-            RoutingEvent::PromotedToElder => {
+            SNRoutingEvent::PromotedToElder => {
                 info!("Node promoted to Elder");
                 Some(BecomeElder.into())
             }
-            RoutingEvent::MemberLeft { name, age } => {
+            SNRoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
                 Some(
                     ProcessLostMember {
@@ -50,11 +50,11 @@ impl NetworkEvents {
                     .into(),
                 )
             }
-            RoutingEvent::InfantJoined { name, .. } => {
+            SNRoutingEvent::InfantJoined { name, .. } => {
                 trace!("New node has joined the network");
                 Some(ProcessNewMember(XorName(name.0)).into())
             }
-            RoutingEvent::MemberJoined {
+            SNRoutingEvent::MemberJoined {
                 name,
                 previous_name,
                 age,
@@ -69,11 +69,11 @@ impl NetworkEvents {
                     .into(),
                 )
             }
-            RoutingEvent::Connected(_) => {
+            SNRoutingEvent::Connected(_) => {
                 info!("Node connected.");
                 None
             }
-            RoutingEvent::MessageReceived { content, src, dst } => {
+            SNRoutingEvent::MessageReceived { content, src, dst } => {
                 info!(
                     "Received network message: {:8?}\n Sent from {:?} to {:?}",
                     HexFmt(&content),
@@ -82,7 +82,7 @@ impl NetworkEvents {
                 );
                 self.evaluate_msg(content)
             }
-            RoutingEvent::EldersChanged {
+            SNRoutingEvent::EldersChanged {
                 key,
                 elders,
                 prefix,

@@ -18,12 +18,12 @@ use std::{
 
 /// Sending of messages to clients.
 pub(super) struct ClientSender {
-    routing: Network,
+    sn_routing: Network,
 }
 
 impl ClientSender {
-    pub fn new(routing: Network) -> Self {
-        Self { routing }
+    pub fn new(sn_routing: Network) -> Self {
+        Self { sn_routing }
     }
 
     pub async fn send(
@@ -52,7 +52,11 @@ impl ClientSender {
         msg: &T,
     ) -> Option<MessagingDuty> {
         let bytes = utils::serialise(msg);
-        if let Err(e) = self.routing.send_message_to_client(recipient, bytes).await {
+        if let Err(e) = self
+            .sn_routing
+            .send_message_to_client(recipient, bytes)
+            .await
+        {
             warn!(
                 "{}: Could not send message to client {}: {:?}",
                 self, recipient, e

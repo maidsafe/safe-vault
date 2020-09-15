@@ -17,7 +17,7 @@ use crate::{
 };
 use log::trace;
 use rand::{CryptoRng, Rng};
-use routing::Prefix;
+use sn_routing::Prefix;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},
@@ -36,12 +36,12 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     pub fn new(
         info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        routing: Network,
+        sn_routing: Network,
         rng: R,
     ) -> Result<Self> {
-        let prefix = routing.our_prefix().ok_or(Error::Logic)?;
-        let key_section = KeySection::new(info, routing.clone(), rng)?;
-        let data_section = DataSection::new(info, total_used_space, routing)?;
+        let prefix = sn_routing.our_prefix().ok_or(Error::Logic)?;
+        let key_section = KeySection::new(info, sn_routing.clone(), rng)?;
+        let data_section = DataSection::new(info, total_used_space, sn_routing)?;
         Ok(Self {
             prefix,
             key_section,

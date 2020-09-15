@@ -18,7 +18,7 @@ use sn_data_types::{
 use sn_transfers::{get_genesis, TransferReplica as Replica};
 use std::collections::BTreeSet;
 
-use routing::SectionProofChain;
+use sn_routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use {
     crate::node::node_ops::MessagingDuty,
