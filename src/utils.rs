@@ -68,7 +68,7 @@ pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> T {
 }
 
 // NB: needs to allow for nodes not having a key share yet?
-pub(crate) fn key_pair(routing: Network) -> Result<Keypair> {
+pub(crate) async fn key_pair(routing: Network) -> Result<Keypair> {
     let index = routing.our_index().await?;
     let bls_secret_key = routing.secret_key_share().await?;
     let secret = SerdeSecret(bls_secret_key.clone());

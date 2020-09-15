@@ -13,7 +13,7 @@ use crate::node::node_ops::NodeMessagingDuty;
 use log::error;
 use sn_data_types::{BlobWrite, MsgEnvelope};
 
-pub(super) fn get_result(
+pub(super) async fn get_result(
     write: &BlobWrite,
     msg: &MsgEnvelope,
     storage: &mut ChunkStorage,
@@ -22,7 +22,7 @@ pub(super) fn get_result(
     match &write {
         New(data) => {
             if msg.verify() {
-                storage.store(&data, msg.id(), &msg.origin)
+                storage.store(&data, msg.id(), &msg.origin).await
             } else {
                 error!("Accumulated signature for {:?} is invalid!", &msg.id());
                 None
@@ -31,7 +31,7 @@ pub(super) fn get_result(
         DeletePrivate(address) => {
             if msg.verify() {
                 // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
-                storage.delete(*address, msg.id(), &msg.origin)
+                storage.delete(*address, msg.id(), &msg.origin).await
             } else {
                 error!("Accumulated signature is invalid!");
                 None

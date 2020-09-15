@@ -50,7 +50,7 @@ impl Chunks {
                         ..
                     },
                 ..
-            } => writing::get_result(write, msg, &mut self.chunk_storage),
+            } => writing::get_result(write, msg, &mut self.chunk_storage).await,
             _ => None,
         }
     }

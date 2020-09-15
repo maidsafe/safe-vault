@@ -37,31 +37,31 @@ impl NetworkMsgAnalysis {
         }
     }
 
-    pub fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
-        self.self_is_handler_for(&msg.destination().xorname())
+    pub async fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
+        self.self_is_handler_for(&msg.destination().xorname()).await
     }
 
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-        let result = if self.should_accumulate(msg) {
+        let result = if self.should_accumulate(msg).await {
             let msg = self.accumulation.process_message_envelope(msg)?;
             self.evaluate(&msg)?
-        } else if let Some(duty) = self.try_messaging(msg) {
+        } else if let Some(duty) = self.try_messaging(msg).await {
             // Identified as an outbound msg, to be sent on the wire.
             duty.into()
-        } else if let Some(duty) = self.try_client_entry(msg) {
+        } else if let Some(duty) = self.try_client_entry(&msg).await {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
             // (All other client msgs are handled when received from client).
             duty.into()
-        } else if let Some(duty) = self.try_transfers(msg) {
+        } else if let Some(duty) = self.try_transfers(&msg).await {
             duty.into()
-        } else if let Some(duty) = self.try_metadata(msg) {
+        } else if let Some(duty) = self.try_metadata(&msg).await {
             // Accumulated msg from `Payment`!
             duty.into()
-        } else if let Some(duty) = self.try_adult(msg) {
+        } else if let Some(duty) = self.try_adult(&msg).await {
             // Accumulated msg from `Metadata`!
             duty.into()
-        } else if let Some(duty) = self.try_rewards(msg) {
+        } else if let Some(duty) = self.try_rewards(&msg).await {
             // Identified as a Rewards msg
             duty.into()
         } else {
@@ -71,15 +71,15 @@ impl NetworkMsgAnalysis {
         Some(result)
     }
 
-    fn try_messaging(&self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
+    async fn try_messaging(&self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         use Address::*;
-        let destined_for_network = || match msg.destination() {
-            Client(address) => !self.self_is_handler_for(&address),
-            Node(address) => address != self.routing.our_name(),
-            Section(address) => !self.self_is_handler_for(&address),
+        let destined_for_network = match msg.destination() {
+            Client(address) => !self.self_is_handler_for(&address).await,
+            Node(address) => address != self.routing.our_name().await,
+            Section(address) => !self.self_is_handler_for(&address).await,
         };
 
-        if destined_for_network() {
+        if destined_for_network {
             Some(NodeMessagingDuty::SendToSection(msg.clone())) // Forwards without stamping the duty (was not processed).
         } else {
             None
@@ -88,17 +88,17 @@ impl NetworkMsgAnalysis {
 
     // ----  Accumulation ----
 
-    fn should_accumulate(&self, msg: &MsgEnvelope) -> bool {
+    async fn should_accumulate(&self, msg: &MsgEnvelope) -> bool {
         // Incoming msg from `Payment`!
-        self.should_accumulate_for_metadata_write(msg) // Metadata Elders accumulate the msgs from Payment Elders.
+        self.should_accumulate_for_metadata_write(msg).await // Metadata Elders accumulate the msgs from Payment Elders.
         // Incoming msg from `Metadata`!
-        || self.should_accumulate_for_adult(msg) // Adults accumulate the msgs from Metadata Elders.
-        || self.should_accumulate_for_rewards(msg) // Rewards Elders accumulate the claim counter cmd from other Rewards Elders
+        || self.should_accumulate_for_adult(msg).await // Adults accumulate the msgs from Metadata Elders.
+        || self.should_accumulate_for_rewards(msg).await // Rewards Elders accumulate the claim counter cmd from other Rewards Elders
     }
 
     /// The individual Payment Elder nodes send their msgs
     /// to Metadata section, where it is accumulated.
-    fn should_accumulate_for_metadata_write(&self, msg: &MsgEnvelope) -> bool {
+    async fn should_accumulate_for_metadata_write(&self, msg: &MsgEnvelope) -> bool {
         let from_single_payment_elder = || {
             matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Payment),
@@ -112,10 +112,10 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        is_data_cmd() && from_single_payment_elder() && self.is_dst_for(msg) && self.is_elder()
+        is_data_cmd() && from_single_payment_elder() && self.is_dst_for(msg).await && self.is_elder().await
     }
 
-    fn should_accumulate_for_rewards(&self, msg: &MsgEnvelope) -> bool {
+    async fn should_accumulate_for_rewards(&self, msg: &MsgEnvelope) -> bool {
         let from_single_rewards_elder = || {
             matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Rewards),
@@ -131,12 +131,12 @@ impl NetworkMsgAnalysis {
 
         is_accumulating_reward_query()
             && from_single_rewards_elder()
-            && self.is_dst_for(msg)
-            && self.is_elder()
+            && self.is_dst_for(msg).await
+            && self.is_elder().await
     }
 
     /// Adults accumulate the write requests from Elders.
-    fn should_accumulate_for_adult(&self, msg: &MsgEnvelope) -> bool {
+    async fn should_accumulate_for_adult(&self, msg: &MsgEnvelope) -> bool {
         let from_single_metadata_elder = || {
             matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Metadata),
@@ -159,21 +159,21 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        is_chunk_msg() && from_single_metadata_elder() && self.is_dst_for(msg) && self.is_adult()
+        is_chunk_msg() && from_single_metadata_elder() && self.is_dst_for(msg).await && self.is_adult().await
     }
 
     // ---- .... -----
 
     // todo: eval all msg types!
-    fn try_client_entry(&self, msg: &MsgEnvelope) -> Option<GatewayDuty> {
-        let is_our_client_msg = || match msg.destination() {
-            Address::Client(address) => self.self_is_handler_for(&address),
+    async fn try_client_entry(&self, msg: &MsgEnvelope) -> Option<GatewayDuty> {
+        let is_our_client_msg = match msg.destination() {
+            Address::Client(address) => self.self_is_handler_for(&address).await,
             _ => false,
         };
 
-        let shall_process = || is_our_client_msg() && self.is_elder();
+        let shall_process = is_our_client_msg && self.is_elder().await;
 
-        if !shall_process() {
+        if !shall_process {
             return None;
         }
 
@@ -183,7 +183,7 @@ impl NetworkMsgAnalysis {
     /// After the data write sent from Payment Elders has been
     /// accumulated (can be seen since the sender is `Section`),
     /// it is time to actually carry out the write operation.
-    fn try_metadata(&self, msg: &MsgEnvelope) -> Option<MetadataDuty> {
+    async fn try_metadata(&self, msg: &MsgEnvelope) -> Option<MetadataDuty> {
         let is_data_cmd = || {
             matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
@@ -210,11 +210,11 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        let is_correct_dst = |msg| self.is_dst_for(msg) && self.is_elder();
+        let is_correct_dst = self.is_dst_for(msg).await && self.is_elder().await;
 
-        let duty = if is_data_query() && from_single_gateway_elder() && is_correct_dst(msg) {
+        let duty = if is_data_query() && from_single_gateway_elder() && is_correct_dst {
             MetadataDuty::ProcessRead(msg.clone()) // TODO: Fix these for type safety
-        } else if is_data_cmd() && from_payment_section() && is_correct_dst(msg) {
+        } else if is_data_cmd() && from_payment_section() && is_correct_dst {
             MetadataDuty::ProcessWrite(msg.clone()) // TODO: Fix these for type safety
         } else {
             return None;
@@ -224,7 +224,7 @@ impl NetworkMsgAnalysis {
 
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
-    fn try_adult(&self, msg: &MsgEnvelope) -> Option<AdultDuty> {
+    async fn try_adult(&self, msg: &MsgEnvelope) -> Option<AdultDuty> {
         let from_metadata_section = || {
             matches!(msg.most_recent_sender(), MsgSender::Section {
                 duty: Duty::Elder(ElderDuties::Metadata),
@@ -251,10 +251,9 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        let shall_process =
-            |msg| from_metadata_section() && self.is_dst_for(msg) && self.is_adult();
+        let shall_process = from_metadata_section() && self.is_dst_for(msg).await && self.is_adult().await;
 
-        if !shall_process(msg) {
+        if !shall_process {
             return None;
         }
 
@@ -270,28 +269,28 @@ impl NetworkMsgAnalysis {
         Some(duty)
     }
 
-    fn try_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
-        let result = self.try_nonacc_rewards(msg);
+    async fn try_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
+        let result = self.try_nonacc_rewards(msg).await;
         if result.is_some() {
             return result;
         }
-        let result = self.try_accumulated_rewards(msg);
+        let result = self.try_accumulated_rewards(msg).await;
         if result.is_some() {
             return result;
         }
-        self.try_wallet_register(msg)
+        self.try_wallet_register(msg).await
     }
 
-    fn try_wallet_register(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
+    async fn try_wallet_register(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
         let from_node = || {
             matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Node(NodeDuties::NodeConfig),
                 ..
             })
         };
-        let shall_process = |msg| from_node() && self.is_dst_for(msg) && self.is_elder();
+        let shall_process = from_node() && self.is_dst_for(msg).await && self.is_elder().await;
 
-        if !shall_process(msg) {
+        if !shall_process {
             return None;
         }
 
@@ -308,16 +307,16 @@ impl NetworkMsgAnalysis {
     }
 
     // Check non-accumulated reward msgs.
-    fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
+    async fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
         let from_rewards_elder = || {
             matches!(msg.most_recent_sender(), MsgSender::Node {
                 duty: Duty::Elder(ElderDuties::Rewards),
                 ..
             })
         };
-        let shall_process = |msg| from_rewards_elder() && self.is_dst_for(msg) && self.is_elder();
+        let shall_process = from_rewards_elder() && self.is_dst_for(msg).await && self.is_elder().await;
 
-        if !shall_process(msg) {
+        if !shall_process {
             return None;
         }
 
@@ -341,7 +340,7 @@ impl NetworkMsgAnalysis {
     }
 
     // Check accumulated reward msgs.
-    fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
+    async fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Option<RewardDuty> {
         let from_rewards_section = || {
             matches!(msg.most_recent_sender(), MsgSender::Section {
                 duty: Duty::Elder(ElderDuties::Rewards),
@@ -349,9 +348,9 @@ impl NetworkMsgAnalysis {
             })
         };
         let shall_process_accumulated =
-            |msg| from_rewards_section() && self.is_dst_for(msg) && self.is_elder();
+            from_rewards_section() && self.is_dst_for(msg).await && self.is_elder().await;
 
-        if !shall_process_accumulated(msg) {
+        if !shall_process_accumulated {
             return None;
         }
 
@@ -375,7 +374,7 @@ impl NetworkMsgAnalysis {
     }
 
     // Check internal transfer cmds.
-    fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
+    async fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
         use NodeTransferCmd::*;
 
         // From Transfer module we get `PropagateTransfer`.
@@ -386,9 +385,9 @@ impl NetworkMsgAnalysis {
                 ..
             })
         };
-        let shall_process = |msg| from_transfer_elder() && self.is_dst_for(msg) && self.is_elder();
+        let shall_process = from_transfer_elder() && self.is_dst_for(msg).await && self.is_elder().await;
 
-        if shall_process(msg) {
+        if shall_process {
             return match &msg.message {
                 Message::NodeCmd {
                     cmd: NodeCmd::Transfers(PropagateTransfer(debit_agreement)),
@@ -404,7 +403,7 @@ impl NetworkMsgAnalysis {
                 } => {
                     // This comparison is a good example of the need to use `lazy messaging`,
                     // as to handle that the expected public key is not the same as the current.
-                    if public_key == &self.routing.public_key()? {
+                    if public_key == &self.routing.public_key().await? {
                         Some(TransferDuty::ProcessQuery {
                             query: TransferQuery::GetReplicaEvents,
                             msg_id: *id,
@@ -440,9 +439,9 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        let shall_process = |msg| from_rewards_elder() && self.is_dst_for(msg) && self.is_elder();
+        let shall_process = from_rewards_elder() && self.is_dst_for(msg).await && self.is_elder().await;
 
-        if !shall_process(msg) {
+        if !shall_process {
             return None;
         }
 
@@ -467,15 +466,15 @@ impl NetworkMsgAnalysis {
         }
     }
 
-    fn self_is_handler_for(&self, address: &XorName) -> bool {
-        self.routing.matches_our_prefix(*address)
+    async fn self_is_handler_for(&self, address: &XorName) -> bool {
+        self.routing.matches_our_prefix(*address).await
     }
 
-    fn is_elder(&self) -> bool {
-        self.routing.is_elder()
+    async fn is_elder(&self) -> bool {
+        self.routing.is_elder().await
     }
 
-    fn is_adult(&self) -> bool {
-        self.routing.is_adult()
+    async fn is_adult(&self) -> bool {
+        self.routing.is_adult().await
     }
 }

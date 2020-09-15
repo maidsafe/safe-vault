@@ -43,9 +43,9 @@ pub(super) async fn get_result(
                 )
                 .await
             }
-            Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin),
-            Sequence(write) => sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin),
-            Account(write) => account(write, stores.account_storage_mut(), msg_id, msg_origin),
+            Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin).await,
+            Sequence(write) => sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await,
+            Account(write) => account(write, stores.account_storage_mut(), msg_id, msg_origin).await,
         },
         _ => unreachable!("Logic error"),
     };
@@ -65,29 +65,29 @@ async fn blob(
         .await
 }
 
-fn map(
+async fn map(
     write: MapWrite,
     storage: &mut MapStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Option<NodeMessagingDuty> {
-    storage.write(write, msg_id, &origin)
+    storage.write(write, msg_id, &origin).await
 }
 
-fn sequence(
+async fn sequence(
     write: SequenceWrite,
     storage: &mut SequenceStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Option<NodeMessagingDuty> {
-    storage.write(write, msg_id, &origin)
+    storage.write(write, msg_id, &origin).await
 }
 
-fn account(
+async fn account(
     write: AccountWrite,
     storage: &mut AccountStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Option<NodeMessagingDuty> {
-    storage.write(write, msg_id, &origin)
+    storage.write(write, msg_id, &origin).await
 }

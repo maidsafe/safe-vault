@@ -24,7 +24,7 @@ impl NetworkSender {
     }
 
     pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
-        let name = *self.routing.id().name();
+        let name = *self.routing.id().await.name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
             Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg)),
@@ -50,7 +50,7 @@ impl NetworkSender {
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
     ) -> Option<NodeMessagingDuty> {
-        let name = *self.routing.id().name();
+        let name = *self.routing.id().await.name();
         for target in targets {
             self.routing
                 .send_message(
@@ -72,7 +72,7 @@ impl NetworkSender {
     }
 
     pub async fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
-        let name = *self.routing.id().name();
+        let name = *self.routing.id().await.name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
             Address::Client(xorname) | Address::Section(xorname) => {

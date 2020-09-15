@@ -90,25 +90,26 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         use NodeDuty::*;
         info!("Processing Node Duty: {:?}", duty);
         match duty {
-            RegisterWallet(wallet) => self.register_wallet(wallet),
+            RegisterWallet(wallet) => self.register_wallet(wallet).await,
             BecomeAdult => self.become_adult(),
-            BecomeElder => self.become_elder(),
+            BecomeElder => self.become_elder().await,
             ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
-            ProcessNetworkEvent(event) => self.network_events.process_network_event(event),
+            ProcessNetworkEvent(event) => self.network_events.process_network_event(event).await,
         }
     }
 
-    fn register_wallet(&mut self, wallet: PublicKey) -> Option<NodeOperation> {
+    async fn register_wallet(&mut self, wallet: PublicKey) -> Option<NodeOperation> {
         let wrapping =
             NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
         wrapping
             .send(Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
                     wallet,
-                    section: self.node_info.public_key()?.into(),
+                    section: self.node_info.public_key().await?.into(),
                 }),
                 id: MessageId::new(),
             })
+            .await
             .map(|c| c.into())
     }
 
@@ -126,7 +127,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         None
     }
 
-    fn become_elder(&mut self) -> Option<NodeOperation> {
+    async fn become_elder(&mut self) -> Option<NodeOperation> {
         trace!("Becoming Elder");
 
         use DutyLevel::*;
@@ -140,9 +141,9 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             &total_used_space,
             self.routing.clone(),
             self.rng.take()?,
-        ) {
+        ).await {
             let mut duties = duties;
-            let op = duties.initiate();
+            let op = duties.initiate().await;
             self.duty_level = Elder(duties);
             // NB: This is wrong, shouldn't write to disk here,
             // let it be upper layer resp.

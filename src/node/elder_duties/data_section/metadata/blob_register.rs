@@ -386,7 +386,7 @@ impl BlobRegister {
 
         if let Some(data_owner) = metadata.owner {
             if data_owner != origin.id() {
-                return query_error(NdError::AccessDenied);
+                return query_error(NdError::AccessDenied).await;
             }
         };
         let msg = MsgEnvelope {

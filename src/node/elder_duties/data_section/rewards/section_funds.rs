@@ -62,7 +62,7 @@ impl SectionFunds {
     }
 
     /// At Elder churn, we must transition to a new account.
-    pub fn transition(&mut self, to: TransferActor<Validator>) -> Option<NodeMessagingDuty> {
+    pub async fn transition(&mut self, to: TransferActor<Validator>) -> Option<NodeMessagingDuty> {
         if self.is_transitioning() {
             // hm, could be tricky edge cases here, but
             // we'll start by assuming there will only be
@@ -104,7 +104,7 @@ impl SectionFunds {
                     self.wrapping.send(Message::NodeCmd {
                         cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
                         id: MessageId::new(),
-                    })
+                    }).await
                 }
             }
             Ok(None) => None, // Would indicate that this apparently has already been done, so no change.
@@ -114,7 +114,7 @@ impl SectionFunds {
 
     /// Will validate and sign the payout, and ask of the replicas to
     /// do the same, and await their responses as to accumulate the result.
-    pub fn initiate_reward_payout(&mut self, payout: Payout) -> Option<NodeMessagingDuty> {
+    pub async fn initiate_reward_payout(&mut self, payout: Payout) -> Option<NodeMessagingDuty> {
         if self.state.finished.contains(&payout.node_id) {
             return None;
         }
@@ -141,7 +141,7 @@ impl SectionFunds {
                     self.wrapping.send(Message::NodeCmd {
                         cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
                         id: MessageId::new(),
-                    })
+                    }).await
                 }
             }
             Ok(None) => None, // Would indicate that this apparently has already been done, so no change.
@@ -152,7 +152,7 @@ impl SectionFunds {
     /// As all Replicas have accumulated the distributed
     /// actor cmds and applied them, they'll send out the
     /// result, which each actor instance accumulates locally.
-    pub fn receive(&mut self, validation: TransferValidated) -> Option<NodeOperation> {
+    pub async fn receive(&mut self, validation: TransferValidated) -> Option<NodeOperation> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
         match self.actor.receive(validation) {
@@ -183,7 +183,7 @@ impl SectionFunds {
 
                     // If there are queued payouts,
                     // the first in queue will be executed.
-                    let queued_op = self.try_pop_queue();
+                    let queued_op = self.try_pop_queue().await;
 
                     // We ask of our Replicas to register this transfer.
                     let reg_op = self
@@ -191,7 +191,7 @@ impl SectionFunds {
                         .send(Message::NodeCmd {
                             cmd: Transfers(RegisterSectionPayout(proof)),
                             id: MessageId::new(),
-                        })?
+                        }).await?
                         .into();
 
                     if let Some(queued) = queued_op {
@@ -210,14 +210,14 @@ impl SectionFunds {
 
     // Can safely be called without overwriting any
     // payout in flight, since validations for that are made.
-    fn try_pop_queue(&mut self) -> Option<NodeOperation> {
+    async fn try_pop_queue(&mut self) -> Option<NodeOperation> {
         if let Some(payout) = self.state.queued_payouts.pop_front() {
             // Validation logic when inititating rewards prevents enqueueing a payout that is already
             // in the finished set. Therefore, calling initiate here cannot return None because of
             // the payout already being finished.
             // For that reason it is safe to enqueue it again, if this call returns None.
             // (we will not loop on that payout)
-            if let Some(msg) = self.initiate_reward_payout(payout.clone()) {
+            if let Some(msg) = self.initiate_reward_payout(payout.clone()).await {
                 return Some(msg.into());
             } else if !self.state.finished.contains(&payout.node_id) {
                 // buut.. just to prevent any future changes to

@@ -42,7 +42,7 @@ impl MapStorage {
         Ok(Self { chunks, wrapping })
     }
 
-    pub(super) fn read(
+    pub(super) async fn read(
         &self,
         read: &MapRead,
         msg_id: MessageId,
@@ -50,21 +50,21 @@ impl MapStorage {
     ) -> Option<NodeMessagingDuty> {
         use MapRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin),
-            GetValue { address, ref key } => self.get_value(*address, key, msg_id, origin),
-            GetShell(address) => self.get_shell(*address, msg_id, origin),
-            GetVersion(address) => self.get_version(*address, msg_id, origin),
-            ListEntries(address) => self.list_entries(*address, msg_id, origin),
-            ListKeys(address) => self.list_keys(*address, msg_id, origin),
-            ListValues(address) => self.list_values(*address, msg_id, origin),
-            ListPermissions(address) => self.list_permissions(*address, msg_id, origin),
+            Get(address) => self.get(*address, msg_id, origin).await,
+            GetValue { address, ref key } => self.get_value(*address, key, msg_id, origin).await,
+            GetShell(address) => self.get_shell(*address, msg_id, origin).await,
+            GetVersion(address) => self.get_version(*address, msg_id, origin).await,
+            ListEntries(address) => self.list_entries(*address, msg_id, origin).await,
+            ListKeys(address) => self.list_keys(*address, msg_id, origin).await,
+            ListValues(address) => self.list_values(*address, msg_id, origin).await,
+            ListPermissions(address) => self.list_permissions(*address, msg_id, origin).await,
             ListUserPermissions { address, user } => {
-                self.list_user_permissions(*address, *user, msg_id, origin)
+                self.list_user_permissions(*address, *user, msg_id, origin).await
             }
         }
     }
 
-    pub(super) fn write(
+    pub(super) async fn write(
         &mut self,
         write: MapWrite,
         msg_id: MessageId,
@@ -72,20 +72,20 @@ impl MapStorage {
     ) -> Option<NodeMessagingDuty> {
         use MapWrite::*;
         match write {
-            New(data) => self.create(&data, msg_id, origin),
-            Delete(address) => self.delete(address, msg_id, origin),
+            New(data) => self.create(&data, msg_id, origin).await,
+            Delete(address) => self.delete(address, msg_id, origin).await,
             SetUserPermissions {
                 address,
                 user,
                 ref permissions,
                 version,
-            } => self.set_user_permissions(address, user, permissions, version, msg_id, origin),
+            } => self.set_user_permissions(address, user, permissions, version, msg_id, origin).await,
             DelUserPermissions {
                 address,
                 user,
                 version,
-            } => self.delete_user_permissions(address, user, version, msg_id, origin),
-            Edit { address, changes } => self.edit_entries(address, changes, msg_id, origin),
+            } => self.delete_user_permissions(address, user, version, msg_id, origin).await,
+            Edit { address, changes } => self.edit_entries(address, changes, msg_id, origin).await,
         }
     }
 
@@ -111,7 +111,7 @@ impl MapStorage {
     }
 
     /// Get Map from the chunk store, update it, and overwrite the stored chunk.
-    fn edit_chunk<F>(
+    async fn edit_chunk<F>(
         &mut self,
         address: &MapAddress,
         origin: &MsgSender,
@@ -134,11 +134,11 @@ impl MapStorage {
                     .put(&map)
                     .map_err(|error| error.to_string().into())
             });
-        self.ok_or_error(result, msg_id, &origin)
+        self.ok_or_error(result, msg_id, &origin).await
     }
 
     /// Put Map.
-    fn create(
+    async fn create(
         &mut self,
         data: &Map,
         msg_id: MessageId,
@@ -151,10 +151,10 @@ impl MapStorage {
                 .put(&data)
                 .map_err(|error| error.to_string().into())
         };
-        self.ok_or_error(result, msg_id, origin)
+        self.ok_or_error(result, msg_id, origin).await
     }
 
-    fn delete(
+    async fn delete(
         &mut self,
         address: MapAddress,
         msg_id: MessageId,
@@ -174,11 +174,11 @@ impl MapStorage {
                     .map_err(|error| error.to_string().into())
             });
 
-        self.ok_or_error(result, msg_id, origin)
+        self.ok_or_error(result, msg_id, origin).await
     }
 
     /// Set Map user permissions.
-    fn set_user_permissions(
+    async fn set_user_permissions(
         &mut self,
         address: MapAddress,
         user: PublicKey,
@@ -191,11 +191,11 @@ impl MapStorage {
             data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.set_user_permissions(user, permissions.clone(), version)?;
             Ok(data)
-        })
+        }).await
     }
 
     /// Delete Map user permissions.
-    fn delete_user_permissions(
+    async fn delete_user_permissions(
         &mut self,
         address: MapAddress,
         user: PublicKey,
@@ -207,11 +207,11 @@ impl MapStorage {
             data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.del_user_permissions(user, version)?;
             Ok(data)
-        })
+        }).await
     }
 
     /// Edit Map.
-    fn edit_entries(
+    async fn edit_entries(
         &mut self,
         address: MapAddress,
         actions: MapEntryActions,
@@ -221,7 +221,7 @@ impl MapStorage {
         self.edit_chunk(&address, origin, msg_id, move |mut data| {
             data.mutate_entries(actions, origin.id())?;
             Ok(data)
-        })
+        }).await
     }
 
     /// Get entire Map.
@@ -243,7 +243,7 @@ impl MapStorage {
     }
 
     /// Get Map shell.
-    fn get_shell(
+    async fn get_shell(
         &self,
         address: MapAddress,
         msg_id: MessageId,
@@ -257,11 +257,11 @@ impl MapStorage {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
     /// Get Map version.
-    fn get_version(
+    async fn get_version(
         &self,
         address: MapAddress,
         msg_id: MessageId,
@@ -275,11 +275,11 @@ impl MapStorage {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
     /// Get Map value.
-    fn get_value(
+    async fn get_value(
         &self,
         address: MapAddress,
         key: &[u8],
@@ -304,11 +304,11 @@ impl MapStorage {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
     /// Get Map keys.
-    fn list_keys(
+    async fn list_keys(
         &self,
         address: MapAddress,
         msg_id: MessageId,
@@ -322,11 +322,11 @@ impl MapStorage {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
     /// Get Map values.
-    fn list_values(
+    async fn list_values(
         &self,
         address: MapAddress,
         msg_id: MessageId,
@@ -342,11 +342,11 @@ impl MapStorage {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
     /// Get Map entries.
-    fn list_entries(
+    async fn list_entries(
         &self,
         address: MapAddress,
         msg_id: MessageId,
@@ -362,11 +362,11 @@ impl MapStorage {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
     /// Get Map permissions.
-    fn list_permissions(
+    async fn list_permissions(
         &self,
         address: MapAddress,
         msg_id: MessageId,
@@ -380,11 +380,11 @@ impl MapStorage {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
     /// Get Map user permissions.
-    fn list_user_permissions(
+    async fn list_user_permissions(
         &self,
         address: MapAddress,
         user: PublicKey,
@@ -399,10 +399,10 @@ impl MapStorage {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin.address(),
-        })
+        }).await
     }
 
-    fn ok_or_error(
+    async fn ok_or_error(
         &self,
         result: NdResult<()>,
         msg_id: MessageId,
@@ -410,7 +410,7 @@ impl MapStorage {
     ) -> Option<NodeMessagingDuty> {
         if let Err(error) = result {
             self.wrapping
-                .error(CmdError::Data(error), msg_id, &origin.address())
+                .error(CmdError::Data(error), msg_id, &origin.address()).await
         } else {
             None
         }

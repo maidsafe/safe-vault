@@ -34,7 +34,7 @@ impl ChunkStorage {
         Ok(Self { chunks, wrapping })
     }
 
-    pub(crate) fn store(
+    pub(crate) async fn store(
         &mut self,
         data: &Blob,
         msg_id: MessageId,
@@ -43,7 +43,7 @@ impl ChunkStorage {
         if let Err(error) = self.try_store(data) {
             return self
                 .wrapping
-                .error(CmdError::Data(error), msg_id, &origin.address());
+                .error(CmdError::Data(error), msg_id, &origin.address()).await;
         }
         None
     }
@@ -135,7 +135,7 @@ impl ChunkStorage {
     //     })
     // }
 
-    pub(crate) fn delete(
+    pub(crate) async fn delete(
         &mut self,
         address: BlobAddress,
         msg_id: MessageId,
@@ -165,7 +165,7 @@ impl ChunkStorage {
         if let Err(error) = result {
             return self
                 .wrapping
-                .error(CmdError::Data(error), msg_id, &origin.address());
+                .error(CmdError::Data(error), msg_id, &origin.address()).await;
         }
         None
     }

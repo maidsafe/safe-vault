@@ -52,9 +52,9 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub fn initiate(&mut self) -> Option<NodeOperation> {
+    pub async fn initiate(&mut self) -> Option<NodeOperation> {
         // currently only key section needs to catch up
-        self.key_section.catchup_with_section()
+        self.key_section.catchup_with_section().await
     }
 
     /// Processing of any Elder duty.
@@ -62,7 +62,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         trace!("Processing elder duty");
         use ElderDuty::*;
         match duty {
-            ProcessNewMember(name) => self.new_node_joined(name),
+            ProcessNewMember(name) => self.new_node_joined(name).await,
             ProcessLostMember { name, age } => self.member_left(name, age).await,
             ProcessRelocatedMember {
                 old_node_id,
@@ -81,8 +81,8 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     }
 
     ///
-    fn new_node_joined(&mut self, name: XorName) -> Option<NodeOperation> {
-        self.data_section.new_node_joined(name)
+    async fn new_node_joined(&mut self, name: XorName) -> Option<NodeOperation> {
+        self.data_section.new_node_joined(name).await
     }
 
     ///

@@ -64,6 +64,7 @@ impl Network {
                 .expect("Unable to start vault Node");
             let our_conn_info = node
                 .our_connection_info()
+                .await
                 .expect("Could not get genesis info");
             let _ = write_connection_info(&our_conn_info).unwrap();
             let _ = node.run().await.unwrap();

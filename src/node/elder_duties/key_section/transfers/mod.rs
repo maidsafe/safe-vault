@@ -68,7 +68,7 @@ impl Transfers {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub fn catchup_with_replicas(&mut self) -> Option<NodeOperation> {
+    pub async fn catchup_with_replicas(&mut self) -> Option<NodeOperation> {
         // prepare replica init
         self.wrapping
             .send(Message::NodeQuery {
@@ -76,31 +76,31 @@ impl Transfers {
                     self.replica.lock().unwrap().replicas_pk_set()?.public_key(),
                 ))),
                 id: MessageId::new(),
-            })
+            }).await
             .map(|c| c.into())
     }
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Option<NodeOperation> {
+    pub async fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Option<NodeOperation> {
         use TransferDuty::*;
         let result = match duty {
             ProcessQuery {
                 query,
                 msg_id,
                 origin,
-            } => self.process_query(query, *msg_id, origin.clone()),
+            } => self.process_query(query, *msg_id, origin.clone()).await,
             ProcessCmd {
                 cmd,
                 msg_id,
                 origin,
-            } => self.process_cmd(cmd, *msg_id, origin.clone()),
+            } => self.process_cmd(cmd, *msg_id, origin.clone()).await,
         };
 
         result.map(|c| c.into())
     }
 
-    fn process_query(
+    async fn process_query(
         &mut self,
         query: &TransferQuery,
         msg_id: MessageId,
@@ -108,14 +108,14 @@ impl Transfers {
     ) -> Option<NodeMessagingDuty> {
         use TransferQuery::*;
         match query {
-            GetReplicaEvents => self.all_events(msg_id, origin),
-            GetReplicaKeys(wallet_id) => self.get_replica_pks(wallet_id, msg_id, origin),
-            GetBalance(wallet_id) => self.balance(wallet_id, msg_id, origin),
-            GetHistory { at, since_version } => self.history(at, *since_version, msg_id, origin),
+            GetReplicaEvents => self.all_events(msg_id, origin).await,
+            GetReplicaKeys(wallet_id) => self.get_replica_pks(wallet_id, msg_id, origin).await,
+            GetBalance(wallet_id) => self.balance(wallet_id, msg_id, origin).await,
+            GetHistory { at, since_version } => self.history(at, *since_version, msg_id, origin).await,
         }
     }
 
-    fn process_cmd(
+    async fn process_cmd(
         &mut self,
         cmd: &TransferCmd,
         msg_id: MessageId,
@@ -133,16 +133,16 @@ impl Transfers {
                 .unwrap()
                 .credit_without_proof(transfer.clone()),
             ValidateTransfer(signed_transfer) => {
-                self.validate(signed_transfer.clone(), msg_id, origin)
+                self.validate(signed_transfer.clone(), msg_id, origin).await
             }
             ValidateSectionPayout(signed_transfer) => {
-                self.validate_section_payout(signed_transfer.clone(), msg_id, origin)
+                self.validate_section_payout(signed_transfer.clone(), msg_id, origin).await
             }
             RegisterTransfer(debit_agreement) | RegisterSectionPayout(debit_agreement) => {
-                self.register(&debit_agreement, msg_id, origin)
+                self.register(&debit_agreement, msg_id, origin).await
             }
             PropagateTransfer(debit_agreement) => {
-                self.receive_propagated(&debit_agreement, msg_id, origin)
+                self.receive_propagated(&debit_agreement, msg_id, origin).await
             }
         }
     }
@@ -158,7 +158,7 @@ impl Transfers {
     }
 
     /// Get all the events of the Replica.
-    fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<NodeMessagingDuty> {
+    async fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<NodeMessagingDuty> {
         let result = match self.replica.lock().unwrap().all_events() {
             None => Err(Error::NoSuchData),
             Some(events) => Ok(events),
@@ -170,11 +170,11 @@ impl Transfers {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin,
-        })
+        }).await
     }
 
     /// Get the PublicKeySet of our replicas
-    fn get_replica_pks(
+    async fn get_replica_pks(
         &self,
         _wallet_id: &PublicKey,
         msg_id: MessageId,
@@ -190,10 +190,10 @@ impl Transfers {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin,
-        })
+        }).await
     }
 
-    fn balance(
+    async fn balance(
         &self,
         wallet_id: &PublicKey,
         msg_id: MessageId,
@@ -210,10 +210,10 @@ impl Transfers {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin,
-        })
+        }).await
     }
 
-    fn history(
+    async fn history(
         &self,
         wallet_id: &PublicKey,
         _since_version: usize,
@@ -235,13 +235,13 @@ impl Transfers {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin,
-        })
+        }).await
     }
 
     /// This validation will render a signature over the
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
-    fn validate(
+    async fn validate(
         &mut self,
         transfer: SignedTransfer,
         msg_id: MessageId,
@@ -265,13 +265,13 @@ impl Transfers {
                 cmd_origin: origin,
             },
         };
-        self.wrapping.send(message)
+        self.wrapping.send(message).await
     }
 
     /// This validation will render a signature over the
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
-    fn validate_section_payout(
+    async fn validate_section_payout(
         &mut self,
         transfer: SignedTransfer,
         msg_id: MessageId,
@@ -291,12 +291,12 @@ impl Transfers {
                 cmd_origin: origin,
             },
         };
-        self.wrapping.send(message)
+        self.wrapping.send(message).await
     }
 
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
-    fn register(
+    async fn register(
         &mut self,
         proof: &DebitAgreementProof,
         msg_id: MessageId,
@@ -310,12 +310,12 @@ impl Transfers {
             Ok(Some(event)) => self.wrapping.send(Message::NodeCmd {
                 cmd: Transfers(PropagateTransfer(event.debit_proof)),
                 id: MessageId::new(),
-            }),
+            }).await,
             Err(error) => self.wrapping.error(
                 CmdError::Transfer(TransferError::TransferRegistration(error)),
                 msg_id,
                 &origin,
-            ),
+            ).await,
         }
     }
 
@@ -323,7 +323,7 @@ impl Transfers {
     /// (See fn register_transfer).
     /// After a successful registration of a transfer at
     /// the source, the transfer is propagated to the destination.
-    fn receive_propagated(
+    async fn receive_propagated(
         &mut self,
         proof: &DebitAgreementProof,
         msg_id: MessageId,
@@ -340,7 +340,7 @@ impl Transfers {
                 cmd_origin: origin,
             },
         };
-        self.wrapping.send(message)
+        self.wrapping.send(message).await
     }
 
     #[allow(unused)]

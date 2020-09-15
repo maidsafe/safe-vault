@@ -66,13 +66,13 @@ impl AdultMsgWrapping {
         self.inner.send(message).await
     }
 
-    pub fn error(
+    pub async fn error(
         &self,
         error: CmdError,
         msg_id: MessageId,
         origin: &Address,
     ) -> Option<NodeMessagingDuty> {
-        self.inner.error(error, msg_id, origin)
+        self.inner.error(error, msg_id, origin).await
     }
 }
 
@@ -99,13 +99,13 @@ impl ElderMsgWrapping {
         self.inner.send_to_adults(targets, msg).await
     }
 
-    pub fn error(
+    pub async fn error(
         &self,
         error: CmdError,
         msg_id: MessageId,
         origin: &Address,
     ) -> Option<NodeMessagingDuty> {
-        self.inner.error(error, msg_id, origin)
+        self.inner.error(error, msg_id, origin).await
     }
 }
 
@@ -133,7 +133,7 @@ impl MsgWrapping {
         Some(MessagingDuty::SendToAdults { targets, msg })
     }
 
-    pub fn error(
+    pub async fn error(
         &self,
         error: CmdError,
         msg_id: MessageId,
@@ -145,7 +145,7 @@ impl MsgWrapping {
             error,
             correlation_id: msg_id,
             cmd_origin: origin.clone(),
-        })
+        }).await
     }
 
     async fn sign<T: Serialize>(&self, data: &T) -> MsgSender {

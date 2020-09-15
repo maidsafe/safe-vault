@@ -51,7 +51,7 @@ impl DataSection {
         let metadata = Metadata::new(info, dbs, &total_used_space, network.clone())?;
 
         // Rewards
-        let keypair = utils::key_pair(network.clone())?;
+        let keypair = utils::key_pair(network.clone()).await?;
         let public_key_set = network.public_key_set().await?;
         let actor = TransferActor::new(keypair, public_key_set, Validator {});
         let reward_calc = RewardCalc::new(network.clone());
@@ -68,16 +68,16 @@ impl DataSection {
         use DataSectionDuty::*;
         match duty {
             RunAsMetadata(duty) => self.metadata.process_metadata_duty(duty).await,
-            RunAsRewards(duty) => self.rewards.process_reward_duty(duty),
+            RunAsRewards(duty) => self.rewards.process_reward_duty(duty).await,
         }
     }
 
     // Transition the section funds account to the new key.
     pub async fn elders_changed(&mut self) -> Option<NodeOperation> {
         let pub_key_set = self.network.public_key_set().await.ok()?;
-        let keypair = utils::key_pair(self.network.clone()).ok()?;
+        let keypair = utils::key_pair(self.network.clone()).await.ok()?;
         let actor = TransferActor::new(keypair, pub_key_set, Validator {});
-        self.rewards.transition(actor)
+        self.rewards.transition(actor).await
     }
 
     // At section split, all Elders get their reward payout.
@@ -93,12 +93,12 @@ impl DataSection {
 
         // Then payout rewards to all the Elders.
         let elders = self.network.our_elder_names().await;
-        self.rewards.payout_rewards(elders)
+        self.network.payout_rewards(elders).await
     }
 
     /// When a new node joins, it is registered for receiving rewards.
-    pub fn new_node_joined(&mut self, id: XorName) -> Option<NodeOperation> {
-        self.rewards.process_reward_duty(RewardDuty::AddNewNode(id))
+    pub async fn new_node_joined(&mut self, id: XorName) -> Option<NodeOperation> {
+        self.rewards.process_reward_duty(RewardDuty::AddNewNode(id)).await
     }
 
     /// When a relocated node joins, a DataSection
@@ -117,7 +117,7 @@ impl DataSection {
                 old_node_id,
                 new_node_id,
                 age,
-            });
+            }).await;
         let second = self.metadata.trigger_chunk_duplication(new_node_id).await;
         Some(vec![first, second].into())
     }
@@ -129,7 +129,7 @@ impl DataSection {
         // awaiting claiming of the counter
         let first = self
             .rewards
-            .process_reward_duty(RewardDuty::DeactivateNode(node_id));
+            .process_reward_duty(RewardDuty::DeactivateNode(node_id)).await;
         let second = self.metadata.trigger_chunk_duplication(node_id).await;
         Some(vec![first, second].into())
     }
