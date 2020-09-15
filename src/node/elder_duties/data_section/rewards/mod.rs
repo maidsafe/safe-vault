@@ -85,11 +85,11 @@ impl Rewards {
 
     /// After Elder change, we transition to a new
     /// transfer actor, as there is now a new keypair for it.
-    pub fn transition(&mut self, to: TransferActor<Validator>) -> Option<NodeOperation> {
-        Some(self.section_funds.transition(to)?.into())
+    pub async fn transition(&mut self, to: TransferActor<Validator>) -> Option<NodeOperation> {
+        Some(self.section_funds.transition(to).await?.into())
     }
 
-    pub fn process(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
+    pub async fn process(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
         use RewardDuty::*;
         let result = match duty {
             AddNewNode(node_id) => self.add_new_node(node_id)?.into(),
@@ -101,7 +101,7 @@ impl Rewards {
                 new_node_id,
                 age,
             } => self
-                .add_relocating_node(old_node_id, new_node_id, age)?
+                .add_relocating_node(old_node_id, new_node_id, age).await?
                 .into(),
             GetWalletId {
                 old_node_id,
@@ -109,18 +109,18 @@ impl Rewards {
                 msg_id,
                 origin,
             } => self
-                .get_wallet_id(old_node_id, new_node_id, msg_id, &origin)?
+                .get_account_id(old_node_id, new_node_id, msg_id, &origin).await?
                 .into(),
-            ActivateNodeRewards { id, node_id } => self.activate_node_rewards(id, node_id)?.into(),
+            ActivateNodeRewards { id, node_id } => self.activate_node_rewards(id, node_id).await?.into(),
             DeactivateNode(node_id) => self.deactivate(node_id)?.into(),
-            ReceivePayoutValidation(validation) => self.section_funds.receive(validation)?,
+            ReceivePayoutValidation(validation) => self.section_funds.receive(validation).await?,
         };
 
         Some(result)
     }
 
     /// On section splits, we are paying out to Elders.
-    pub fn payout_rewards(&mut self, node_ids: BTreeSet<XorName>) -> Option<NodeOperation> {
+    pub async fn payout_rewards(&mut self, node_ids: BTreeSet<XorName>) -> Option<NodeOperation> {
         let mut payouts: Vec<NodeOperation> = vec![];
         for node_id in node_ids {
             // Try get the wallet..
@@ -146,7 +146,7 @@ impl Rewards {
                 to: wallet,
                 amount: Money::from_nano(self.reward_calc.reward(age)?.as_nano() / age as u64),
                 node_id,
-            }) {
+            }).await {
                 // add the payout to list of ops
                 payouts.push(payout.into());
             }
@@ -189,7 +189,7 @@ impl Rewards {
 
     /// 2. When a node is relocated to our section, we add the node id
     /// and send a query to old section, for retreiving the wallet id.
-    fn add_relocating_node(
+    async fn add_relocating_node(
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
@@ -208,17 +208,13 @@ impl Rewards {
                 new_node_id,
             }),
             id: MessageId::new(),
-        })
+        }).await
     }
 
     /// 3. The old section will send back the wallet id, which allows us to activate it.
     /// At this point, we payout a standard reward based on the node age,
     /// which represents the work performed in its previous section.
-    fn activate_node_rewards(
-        &mut self,
-        wallet: PublicKey,
-        node_id: XorName,
-    ) -> Option<MessagingDuty> {
+    async fn activate_node_rewards(&mut self, wallet: PublicKey, node_id: XorName) -> Option<MessagingDuty> {
         // If we ever hit these errors, something is very odd
         // most likely a bug, because we are receiving an event triggered by our cmd.
         // So, it doesn't make much sense to send some error msg back on the wire.
@@ -253,7 +249,7 @@ impl Rewards {
             to: wallet,
             amount: self.reward_calc.reward(age)?,
             node_id,
-        })
+        }).await
     }
 
     /// 4. When the section becomes aware that a node has left,
@@ -276,7 +272,7 @@ impl Rewards {
     /// will locally be executing `add_wallet(..)` of this very module,
     /// thereby sending a query to the old section, leading to this method
     /// here being called. A query response will be sent back with the wallet id.
-    fn get_wallet_id(
+    async fn get_wallet_id(
         &mut self,
         old_node_id: XorName,
         new_node_id: XorName,
@@ -298,7 +294,7 @@ impl Rewards {
                     id: MessageId::new(),
                     correlation_id: msg_id,
                     query_origin: origin.clone(),
-                });
+                }).await;
             }
             None => return None,
         };
@@ -317,6 +313,6 @@ impl Rewards {
             id: MessageId::new(),
             correlation_id: msg_id,
             query_origin: origin.clone(),
-        })
+        }).await
     }
 }

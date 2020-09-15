@@ -74,6 +74,7 @@ impl Payments {
                     msg.id(),
                     &msg.origin.address(),
                 )
+                .await
                 .map(|c| c.into());
         }
         let registration = self.replica_mut().register(&payment);
@@ -101,6 +102,7 @@ impl Payments {
                             msg.id(),
                             &msg.origin.address(),
                         )
+                        .await
                         .map(|c| c.into());
                 }
                 // consider having the section actor be
@@ -111,7 +113,7 @@ impl Payments {
                 CmdError::Transfer(TransferRegistration(error)),
                 msg.id(),
                 &msg.origin.address(),
-            ),
+            ).await,
         };
         result.map(|c| c.into())
     }

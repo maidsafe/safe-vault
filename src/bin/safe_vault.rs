@@ -97,7 +97,7 @@ async fn main() {
         }
     };
 
-    match vault.our_connection_info() {
+    match vault.our_connection_info().await {
         Ok(our_conn_info) => {
             println!(
                 "Vault connection info:\n{}",

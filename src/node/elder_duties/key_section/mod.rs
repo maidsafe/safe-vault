@@ -49,7 +49,7 @@ pub struct KeySection<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> KeySection<R> {
     pub async fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
-        let gateway = ClientGateway::new(info, routing.clone(), rng)?;
+        let gateway = ClientGateway::new(info, routing.clone(), rng).await?;
         let replica_manager = Self::new_replica_manager(info, routing.clone()).await?;
         let payments = Payments::new(info.keys.clone(), replica_manager.clone());
         let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
@@ -68,9 +68,9 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub fn catchup_with_section(&mut self) -> Option<NodeOperation> {
+    pub async fn catchup_with_section(&mut self) -> Option<NodeOperation> {
         // currently only at2 replicas need to catch up
-        self.transfers.catchup_with_replicas()
+        self.transfers.catchup_with_replicas().await
     }
 
     // Update our replica with the latest keys
@@ -121,7 +121,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             EvaluateClientMsg(msg) => self.msg_analysis.evaluate(&msg).await,
             RunAsGateway(duty) => self.gateway.process(duty).await,
             RunAsPayment(duty) => self.payments.process(&duty).await,
-            RunAsTransfers(duty) => self.transfers.process(&duty),
+            RunAsTransfers(duty) => self.transfers.process(&duty).await,
         }
     }
 
