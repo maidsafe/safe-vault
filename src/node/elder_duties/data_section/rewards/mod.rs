@@ -6,11 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod reward_calc;
 mod section_funds;
 mod validator;
 
 use self::section_funds::{Payout, SectionFunds};
-pub use self::validator::Validator;
+pub use self::{reward_calc::RewardCalc, validator::Validator};
 use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
@@ -32,6 +33,7 @@ pub struct Rewards {
     node_rewards: HashMap<XorName, NodeRewards>,
     section_funds: SectionFunds,
     wrapping: ElderMsgWrapping,
+    reward_calc: RewardCalc,
 }
 
 // Node age
@@ -51,18 +53,19 @@ pub enum NodeRewards {
     AwaitingRelocation(PublicKey),
 }
 
-fn reward(age: Age) -> Money {
-    Money::from_nano(2_u64.pow(age as u32) * 1_000_000_000)
-}
-
 impl Rewards {
-    pub fn new(keys: NodeSigningKeys, actor: TransferActor<Validator>) -> Self {
+    pub fn new(
+        keys: NodeSigningKeys,
+        actor: TransferActor<Validator>,
+        reward_calc: RewardCalc,
+    ) -> Self {
         let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Rewards);
         let section_funds = SectionFunds::new(actor, wrapping.clone());
         Self {
             node_rewards: Default::default(),
             section_funds,
             wrapping,
+            reward_calc,
         }
     }
 
@@ -141,7 +144,7 @@ impl Rewards {
             // Because of the more frequent payout, every such payout is made a bit smaller (dividing by age).
             if let Some(payout) = self.section_funds.initiate_reward_payout(Payout {
                 to: wallet,
-                amount: Money::from_nano(reward(age).as_nano() / age as u64),
+                amount: Money::from_nano(self.reward_calc.reward(age)?.as_nano() / age as u64),
                 node_id,
             }) {
                 // add the payout to list of ops
@@ -248,7 +251,7 @@ impl Rewards {
         info!("Initiating reward payout to: {}.", wallet);
         self.section_funds.initiate_reward_payout(Payout {
             to: wallet,
-            amount: reward(age),
+            amount: self.reward_calc.reward(age)?,
             node_id,
         })
     }

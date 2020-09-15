@@ -11,7 +11,7 @@ mod rewards;
 
 use self::{
     metadata::Metadata,
-    rewards::{Rewards, Validator},
+    rewards::{RewardCalc, Rewards, Validator},
 };
 
 use crate::{
@@ -35,7 +35,7 @@ pub struct DataSection {
     /// services to the network.
     rewards: Rewards,
     /// The routing layer.
-    routing: Network,
+    network: Network,
 }
 
 impl DataSection {
@@ -43,21 +43,22 @@ impl DataSection {
     pub fn new(
         info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        routing: Network,
+        network: Network,
     ) -> Result<Self> {
         // Metadata
-        let metadata = Metadata::new(info, &total_used_space, routing.clone())?;
+        let metadata = Metadata::new(info, &total_used_space, network.clone())?;
 
         // Rewards
-        let keypair = utils::key_pair(routing.clone())?;
-        let public_key_set = routing.public_key_set()?;
+        let keypair = utils::key_pair(network.clone())?;
+        let public_key_set = network.public_key_set()?;
         let actor = TransferActor::new(keypair, public_key_set, Validator {});
-        let rewards = Rewards::new(info.keys.clone(), actor);
+        let reward_calc = RewardCalc::new(network.clone());
+        let rewards = Rewards::new(info.keys.clone(), actor, reward_calc);
 
         Ok(Self {
             metadata,
             rewards,
-            routing,
+            network,
         })
     }
 
@@ -71,8 +72,8 @@ impl DataSection {
 
     // Transition the section funds account to the new key.
     pub fn elders_changed(&mut self) -> Option<NodeOperation> {
-        let pub_key_set = self.routing.public_key_set().ok()?;
-        let keypair = utils::key_pair(self.routing.clone()).ok()?;
+        let pub_key_set = self.network.public_key_set().ok()?;
+        let keypair = utils::key_pair(self.network.clone()).ok()?;
         let actor = TransferActor::new(keypair, pub_key_set, Validator {});
         self.rewards.transition(actor)
     }
@@ -89,7 +90,7 @@ impl DataSection {
         self.rewards.remove(to_remove);
 
         // Then payout rewards to all the Elders.
-        let elders = self.routing.our_elder_names();
+        let elders = self.network.our_elder_names();
         self.rewards.payout_rewards(elders)
     }
 
