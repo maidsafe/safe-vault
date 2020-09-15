@@ -8,7 +8,7 @@
 
 use crate::{node::state_db::Init, to_db_key::from_db_key, utils, Error, Result, ToDbKey};
 use pickledb::PickleDb;
-use sn_data_types::{AccountId, ReplicaEvent};
+use sn_data_types::{PublicKey, ReplicaEvent};
 use std::{collections::BTreeSet, path::Path};
 
 const TRANSFERS_DB_NAME: &str = "transfers.db";
@@ -26,7 +26,7 @@ impl TransferStore {
         })
     }
 
-    pub fn all_stream_keys(&self) -> Option<Vec<AccountId>> {
+    pub fn all_stream_keys(&self) -> Option<Vec<PublicKey>> {
         let keys = self
             .db
             .get_all()
@@ -37,7 +37,7 @@ impl TransferStore {
         Some(keys)
     }
 
-    pub fn history(&self, id: &AccountId) -> Option<Vec<ReplicaEvent>> {
+    pub fn history(&self, id: &PublicKey) -> Option<Vec<ReplicaEvent>> {
         trace!("Getting History from node store");
 
         // check list exists. If not, pickle panics
@@ -73,7 +73,7 @@ impl TransferStore {
         Ok(events)
     }
 
-    pub fn drop(&mut self, streams: &BTreeSet<AccountId>) -> Result<()> {
+    pub fn drop(&mut self, streams: &BTreeSet<PublicKey>) -> Result<()> {
         for stream in streams {
             let _ = self.db.lrem_list(&stream.to_db_key());
         }
@@ -157,14 +157,14 @@ mod test {
         let tmp_dir = TempDir::new("history")?;
         let root_dir = tmp_dir.path();
         let mut store = TransferStore::new(root_dir, Init::New)?;
-        let account_id = get_random_pk();
-        let debit_proof = get_genesis(10, account_id)?;
+        let wallet_id = get_random_pk();
+        let debit_proof = get_genesis(10, wallet_id)?;
         store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
             debit_proof,
             debiting_replicas: get_random_pk(),
             crediting_replica_sig: dummy_sig(),
         }))?;
-        if let Some(history) = store.history(&account_id) {
+        if let Some(history) = store.history(&wallet_id) {
             assert_eq!(history.len(), 1);
         } else {
             panic!();
@@ -177,8 +177,8 @@ mod test {
         let tmp_dir = TempDir::new("all_stream_keys")?;
         let root_dir = tmp_dir.path();
         let mut store = TransferStore::new(root_dir, Init::New)?;
-        let account_id = get_random_pk();
-        let debit_proof = get_genesis(10, account_id)?;
+        let wallet_id = get_random_pk();
+        let debit_proof = get_genesis(10, wallet_id)?;
         store.try_append(ReplicaEvent::TransferPropagated(TransferPropagated {
             debit_proof,
             debiting_replicas: get_random_pk(),

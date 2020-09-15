@@ -2623,8 +2623,8 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.13"
-source = "git+https://github.com/maidsafe/sn_data_types.git#e702f92f3f9049681c81c0e650492af32e32d580"
+version = "0.11.17"
+source = "git+https://github.com/maidsafe/sn_data_types.git#1b82200d46b85d40555cd5b34021cf554bbf7ff8"
 dependencies = [
  "bincode",
  "crdts",
@@ -2651,7 +2651,7 @@ checksum = "9b3bb89541a5068ba2861181892745587897765ea2724b78257eb5f289de16ab"
 [[package]]
 name = "sn_transfers"
 version = "0.2.0"
-source = "git+https://github.com/maidsafe/sn_transfers.git#bf5e770bf4ab05f23abb41cf56819bb90cd4978e"
+source = "git+https://github.com/maidsafe/sn_transfers.git#59a2bb39af50ad6c8867ad4b8fc5075e93c247df"
 dependencies = [
  "bincode",
  "crdts",

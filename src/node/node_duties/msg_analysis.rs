@@ -124,7 +124,7 @@ impl NetworkMsgAnalysis {
         };
         let is_accumulating_reward_query = || {
             matches!(msg.message, Message::NodeQuery {
-                query: NodeQuery::Rewards(NodeRewardQuery::GetAccountId { .. }),
+                query: NodeQuery::Rewards(NodeRewardQuery::GetWalletId { .. }),
                 ..
             })
         };
@@ -299,8 +299,8 @@ impl NetworkMsgAnalysis {
             Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet { wallet, .. }),
                 ..
-            } => Some(RewardDuty::SetNodeAccount {
-                account_id: *wallet,
+            } => Some(RewardDuty::SetNodeWallet {
+                wallet_id: *wallet,
                 node_id: msg.origin.address().xorname(),
             }),
             _ => None,
@@ -321,7 +321,7 @@ impl NetworkMsgAnalysis {
             return None;
         }
 
-        // SectionPayoutValidated and GetAccountId
+        // SectionPayoutValidated and GetWalletId
         // do not need accumulation since they are accumulated in the domain logic.
         use NodeRewardQueryResponse::*;
         match &msg.message {
@@ -330,10 +330,10 @@ impl NetworkMsgAnalysis {
                 ..
             } => Some(RewardDuty::ReceivePayoutValidation(validation.clone())),
             Message::NodeQueryResponse {
-                response: NodeQueryResponse::Rewards(GetAccountId(Ok((account_id, new_node_id)))),
+                response: NodeQueryResponse::Rewards(GetWalletId(Ok((wallet_id, new_node_id)))),
                 ..
-            } => Some(RewardDuty::ActivateNodeAccount {
-                id: *account_id,
+            } => Some(RewardDuty::ActivateNodeRewards {
+                id: *wallet_id,
                 node_id: *new_node_id,
             }),
             _ => None,
@@ -359,12 +359,12 @@ impl NetworkMsgAnalysis {
         match &msg.message {
             Message::NodeQuery {
                 query:
-                    NodeQuery::Rewards(GetAccountId {
+                    NodeQuery::Rewards(GetWalletId {
                         old_node_id,
                         new_node_id,
                     }),
                 id,
-            } => Some(RewardDuty::GetAccountId {
+            } => Some(RewardDuty::GetWalletId {
                 old_node_id: *old_node_id,
                 new_node_id: *new_node_id,
                 msg_id: *id,

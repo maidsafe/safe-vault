@@ -13,7 +13,7 @@ use qp2p::SendStream;
 use routing::{event::Event as RoutingEvent, Prefix};
 use serde::export::Formatter;
 use sn_data_types::{
-    AccountId, Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
+    Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
     ReplicaEvent, SignedTransfer, TransferValidated,
 };
 use std::fmt::Debug;
@@ -399,12 +399,12 @@ pub enum RewardDuty {
     /// With the node id.
     AddNewNode(XorName),
     /// Set the account for a node.
-    SetNodeAccount {
+    SetNodeWallet {
         /// The node which accumulated the rewards.
         node_id: XorName,
         /// The account to which the accumulated
         /// rewards should be paid out.
-        account_id: AccountId,
+        wallet_id: PublicKey,
     },
     /// We add relocated nodes to our rewards
     /// system, so that they can participate
@@ -420,7 +420,7 @@ pub enum RewardDuty {
     /// When a node is relocated from us, the other
     /// section will claim the reward counter, so that
     /// they can pay it out to their new node.
-    GetAccountId {
+    GetWalletId {
         /// The id of the node at the previous section.
         old_node_id: XorName,
         /// The id of the node at its new section (i.e. this one).
@@ -432,10 +432,10 @@ pub enum RewardDuty {
     },
     /// When a node has been relocated to our section
     /// we receive the account id from the other section.
-    ActivateNodeAccount {
+    ActivateNodeRewards {
         /// The account to which the accumulated
         /// rewards should be paid out.
-        id: AccountId,
+        id: PublicKey,
         /// The node which accumulated the rewards.
         node_id: XorName,
     },
@@ -498,13 +498,13 @@ impl Into<NodeOperation> for TransferDuty {
 #[derive(Debug)]
 pub enum TransferQuery {
     /// Get the PublicKeySet for replicas of a given PK
-    GetReplicaKeys(AccountId),
+    GetReplicaKeys(PublicKey),
     /// Get key balance.
-    GetBalance(AccountId),
+    GetBalance(PublicKey),
     /// Get key transfers since specified version.
     GetHistory {
         /// The balance key.
-        at: AccountId,
+        at: PublicKey,
         /// The last version of transfers we know of.
         since_version: usize,
     },

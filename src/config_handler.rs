@@ -64,7 +64,7 @@ pub struct Config {
     /// The address to be credited when this vault farms SafeCoin.
     /// A hex formatted BLS public key.
     #[structopt(short, long, parse(try_from_str))]
-    wallet_address: Option<String>,
+    wallet_id: Option<String>,
     /// Upper limit in bytes for allowed network storage on this vault.
     #[structopt(short, long)]
     max_capacity: Option<u64>,
@@ -127,8 +127,8 @@ impl Config {
     }
 
     /// The address to be credited when this vault farms SafeCoin.
-    pub fn wallet_address(&self) -> Option<&String> {
-        self.wallet_address.as_ref()
+    pub fn wallet_id(&self) -> Option<&String> {
+        self.wallet_id.as_ref()
     }
 
     /// Is this the first node in a section?
@@ -214,7 +214,7 @@ impl Config {
 
     pub(crate) fn set_value(&mut self, arg: &str, value: &str) {
         if arg == ARGS[0] {
-            self.wallet_address = Some(value.parse().unwrap());
+            self.wallet_id = Some(value.parse().unwrap());
         } else if arg == ARGS[1] {
             self.max_capacity = Some(value.parse().unwrap());
         } else if arg == ARGS[2] {
@@ -391,7 +391,7 @@ mod test {
 
             let mut config = Config {
                 local: false,
-                wallet_address: None,
+                wallet_id: None,
                 max_capacity: None,
                 root_dir: None,
                 verbose: 0,
@@ -430,8 +430,8 @@ mod test {
         );
 
         assert!(
-            config.wallet_address.is_some(),
-            "{} is missing `wallet_address` field.",
+            config.wallet_id.is_some(),
+            "{} is missing `wallet_id` field.",
             path.display()
         );
         assert!(

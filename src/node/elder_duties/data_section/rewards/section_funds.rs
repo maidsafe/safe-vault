@@ -12,7 +12,7 @@ use crate::{
     node::node_ops::{MessagingDuty, NodeOperation},
 };
 use sn_data_types::{
-    AccountId, DebitAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, Result,
+    DebitAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, PublicKey, Result,
     TransferValidated,
 };
 use xor_name::XorName;
@@ -31,7 +31,7 @@ pub(super) struct SectionFunds {
 
 #[derive(Clone)]
 pub struct Payout {
-    pub to: AccountId,
+    pub to: PublicKey,
     pub amount: Money,
     pub node_id: XorName,
 }

@@ -47,7 +47,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
 
-        let reward_key = match config.wallet_address() {
+        let reward_key = match config.wallet_id() {
             Some(public_key) => PublicKey::Bls(state_db::pk_from_hex(public_key)?),
             None => {
                 let secret = SecretKey::random();

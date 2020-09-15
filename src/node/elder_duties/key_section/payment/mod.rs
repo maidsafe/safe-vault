@@ -63,7 +63,7 @@ impl Payments {
         // before executing the debit.
         // (We could also add a method that executes both
         // debit + credit atomically, but this is much simpler).
-        let recipient_is_not_section = match self.section_account_id() {
+        let recipient_is_not_section = match self.section_wallet_id() {
             Ok(section) => payment.to() != section,
             _ => true, // this would be strange, is it even possible?
         };
@@ -119,7 +119,7 @@ impl Payments {
         result.map(|c| c.into())
     }
 
-    fn section_account_id(&self) -> Result<PublicKey> {
+    fn section_wallet_id(&self) -> Result<PublicKey> {
         match self.replica.borrow().replicas_pk_set() {
             Some(keys) => Ok(PublicKey::Bls(keys.public_key())),
             None => Err(Error::NoSuchKey),

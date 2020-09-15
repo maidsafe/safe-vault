@@ -25,7 +25,7 @@ use crate::{
 use log::trace;
 use rand::{CryptoRng, Rng};
 use routing::{Prefix, RoutingError};
-use sn_data_types::AccountId;
+use sn_data_types::PublicKey;
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 use xor_name::XorName;
 
@@ -95,7 +95,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     /// the other group is now responsible for.
     pub fn section_split(&mut self, prefix: Prefix) -> Option<NodeOperation> {
         // Removes accounts that are no longer our section responsibility.
-        let not_matching = |key: AccountId| {
+        let not_matching = |key: PublicKey| {
             let xorname: XorName = key.into();
             !prefix.matches(&XorName(xorname.0))
         };
@@ -104,7 +104,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             .iter()
             .filter(|key| not_matching(**key))
             .copied()
-            .collect::<BTreeSet<AccountId>>();
+            .collect::<BTreeSet<PublicKey>>();
         self.replica_manager
             .borrow_mut()
             .drop_accounts(&accounts)

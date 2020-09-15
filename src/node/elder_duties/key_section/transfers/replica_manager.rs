@@ -11,7 +11,7 @@ use crate::Result;
 use bls::{PublicKeySet, SecretKeyShare};
 use log::info;
 use sn_data_types::{
-    AccountId, DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey, PublicKey,
+    DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey, PublicKey,
     ReplicaEvent, Result as NdResult, SignedTransfer, TransferPropagated, TransferRegistered,
     TransferValidated,
 };
@@ -71,7 +71,7 @@ impl ReplicaManager {
         })
     }
 
-    pub(crate) fn all_keys(&self) -> Option<Vec<AccountId>> {
+    pub(crate) fn all_keys(&self) -> Option<Vec<PublicKey>> {
         self.store.all_stream_keys()
     }
 
@@ -79,11 +79,11 @@ impl ReplicaManager {
         self.store.try_load().ok()
     }
 
-    pub(crate) fn history(&self, id: &AccountId) -> Option<Vec<ReplicaEvent>> {
+    pub(crate) fn history(&self, id: &PublicKey) -> Option<Vec<ReplicaEvent>> {
         self.store.history(id)
     }
 
-    pub(crate) fn balance(&self, id: &AccountId) -> Option<Money> {
+    pub(crate) fn balance(&self, id: &PublicKey) -> Option<Money> {
         self.replica.balance(id)
     }
 
@@ -91,7 +91,7 @@ impl ReplicaManager {
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that
     /// the other group is now responsible for.
-    pub(crate) fn drop_accounts(&mut self, accounts: &BTreeSet<AccountId>) -> NdResult<()> {
+    pub(crate) fn drop_accounts(&mut self, accounts: &BTreeSet<PublicKey>) -> NdResult<()> {
         self.check_init_status()?;
 
         // Drops the streams from db.

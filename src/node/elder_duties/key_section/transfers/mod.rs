@@ -112,8 +112,8 @@ impl Transfers {
         use TransferQuery::*;
         match query {
             GetReplicaEvents => self.all_events(msg_id, origin),
-            GetReplicaKeys(account_id) => self.get_replica_pks(account_id, msg_id, origin),
-            GetBalance(account_id) => self.balance(account_id, msg_id, origin),
+            GetReplicaKeys(wallet_id) => self.get_replica_pks(wallet_id, msg_id, origin),
+            GetBalance(wallet_id) => self.balance(wallet_id, msg_id, origin),
             GetHistory { at, since_version } => self.history(at, *since_version, msg_id, origin),
         }
     }
@@ -177,7 +177,7 @@ impl Transfers {
     /// Get the PublicKeySet of our replicas
     fn get_replica_pks(
         &self,
-        _account_id: &PublicKey,
+        _wallet_id: &PublicKey,
         msg_id: MessageId,
         origin: Address,
     ) -> Option<MessagingDuty> {
@@ -196,7 +196,7 @@ impl Transfers {
 
     fn balance(
         &self,
-        account_id: &PublicKey,
+        wallet_id: &PublicKey,
         msg_id: MessageId,
         origin: Address,
     ) -> Option<MessagingDuty> {
@@ -204,7 +204,7 @@ impl Transfers {
         let result = self
             .replica
             .borrow()
-            .balance(account_id)
+            .balance(wallet_id)
             .ok_or(Error::NoSuchBalance);
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetBalance(result),
@@ -216,7 +216,7 @@ impl Transfers {
 
     fn history(
         &self,
-        account_id: &PublicKey,
+        wallet_id: &PublicKey,
         _since_version: usize,
         msg_id: MessageId,
         origin: Address,
@@ -226,7 +226,7 @@ impl Transfers {
         let result = match self
             .replica
             .borrow()
-            .history(account_id) // since_version
+            .history(wallet_id) // since_version
         {
             None => Ok(vec![]),
             Some(history) => Ok(history),
