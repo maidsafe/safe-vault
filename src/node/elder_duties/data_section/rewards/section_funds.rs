@@ -101,10 +101,12 @@ impl SectionFunds {
                     panic!(applied)
                 } else {
                     // We ask of our Replicas to validate this transfer.
-                    self.wrapping.send(Message::NodeCmd {
-                        cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
-                        id: MessageId::new(),
-                    }).await
+                    self.wrapping
+                        .send(Message::NodeCmd {
+                            cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
+                            id: MessageId::new(),
+                        })
+                        .await
                 }
             }
             Ok(None) => None, // Would indicate that this apparently has already been done, so no change.
@@ -138,10 +140,12 @@ impl SectionFunds {
                     // We now have a payout in flight.
                     self.state.payout_in_flight = Some(payout);
                     // We ask of our Replicas to validate this transfer.
-                    self.wrapping.send(Message::NodeCmd {
-                        cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
-                        id: MessageId::new(),
-                    }).await
+                    self.wrapping
+                        .send(Message::NodeCmd {
+                            cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
+                            id: MessageId::new(),
+                        })
+                        .await
                 }
             }
             Ok(None) => None, // Would indicate that this apparently has already been done, so no change.
@@ -191,7 +195,8 @@ impl SectionFunds {
                         .send(Message::NodeCmd {
                             cmd: Transfers(RegisterSectionPayout(proof)),
                             id: MessageId::new(),
-                        }).await?
+                        })
+                        .await?
                         .into();
 
                     if let Some(queued) = queued_op {

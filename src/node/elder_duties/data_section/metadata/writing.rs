@@ -44,8 +44,12 @@ pub(super) async fn get_result(
                 .await
             }
             Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin).await,
-            Sequence(write) => sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await,
-            Account(write) => account(write, stores.account_storage_mut(), msg_id, msg_origin).await,
+            Sequence(write) => {
+                sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await
+            }
+            Account(write) => {
+                account(write, stores.account_storage_mut(), msg_id, msg_origin).await
+            }
         },
         _ => unreachable!("Logic error"),
     };
