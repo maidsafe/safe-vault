@@ -152,25 +152,32 @@ impl ClientMsgTracking {
             }
         };
 
-        warn!("!!!!!!!!!!!!!!OUTGOING MESSAGE W/ CORRELATION ID::: {:?}", correlation_id);
+        warn!("!!!!!!!!!!!!!!OUTGOING MESSAGE W/ CORRELATION ID::: {:?}, message: {:?}", correlation_id, msg.message);
         // if is_query_response {
-            trace!("Finding stream for QueryResponse");
+            trace!("Finding stream for message");
 
             // Currently Query responses are sent on the stream from the connection. Events are sent to the held stream from the bootstrap process.
             
             match self.tracked_incoming.remove(&correlation_id) {
                 Some((peer_addr, mut stream)) => {
                     if is_query_response {
+                        info!("Sending QueryResponse on request's stream");
                         send_message_on_stream(&msg, &mut stream)
 
                     }
                     else {
+                        info!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+                        info!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+                        info!(">> attempting to reuse bootstrap stream");
                         if let Some(pk) = self.get_public_key(peer_addr) {
                             let pk = pk.clone();
                             // get the streams and ownership
                             if let Some( streams) = self.tracked_streams.remove(&pk) {
                                 let mut used_streams = vec!();
+                                warn!("Number of known streams for PK: {:?} is {:?}", &pk, streams.len());
                                 for mut stream in streams {
+
+                                    info!("Sending on a streammmmmmm {:?}", msg.message);
                                     // send to each registered stream for that PK
                                     send_message_on_stream(&msg, &mut stream);
                                     used_streams.push(stream);
@@ -193,7 +200,7 @@ impl ClientMsgTracking {
                 // Hmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
                 None => {
                     info!(
-                        "{} for message-id {:?}, Unable to find client message to respond to. The message may have already been sent to the client.",
+                        "{} for message-id {:?}, Unable to find client message to respond to. The message may have already been sent to the client previously.",
                         self, correlation_id
                     );
     
