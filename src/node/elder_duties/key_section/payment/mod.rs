@@ -118,11 +118,15 @@ impl Payments {
                 // informed of this transfer as well..
                 self.wrapping.forward(msg).await
             }
-            Err(error) => self.wrapping.error(
-                CmdError::Transfer(TransferRegistration(error)),
-                msg.id(),
-                &msg.origin.address(),
-            ).await,
+            Err(error) => {
+                self.wrapping
+                    .error(
+                        CmdError::Transfer(TransferRegistration(error)),
+                        msg.id(),
+                        &msg.origin.address(),
+                    )
+                    .await
+            }
         };
         result.map(|c| c.into())
     }

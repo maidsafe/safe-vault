@@ -59,7 +59,8 @@ impl MapStorage {
             ListValues(address) => self.list_values(*address, msg_id, origin).await,
             ListPermissions(address) => self.list_permissions(*address, msg_id, origin).await,
             ListUserPermissions { address, user } => {
-                self.list_user_permissions(*address, *user, msg_id, origin).await
+                self.list_user_permissions(*address, *user, msg_id, origin)
+                    .await
             }
         }
     }
@@ -79,12 +80,18 @@ impl MapStorage {
                 user,
                 ref permissions,
                 version,
-            } => self.set_user_permissions(address, user, permissions, version, msg_id, origin).await,
+            } => {
+                self.set_user_permissions(address, user, permissions, version, msg_id, origin)
+                    .await
+            }
             DelUserPermissions {
                 address,
                 user,
                 version,
-            } => self.delete_user_permissions(address, user, version, msg_id, origin).await,
+            } => {
+                self.delete_user_permissions(address, user, version, msg_id, origin)
+                    .await
+            }
             Edit { address, changes } => self.edit_entries(address, changes, msg_id, origin).await,
         }
     }
@@ -191,7 +198,8 @@ impl MapStorage {
             data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.set_user_permissions(user, permissions.clone(), version)?;
             Ok(data)
-        }).await
+        })
+        .await
     }
 
     /// Delete Map user permissions.
@@ -207,7 +215,8 @@ impl MapStorage {
             data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.del_user_permissions(user, version)?;
             Ok(data)
-        }).await
+        })
+        .await
     }
 
     /// Edit Map.
@@ -221,7 +230,8 @@ impl MapStorage {
         self.edit_chunk(&address, origin, msg_id, move |mut data| {
             data.mutate_entries(actions, origin.id())?;
             Ok(data)
-        }).await
+        })
+        .await
     }
 
     /// Get entire Map.
@@ -252,12 +262,14 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.shell());
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetMapShell(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetMapShell(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     /// Get Map version.
@@ -270,12 +282,14 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.version());
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetMapVersion(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetMapVersion(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     /// Get Map value.
@@ -299,12 +313,14 @@ impl MapStorage {
                 .map(MapValue::from)
                 .ok_or_else(|| NdError::NoSuchEntry),
         });
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetMapValue(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetMapValue(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     /// Get Map keys.
@@ -317,12 +333,14 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.keys());
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::ListMapKeys(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::ListMapKeys(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     /// Get Map values.
@@ -337,12 +355,14 @@ impl MapStorage {
             Map::Seq(map) => map.values().into(),
             Map::Unseq(map) => map.values().into(),
         });
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::ListMapValues(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::ListMapValues(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     /// Get Map entries.
@@ -357,12 +377,14 @@ impl MapStorage {
             Map::Seq(map) => map.entries().clone().into(),
             Map::Unseq(map) => map.entries().clone().into(),
         });
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::ListMapEntries(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::ListMapEntries(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     /// Get Map permissions.
@@ -375,12 +397,14 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.permissions());
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::ListMapPermissions(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::ListMapPermissions(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     /// Get Map user permissions.
@@ -394,12 +418,14 @@ impl MapStorage {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .and_then(|data| data.user_permissions(user).map(MapPermissionSet::clone));
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::ListMapUserPermissions(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::ListMapUserPermissions(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.address(),
+            })
+            .await
     }
 
     async fn ok_or_error(
@@ -410,7 +436,8 @@ impl MapStorage {
     ) -> Option<NodeMessagingDuty> {
         if let Err(error) = result {
             self.wrapping
-                .error(CmdError::Data(error), msg_id, &origin.address()).await
+                .error(CmdError::Data(error), msg_id, &origin.address())
+                .await
         } else {
             None
         }

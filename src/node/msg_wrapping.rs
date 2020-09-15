@@ -145,7 +145,8 @@ impl MsgWrapping {
             error,
             correlation_id: msg_id,
             cmd_origin: origin.clone(),
-        }).await
+        })
+        .await
     }
 
     async fn sign<T: Serialize>(&self, data: &T) -> MsgSender {

@@ -76,7 +76,8 @@ impl Transfers {
                     self.replica.lock().unwrap().replicas_pk_set()?.public_key(),
                 ))),
                 id: MessageId::new(),
-            }).await
+            })
+            .await
             .map(|c| c.into())
     }
 
@@ -111,7 +112,9 @@ impl Transfers {
             GetReplicaEvents => self.all_events(msg_id, origin).await,
             GetReplicaKeys(wallet_id) => self.get_replica_pks(wallet_id, msg_id, origin).await,
             GetBalance(wallet_id) => self.balance(wallet_id, msg_id, origin).await,
-            GetHistory { at, since_version } => self.history(at, *since_version, msg_id, origin).await,
+            GetHistory { at, since_version } => {
+                self.history(at, *since_version, msg_id, origin).await
+            }
         }
     }
 
@@ -136,13 +139,15 @@ impl Transfers {
                 self.validate(signed_transfer.clone(), msg_id, origin).await
             }
             ValidateSectionPayout(signed_transfer) => {
-                self.validate_section_payout(signed_transfer.clone(), msg_id, origin).await
+                self.validate_section_payout(signed_transfer.clone(), msg_id, origin)
+                    .await
             }
             RegisterTransfer(debit_agreement) | RegisterSectionPayout(debit_agreement) => {
                 self.register(&debit_agreement, msg_id, origin).await
             }
             PropagateTransfer(debit_agreement) => {
-                self.receive_propagated(&debit_agreement, msg_id, origin).await
+                self.receive_propagated(&debit_agreement, msg_id, origin)
+                    .await
             }
         }
     }
@@ -165,12 +170,14 @@ impl Transfers {
         };
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
-        self.wrapping.send(Message::NodeQueryResponse {
-            response: Transfers(GetReplicaEvents(result)),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin,
-        }).await
+        self.wrapping
+            .send(Message::NodeQueryResponse {
+                response: Transfers(GetReplicaEvents(result)),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
     }
 
     /// Get the PublicKeySet of our replicas
@@ -185,12 +192,14 @@ impl Transfers {
             None => Err(Error::NoSuchKey),
             Some(keys) => Ok(keys),
         };
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetReplicaKeys(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetReplicaKeys(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
     }
 
     async fn balance(
@@ -202,15 +211,18 @@ impl Transfers {
         // validate signature
         let result = self
             .replica
-            .lock().unwrap()
+            .lock()
+            .unwrap()
             .balance(wallet_id)
             .ok_or(Error::NoSuchBalance);
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetBalance(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetBalance(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
     }
 
     async fn history(
@@ -230,12 +242,14 @@ impl Transfers {
             None => Ok(vec![]),
             Some(history) => Ok(history),
         };
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetHistory(result),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetHistory(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
     }
 
     /// This validation will render a signature over the
@@ -307,15 +321,23 @@ impl Transfers {
 
         match self.replica.lock().unwrap().register(proof) {
             Ok(None) => None,
-            Ok(Some(event)) => self.wrapping.send(Message::NodeCmd {
-                cmd: Transfers(PropagateTransfer(event.debit_proof)),
-                id: MessageId::new(),
-            }).await,
-            Err(error) => self.wrapping.error(
-                CmdError::Transfer(TransferError::TransferRegistration(error)),
-                msg_id,
-                &origin,
-            ).await,
+            Ok(Some(event)) => {
+                self.wrapping
+                    .send(Message::NodeCmd {
+                        cmd: Transfers(PropagateTransfer(event.debit_proof)),
+                        id: MessageId::new(),
+                    })
+                    .await
+            }
+            Err(error) => {
+                self.wrapping
+                    .error(
+                        CmdError::Transfer(TransferError::TransferRegistration(error)),
+                        msg_id,
+                        &origin,
+                    )
+                    .await
+            }
         }
     }
 

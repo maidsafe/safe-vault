@@ -101,7 +101,8 @@ impl Rewards {
                 new_node_id,
                 age,
             } => self
-                .add_relocating_node(old_node_id, new_node_id, age).await?
+                .add_relocating_node(old_node_id, new_node_id, age)
+                .await?
                 .into(),
             GetWalletId {
                 old_node_id,
@@ -109,9 +110,12 @@ impl Rewards {
                 msg_id,
                 origin,
             } => self
-                .get_account_id(old_node_id, new_node_id, msg_id, &origin).await?
+                .get_account_id(old_node_id, new_node_id, msg_id, &origin)
+                .await?
                 .into(),
-            ActivateNodeRewards { id, node_id } => self.activate_node_rewards(id, node_id).await?.into(),
+            ActivateNodeRewards { id, node_id } => {
+                self.activate_node_rewards(id, node_id).await?.into()
+            }
             DeactivateNode(node_id) => self.deactivate(node_id)?.into(),
             ReceivePayoutValidation(validation) => self.section_funds.receive(validation).await?,
         };
@@ -142,11 +146,15 @@ impl Rewards {
             };
             info!("Initiating local reward payout to node: {}.", node_id);
             // Because of the more frequent payout, every such payout is made a bit smaller (dividing by age).
-            if let Some(payout) = self.section_funds.initiate_reward_payout(Payout {
-                to: wallet,
-                amount: Money::from_nano(self.reward_calc.reward(age)?.as_nano() / age as u64),
-                node_id,
-            }).await {
+            if let Some(payout) = self
+                .section_funds
+                .initiate_reward_payout(Payout {
+                    to: wallet,
+                    amount: Money::from_nano(self.reward_calc.reward(age)?.as_nano() / age as u64),
+                    node_id,
+                })
+                .await
+            {
                 // add the payout to list of ops
                 payouts.push(payout.into());
             }
@@ -206,13 +214,15 @@ impl Rewards {
         let state = AwaitingActivation(age);
         let _ = self.node_rewards.insert(new_node_id, state);
 
-        self.wrapping.send(Message::NodeQuery {
-            query: Rewards(GetWalletId {
-                old_node_id,
-                new_node_id,
-            }),
-            id: MessageId::new(),
-        }).await
+        self.wrapping
+            .send(Message::NodeQuery {
+                query: Rewards(GetWalletId {
+                    old_node_id,
+                    new_node_id,
+                }),
+                id: MessageId::new(),
+            })
+            .await
     }
 
     /// 3. The old section will send back the wallet id, which allows us to activate it.
@@ -253,11 +263,13 @@ impl Rewards {
             .insert(node_id, NodeRewards::Active { wallet, age });
 
         info!("Initiating reward payout to: {}.", wallet);
-        self.section_funds.initiate_reward_payout(Payout {
-            to: wallet,
-            amount: self.reward_calc.reward(age)?,
-            node_id,
-        }).await
+        self.section_funds
+            .initiate_reward_payout(Payout {
+                to: wallet,
+                amount: self.reward_calc.reward(age)?,
+                node_id,
+            })
+            .await
     }
 
     /// 4. When the section becomes aware that a node has left,
@@ -295,14 +307,17 @@ impl Rewards {
                 // ..means the node has not left, and was not
                 // marked as relocating..
                 // (Could be a case for lazy messaging..)
-                return self.wrapping.send(Message::NodeQueryResponse {
-                    response: Rewards(GetWalletId(Err(Error::NetworkOther(
-                        "Node is not being relocated.".to_string(),
-                    )))),
-                    id: MessageId::new(),
-                    correlation_id: msg_id,
-                    query_origin: origin.clone(),
-                }).await;
+                return self
+                    .wrapping
+                    .send(Message::NodeQueryResponse {
+                        response: Rewards(GetWalletId(Err(Error::NetworkOther(
+                            "Node is not being relocated.".to_string(),
+                        )))),
+                        id: MessageId::new(),
+                        correlation_id: msg_id,
+                        query_origin: origin.clone(),
+                    })
+                    .await;
             }
             None => return None,
         };
@@ -316,11 +331,13 @@ impl Rewards {
         // will pay out the accumulated rewards to the wallet.
         use NodeQueryResponse::*;
         use NodeRewardQueryResponse::*;
-        self.wrapping.send(Message::NodeQueryResponse {
-            response: Rewards(GetWalletId(Ok((wallet, new_node_id)))),
-            id: MessageId::new(),
-            correlation_id: msg_id,
-            query_origin: origin.clone(),
-        }).await
+        self.wrapping
+            .send(Message::NodeQueryResponse {
+                response: Rewards(GetWalletId(Ok((wallet, new_node_id)))),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin.clone(),
+            })
+            .await
     }
 }

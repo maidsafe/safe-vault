@@ -56,7 +56,8 @@ impl SequenceStorage {
             GetLastEntry(address) => self.get_last_entry(*address, msg_id, &origin).await,
             GetOwner(address) => self.get_owner(*address, msg_id, &origin).await,
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, msg_id, &origin).await
+                self.get_user_permissions(*address, *user, msg_id, &origin)
+                    .await
             }
             GetPublicPolicy(address) => self.get_public_policy(*address, msg_id, &origin).await,
             GetPrivatePolicy(address) => self.get_private_policy(*address, msg_id, &origin).await,
@@ -74,8 +75,13 @@ impl SequenceStorage {
             New(data) => self.store(&data, msg_id, origin).await,
             Edit(operation) => self.edit(operation, msg_id, origin).await,
             Delete(address) => self.delete(address, msg_id, origin).await,
-            SetPublicPolicy(operation) => self.set_public_permissions(operation, msg_id, origin).await,
-            SetPrivatePolicy(operation) => self.set_private_permissions(operation, msg_id, origin).await,
+            SetPublicPolicy(operation) => {
+                self.set_public_permissions(operation, msg_id, origin).await
+            }
+            SetPrivatePolicy(operation) => {
+                self.set_private_permissions(operation, msg_id, origin)
+                    .await
+            }
         }
     }
 
@@ -102,12 +108,14 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
         let result = self.get_chunk(address, SequenceAction::Read, origin);
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetSequence(result),
-            id: MessageId::new(),
-            query_origin: origin.address(),
-            correlation_id: msg_id,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetSequence(result),
+                id: MessageId::new(),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
+            })
+            .await
     }
 
     fn get_chunk(
@@ -176,12 +184,14 @@ impl SequenceStorage {
                     .in_range(range.0, range.1)
                     .ok_or(NdError::NoSuchEntry)
             });
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetSequenceRange(result),
-            id: MessageId::new(),
-            query_origin: origin.address(),
-            correlation_id: msg_id,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetSequenceRange(result),
+                id: MessageId::new(),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
+            })
+            .await
     }
 
     async fn get_last_entry(
@@ -196,12 +206,14 @@ impl SequenceStorage {
                 Some(entry) => Ok((sequence.len() - 1, entry.to_vec())),
                 None => Err(NdError::NoSuchEntry),
             });
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetSequenceLastEntry(result),
-            id: MessageId::new(),
-            query_origin: origin.address(),
-            correlation_id: msg_id,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetSequenceLastEntry(result),
+                id: MessageId::new(),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
+            })
+            .await
     }
 
     async fn get_owner(
@@ -223,12 +235,14 @@ impl SequenceStorage {
                     Ok(policy.owner)
                 }
             });
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetSequenceOwner(result),
-            id: MessageId::new(),
-            query_origin: origin.address(),
-            correlation_id: msg_id,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetSequenceOwner(result),
+                id: MessageId::new(),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
+            })
+            .await
     }
 
     async fn get_user_permissions(
@@ -244,12 +258,14 @@ impl SequenceStorage {
                 let index = sequence.policy_version() - 1;
                 sequence.permissions(user, index)
             });
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetSequenceUserPermissions(result),
-            id: MessageId::new(),
-            query_origin: origin.address(),
-            correlation_id: msg_id,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetSequenceUserPermissions(result),
+                id: MessageId::new(),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
+            })
+            .await
     }
 
     async fn get_public_policy(
@@ -272,12 +288,14 @@ impl SequenceStorage {
                 };
                 Ok(res)
             });
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetSequencePublicPolicy(result),
-            id: MessageId::new(),
-            query_origin: origin.address(),
-            correlation_id: msg_id,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetSequencePublicPolicy(result),
+                id: MessageId::new(),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
+            })
+            .await
     }
 
     async fn get_private_policy(
@@ -300,12 +318,14 @@ impl SequenceStorage {
                 };
                 Ok(res)
             });
-        self.wrapping.send(Message::QueryResponse {
-            response: QueryResponse::GetSequencePrivatePolicy(result),
-            id: MessageId::new(),
-            query_origin: origin.address(),
-            correlation_id: msg_id,
-        }).await
+        self.wrapping
+            .send(Message::QueryResponse {
+                response: QueryResponse::GetSequencePrivatePolicy(result),
+                id: MessageId::new(),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
+            })
+            .await
     }
 
     async fn set_public_permissions(
@@ -413,12 +433,14 @@ impl SequenceStorage {
             Ok(_) => return None,
             Err(error) => error,
         };
-        self.wrapping.send(Message::CmdError {
-            id: MessageId::new(),
-            error: CmdError::Data(error),
-            correlation_id: msg_id,
-            cmd_origin: origin.address(),
-        }).await
+        self.wrapping
+            .send(Message::CmdError {
+                id: MessageId::new(),
+                error: CmdError::Data(error),
+                correlation_id: msg_id,
+                cmd_origin: origin.address(),
+            })
+            .await
     }
 }
 

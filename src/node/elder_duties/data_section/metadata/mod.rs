@@ -77,7 +77,9 @@ impl Metadata {
     async fn process_msg(&mut self, msg: MsgEnvelope) -> Option<NodeOperation> {
         match &msg.message {
             Message::Cmd { .. } => writing::get_result(msg, &mut self.elder_stores).await,
-            Message::Query { .. } => reading::get_result(msg, &self.elder_stores).await.map(|c| c.into()),
+            Message::Query { .. } => reading::get_result(msg, &self.elder_stores)
+                .await
+                .map(|c| c.into()),
             _ => None, // only Queries and Cmds from client is handled at Metadata
         }
     }

@@ -112,7 +112,10 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        is_data_cmd() && from_single_payment_elder() && self.is_dst_for(msg).await && self.is_elder().await
+        is_data_cmd()
+            && from_single_payment_elder()
+            && self.is_dst_for(msg).await
+            && self.is_elder().await
     }
 
     async fn should_accumulate_for_rewards(&self, msg: &MsgEnvelope) -> bool {
@@ -159,7 +162,10 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        is_chunk_msg() && from_single_metadata_elder() && self.is_dst_for(msg).await && self.is_adult().await
+        is_chunk_msg()
+            && from_single_metadata_elder()
+            && self.is_dst_for(msg).await
+            && self.is_adult().await
     }
 
     // ---- .... -----
@@ -251,7 +257,8 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        let shall_process = from_metadata_section() && self.is_dst_for(msg).await && self.is_adult().await;
+        let shall_process =
+            from_metadata_section() && self.is_dst_for(msg).await && self.is_adult().await;
 
         if !shall_process {
             return None;
@@ -314,7 +321,8 @@ impl NetworkMsgAnalysis {
                 ..
             })
         };
-        let shall_process = from_rewards_elder() && self.is_dst_for(msg).await && self.is_elder().await;
+        let shall_process =
+            from_rewards_elder() && self.is_dst_for(msg).await && self.is_elder().await;
 
         if !shall_process {
             return None;
@@ -385,7 +393,8 @@ impl NetworkMsgAnalysis {
                 ..
             })
         };
-        let shall_process = from_transfer_elder() && self.is_dst_for(msg).await && self.is_elder().await;
+        let shall_process =
+            from_transfer_elder() && self.is_dst_for(msg).await && self.is_elder().await;
 
         if shall_process {
             return match &msg.message {
@@ -439,7 +448,8 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        let shall_process = from_rewards_elder() && self.is_dst_for(msg).await && self.is_elder().await;
+        let shall_process =
+            from_rewards_elder() && self.is_dst_for(msg).await && self.is_elder().await;
 
         if !shall_process {
             return None;
