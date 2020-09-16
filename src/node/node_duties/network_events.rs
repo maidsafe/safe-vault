@@ -11,8 +11,8 @@ use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
-use routing::event::Event as RoutingEvent;
 use sn_data_types::{MsgEnvelope, PublicKey};
+use sn_routing::event::Event as RoutingEvent;
 use xor_name::XorName;
 
 /// Maps events from the transport layer

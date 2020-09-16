@@ -24,8 +24,8 @@ use crate::{
 };
 use log::trace;
 use rand::{CryptoRng, Rng};
-use routing::{Prefix, RoutingError};
 use sn_data_types::PublicKey;
+use sn_routing::{Error, Prefix};
 use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 use xor_name::XorName;
 
@@ -130,7 +130,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let public_key_set = routing.public_key_set()?;
         let secret_key_share = routing.secret_key_share()?;
         let key_index = routing.our_index()?;
-        let proof_chain = routing.our_history().ok_or(RoutingError::InvalidState)?;
+        let proof_chain = routing.our_history().ok_or(Error::InvalidState)?;
         let store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
         let replica_manager = ReplicaManager::new(
             store,

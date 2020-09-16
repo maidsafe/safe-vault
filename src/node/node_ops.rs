@@ -9,12 +9,12 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
-use routing::{event::Event as RoutingEvent, Prefix};
 use serde::export::Formatter;
 use sn_data_types::{
     Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
     ReplicaEvent, SignedTransfer, TransferValidated,
 };
+use sn_routing::{event::Event as RoutingEvent, Prefix};
 use std::fmt::Debug;
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;

@@ -61,7 +61,7 @@ quick_error! {
             from()
         }
         /// Routing error.
-        Routing(error: routing::RoutingError) {
+        Routing(error: sn_routing::Error) {
             display("Routing error: {:?}", error)
             from()
         }

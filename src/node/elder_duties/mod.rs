@@ -17,7 +17,7 @@ use crate::{
 };
 use log::trace;
 use rand::{CryptoRng, Rng};
-use routing::Prefix;
+use sn_routing::Prefix;
 use std::{
     cell::Cell,
     fmt::{self, Display, Formatter},

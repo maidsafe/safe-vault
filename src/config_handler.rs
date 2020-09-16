@@ -10,8 +10,8 @@ use crate::Result;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use log::{debug, Level};
-use routing::TransportConfig as NetworkConfig;
 use serde::{Deserialize, Serialize};
+use sn_routing::TransportConfig as NetworkConfig;
 use std::{
     fs::{self, File},
     io::{self, BufReader},

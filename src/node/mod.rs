@@ -28,8 +28,8 @@ use crate::{
 use bls::SecretKey;
 use log::info;
 use rand::{CryptoRng, Rng};
-use routing::event::Event;
 use sn_data_types::PublicKey;
+use sn_routing::event::Event;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,

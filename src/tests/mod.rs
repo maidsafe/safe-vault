@@ -13,7 +13,7 @@ use crate::{Command, Config, Node};
 use crossbeam_channel::Sender;
 use file_per_thread_logger::{self as logger, FormatFn};
 use qp2p::Config as NetworkConfig;
-use routing::NodeConfig as RoutingConfig;
+use sn_routing::NodeConfig as RoutingConfig;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::thread::{self, JoinHandle};

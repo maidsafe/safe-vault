@@ -19,7 +19,7 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Network, Result,
 };
-use routing::Prefix;
+use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use std::{cell::Cell, rc::Rc};
 use xor_name::XorName;
