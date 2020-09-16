@@ -9,9 +9,7 @@
 use crate::{node::keys::NodeSigningKeys, utils, Error, Result};
 use bls::{self, serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 use serde::{Deserialize, Serialize};
-use std::{
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
 const AGE_GROUP_FILENAME: &str = "age_group";

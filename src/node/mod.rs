@@ -50,23 +50,34 @@ impl<R: CryptoRng + Rng> Node<R> {
         let root_dir = root_dir_buf.as_path();
         std::fs::create_dir_all(root_dir)?;
 
-        let reward_key = match config.wallet_id() {
-            Some(public_key) => PublicKey::Bls(state_db::pk_from_hex(public_key)?),
-            None => {
-                let secret = SecretKey::random();
-                let public = secret.public_key();
-                store_new_reward_keypair(root_dir, &secret, &public).await?;
-                PublicKey::Bls(public)
-            }
+        let reward_key_task = async move {
+            let res: Result<PublicKey>;
+            match config.wallet_id() {
+                Some(public_key) => {
+                    res = Ok(PublicKey::Bls(state_db::pk_from_hex(public_key)?));
+                }
+                None => {
+                    let secret = SecretKey::random();
+                    let public = secret.public_key();
+                    store_new_reward_keypair(root_dir, &secret, &public).await?;
+                    res = Ok(PublicKey::Bls(public));
+                }
+            };
+            res
         };
-        let age_group = if let Some(age_group) = get_age_group(&root_dir).await? {
-            age_group
-        } else {
-            let age_group = Infant;
-            store_age_group(root_dir, &age_group).await?;
-            age_group
+        let age_group_task = async move {
+            let res: Result<AgeGroup>;
+            if let Some(age_group) = get_age_group(&root_dir).await? {
+                res = Ok(age_group)
+            } else {
+                let age_group = Infant;
+                store_age_group(root_dir, &age_group).await?;
+                res = Ok(age_group)
+            };
+            res
         };
 
+        let (reward_key, age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
         let (network_api, network_events) = Network::new(config).await?;
         let keys = NodeSigningKeys::new(network_api.clone());
 
