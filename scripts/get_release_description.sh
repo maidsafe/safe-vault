@@ -8,7 +8,7 @@ fi
 
 # The single quotes around EOF is to stop attempted variable and backtick expansion.
 read -r -d '' release_description << 'EOF'
-Implements a SAFE Network Vault.
+Implements a Safe Network Vault.
 
 ## SHA-256 checksums for release versions:
 ```
@@ -26,8 +26,8 @@ tar.gz: TAR_WIN_CHECKSUM
 ```
 
 ## Related Links
-* [SAFE CLI and Authenticator daemon](https://github.com/maidsafe/sn_api/releases/latest/)
-* [SAFE Browser](https://github.com/maidsafe/safe_browser/releases/)
+* [Safe CLI and Authenticator daemon](https://github.com/maidsafe/sn_api/releases/latest/)
+* [Safe Browser](https://github.com/maidsafe/sn_browser/releases/)
 EOF
 
 zip_linux_checksum=$(sha256sum \
