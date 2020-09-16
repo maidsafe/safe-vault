@@ -25,7 +25,7 @@ use std::{
 /// between client and network.
 pub struct ClientMsgTracking {
     onboarding: Onboarding,
-    tracked_streams: HashMap<PublicKey, Vec<SendStream>>,
+    notification_streams: HashMap<PublicKey, Vec<SendStream>>,
     tracked_incoming: HashMap<MessageId, (SocketAddr, SendStream)>,
     tracked_outgoing: HashMap<MessageId, MsgEnvelope>,
 }
@@ -34,7 +34,7 @@ impl ClientMsgTracking {
     pub fn new(onboarding: Onboarding) -> Self {
         Self {
             onboarding,
-            tracked_streams: Default::default(),
+            notification_streams: Default::default(),
             tracked_incoming: Default::default(),
             tracked_outgoing: Default::default(),
         }
@@ -63,12 +63,12 @@ impl ClientMsgTracking {
                 let pk = pk.clone();
 
                 // let's append to any existing known streams for this PK
-                if let Some(current_streams_for_pk) = self.tracked_streams.remove(&pk) {
+                if let Some(current_streams_for_pk) = self.notification_streams.remove(&pk) {
                     updated_streams = current_streams_for_pk;
                 }
 
                 updated_streams.push(the_stream);
-                let _ = self.tracked_streams.insert(pk, updated_streams);
+                let _ = self.notification_streams.insert(pk, updated_streams);
             } else {
                 warn!(
                     "No PK found for onboarded peer at address : {:?}",
@@ -158,7 +158,7 @@ impl ClientMsgTracking {
                     if let Some(pk) = self.get_public_key(peer_addr) {
                         let pk = pk.clone();
                         // get the streams and ownership
-                        if let Some(streams) = self.tracked_streams.remove(&pk) {
+                        if let Some(streams) = self.notification_streams.remove(&pk) {
                             let mut used_streams = vec![];
                             for mut stream in streams {
                                 // send to each registered stream for that PK
@@ -166,7 +166,7 @@ impl ClientMsgTracking {
                                 used_streams.push(stream);
                             }
 
-                            let _ = self.tracked_streams.insert(pk, used_streams);
+                            let _ = self.notification_streams.insert(pk, used_streams);
                         } else {
                             error!("Could not find stream for Message response")
                         }
