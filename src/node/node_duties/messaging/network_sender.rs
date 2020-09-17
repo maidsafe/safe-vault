@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::node_ops::MessagingDuty, utils, Network};
+use crate::{node::node_ops::NodeMessagingDuty, utils, Network};
 use log::{error, info};
 use sn_data_types::{Address, MsgEnvelope};
 use sn_routing::{DstLocation, SrcLocation};
@@ -23,11 +23,11 @@ impl NetworkSender {
         Self { routing }
     }
 
-    pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
+    pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
         let name = *self.routing.id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
-            Address::Section(_) => return Some(MessagingDuty::SendToSection(msg)),
+            Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg)),
             Address::Client(_) => return None,
         };
         self.routing
@@ -49,7 +49,7 @@ impl NetworkSender {
         &mut self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let name = *self.routing.id().name();
         for target in targets {
             self.routing
@@ -71,7 +71,7 @@ impl NetworkSender {
         None
     }
 
-    pub async fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<MessagingDuty> {
+    pub async fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
         let name = *self.routing.id().name();
         let dst = match msg.destination() {
             Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),

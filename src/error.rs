@@ -70,6 +70,10 @@ quick_error! {
             display("Config error: {:?}", error)
             from()
         }
+        /// Onboarding error
+        Onboarding{
+            display("Onboarding error")
+        }
         /// Message is invalid.
         InvalidMessage {}
         /// Account doesn't exist.

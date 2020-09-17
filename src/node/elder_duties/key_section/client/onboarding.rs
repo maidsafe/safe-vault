@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::node_ops::MessagingDuty;
 use crate::{utils, Network};
+use crate::{Error, Result};
 use log::{debug, error, info, trace};
 use rand::{CryptoRng, Rng};
 use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
@@ -30,7 +30,7 @@ pub struct Onboarding {
     node_id: PublicKey,
     routing: Network,
     clients: HashMap<SocketAddr, PublicKey>,
-    // Map of new client connections to the challenge value we sent them.
+    /// Map of new client connections to the challenge value we sent them.
     client_candidates: HashMap<SocketAddr, (Vec<u8>, PublicKey)>,
 }
 
@@ -64,7 +64,7 @@ impl Onboarding {
         peer_addr: SocketAddr,
         stream: &mut SendStream,
         rng: &mut G,
-    ) -> Option<MessagingDuty> {
+    ) -> Result<()> {
         match handshake {
             HandshakeRequest::Bootstrap(client_key) => {
                 self.try_bootstrap(peer_addr, &client_key, stream)
@@ -90,13 +90,13 @@ impl Onboarding {
         peer_addr: SocketAddr,
         client_key: &PublicKey,
         stream: &mut SendStream,
-    ) -> Option<MessagingDuty> {
+    ) -> Result<()> {
         if !self.shall_bootstrap(&peer_addr) {
             info!(
                 "{}: Redundant bootstrap..: {} on {}",
                 self, client_key, peer_addr
             );
-            return None;
+            return Ok(());
         }
         info!(
             "{}: Trying to bootstrap..: {} on {}",
@@ -113,7 +113,7 @@ impl Onboarding {
                     "{}: No closest known elders in any section we know of",
                     self
                 );
-                return None;
+                return Ok(());
             } else {
                 closest_known_elders
             }
@@ -123,11 +123,12 @@ impl Onboarding {
         let res = futures::executor::block_on(stream.send(bytes));
 
         match res {
-            Ok(()) => info!("message sent!!!! via send stream"),
-            Err(error) => error!("Some issue sendstreaming {:?}", error),
-        };
-
-        None
+            Ok(()) => Ok(()),
+            Err(error) => {
+                error!("Error sending on stream {:?}", error);
+                Err(Error::Onboarding)
+            }
+        }
     }
 
     /// Handles a received join request from a client.
@@ -137,13 +138,13 @@ impl Onboarding {
         client_key: PublicKey,
         stream: &mut SendStream,
         rng: &mut G,
-    ) -> Option<MessagingDuty> {
+    ) -> Result<()> {
         if self.clients.contains_key(&peer_addr) {
             info!(
                 "{}: Client is already accepted..: {} on {}",
                 self, client_key, peer_addr
             );
-            return None;
+            return Ok(());
         }
         info!(
             "{}: Trying to join..: {} on {}",
@@ -166,17 +167,18 @@ impl Onboarding {
             let res = futures::executor::block_on(stream.send(bytes));
 
             match res {
-                Ok(()) => info!("message sent!!!! via send stream"),
-                Err(error) => error!("Some issue sendstreaming {:?}", error),
-            };
-
-            None
+                Ok(()) => Ok(()),
+                Err(error) => {
+                    error!("Error sending on stream {:?}", error);
+                    Err(Error::Onboarding)
+                }
+            }
         } else {
             debug!(
                 "Client {} ({}) wants to join us but we are not its client handler",
                 client_key, peer_addr
             );
-            Some(MessagingDuty::DisconnectClient(peer_addr))
+            Err(Error::Onboarding)
         }
     }
 
@@ -188,25 +190,26 @@ impl Onboarding {
         &mut self,
         peer_addr: SocketAddr,
         signature: &Signature,
-    ) -> Option<MessagingDuty> {
+    ) -> Result<()> {
         trace!("Receive challenge response");
         if self.clients.contains_key(&peer_addr) {
             info!("{}: Client is already accepted (on {})", self, peer_addr);
-            return None;
+            return Ok(());
         }
         if let Some((challenge, public_key)) = self.client_candidates.remove(&peer_addr) {
             match public_key.verify(&signature, challenge) {
                 Ok(()) => {
                     info!("{}: Accepted {} on {}.", self, public_key, peer_addr,);
                     let _ = self.clients.insert(peer_addr, public_key);
-                    None
+                    Ok(())
                 }
                 Err(err) => {
                     info!(
                         "{}: Challenge failed for {} on {}: {}",
                         self, public_key, peer_addr, err
                     );
-                    Some(MessagingDuty::DisconnectClient(peer_addr))
+
+                    Err(Error::Onboarding)
                 }
             }
         } else {
@@ -214,7 +217,10 @@ impl Onboarding {
                 "{}: {} supplied challenge response without us providing it.",
                 self, peer_addr
             );
-            Some(MessagingDuty::DisconnectClient(peer_addr))
+
+            Err(Error::Onboarding)
+
+            // Some(NodeMessagingDuty::DisconnectClient(peer_addr))
         }
     }
 

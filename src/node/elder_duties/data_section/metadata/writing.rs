@@ -10,7 +10,7 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
-use crate::node::node_ops::{MessagingDuty, NodeOperation};
+use crate::node::node_ops::{NodeMessagingDuty, NodeOperation};
 use sn_data_types::{
     AccountWrite, BlobWrite, Cmd, DataCmd, DebitAgreementProof, MapWrite, Message, MessageId,
     MsgEnvelope, MsgSender, SequenceWrite,
@@ -53,7 +53,7 @@ fn blob(
     origin: MsgSender,
     payment: DebitAgreementProof,
     proxies: Vec<MsgSender>,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     register.write(write, msg_id, origin, payment, proxies)
 }
 
@@ -62,7 +62,7 @@ fn map(
     storage: &mut MapStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     storage.write(write, msg_id, &origin)
 }
 
@@ -71,7 +71,7 @@ fn sequence(
     storage: &mut SequenceStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     storage.write(write, msg_id, &origin)
 }
 
@@ -80,6 +80,6 @@ fn account(
     storage: &mut AccountStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     storage.write(write, msg_id, &origin)
 }

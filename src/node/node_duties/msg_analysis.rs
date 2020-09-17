@@ -8,7 +8,7 @@
 
 use crate::node::node_duties::accumulation::Accumulation;
 use crate::node::node_ops::{
-    AdultDuty, ChunkDuty, GatewayDuty, MessagingDuty, MetadataDuty, NodeOperation, RewardDuty,
+    AdultDuty, ChunkDuty, GatewayDuty, MetadataDuty, NodeMessagingDuty, NodeOperation, RewardDuty,
     TransferCmd, TransferDuty, TransferQuery,
 };
 use crate::Network;
@@ -71,7 +71,7 @@ impl NetworkMsgAnalysis {
         Some(result)
     }
 
-    fn try_messaging(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn try_messaging(&self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         use Address::*;
         let destined_for_network = || match msg.destination() {
             Client(address) => !self.self_is_handler_for(&address),
@@ -80,7 +80,7 @@ impl NetworkMsgAnalysis {
         };
 
         if destined_for_network() {
-            Some(MessagingDuty::SendToSection(msg.clone())) // Forwards without stamping the duty (was not processed).
+            Some(NodeMessagingDuty::SendToSection(msg.clone())) // Forwards without stamping the duty (was not processed).
         } else {
             None
         }

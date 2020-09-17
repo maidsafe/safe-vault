@@ -9,7 +9,7 @@
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, AccountChunkStore},
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::MessagingDuty,
+    node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
     Result,
 };
@@ -53,7 +53,7 @@ impl AccountStorage {
         read: &AccountRead,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use AccountRead::*;
         match read {
             Get(ref address) => self.get(address, msg_id, origin),
@@ -65,7 +65,7 @@ impl AccountStorage {
         address: &XorName,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self
             .account(&origin.id(), address)
             .map(Account::into_data_and_signature);
@@ -82,7 +82,7 @@ impl AccountStorage {
         write: AccountWrite,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use AccountWrite::*;
         match write {
             New(ref account) => self.create(account, msg_id, &origin),
@@ -95,7 +95,7 @@ impl AccountStorage {
         account: &Account,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = if self.chunks.has(account.address()) {
             Err(NdError::LoginPacketExists)
         } else if account.owner() != &origin.id() {
@@ -114,7 +114,7 @@ impl AccountStorage {
         updated_account: &Account,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self
             .account(&origin.id(), updated_account.address())
             .and_then(|existing_account| {
@@ -153,7 +153,7 @@ impl AccountStorage {
         result: NdResult<()>,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         if let Err(error) = result {
             return self.wrapping.send(Message::CmdError {
                 id: MessageId::new(),

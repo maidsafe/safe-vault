@@ -12,13 +12,13 @@ use super::{
     account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
-use crate::node::node_ops::MessagingDuty;
+use crate::node::node_ops::NodeMessagingDuty;
 use sn_data_types::{
     AccountRead, BlobRead, DataQuery, MapRead, Message, MessageId, MsgEnvelope, MsgSender, Query,
     SequenceRead,
 };
 
-pub(super) fn get_result(msg: MsgEnvelope, stores: &ElderStores) -> Option<MessagingDuty> {
+pub(super) fn get_result(msg: MsgEnvelope, stores: &ElderStores) -> Option<NodeMessagingDuty> {
     use DataQuery::*;
     let msg_id = msg.id();
     let origin = msg.origin;
@@ -43,7 +43,7 @@ fn blob(
     msg_id: MessageId,
     origin: MsgSender,
     proxies: Vec<MsgSender>,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     register.read(read, msg_id, origin, proxies) // since the data is sent on to adults, the entire msg is passed in
 }
 
@@ -52,7 +52,7 @@ fn map(
     storage: &MapStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     storage.read(read, msg_id, &origin) // map data currently stay at elders, so the msg is not needed
 }
 
@@ -61,7 +61,7 @@ fn sequence(
     storage: &SequenceStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     storage.read(read, msg_id, &origin) // sequence data currently stay at elders, so the msg is not needed
 }
 
@@ -70,6 +70,6 @@ fn account(
     storage: &AccountStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     storage.read(read, msg_id, &origin) // account data currently stay at elders, so the msg is not needed
 }

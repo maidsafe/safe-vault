@@ -9,7 +9,7 @@
 use super::validator::Validator;
 use crate::{
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MessagingDuty, NodeOperation},
+    node::node_ops::{NodeMessagingDuty, NodeOperation},
 };
 use sn_data_types::{
     DebitAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, PublicKey, Result,
@@ -62,7 +62,7 @@ impl SectionFunds {
     }
 
     /// At Elder churn, we must transition to a new account.
-    pub fn transition(&mut self, to: TransferActor<Validator>) -> Option<MessagingDuty> {
+    pub fn transition(&mut self, to: TransferActor<Validator>) -> Option<NodeMessagingDuty> {
         if self.is_transitioning() {
             // hm, could be tricky edge cases here, but
             // we'll start by assuming there will only be
@@ -114,7 +114,7 @@ impl SectionFunds {
 
     /// Will validate and sign the payout, and ask of the replicas to
     /// do the same, and await their responses as to accumulate the result.
-    pub fn initiate_reward_payout(&mut self, payout: Payout) -> Option<MessagingDuty> {
+    pub fn initiate_reward_payout(&mut self, payout: Payout) -> Option<NodeMessagingDuty> {
         if self.state.finished.contains(&payout.node_id) {
             return None;
         }

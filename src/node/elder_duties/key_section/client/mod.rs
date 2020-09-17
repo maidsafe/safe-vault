@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod client_input_parse;
-mod client_msg_tracking;
+mod client_msg_handling;
 mod onboarding;
 use self::{
     client_input_parse::{try_deserialize_handshake, try_deserialize_msg},
-    client_msg_tracking::ClientMsgTracking,
+    client_msg_handling::ClientMsgHandling,
     onboarding::Onboarding,
 };
 use crate::{
-    node::node_ops::{GatewayDuty, KeySectionDuty, MessagingDuty, NodeOperation},
+    node::node_ops::{GatewayDuty, KeySectionDuty, NodeMessagingDuty, NodeOperation},
     node::state_db::NodeInfo,
     utils, Error, Network, Result,
 };
@@ -30,7 +30,7 @@ use std::fmt::{self, Display, Formatter};
 /// A client gateway routes messages
 /// back and forth between a client and the network.
 pub struct ClientGateway<R: CryptoRng + Rng> {
-    client_msg_tracking: ClientMsgTracking,
+    client_msg_handling: ClientMsgHandling,
     rng: R,
     routing: Network,
 }
@@ -38,10 +38,10 @@ pub struct ClientGateway<R: CryptoRng + Rng> {
 impl<R: CryptoRng + Rng> ClientGateway<R> {
     pub fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
         let onboarding = Onboarding::new(info.public_key().ok_or(Error::Logic)?, routing.clone());
-        let client_msg_tracking = ClientMsgTracking::new(onboarding);
+        let client_msg_handling = ClientMsgHandling::new(onboarding);
 
         let gateway = Self {
-            client_msg_tracking,
+            client_msg_handling,
             rng,
             routing,
         };
@@ -57,13 +57,15 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         }
     }
 
-    fn try_find_client(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    fn try_find_client(&mut self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         if let Address::Client(xorname) = &msg.destination() {
             if self.routing.matches_our_prefix(*xorname) {
-                return self.client_msg_tracking.match_outgoing(msg);
+                let _ = self.client_msg_handling.match_outgoing(msg);
+
+                return None;
             }
         }
-        Some(MessagingDuty::SendToSection(msg.clone()))
+        Some(NodeMessagingDuty::SendToSection(msg.clone()))
     }
 
     /// This is where client input is parsed.
@@ -72,7 +74,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
             RoutingEvent::ClientMessageReceived {
                 content, src, send, ..
             } => {
-                let existing_client = self.client_msg_tracking.get_public_key(src);
+                let existing_client = self.client_msg_handling.get_public_key(src);
                 if let Some(public_key) = existing_client {
                     let msg = try_deserialize_msg(&content)?;
                     info!("Deserialized client msg from {}", public_key);
@@ -81,7 +83,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                         return None;
                     }
                     match self
-                        .client_msg_tracking
+                        .client_msg_handling
                         .track_incoming(&msg.message, src, send)
                     {
                         Some(c) => Some(c.into()),
@@ -90,9 +92,11 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                 } else {
                     let hs = try_deserialize_handshake(&content, src)?;
                     let mut rng = ChaChaRng::from_seed(self.rng.gen());
-                    self.client_msg_tracking
-                        .process_handshake(hs, src, send, &mut rng)
-                        .map(|c| c.into())
+                    let _ = self
+                        .client_msg_handling
+                        .process_handshake(hs, src, send, &mut rng);
+
+                    None
                 }
             }
             other => {

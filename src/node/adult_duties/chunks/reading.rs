@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::node::node_ops::MessagingDuty;
+use crate::node::node_ops::NodeMessagingDuty;
 use log::error;
 use sn_data_types::{Address, BlobRead, MsgEnvelope};
 
@@ -17,7 +17,7 @@ pub(super) fn get_result(
     read: &BlobRead,
     msg: &MsgEnvelope,
     storage: &ChunkStorage,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     let BlobRead::Get(address) = read;
     if let Address::Section(_) = msg.most_recent_sender().address() {
         if msg.verify() {

@@ -9,7 +9,7 @@
 //! Write operations on data chunks.
 
 use super::chunk_storage::ChunkStorage;
-use crate::node::node_ops::MessagingDuty;
+use crate::node::node_ops::NodeMessagingDuty;
 use log::error;
 use sn_data_types::{BlobWrite, MsgEnvelope};
 
@@ -17,7 +17,7 @@ pub(super) fn get_result(
     write: &BlobWrite,
     msg: &MsgEnvelope,
     storage: &mut ChunkStorage,
-) -> Option<MessagingDuty> {
+) -> Option<NodeMessagingDuty> {
     use BlobWrite::*;
     match &write {
         New(data) => {

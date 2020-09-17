@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::MessagingDuty};
+use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty};
 use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
 use log::{error, info};
 use sn_data_types::{
@@ -42,7 +42,7 @@ impl ChunkStorage {
         data: &Blob,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         if let Err(error) = self.try_store(data) {
             return self
                 .wrapping
@@ -58,7 +58,7 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: &MsgSender,
         accumulated_signature: &Signature,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let message = match self.try_store(data) {
             Ok(()) => Message::NodeEvent {
                 event: NodeEvent::DuplicationComplete {
@@ -100,7 +100,7 @@ impl ChunkStorage {
         address: &BlobAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self
             .chunks
             .get(address)
@@ -117,7 +117,7 @@ impl ChunkStorage {
     //     &self,
     //     address: BlobAddress,
     //     msg: &MsgEnvelope,
-    // ) -> Option<MessagingDuty> {
+    // ) -> Option<NodeMessagingDuty> {
 
     //     match self.chunks.get(&address) {
 
@@ -125,7 +125,7 @@ impl ChunkStorage {
 
     //     let mut targets: BTreeSet<XorName> = Default::default();
     //     let _ = targets.insert(XorName(xorname.0));
-    //     Some(MessagingDuty::SendToNode {
+    //     Some(NodeMessagingDuty::SendToNode {
     //         targets,
     //         msg: Message::QueryResponse {
     //             requester: requester.clone(),
@@ -141,7 +141,7 @@ impl ChunkStorage {
         address: BlobAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         if !self.chunks.has(&address) {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
             return None;

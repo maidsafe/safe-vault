@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::keys::NodeSigningKeys, node::node_ops::MessagingDuty, utils};
+use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty, utils};
 use log::info;
 use sn_data_types::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
@@ -51,7 +51,7 @@ impl NodeMsgWrapping {
         Self { inner }
     }
 
-    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
+    pub fn send(&self, message: Message) -> Option<NodeMessagingDuty> {
         self.inner.send(message)
     }
 }
@@ -62,7 +62,7 @@ impl AdultMsgWrapping {
         Self { inner }
     }
 
-    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
+    pub fn send(&self, message: Message) -> Option<NodeMessagingDuty> {
         self.inner.send(message)
     }
 
@@ -71,7 +71,7 @@ impl AdultMsgWrapping {
         error: CmdError,
         msg_id: MessageId,
         origin: &Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         self.inner.error(error, msg_id, origin)
     }
 }
@@ -82,12 +82,12 @@ impl ElderMsgWrapping {
         Self { inner }
     }
 
-    pub fn forward(&self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub fn forward(&self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         let msg = self.inner.set_proxy(&msg);
-        Some(MessagingDuty::SendToSection(msg))
+        Some(NodeMessagingDuty::SendToSection(msg))
     }
 
-    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
+    pub fn send(&self, message: Message) -> Option<NodeMessagingDuty> {
         self.inner.send(message)
     }
 
@@ -95,7 +95,7 @@ impl ElderMsgWrapping {
         &self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         self.inner.send_to_adults(targets, msg)
     }
 
@@ -104,7 +104,7 @@ impl ElderMsgWrapping {
         error: CmdError,
         msg_id: MessageId,
         origin: &Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         self.inner.error(error, msg_id, origin)
     }
 }
@@ -114,23 +114,23 @@ impl MsgWrapping {
         Self { keys, duty }
     }
 
-    pub fn send(&self, message: Message) -> Option<MessagingDuty> {
+    pub fn send(&self, message: Message) -> Option<NodeMessagingDuty> {
         let origin = self.sign(&message);
         let msg = MsgEnvelope {
             message,
             origin,
             proxies: Default::default(),
         };
-        Some(MessagingDuty::SendToSection(msg))
+        Some(NodeMessagingDuty::SendToSection(msg))
     }
 
     pub fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let msg = self.set_proxy(&msg);
-        Some(MessagingDuty::SendToAdults { targets, msg })
+        Some(NodeMessagingDuty::SendToAdults { targets, msg })
     }
 
     pub fn error(
@@ -138,7 +138,7 @@ impl MsgWrapping {
         error: CmdError,
         msg_id: MessageId,
         origin: &Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         info!("Error {:?}", error);
         self.send(Message::CmdError {
             id: MessageId::new(),

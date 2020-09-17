@@ -10,7 +10,7 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{node::node_ops::MessagingDuty, node::state_db::NodeInfo, Result};
+use crate::{node::node_ops::NodeMessagingDuty, node::state_db::NodeInfo, Result};
 use chunk_storage::ChunkStorage;
 
 use log::trace;
@@ -34,7 +34,7 @@ impl Chunks {
         Ok(Self { chunk_storage })
     }
 
-    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         trace!(
             "{}: Received ({:?} from src {:?}",
             self,
@@ -65,7 +65,7 @@ impl Chunks {
     //     requester: PublicId,
     //     message_id: MessageId,
     //     proof: Option<(Request, Signature)>,
-    // ) -> Option<MessagingDuty> {
+    // ) -> Option<NodeMessagingDuty> {
     //     use Response::*;
     //     trace!(
     //         "{}: Received ({:?} {:?}) from {}",

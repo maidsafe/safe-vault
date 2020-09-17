@@ -106,7 +106,7 @@ impl Metadata {
     //     requester: PublicId,
     //     message_id: MessageId,
     //     proof: Option<(Request, Signature)>,
-    // ) -> Option<MessagingDuty> {
+    // ) -> Option<NodeMessagingDuty> {
     //     use Response::*;
     //     trace!(
     //         "{}: Received ({:?} {:?}) from {}",
@@ -161,7 +161,7 @@ impl Metadata {
     //     holders: BTreeSet<XorName>,
     //     message_id: MessageId,
     //     accumulated_signature: Option<Signature>,
-    // ) -> Option<MessagingDuty> {
+    // ) -> Option<NodeMessagingDuty> {
     //     trace!(
     //         "Sending GetBlob request for address: ({:?}) to {:?}",
     //         address,
@@ -186,7 +186,7 @@ impl Metadata {
     //     message_id: MessageId,
     //     Blob_address: BlobAddress,
     //     signature: Signature,
-    // ) -> Option<MessagingDuty> {
+    // ) -> Option<NodeMessagingDuty> {
     //     use Response::*;
     //     if self
     //         .routing

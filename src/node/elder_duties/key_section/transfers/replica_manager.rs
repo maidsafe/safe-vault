@@ -24,7 +24,7 @@ use std::collections::BTreeSet;
 use sn_routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use {
-    crate::node::node_ops::MessagingDuty,
+    crate::node::node_ops::NodeMessagingDuty,
     bls::{SecretKey, SecretKeySet},
     rand::thread_rng,
     sn_data_types::{Signature, SignatureShare, Transfer},
@@ -319,7 +319,7 @@ impl ReplicaManager {
 
 #[cfg(feature = "simulated-payouts")]
 impl ReplicaManager {
-    pub fn credit_without_proof(&mut self, transfer: Transfer) -> Option<MessagingDuty> {
+    pub fn credit_without_proof(&mut self, transfer: Transfer) -> Option<NodeMessagingDuty> {
         trace!("Performing credit without proof");
         self.replica.credit_without_proof(transfer.clone());
         let dummy_msg = "DUMMY MSG";

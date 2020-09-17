@@ -8,8 +8,9 @@
 
 pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_msg};
 pub use super::onboarding::Onboarding;
-use crate::node::node_ops::MessagingDuty;
+use crate::node::node_ops::NodeMessagingDuty;
 use crate::utils;
+use crate::{Error, Result};
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
@@ -22,14 +23,14 @@ use std::{
 
 /// Tracks incoming and outgoingg messages
 /// between client and network.
-pub struct ClientMsgTracking {
+pub struct ClientMsgHandling {
     onboarding: Onboarding,
     notification_streams: HashMap<PublicKey, Vec<SendStream>>,
     tracked_incoming: HashMap<MessageId, (SocketAddr, SendStream)>,
     tracked_outgoing: HashMap<MessageId, MsgEnvelope>,
 }
 
-impl ClientMsgTracking {
+impl ClientMsgHandling {
     pub fn new(onboarding: Onboarding) -> Self {
         Self {
             onboarding,
@@ -49,14 +50,14 @@ impl ClientMsgTracking {
         peer_addr: SocketAddr,
         stream: SendStream,
         rng: &mut G,
-    ) -> Option<MessagingDuty> {
+    ) -> Result<()> {
         let mut the_stream = stream;
-        let duty = self
+        let result = self
             .onboarding
             .onboard_client(handshake, peer_addr, &mut the_stream, rng);
 
         // client has been onboarded or already exists
-        if duty.is_none() {
+        if result.is_ok() {
             if let Some(pk) = self.get_public_key(peer_addr) {
                 let mut updated_streams = vec![];
                 let pk = pk.clone();
@@ -76,7 +77,7 @@ impl ClientMsgTracking {
             }
         }
 
-        duty
+        result
     }
 
     // pub fn remove_client(&mut self, peer_addr: SocketAddr) {
@@ -89,7 +90,7 @@ impl ClientMsgTracking {
         msg: &Message,
         client_address: SocketAddr,
         stream: SendStream,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let msg_id = msg.id();
 
         // We could have received a group decision containing a client msg,
@@ -97,10 +98,7 @@ impl ClientMsgTracking {
         if let Some(msg) = self.tracked_outgoing.remove(&msg_id) {
             warn!("Tracking incoming: Prior group decision on msg found.");
 
-            return Some(MessagingDuty::SendToClient {
-                address: client_address,
-                msg,
-            });
+            self.match_outgoing(&msg);
         }
 
         if let Entry::Vacant(ve) = self.tracked_incoming.entry(msg_id) {
@@ -115,7 +113,7 @@ impl ClientMsgTracking {
         }
     }
 
-    pub fn match_outgoing(&mut self, msg: &MsgEnvelope) -> Option<MessagingDuty> {
+    pub fn match_outgoing(&mut self, msg: &MsgEnvelope) -> Result<()> {
         match msg.destination() {
             Address::Client { .. } => (),
             _ => {
@@ -124,8 +122,7 @@ impl ClientMsgTracking {
                     self,
                     msg.id()
                 );
-                return None;
-                //return Err(Error::InvalidOperation);
+                return Err(Error::InvalidMessage);
             }
         };
         let (is_query_response, correlation_id) = match msg.message {
@@ -139,8 +136,7 @@ impl ClientMsgTracking {
                     self,
                     msg.id()
                 );
-                return None;
-                //return Err(Error::InvalidOperation);
+                return Err(Error::InvalidMessage);
             }
         };
 
@@ -181,10 +177,10 @@ impl ClientMsgTracking {
                     );
 
                 let _ = self.tracked_outgoing.insert(correlation_id, msg.clone());
-                return None;
+                return Ok(());
             }
         }
-        None
+        Ok(())
     }
 }
 
@@ -203,8 +199,8 @@ fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) {
     };
 }
 
-impl Display for ClientMsgTracking {
+impl Display for ClientMsgHandling {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "ClientMsgTracking")
+        write!(formatter, "ClientMsgHandling")
     }
 }

@@ -6,42 +6,36 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod client_sender;
 pub mod network_sender;
 
-use crate::node::node_ops::{MessagingDuty, NodeOperation};
+use crate::node::node_ops::{NodeMessagingDuty, NodeOperation};
 use crate::Network;
-use client_sender::ClientSender;
 use log::info;
 use network_sender::NetworkSender;
 
 /// Sending of messages
 /// to nodes and clients in the network.
 pub struct Messaging {
-    client_sender: ClientSender,
     network_sender: NetworkSender,
 }
 
 impl Messaging {
     pub fn new(routing: Network) -> Self {
-        let client_sender = ClientSender::new(routing.clone());
         let network_sender = NetworkSender::new(routing);
-        Self {
-            client_sender,
-            network_sender,
-        }
+        Self { network_sender }
     }
 
-    pub async fn process_messaging_duty(&mut self, duty: MessagingDuty) -> Option<NodeOperation> {
-        use MessagingDuty::*;
+    pub async fn process_messaging_duty(
+        &mut self,
+        duty: NodeMessagingDuty,
+    ) -> Option<NodeOperation> {
+        use NodeMessagingDuty::*;
         info!("Sending message: {:?}", duty);
         let result = match duty {
-            SendToClient { address, msg } => self.client_sender.send(address, &msg).await,
             SendToNode(msg) => self.network_sender.send_to_node(msg).await,
             SendToSection(msg) => self.network_sender.send_to_network(msg).await,
             SendToAdults { targets, msg } => self.network_sender.send_to_nodes(targets, &msg).await,
-            SendHandshake { .. } => None,       // unreachable?
-            DisconnectClient(_address) => None, // TODO: self.client_sender.disconnect(address),
+            SendHandshake { .. } => None, // unreachable?
         };
 
         result.map(|c| c.into())

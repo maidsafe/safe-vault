@@ -102,7 +102,7 @@ pub enum NodeDuty {
     /// On being promoted, an Adult node becomes an Elder.
     BecomeElder,
     /// Sending messages on to the network.
-    ProcessMessaging(MessagingDuty),
+    ProcessMessaging(NodeMessagingDuty),
     /// Receiving and processing events from the network.
     ProcessNetworkEvent(RoutingEvent),
 }
@@ -133,12 +133,7 @@ impl Debug for NodeDuty {
 /// and domain duties. Messaging is such a fundamental
 /// part of the system, that it can be considered domain.
 #[allow(clippy::large_enum_variant)]
-pub enum MessagingDuty {
-    /// Send to a client.
-    SendToClient {
-        address: SocketAddr,
-        msg: MsgEnvelope,
-    },
+pub enum NodeMessagingDuty {
     /// Send to a single node.
     SendToNode(MsgEnvelope),
     /// Send to a section.
@@ -155,11 +150,9 @@ pub enum MessagingDuty {
         address: SocketAddr,
         response: HandshakeResponse,
     },
-    /// The key section might also disonnect a client.
-    DisconnectClient(SocketAddr),
 }
 
-impl Into<NodeOperation> for MessagingDuty {
+impl Into<NodeOperation> for NodeMessagingDuty {
     fn into(self) -> NodeOperation {
         use NetworkDuty::*;
         use NodeDuty::*;
@@ -168,12 +161,9 @@ impl Into<NodeOperation> for MessagingDuty {
     }
 }
 
-impl Debug for MessagingDuty {
+impl Debug for NodeMessagingDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SendToClient { address, msg } => {
-                write!(f, "SendToClient [ address: {:?}, msg: {:?} ]", address, msg)
-            }
             Self::SendHandshake { address, .. } => write!(
                 f,
                 "SendHandshake [ address: {:?}, response: (...) ]",
@@ -184,7 +174,6 @@ impl Debug for MessagingDuty {
             }
             Self::SendToNode(msg) => write!(f, "SendToNode [ msg: {:?} ]", msg),
             Self::SendToSection(msg) => write!(f, "SendToSection [ msg: {:?} ]", msg),
-            Self::DisconnectClient(addr) => write!(f, "Disconnection(Address: {:?})", addr),
         }
     }
 }

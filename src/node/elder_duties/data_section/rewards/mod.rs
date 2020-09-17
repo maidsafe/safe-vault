@@ -15,7 +15,7 @@ pub use self::{reward_calc::RewardCalc, validator::Validator};
 use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MessagingDuty, NodeOperation, RewardDuty},
+    node::node_ops::{NodeMessagingDuty, NodeOperation, RewardDuty},
 };
 use log::{info, warn};
 use sn_data_types::{
@@ -160,14 +160,18 @@ impl Rewards {
     /// It still hasn't registered a wallet id at
     /// this point, but will as part of starting up.
     /// At age 5 it gets its first reward payout.
-    fn add_new_node(&mut self, node_id: XorName) -> Option<MessagingDuty> {
+    fn add_new_node(&mut self, node_id: XorName) -> Option<NodeMessagingDuty> {
         let _ = self.node_rewards.insert(node_id, NodeRewards::NewNode);
         None
     }
 
     /// 1. A new node registers a wallet id for future reward payout.
     /// ... or, an active node updates its wallet.
-    fn set_node_wallet(&mut self, node_id: XorName, wallet: PublicKey) -> Option<MessagingDuty> {
+    fn set_node_wallet(
+        &mut self,
+        node_id: XorName,
+        wallet: PublicKey,
+    ) -> Option<NodeMessagingDuty> {
         // Try get the info..
         let state = match self.node_rewards.get_mut(&node_id) {
             None => return None,
@@ -194,7 +198,7 @@ impl Rewards {
         old_node_id: XorName,
         new_node_id: XorName,
         age: u8,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use NodeQuery::*;
         use NodeRewardQuery::*;
         use NodeRewards::*;
@@ -218,7 +222,7 @@ impl Rewards {
         &mut self,
         wallet: PublicKey,
         node_id: XorName,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         // If we ever hit these errors, something is very odd
         // most likely a bug, because we are receiving an event triggered by our cmd.
         // So, it doesn't make much sense to send some error msg back on the wire.
@@ -258,7 +262,7 @@ impl Rewards {
 
     /// 4. When the section becomes aware that a node has left,
     /// its account is deactivated.
-    fn deactivate(&mut self, node_id: XorName) -> Option<MessagingDuty> {
+    fn deactivate(&mut self, node_id: XorName) -> Option<NodeMessagingDuty> {
         let wallet = match self.node_rewards.get(&node_id) {
             Some(NodeRewards::Active { wallet, .. }) => *wallet,
             Some(NodeRewards::AwaitingActivation { .. }) // hmm.. left when AwaitingActivation is a tricky case.. // Might be case for lazy messaging..
@@ -282,7 +286,7 @@ impl Rewards {
         new_node_id: XorName,
         msg_id: MessageId,
         origin: &Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let wallet = match self.node_rewards.get(&old_node_id) {
             Some(NodeRewards::AwaitingRelocation(id)) => *id,
             Some(NodeRewards::NewNode)

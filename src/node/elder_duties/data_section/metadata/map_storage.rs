@@ -9,7 +9,7 @@
 use crate::{
     chunk_store::{error::Error as ChunkStoreError, MapChunkStore},
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::MessagingDuty,
+    node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
     Result,
 };
@@ -50,7 +50,7 @@ impl MapStorage {
         read: &MapRead,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use MapRead::*;
         match read {
             Get(address) => self.get(*address, msg_id, origin),
@@ -72,7 +72,7 @@ impl MapStorage {
         write: MapWrite,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use MapWrite::*;
         match write {
             New(data) => self.create(&data, msg_id, origin),
@@ -120,7 +120,7 @@ impl MapStorage {
         origin: &MsgSender,
         msg_id: MessageId,
         mutation_fn: F,
-    ) -> Option<MessagingDuty>
+    ) -> Option<NodeMessagingDuty>
     where
         F: FnOnce(Map) -> NdResult<Map>,
     {
@@ -146,7 +146,7 @@ impl MapStorage {
         data: &Map,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -162,7 +162,7 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self
             .chunks
             .get(&address)
@@ -189,7 +189,7 @@ impl MapStorage {
         version: u64,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         self.edit_chunk(&address, origin, msg_id, move |mut data| {
             data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.set_user_permissions(user, permissions.clone(), version)?;
@@ -205,7 +205,7 @@ impl MapStorage {
         version: u64,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         self.edit_chunk(&address, origin, msg_id, move |mut data| {
             data.check_permissions(MapAction::ManagePermissions, origin.id())?;
             data.del_user_permissions(user, version)?;
@@ -220,7 +220,7 @@ impl MapStorage {
         actions: MapEntryActions,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         self.edit_chunk(&address, origin, msg_id, move |mut data| {
             data.mutate_entries(actions, origin.id())?;
             Ok(data)
@@ -233,7 +233,7 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self.get_chunk(&address, origin, MapAction::Read)?;
         self.wrapping.send(Message::QueryResponse {
             response: QueryResponse::GetMap(result),
@@ -249,7 +249,7 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.shell());
@@ -267,7 +267,7 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.version());
@@ -286,7 +286,7 @@ impl MapStorage {
         key: &[u8],
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let res = self.get_chunk(&address, origin, MapAction::Read)?;
         let result = res.and_then(|data| match data {
             Map::Seq(map) => map
@@ -314,7 +314,7 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.keys());
@@ -332,7 +332,7 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let res = self.get_chunk(&address, origin, MapAction::Read)?;
         let result = res.map(|data| match data {
             Map::Seq(map) => map.values().into(),
@@ -352,7 +352,7 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let res = self.get_chunk(&address, origin, MapAction::Read)?;
         let result = res.map(|data| match data {
             Map::Seq(map) => map.entries().clone().into(),
@@ -372,7 +372,7 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.permissions());
@@ -391,7 +391,7 @@ impl MapStorage {
         user: PublicKey,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)?
             .and_then(|data| data.user_permissions(user).map(MapPermissionSet::clone));
@@ -408,7 +408,7 @@ impl MapStorage {
         result: NdResult<()>,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         if let Err(error) = result {
             self.wrapping
                 .error(CmdError::Data(error), msg_id, &origin.address())

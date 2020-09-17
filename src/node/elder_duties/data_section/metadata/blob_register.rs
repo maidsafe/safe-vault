@@ -8,7 +8,7 @@
 
 use crate::{
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MessagingDuty, NodeOperation},
+    node::node_ops::{NodeMessagingDuty, NodeOperation},
     node::NodeInfo,
     utils, Network, Result, ToDbKey,
 };
@@ -82,7 +82,7 @@ impl BlobRegister {
         origin: MsgSender,
         payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use BlobWrite::*;
         match write {
             New(data) => self.store(data, msg_id, origin, payment, proxies),
@@ -97,7 +97,7 @@ impl BlobRegister {
         origin: MsgSender,
         payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let cmd_error = |error: NdError| {
             self.wrapping.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -170,7 +170,7 @@ impl BlobRegister {
         origin: MsgSender,
         payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let cmd_error = |error: NdError| {
             self.wrapping.send(Message::CmdError {
                 error: CmdError::Data(error),
@@ -343,7 +343,7 @@ impl BlobRegister {
         msg_id: MessageId,
         origin: MsgSender,
         proxies: Vec<MsgSender>,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use BlobRead::*;
         match read {
             Get(address) => self.get(*address, msg_id, origin, proxies),
@@ -356,7 +356,7 @@ impl BlobRegister {
         msg_id: MessageId,
         origin: MsgSender,
         proxies: Vec<MsgSender>,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let query_error = |error: NdError| {
             self.wrapping.send(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
@@ -394,7 +394,7 @@ impl BlobRegister {
         holder: XorName,
         result: NdResult<()>,
         message_id: MessageId,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
         let _ = chunk_metadata.holders.insert(holder);
         if let Err(error) = self.metadata.set(&address.to_db_key(), &chunk_metadata) {

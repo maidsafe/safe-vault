@@ -13,7 +13,7 @@ pub use self::replica_manager::ReplicaManager;
 use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{MessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
+    node::node_ops::{NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
 use log::{debug, trace};
 #[cfg(feature = "simulated-payouts")]
@@ -108,7 +108,7 @@ impl Transfers {
         query: &TransferQuery,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use TransferQuery::*;
         match query {
             GetReplicaEvents => self.all_events(msg_id, origin),
@@ -123,7 +123,7 @@ impl Transfers {
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use TransferCmd::*;
         debug!("Processing Transfer CMD in keysection");
         match cmd {
@@ -151,7 +151,7 @@ impl Transfers {
 
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
-    fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Option<MessagingDuty> {
+    fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Option<NodeMessagingDuty> {
         // We must be able to initiate the replica, otherwise this node cannot function.
         match self.replica.borrow_mut().initiate(events) {
             Ok(()) => None,
@@ -160,7 +160,7 @@ impl Transfers {
     }
 
     /// Get all the events of the Replica.
-    fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<MessagingDuty> {
+    fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<NodeMessagingDuty> {
         let result = match self.replica.borrow().all_events() {
             None => Err(Error::NoSuchData),
             Some(events) => Ok(events),
@@ -181,7 +181,7 @@ impl Transfers {
         _wallet_id: &PublicKey,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         // validate signature
         let result = match self.replica.borrow().replicas_pk_set() {
             None => Err(Error::NoSuchKey),
@@ -200,7 +200,7 @@ impl Transfers {
         wallet_id: &PublicKey,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         // validate signature
         let result = self
             .replica
@@ -221,7 +221,7 @@ impl Transfers {
         _since_version: usize,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         trace!("Handling GetHistory");
         // validate signature
         let result = match self
@@ -248,7 +248,7 @@ impl Transfers {
         transfer: SignedTransfer,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         debug!("Validating a transfer from msg_id: {:?}", msg_id);
         let message = match self.replica.borrow_mut().validate(transfer) {
             Ok(None) => return None,
@@ -278,7 +278,7 @@ impl Transfers {
         transfer: SignedTransfer,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         let message = match self.replica.borrow_mut().validate(transfer) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::NodeEvent {
@@ -303,7 +303,7 @@ impl Transfers {
         proof: &DebitAgreementProof,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
 
@@ -330,7 +330,7 @@ impl Transfers {
         proof: &DebitAgreementProof,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<MessagingDuty> {
+    ) -> Option<NodeMessagingDuty> {
         use NodeTransferError::*;
         // We will just validate the proofs and then apply the event.
         let message = match self.replica.borrow_mut().receive_propagated(proof) {
