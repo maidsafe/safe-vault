@@ -26,24 +26,19 @@ pub struct Network {
 
 #[allow(missing_docs)]
 impl Network {
-    pub async fn new(config: &NodeConfig) -> Result<Self> {
+    pub async fn new(config: &NodeConfig) -> Result<(Self, EventStream)> {
         let mut node_config = RoutingConfig::default();
         node_config.first = config.is_first();
         node_config.transport_config = config.network_config().clone();
         node_config.network_params.recommended_section_size = 500;
-        let routing = RoutingNode::new(node_config).await?;
+        let (routing, event_stream) = RoutingNode::new(node_config).await?;
 
-        Ok(Self {
-            routing: Rc::new(RefCell::new(routing)),
-        })
-    }
-
-    pub async fn listen_events(&self) -> Result<EventStream> {
-        self.routing
-            .borrow()
-            .listen_events()
-            .await
-            .map_err(Error::Routing)
+        Ok((
+            Self {
+                routing: Rc::new(RefCell::new(routing)),
+            },
+            event_stream,
+        ))
     }
 
     pub fn our_name(&self) -> XorName {

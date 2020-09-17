@@ -400,9 +400,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.59"
+version = "1.0.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66120af515773fb005778dc07c261bd201ec8ce50bd6e7144c927753fe013381"
+checksum = "ef611cc68ff783f18535d77ddd080185275713d852c4f5cbb6122c462a7a825c"
 
 [[package]]
 name = "cfg-if"
@@ -749,9 +749,9 @@ dependencies = [
 
 [[package]]
 name = "either"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd56b59865bce947ac5958779cfa508f6c3b9497cc762b7e24a12d11ccde2c4f"
+checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "encode_unicode"
@@ -1875,7 +1875,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.8.1"
-source = "git+https://github.com/maidsafe/qp2p.git#0a9bf09f7a628843e014302e81d21070af5a5566"
+source = "git+https://github.com/maidsafe/qp2p#0a9bf09f7a628843e014302e81d21070af5a5566"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2349,7 +2349,6 @@ dependencies = [
  "log",
  "maplit",
  "pickledb",
- "qp2p",
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",
@@ -2610,7 +2609,7 @@ checksum = "9b3bb89541a5068ba2861181892745587897765ea2724b78257eb5f289de16ab"
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/bochaco/sn_routing.git?branch=async-quic-p2p-api#a1df443e1a3c5dba7c0843184dee600d2bb44686"
+source = "git+https://github.com/bochaco/sn_routing.git?branch=async-quic-p2p-api#621953d3894fc160a58f0b67e9233f904cbe36e7"
 dependencies = [
  "bincode",
  "bls_dkg",

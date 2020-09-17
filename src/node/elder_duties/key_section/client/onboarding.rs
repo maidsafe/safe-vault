@@ -9,9 +9,9 @@
 use crate::node::node_ops::MessagingDuty;
 use crate::{utils, Network};
 use log::{debug, error, info, trace};
-use qp2p::SendStream;
 use rand::{CryptoRng, Rng};
 use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
+use sn_routing::event::SendStream;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},

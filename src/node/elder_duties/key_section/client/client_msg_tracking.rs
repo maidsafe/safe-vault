@@ -10,9 +10,9 @@ pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_m
 pub use super::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
 use log::{error, info, warn};
-use qp2p::SendStream;
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
+use sn_routing::event::SendStream;
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},

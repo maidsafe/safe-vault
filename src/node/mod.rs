@@ -29,7 +29,7 @@ use bls::SecretKey;
 use log::info;
 use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
-use sn_routing::event::Event;
+use sn_routing::{event::Event, EventStream};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -39,6 +39,7 @@ use std::{
 pub struct Node<R: CryptoRng + Rng> {
     duties: NodeDuties<R>,
     network_api: Network,
+    network_events: EventStream,
 }
 
 impl<R: CryptoRng + Rng> Node<R> {
@@ -64,7 +65,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             age_group
         };
 
-        let network_api = Network::new(config).await?;
+        let (network_api, network_events) = Network::new(config).await?;
         let keys = NodeSigningKeys::new(network_api.clone());
 
         let node_info = NodeInfo {
@@ -89,6 +90,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         let mut node = Self {
             duties,
             network_api,
+            network_events,
         };
 
         node.register(reward_key).await;
@@ -118,10 +120,9 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
-        let mut event_stream = self.network_api.listen_events().await?;
         let info = self.network_api.our_connection_info().unwrap();
         info!("Listening for routing events at: {}", info);
-        while let Some(event) = event_stream.next().await {
+        while let Some(event) = self.network_events.next().await {
             info!("New event received from the Network: {:?}", event);
             let duty = if let Event::ClientMessageReceived { .. } = event {
                 info!("Event from client peer: {:?}", event);
