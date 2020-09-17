@@ -11,7 +11,6 @@ pub use super::onboarding::Onboarding;
 use crate::node::node_ops::MessagingDuty;
 use crate::utils;
 use log::{error, info, trace, warn};
-use qp2p::SendStream;
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
 use sn_routing::event::SendStream;
