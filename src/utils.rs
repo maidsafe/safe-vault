@@ -11,8 +11,6 @@
 use crate::{config_handler::Config, node::state_db::Init, Network, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use bytes::Bytes;
-use flexi_logger::{DeferredNow, Logger};
-use log::Record;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
@@ -84,32 +82,7 @@ pub(crate) async fn key_pair(routing: Network) -> Result<Keypair> {
 
 /// Initialize logging
 pub fn init_logging(config: &Config) {
-    // // Custom formatter for logs
-    // let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
-    //     write!(
-    //         writer,
-    //         "{} {} [{}:{}] {}",
-    //         record.level(),
-    //         clock.now().to_rfc3339(),
-    //         record.file().unwrap_or_default(),
-    //         record.line().unwrap_or_default(),
-    //         record.args()
-    //     )
-    // };
-
-    // let level_filter = config.verbose().to_level_filter();
-    // let module_log_filter = format!("{}={}", VAULT_MODULE_NAME, level_filter.to_string());
-    // let logger = Logger::with_env_or_str(module_log_filter)
-    //     .format(do_format)
-    //     .suppress_timestamp();
-
-    // let logger = if let Some(log_dir) = config.log_dir() {
-    //     logger.log_to_file().directory(log_dir)
-    // } else {
-    //     logger
-    // };
-
-    let logger = env_logger::builder()
+    let logger = env_logger::Builder::from_default_env()
         .format(|buf, record| {
             let style = buf.default_level_style(record.level());
             let handle = std::thread::current();

@@ -39,7 +39,7 @@ mod to_db_key;
 
 pub mod utils;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "simulated-payouts"))]
 mod tests;
 
 pub(crate) use to_db_key::ToDbKey;
