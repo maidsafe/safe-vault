@@ -47,6 +47,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     pub async fn new(config: &Config, rng: R) -> Result<Self> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
+        std::fs::create_dir_all(root_dir)?;
 
         let reward_key = match config.wallet_id() {
             Some(public_key) => PublicKey::Bls(state_db::pk_from_hex(public_key)?),
