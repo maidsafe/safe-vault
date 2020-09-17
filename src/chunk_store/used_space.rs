@@ -45,6 +45,24 @@ impl UsedSpace {
         }
     }
 
+    /// Returns the total used space as a snapshot
+    /// Note, due to the async nature of this, the value
+    /// may be stale by the time it is read if there are multiple
+    /// writers
+    #[allow(unused)]
+    pub async fn total(&self) -> u64 {
+        inner::UsedSpace::total(self.inner.clone()).await
+    }
+
+    /// Returns the used space of a local store as a snapshot
+    /// Note, due to the async nature of this, the value
+    /// may be stale by the time it is read if there are multiple
+    /// writers
+    #[allow(unused)]
+    pub async fn local(&self, id: StoreId) -> u64 {
+        inner::UsedSpace::local(self.inner.clone(), id).await
+    }
+
     /// Add an object and file store to track used space of a single
     /// `ChunkStore`
     pub async fn add_local_store<T: AsRef<Path>>(
@@ -109,6 +127,24 @@ mod inner {
                 local_stores: HashMap::new(),
                 next_id: 0u64,
             }
+        }
+
+        /// Returns the total used space as a snapshot
+        /// Note, due to the async nature of this, the value
+        /// may be stale by the time it is read if there are multiple
+        /// writers
+        pub async fn total(used_space: Arc<Mutex<UsedSpace>>) -> u64 {
+            let used_space_lock = used_space.lock().await;
+            used_space_lock.total_value
+        }
+
+        /// Returns the used space of a local store as a snapshot
+        /// Note, due to the async nature of this, the value
+        /// may be stale by the time it is read if there are multiple
+        /// writers
+        pub async fn local(used_space: Arc<Mutex<UsedSpace>>, id: StoreId) -> u64 {
+            let used_space_lock = used_space.lock().await;
+            used_space_lock.local_stores.get(&id).unwrap().local_value
         }
 
         /// Adds a new record for tracking the actions

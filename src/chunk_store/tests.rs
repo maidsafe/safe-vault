@@ -9,13 +9,11 @@
 use super::{
     chunk::{Chunk, ChunkId},
     error::Error,
-    ChunkStore, Subdir,
+    ChunkStore, Subdir, UsedSpace,
 };
 use crate::{utils::Init, Result, ToDbKey};
-use futures::lock::Mutex;
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::{path::Path, u64};
 use tempdir::TempDir;
 use unwrap::unwrap;
@@ -90,13 +88,9 @@ async fn successful_put() -> Result<()> {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Arc::new(Mutex::new(0));
-    let mut chunk_store = unwrap!(ChunkStore::<Data>::new(
-        root.path(),
-        u64::MAX,
-        Arc::clone(&used_space),
-        Init::New
-    ));
+    let used_space = UsedSpace::new(u64::MAX);
+    let mut chunk_store =
+        unwrap!(ChunkStore::<Data>::new(root.path(), used_space.clone(), Init::New).await);
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &Data {
@@ -131,13 +125,9 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
     let mut rng = new_rng();
     let root = temp_dir();
     let capacity = 32;
-    let used_space = Arc::new(Mutex::new(0));
-    let mut chunk_store = unwrap!(ChunkStore::new(
-        root.path(),
-        capacity,
-        used_space,
-        Init::New
-    ));
+    let used_space = UsedSpace::new(capacity);
+    let mut chunk_store =
+        unwrap!(ChunkStore::new(root.path(), used_space.clone(), Init::New).await);
 
     let data = Data {
         id: Id(rng.gen()),
@@ -161,8 +151,8 @@ async fn delete() -> Result<()> {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Arc::new(Mutex::new(0));
-    let mut chunk_store = ChunkStore::new(root.path(), u64::MAX, used_space, Init::New)?;
+    let used_space = UsedSpace::new(u64::MAX);
+    let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate() {
         let the_data = &Data {
@@ -186,13 +176,9 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Arc::new(Mutex::new(0));
-    let mut chunk_store = unwrap!(ChunkStore::new(
-        root.path(),
-        u64::MAX,
-        Arc::clone(&used_space),
-        Init::New
-    ));
+    let used_space = UsedSpace::new(u64::MAX);
+    let mut chunk_store =
+        unwrap!(ChunkStore::new(root.path(), used_space.clone(), Init::New).await);
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         chunk_store
@@ -217,9 +203,8 @@ async fn overwrite_value() -> Result<()> {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Arc::new(Mutex::new(0));
-    let mut chunk_store =
-        ChunkStore::new(root.path(), u64::MAX, Arc::clone(&used_space), Init::New)?;
+    let used_space = UsedSpace::new(u64::MAX);
+    let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 
     for (data, size) in chunks.data_and_sizes {
         chunk_store
@@ -239,13 +224,9 @@ async fn overwrite_value() -> Result<()> {
 #[tokio::test]
 async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let root = temp_dir();
-    let used_space = Arc::new(Mutex::new(0));
-    let chunk_store: ChunkStore<Data> = unwrap!(ChunkStore::new(
-        root.path(),
-        u64::MAX,
-        used_space,
-        Init::New
-    ));
+    let used_space = UsedSpace::new(u64::MAX);
+    let chunk_store: ChunkStore<Data> =
+        unwrap!(ChunkStore::new(root.path(), used_space.clone(), Init::New).await);
 
     let id = Id(new_rng().gen());
     match chunk_store.get(&id) {
@@ -262,8 +243,8 @@ async fn keys() -> Result<()> {
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
-    let used_space = Arc::new(Mutex::new(0));
-    let mut chunk_store = ChunkStore::new(root.path(), u64::MAX, used_space, Init::New)?;
+    let used_space = UsedSpace::new(u64::MAX);
+    let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let id = Id(index as u64);

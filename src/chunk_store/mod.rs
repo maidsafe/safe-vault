@@ -121,7 +121,7 @@ impl<T: Chunk> ChunkStore<T> {
 
         let mut file = File::create(&file_path)?;
         file.write_all(&serialised_chunk)?;
-        file.sync_data()?;
+        file.sync_all()?;
 
         self.used_space.increase(self.id, consumed_space).await?;
         println!(
