@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#![allow(trivial_numeric_casts)] // FIXME
+
 use crate::Result;
 use directories::ProjectDirs;
 use lazy_static::lazy_static;

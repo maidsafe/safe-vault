@@ -890,16 +890,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "file-per-thread-logger"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fdbe0d94371f9ce939b555dd342d0686cc4c0cadbcd4b61d70af5ff97eb4126"
-dependencies = [
- "env_logger 0.7.1",
- "log",
-]
-
-[[package]]
 name = "filetime"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1898,7 +1888,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.8.1"
-source = "git+https://github.com/maidsafe/qp2p.git#033f70f1e4af811385c241aa84fe8f554e38a4a9"
+source = "git+https://github.com/maidsafe/qp2p#0a9bf09f7a628843e014302e81d21070af5a5566"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2313,7 +2303,6 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe_core"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/safe_client_libs#f0db1dbba536c57f939dbe3a3e44a664b72d13ee"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2364,7 +2353,6 @@ dependencies = [
  "ed25519",
  "ed25519-dalek",
  "env_logger 0.7.1",
- "file-per-thread-logger",
  "flexi_logger",
  "futures",
  "fxhash",
