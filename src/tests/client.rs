@@ -23,12 +23,11 @@ fn start_network() {
     });
 }
 
-// #[tokio::test]
-// #[cfg(feature = "simulated-payouts")]
-// async fn money_balance_transfer() {
-//     start_network();
-//     assert!(client_tests::money_balance_transfer().await.is_ok());
-// }
+#[tokio::test]
+async fn client_creation() {
+    start_network();
+    assert!(client_tests::client_creation().await.is_ok());
+}
 
 #[tokio::test]
 pub async fn pub_blob_test() {
