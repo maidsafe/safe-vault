@@ -43,7 +43,7 @@ impl Payments {
     }
 
     // The code in this method is a bit messy, needs to be cleaned up.
-    pub fn process(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
+    pub fn process_payment_duty(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
         use PaymentDuty::*;
         match duty {
             ProcessPayment(msg) => self.process_payment(msg),

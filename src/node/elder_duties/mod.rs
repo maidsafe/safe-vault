@@ -58,7 +58,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     }
 
     /// Processing of any Elder duty.
-    pub fn process(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
+    pub fn process_elder_duty(&mut self, duty: ElderDuty) -> Option<NodeOperation> {
         trace!("Processing elder duty");
         use ElderDuty::*;
         match duty {
@@ -70,8 +70,10 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
                 age,
             } => self.relocated_node_joined(old_node_id, new_node_id, age),
             ProcessElderChange { prefix, .. } => self.elders_changed(prefix),
-            RunAsKeySection(the_key_duty) => self.key_section.process_as_key_section(the_key_duty),
-            RunAsDataSection(duty) => self.data_section.process(duty),
+            RunAsKeySection(the_key_duty) => {
+                self.key_section.process_key_section_duty(the_key_duty)
+            }
+            RunAsDataSection(duty) => self.data_section.process_data_section_duty(duty),
         }
     }
 

@@ -68,7 +68,7 @@ impl Metadata {
         })
     }
 
-    pub fn process(&mut self, duty: MetadataDuty) -> Option<NodeOperation> {
+    pub fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Option<NodeOperation> {
         use MetadataDuty::*;
         match duty {
             ProcessRead(msg) | ProcessWrite(msg) => self.process_msg(msg),

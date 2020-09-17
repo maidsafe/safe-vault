@@ -83,8 +83,16 @@ impl<R: CryptoRng + Rng> Node<R> {
         use AgeGroup::*;
         let _ = match age_group {
             Infant => None,
-            Adult => duties.process(node_ops::NodeDuty::BecomeAdult).await,
-            Elder => duties.process(node_ops::NodeDuty::BecomeElder).await,
+            Adult => {
+                duties
+                    .process_node_duty(node_ops::NodeDuty::BecomeAdult)
+                    .await
+            }
+            Elder => {
+                duties
+                    .process_node_duty(node_ops::NodeDuty::BecomeElder)
+                    .await
+            }
         };
 
         let mut node = Self {
@@ -101,7 +109,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     async fn register(&mut self, reward_key: PublicKey) {
         let result = self
             .duties
-            .process(NodeDuty::RegisterWallet(reward_key))
+            .process_node_duty(NodeDuty::RegisterWallet(reward_key))
             .await;
         self.process_while_any(result).await
     }
@@ -163,15 +171,15 @@ impl<R: CryptoRng + Rng> Node<R> {
         match duty {
             RunAsAdult(duty) => {
                 info!("Running as Adult: {:?}", duty);
-                self.duties.adult_duties()?.process(&duty)
+                self.duties.adult_duties()?.process_adult_duty(&duty)
             }
             RunAsElder(duty) => {
                 info!("Running as Elder: {:?}", duty);
-                self.duties.elder_duties()?.process(duty)
+                self.duties.elder_duties()?.process_elder_duty(duty)
             }
             RunAsNode(duty) => {
                 info!("Running as Node: {:?}", duty);
-                self.duties.process(duty).await
+                self.duties.process_node_duty(duty).await
             }
         }
     }

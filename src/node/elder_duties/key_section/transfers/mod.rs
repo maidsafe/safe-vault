@@ -85,7 +85,7 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub fn process(&mut self, duty: &TransferDuty) -> Option<NodeOperation> {
+    pub fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Option<NodeOperation> {
         use TransferDuty::*;
         let result = match duty {
             ProcessQuery {

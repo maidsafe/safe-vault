@@ -26,7 +26,7 @@ impl NetworkEvents {
         Self { analysis }
     }
 
-    pub fn process(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
+    pub fn process_network_event(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
         use ElderDuty::*;
         use NodeDuty::*;
 

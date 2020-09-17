@@ -32,7 +32,7 @@ impl AdultDuties {
         Ok(Self { chunks })
     }
 
-    pub fn process(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
+    pub fn process_adult_duty(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
         use AdultDuty::*;
         use ChunkDuty::*;
         let RunAsChunks(chunk_duty) = duty;

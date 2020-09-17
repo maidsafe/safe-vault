@@ -62,11 +62,11 @@ impl DataSection {
         })
     }
 
-    pub fn process(&mut self, duty: DataSectionDuty) -> Option<NodeOperation> {
+    pub fn process_data_section_duty(&mut self, duty: DataSectionDuty) -> Option<NodeOperation> {
         use DataSectionDuty::*;
         match duty {
-            RunAsMetadata(duty) => self.metadata.process(duty),
-            RunAsRewards(duty) => self.rewards.process(duty),
+            RunAsMetadata(duty) => self.metadata.process_metadata_duty(duty),
+            RunAsRewards(duty) => self.rewards.process_reward_duty(duty),
         }
     }
 
@@ -96,7 +96,7 @@ impl DataSection {
 
     /// When a new node joins, it is registered for receiving rewards.
     pub fn new_node_joined(&mut self, id: XorName) -> Option<NodeOperation> {
-        self.rewards.process(RewardDuty::AddNewNode(id))
+        self.rewards.process_reward_duty(RewardDuty::AddNewNode(id))
     }
 
     /// When a relocated node joins, a DataSection
@@ -109,11 +109,13 @@ impl DataSection {
         age: u8,
     ) -> Option<NodeOperation> {
         // Adds the relocated account.
-        let first = self.rewards.process(RewardDuty::AddRelocatingNode {
-            old_node_id,
-            new_node_id,
-            age,
-        });
+        let first = self
+            .rewards
+            .process_reward_duty(RewardDuty::AddRelocatingNode {
+                old_node_id,
+                new_node_id,
+                age,
+            });
         let second = self.metadata.trigger_chunk_duplication(new_node_id);
         Some(vec![first, second].into())
     }
@@ -123,7 +125,9 @@ impl DataSection {
     pub fn member_left(&mut self, node_id: XorName, _age: u8) -> Option<NodeOperation> {
         // marks the reward account as
         // awaiting claiming of the counter
-        let first = self.rewards.process(RewardDuty::DeactivateNode(node_id));
+        let first = self
+            .rewards
+            .process_reward_duty(RewardDuty::DeactivateNode(node_id));
         let second = self.metadata.trigger_chunk_duplication(node_id);
         Some(vec![first, second].into())
     }

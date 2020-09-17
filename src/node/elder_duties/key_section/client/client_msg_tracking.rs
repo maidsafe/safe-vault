@@ -53,7 +53,7 @@ impl ClientMsgTracking {
         let mut the_stream = stream;
         let duty = self
             .onboarding
-            .process(handshake, peer_addr, &mut the_stream, rng);
+            .onboard_client(handshake, peer_addr, &mut the_stream, rng);
 
         // client has been onboarded or already exists
         if duty.is_none() {

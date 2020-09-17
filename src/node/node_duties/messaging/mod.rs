@@ -32,7 +32,7 @@ impl Messaging {
         }
     }
 
-    pub async fn process(&mut self, duty: MessagingDuty) -> Option<NodeOperation> {
+    pub async fn process_messaging_duty(&mut self, duty: MessagingDuty) -> Option<NodeOperation> {
         use MessagingDuty::*;
         info!("Sending message: {:?}", duty);
         let result = match duty {

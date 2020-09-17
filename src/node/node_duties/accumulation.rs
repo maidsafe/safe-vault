@@ -30,7 +30,7 @@ impl Accumulation {
         }
     }
 
-    pub(crate) fn process(&mut self, msg: &MsgEnvelope) -> Option<MsgEnvelope> {
+    pub(crate) fn process_message_envelope(&mut self, msg: &MsgEnvelope) -> Option<MsgEnvelope> {
         if self.completed.contains(&msg.id()) {
             info!("Message already processed.");
             return None;

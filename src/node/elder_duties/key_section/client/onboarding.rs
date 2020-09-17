@@ -58,7 +58,7 @@ impl Onboarding {
     //     }
     // }
 
-    pub fn process<G: CryptoRng + Rng>(
+    pub fn onboard_client<G: CryptoRng + Rng>(
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,

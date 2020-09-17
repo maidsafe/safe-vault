@@ -43,7 +43,7 @@ impl NetworkMsgAnalysis {
 
     pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
         let result = if self.should_accumulate(msg) {
-            let msg = self.accumulation.process(msg)?;
+            let msg = self.accumulation.process_message_envelope(msg)?;
             self.evaluate(&msg)?
         } else if let Some(duty) = self.try_messaging(msg) {
             // Identified as an outbound msg, to be sent on the wire.

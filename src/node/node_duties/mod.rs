@@ -86,15 +86,15 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         level
     }
 
-    pub async fn process(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
+    pub async fn process_node_duty(&mut self, duty: NodeDuty) -> Option<NodeOperation> {
         use NodeDuty::*;
         info!("Processing Node Duty: {:?}", duty);
         match duty {
             RegisterWallet(wallet) => self.register_wallet(wallet),
             BecomeAdult => self.become_adult(),
             BecomeElder => self.become_elder(),
-            ProcessMessaging(duty) => self.messaging.process(duty).await,
-            ProcessNetworkEvent(event) => self.network_events.process(event),
+            ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
+            ProcessNetworkEvent(event) => self.network_events.process_network_event(event),
         }
     }
 

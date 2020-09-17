@@ -89,7 +89,7 @@ impl Rewards {
         Some(self.section_funds.transition(to)?.into())
     }
 
-    pub fn process(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
+    pub fn process_reward_duty(&mut self, duty: RewardDuty) -> Option<NodeOperation> {
         use RewardDuty::*;
         let result = match duty {
             AddNewNode(node_id) => self.add_new_node(node_id)?.into(),
