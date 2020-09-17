@@ -60,8 +60,8 @@ xor_name = "1.1.0"
 [dev_dependencies]
 maplit = "1.0.1"
 tempdir = "~0.3.7"
-#safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
-safe_core = { path = "../safe_client_libs" }
+safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
+#safe_core = { path = "../safe_client_libs" }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util", "rt-threaded"] }
 futures = "~0.3.5"
 
