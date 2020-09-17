@@ -93,7 +93,7 @@ impl DataSection {
 
         // Then payout rewards to all the Elders.
         let elders = self.network.our_elder_names().await;
-        self.network.payout_rewards(elders).await
+        self.rewards.payout_rewards(elders).await
     }
 
     /// When a new node joins, it is registered for receiving rewards.

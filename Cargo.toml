@@ -64,7 +64,6 @@ tempdir = "~0.3.7"
 safe_core = { path = "../safe_client_libs" }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util", "rt-threaded"] }
 futures = "~0.3.5"
-file-per-thread-logger = "0.1.4"
 
 [[bin]]
 name = "safe_vault"

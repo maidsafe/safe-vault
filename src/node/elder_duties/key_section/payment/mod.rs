@@ -131,7 +131,7 @@ impl Payments {
         result.map(|c| c.into())
     }
 
-    fn section_account_id(&self) -> Result<PublicKey> {
+    fn section_wallet_id(&self) -> Result<PublicKey> {
         match self.replica.lock().unwrap().replicas_pk_set() {
             Some(keys) => Ok(PublicKey::Bls(keys.public_key())),
             None => Err(Error::NoSuchKey),

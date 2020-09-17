@@ -131,7 +131,6 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
-        let mut event_stream = self.network_api.listen_events().await?;
         let info = self.network_api.our_connection_info().await.unwrap();
         info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {

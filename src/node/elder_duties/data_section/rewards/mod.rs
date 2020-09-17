@@ -110,7 +110,7 @@ impl Rewards {
                 msg_id,
                 origin,
             } => self
-                .get_account_id(old_node_id, new_node_id, msg_id, &origin)
+                .get_wallet_id(old_node_id, new_node_id, msg_id, &origin)
                 .await?
                 .into(),
             ActivateNodeRewards { id, node_id } => {
@@ -150,7 +150,9 @@ impl Rewards {
                 .section_funds
                 .initiate_reward_payout(Payout {
                     to: wallet,
-                    amount: Money::from_nano(self.reward_calc.reward(age)?.as_nano() / age as u64),
+                    amount: Money::from_nano(
+                        self.reward_calc.reward(age).await?.as_nano() / age as u64,
+                    ),
                     node_id,
                 })
                 .await
@@ -266,7 +268,7 @@ impl Rewards {
         self.section_funds
             .initiate_reward_payout(Payout {
                 to: wallet,
-                amount: self.reward_calc.reward(age)?,
+                amount: self.reward_calc.reward(age).await?,
                 node_id,
             })
             .await

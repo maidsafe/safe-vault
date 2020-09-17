@@ -42,15 +42,6 @@ impl Network {
         ))
     }
 
-    pub async fn listen_events(&self) -> Result<EventStream> {
-        self.routing
-            .lock()
-            .unwrap()
-            .listen_events()
-            .await
-            .map_err(Error::Routing)
-    }
-
     pub async fn our_name(&self) -> XorName {
         XorName(self.name().await.0)
     }
