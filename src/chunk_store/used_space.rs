@@ -267,8 +267,76 @@ mod inner {
             let mut contents = Vec::<u8>::new();
             bincode::serialize_into(&mut contents, &local)?;
             record.write_all(&contents).await?;
+            record.sync_all().await?;
 
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::{Init, Result, UsedSpace};
+    use tempdir::TempDir;
+    use unwrap::unwrap;
+
+    const TEST_STORE_MAX_SIZE: u64 = u64::MAX;
+
+    /// creates a temp dir for the root of all stores
+    fn create_temp_root() -> TempDir {
+        unwrap!(TempDir::new(&"temp_store_root"))
+    }
+
+    /// create a temp dir for a store at a given temp store root
+    fn create_temp_store(temp_root: &TempDir) -> TempDir {
+        let path_str = temp_root.path().join(&"temp_store");
+        unwrap!(TempDir::new(unwrap!(path_str.to_str())))
+    }
+
+    #[tokio::test]
+    async fn used_space_multiwriter_test() -> Result<()> {
+        const NUMS_TO_ADD: usize = 128;
+
+        // alloc store
+        let root_dir = create_temp_root();
+        let store_dir = create_temp_store(&root_dir);
+        let used_space = UsedSpace::new(TEST_STORE_MAX_SIZE);
+        let id = used_space.add_local_store(&store_dir, Init::New).await?;
+
+        // get a random vec of u64 by adding u32 (avoid overflow)
+        let mut rng = rand::thread_rng();
+        let bytes = crate::utils::random_vec(&mut rng, std::mem::size_of::<u32>() * NUMS_TO_ADD);
+        let mut nums = Vec::new();
+        for chunk in bytes.as_slice().chunks_exact(std::mem::size_of::<u32>()) {
+            let mut num = 0u32;
+            for (i, component) in chunk.iter().enumerate() {
+                num = num | ((*component as u32) << (i * 8));
+            }
+            nums.push(num as u64);
+        }
+        let total: u64 = nums.iter().sum();
+
+        // check that multiwriter increase is consistent
+        let mut tasks = Vec::new();
+        for n in nums.iter() {
+            tasks.push(used_space.increase(id, *n));
+        }
+        let _ = futures::future::try_join_all(tasks.into_iter()).await?;
+
+        assert_eq!(total, used_space.total().await);
+        assert_eq!(total, used_space.local(id).await);
+
+        // check that multiwriter decrease is consistent
+        let mut tasks = Vec::new();
+        for n in nums.iter() {
+            tasks.push(used_space.decrease(id, *n));
+        }
+        let _ = futures::future::try_join_all(tasks.into_iter()).await?;
+
+        assert_eq!(0, used_space.total().await);
+        assert_eq!(0, used_space.local(id).await);
+
+        Ok(())
     }
 }
