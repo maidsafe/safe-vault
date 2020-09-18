@@ -15,6 +15,7 @@ use self::{
 };
 
 use crate::{
+    capacity::ChunkHolderDbs,
     node::node_ops::{DataSectionDuty, NodeOperation, RewardDuty},
     node::state_db::NodeInfo,
     utils, Network, Result,
@@ -42,11 +43,12 @@ impl DataSection {
     ///
     pub fn new(
         info: &NodeInfo,
+        dbs: ChunkHolderDbs,
         total_used_space: &Rc<Cell<u64>>,
         network: Network,
     ) -> Result<Self> {
         // Metadata
-        let metadata = Metadata::new(info, &total_used_space, network.clone())?;
+        let metadata = Metadata::new(info, dbs, &total_used_space, network.clone())?;
 
         // Rewards
         let keypair = utils::key_pair(network.clone())?;

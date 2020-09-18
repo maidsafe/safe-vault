@@ -57,20 +57,6 @@ pub enum AgeGroup {
     Elder,
 }
 
-/// Specifies whether to try loading cached data from disk, or to just construct a new instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Init {
-    Load,
-    New,
-}
-
-/// Command that the user can send to a running node to control its execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Command {
-    /// Shutdown the vault
-    Shutdown,
-}
-
 /// Info about the node used
 /// to init its various dbs
 /// (among things).
@@ -78,7 +64,7 @@ pub enum Command {
 pub struct NodeInfo {
     pub keys: NodeSigningKeys,
     pub root_dir: PathBuf,
-    pub init_mode: Init,
+    pub init_mode: utils::Init,
     /// Upper limit in bytes for allowed network storage on this node.
     /// An Adult would be using the space for chunks,
     /// while an Elder uses it for metadata.

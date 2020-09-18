@@ -18,6 +18,7 @@ use self::{
     transfers::{replica_manager::ReplicaManager, store::TransferStore, Transfers},
 };
 use crate::{
+    capacity::RateLimit,
     node::node_ops::{KeySectionDuty, NodeOperation},
     node::state_db::NodeInfo,
     Network, Result,
@@ -47,10 +48,10 @@ pub struct KeySection<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> KeySection<R> {
-    pub fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
+    pub fn new(info: &NodeInfo, rate_limit: RateLimit, routing: Network, rng: R) -> Result<Self> {
         let gateway = ClientGateway::new(info, routing.clone(), rng)?;
         let replica_manager = Self::new_replica_manager(info, routing.clone())?;
-        let payments = Payments::new(info.keys.clone(), replica_manager.clone());
+        let payments = Payments::new(info.keys.clone(), rate_limit, replica_manager.clone());
         let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
 

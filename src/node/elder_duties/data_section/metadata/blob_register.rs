@@ -7,13 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    capacity::ChunkHolderDbs,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeMessagingDuty, NodeOperation},
-    node::NodeInfo,
-    utils, Network, Result, ToDbKey,
+    Network, Result, ToDbKey,
 };
 use log::{info, trace, warn};
-use pickledb::PickleDb;
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
     Blob, BlobAddress, BlobRead, BlobWrite, Cmd, CmdError, DataQuery, DebitAgreementProof,
@@ -27,9 +26,6 @@ use std::{
 use tiny_keccak::sha3_256;
 use xor_name::XorName;
 
-const BLOB_META_DB_NAME: &str = "immutable_data.db";
-const HOLDER_META_DB_NAME: &str = "holder_data.db";
-const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 // The number of separate copies of a blob chunk which should be maintained.
 const CHUNK_COPY_COUNT: usize = 4;
 const CHUNK_ADULT_COPY_COUNT: usize = 3;
@@ -47,29 +43,19 @@ struct HolderMetadata {
 
 /// Operations over the data type Blob.
 pub(super) struct BlobRegister {
-    metadata: PickleDb,
-    holders: PickleDb,
-    #[allow(unused)]
-    full_adults: PickleDb,
+    dbs: ChunkHolderDbs,
     routing: Network,
     wrapping: ElderMsgWrapping,
 }
 
 impl BlobRegister {
     pub(super) fn new(
-        node_info: &NodeInfo,
+        dbs: ChunkHolderDbs,
         wrapping: ElderMsgWrapping,
         routing: Network,
     ) -> Result<Self> {
-        let metadata = utils::new_db(node_info.path(), BLOB_META_DB_NAME, node_info.init_mode)?;
-        let holders = utils::new_db(node_info.path(), HOLDER_META_DB_NAME, node_info.init_mode)?;
-        let full_adults =
-            utils::new_db(node_info.path(), FULL_ADULTS_DB_NAME, node_info.init_mode)?;
-
         Ok(Self {
-            metadata,
-            holders,
-            full_adults,
+            dbs,
             routing,
             wrapping,
         })
@@ -230,7 +216,7 @@ impl BlobRegister {
 
         let _ = metadata.holders.insert(holder);
 
-        if let Err(error) = self.metadata.set(&db_key, &metadata) {
+        if let Err(error) = self.dbs.metadata.borrow_mut().set(&db_key, &metadata) {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
             return Err(error.into());
         }
@@ -239,7 +225,12 @@ impl BlobRegister {
         let mut holders_metadata = self.get_holder(holder).unwrap_or_default();
         let _ = holders_metadata.chunks.insert(blob_address);
 
-        if let Err(error) = self.holders.set(&holder.to_db_key(), &holders_metadata) {
+        if let Err(error) = self
+            .dbs
+            .holders
+            .borrow_mut()
+            .set(&holder.to_db_key(), &holders_metadata)
+        {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
             return Err(error.into());
         }
@@ -260,13 +251,19 @@ impl BlobRegister {
             if let Ok(mut holder) = holder {
                 let _ = holder.chunks.remove(&blob_address);
                 if holder.chunks.is_empty() {
-                    if let Err(error) = self.holders.rem(&holder_name.to_db_key()) {
+                    if let Err(error) = self.dbs.holders.borrow_mut().rem(&holder_name.to_db_key())
+                    {
                         warn!(
                             "{}: Failed to delete holder metadata from DB: {:?}",
                             self, error
                         );
                     }
-                } else if let Err(error) = self.holders.set(&holder_name.to_db_key(), &holder) {
+                } else if let Err(error) = self
+                    .dbs
+                    .holders
+                    .borrow_mut()
+                    .set(&holder_name.to_db_key(), &holder)
+                {
                     warn!(
                         "{}: Failed to write holder metadata to DB: {:?}",
                         self, error
@@ -277,13 +274,13 @@ impl BlobRegister {
             // Remove the holder from the chunk metadata
             let _ = metadata.holders.remove(&holder_name);
             if metadata.holders.is_empty() {
-                if let Err(error) = self.metadata.rem(&db_key) {
+                if let Err(error) = self.dbs.metadata.borrow_mut().rem(&db_key) {
                     warn!(
                         "{}: Failed to delete chunk metadata from DB: {:?}",
                         self, error
                     );
                 }
-            } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
+            } else if let Err(error) = self.dbs.metadata.borrow_mut().set(&db_key, &metadata) {
                 warn!(
                     "{}: Failed to write chunk metadata to DB: {:?}",
                     self, error
@@ -397,12 +394,22 @@ impl BlobRegister {
     ) -> Option<NodeMessagingDuty> {
         let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
         let _ = chunk_metadata.holders.insert(holder);
-        if let Err(error) = self.metadata.set(&address.to_db_key(), &chunk_metadata) {
+        if let Err(error) = self
+            .dbs
+            .metadata
+            .borrow_mut()
+            .set(&address.to_db_key(), &chunk_metadata)
+        {
             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
         }
         let mut holders_metadata = self.get_holder(holder).unwrap_or_default();
         let _ = holders_metadata.chunks.insert(address);
-        if let Err(error) = self.holders.set(&holder.to_db_key(), &holders_metadata) {
+        if let Err(error) = self
+            .dbs
+            .holders
+            .borrow_mut()
+            .set(&holder.to_db_key(), &holders_metadata)
+        {
             warn!(
                 "{}: Failed to write holder metadata to DB: {:?}",
                 self, error
@@ -434,10 +441,12 @@ impl BlobRegister {
                     let _ = blob_addresses.insert(chunk_address, metadata.holders.clone());
 
                     if metadata.holders.is_empty() {
-                        if let Err(error) = self.metadata.rem(&db_key) {
+                        if let Err(error) = self.dbs.metadata.borrow_mut().rem(&db_key) {
                             warn!("{}: Failed to write metadata to DB: {:?}", self, error);
                         }
-                    } else if let Err(error) = self.metadata.set(&db_key, &metadata) {
+                    } else if let Err(error) =
+                        self.dbs.metadata.borrow_mut().set(&db_key, &metadata)
+                    {
                         warn!("{}: Failed to write metadata to DB: {:?}", self, error);
                     }
                 }
@@ -445,7 +454,7 @@ impl BlobRegister {
         }
 
         // Since the node has left the section, remove it from the holders DB
-        if let Err(error) = self.holders.rem(&node.to_db_key()) {
+        if let Err(error) = self.dbs.holders.borrow_mut().rem(&node.to_db_key()) {
             warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
         };
 
@@ -453,7 +462,12 @@ impl BlobRegister {
     }
 
     fn get_holder(&self, holder: XorName) -> NdResult<HolderMetadata> {
-        match self.holders.get::<HolderMetadata>(&holder.to_db_key()) {
+        match self
+            .dbs
+            .holders
+            .borrow()
+            .get::<HolderMetadata>(&holder.to_db_key())
+        {
             Some(metadata) => {
                 if metadata.chunks.is_empty() {
                     warn!("{}: is not responsible for any chunk", holder);
@@ -470,7 +484,12 @@ impl BlobRegister {
     }
 
     fn get_metadata_for(&self, address: BlobAddress) -> NdResult<ChunkMetadata> {
-        match self.metadata.get::<ChunkMetadata>(&address.to_db_key()) {
+        match self
+            .dbs
+            .metadata
+            .borrow()
+            .get::<ChunkMetadata>(&address.to_db_key())
+        {
             Some(metadata) => {
                 if metadata.holders.is_empty() {
                     warn!("{}: Metadata holders is empty for: {:?}", self, address);

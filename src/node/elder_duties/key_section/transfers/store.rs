@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::state_db::Init, to_db_key::from_db_key, utils, Error, Result, ToDbKey};
+use crate::{to_db_key::from_db_key, utils, utils::Init, Error, Result, ToDbKey};
 use pickledb::PickleDb;
 use sn_data_types::{PublicKey, ReplicaEvent};
 use std::{collections::BTreeSet, path::Path};

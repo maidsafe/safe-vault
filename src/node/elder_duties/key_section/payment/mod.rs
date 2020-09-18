@@ -8,14 +8,14 @@
 
 use super::transfers::replica_manager::ReplicaManager;
 use crate::{
+    capacity::RateLimit,
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeOperation, PaymentDuty},
     utils,
 };
 use sn_data_types::{
-    Cmd, CmdError, ElderDuties, Error, Message, Money, MsgEnvelope, PublicKey, Result,
-    TransferError,
+    Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
 };
 use std::{
     cell::{RefCell, RefMut},
@@ -33,13 +33,22 @@ use std::{
 /// (where it is then handled by Elders with Metadata duties).
 pub struct Payments {
     replica: Rc<RefCell<ReplicaManager>>,
+    rate_limit: RateLimit,
     wrapping: ElderMsgWrapping,
 }
 
 impl Payments {
-    pub fn new(keys: NodeSigningKeys, replica: Rc<RefCell<ReplicaManager>>) -> Self {
+    pub fn new(
+        keys: NodeSigningKeys,
+        rate_limit: RateLimit,
+        replica: Rc<RefCell<ReplicaManager>>,
+    ) -> Self {
         let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Payment);
-        Self { replica, wrapping }
+        Self {
+            replica,
+            rate_limit,
+            wrapping,
+        }
     }
 
     // The code in this method is a bit messy, needs to be cleaned up.
@@ -94,7 +103,7 @@ impl Payments {
                 // serializing the write and counting the num bytes,
                 // so you are forced to do the job properly.
                 // This prevents spam of the network.
-                let total_cost = Money::from_nano(num_bytes);
+                let total_cost = self.rate_limit.from(num_bytes)?;
                 if total_cost > payment.amount() {
                     // todo, better error, like `TooLowPayment`
                     return self

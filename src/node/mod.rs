@@ -15,7 +15,6 @@ mod msg_wrapping;
 mod node_duties;
 mod node_ops;
 
-pub use crate::node::state_db::{Command, Init};
 use crate::{
     node::{
         keys::NodeSigningKeys,
@@ -23,6 +22,7 @@ use crate::{
         node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup, NodeInfo},
     },
+    utils::Init,
     Config, Network, Result,
 };
 use bls::SecretKey;

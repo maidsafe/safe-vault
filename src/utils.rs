@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::state_db::Init, Network, Result};
+use crate::{Network, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use bytes::Bytes;
 use log::{error, trace};
@@ -16,6 +16,13 @@ use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{BlsKeypairShare, Keypair};
 use std::{fs, path::Path};
 use unwrap::unwrap;
+
+/// Specifies whether to try loading cached data from disk, or to just construct a new instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Init {
+    Load,
+    New,
+}
 
 pub(crate) fn new_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
@@ -66,4 +73,11 @@ pub(crate) fn key_pair(routing: Network) -> Result<Keypair> {
         public,
         public_key_set,
     }))
+}
+
+/// Command that the user can send to a running node to control its execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Command {
+    /// Shutdown the vault
+    Shutdown,
 }

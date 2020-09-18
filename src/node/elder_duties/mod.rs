@@ -11,6 +11,7 @@ mod key_section;
 
 use self::{data_section::DataSection, key_section::KeySection};
 use crate::{
+    capacity::{Capacity, ChunkHolderDbs, RateLimit},
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
     Error, Network, Result,
@@ -36,12 +37,14 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     pub fn new(
         info: &NodeInfo,
         total_used_space: &Rc<Cell<u64>>,
-        routing: Network,
+        network: Network,
         rng: R,
     ) -> Result<Self> {
-        let prefix = routing.our_prefix().ok_or(Error::Logic)?;
-        let key_section = KeySection::new(info, routing.clone(), rng)?;
-        let data_section = DataSection::new(info, total_used_space, routing)?;
+        let prefix = network.our_prefix().ok_or(Error::Logic)?;
+        let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
+        let rate_limit = RateLimit::new(network.clone(), Capacity::new(dbs.clone()));
+        let key_section = KeySection::new(info, rate_limit, network.clone(), rng)?;
+        let data_section = DataSection::new(info, dbs, total_used_space, network)?;
         Ok(Self {
             prefix,
             key_section,

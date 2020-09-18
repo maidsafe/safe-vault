@@ -18,7 +18,7 @@ mod sequence;
 mod tests;
 mod used_space;
 
-use crate::{node::state_db::Init, utils};
+use crate::{utils, utils::Init};
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
 use log::trace;

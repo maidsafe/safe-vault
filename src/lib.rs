@@ -29,6 +29,7 @@
 // For quick_error
 #![recursion_limit = "128"]
 
+mod capacity;
 mod chunk_store;
 mod config_handler;
 mod error;
@@ -47,5 +48,6 @@ pub use crate::{
     config_handler::{write_connection_info, Config},
     error::{Error, Result},
     network::Network,
-    node::{state_db::Command, Node},
+    node::Node,
+    utils::Command,
 };
