@@ -64,7 +64,10 @@ impl DataSection {
         })
     }
 
-    pub async fn process_data_section_duty(&mut self, duty: DataSectionDuty) -> Option<NodeOperation> {
+    pub async fn process_data_section_duty(
+        &mut self,
+        duty: DataSectionDuty,
+    ) -> Option<NodeOperation> {
         use DataSectionDuty::*;
         match duty {
             RunAsMetadata(duty) => self.metadata.process_metadata_duty(duty).await,
@@ -98,7 +101,9 @@ impl DataSection {
 
     /// When a new node joins, it is registered for receiving rewards.
     pub async fn new_node_joined(&mut self, id: XorName) -> Option<NodeOperation> {
-        self.rewards.process_reward_duty(RewardDuty::AddNewNode(id)).await
+        self.rewards
+            .process_reward_duty(RewardDuty::AddNewNode(id))
+            .await
     }
 
     /// When a relocated node joins, a DataSection
@@ -117,7 +122,8 @@ impl DataSection {
                 old_node_id,
                 new_node_id,
                 age,
-            }).await;
+            })
+            .await;
         let second = self.metadata.trigger_chunk_duplication(new_node_id).await;
         Some(vec![first, second].into())
     }
@@ -129,7 +135,8 @@ impl DataSection {
         // awaiting claiming of the counter
         let first = self
             .rewards
-            .process_reward_duty(RewardDuty::DeactivateNode(node_id)).await;
+            .process_reward_duty(RewardDuty::DeactivateNode(node_id))
+            .await;
         let second = self.metadata.trigger_chunk_duplication(node_id).await;
         Some(vec![first, second].into())
     }

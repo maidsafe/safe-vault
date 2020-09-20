@@ -41,11 +41,14 @@ impl NetworkMsgAnalysis {
         self.self_is_handler_for(&msg.destination().xorname()).await
     }
 
-    pub fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
-        let result = if self.should_accumulate(msg).await {
-            let msg = self.accumulation.process_message_envelope(msg)?;
-            self.evaluate(&msg)?
-        } else if let Some(duty) = self.try_messaging(msg).await {
+    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+        let msg = if self.should_accumulate(msg).await {
+            self.accumulation.process_message_envelope(msg)?
+        } else {
+            msg.clone() // TODO remove this clone
+        };
+
+        let result = if let Some(duty) = self.try_messaging(&msg).await {
             // Identified as an outbound msg, to be sent on the wire.
             duty.into()
         } else if let Some(duty) = self.try_client_entry(&msg).await {

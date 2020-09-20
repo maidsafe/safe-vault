@@ -101,7 +101,7 @@ impl Payments {
                 // serializing the write and counting the num bytes,
                 // so you are forced to do the job properly.
                 // This prevents spam of the network.
-                let total_cost = self.rate_limit.from(num_bytes)?;
+                let total_cost = self.rate_limit.from(num_bytes).await?;
                 if total_cost > payment.amount() {
                     // todo, better error, like `TooLowPayment`
                     return self

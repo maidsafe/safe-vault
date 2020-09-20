@@ -37,7 +37,10 @@ pub struct ClientGateway<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> ClientGateway<R> {
     pub async fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
-        let onboarding = Onboarding::new(info.public_key().await.ok_or(Error::Logic)?, routing.clone());
+        let onboarding = Onboarding::new(
+            info.public_key().await.ok_or(Error::Logic)?,
+            routing.clone(),
+        );
         let client_msg_handling = ClientMsgHandling::new(onboarding);
 
         let gateway = Self {
@@ -52,7 +55,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
     pub async fn process_as_gateway(&mut self, cmd: GatewayDuty) -> Option<NodeOperation> {
         use GatewayDuty::*;
         match cmd {
-            FindClientFor(msg) => self.try_find_client(msg).await.map(|c| c.into()),
+            FindClientFor(msg) => self.try_find_client(&msg).await.map(|c| c.into()),
             ProcessClientEvent(event) => self.process_client_event(event).await,
         }
     }
@@ -85,6 +88,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                     match self
                         .client_msg_handling
                         .track_incoming(&msg.message, src, send)
+                        .await
                     {
                         Some(c) => Some(c.into()),
                         None => Some(KeySectionDuty::EvaluateClientMsg(msg).into()),
@@ -94,7 +98,8 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                     let mut rng = ChaChaRng::from_seed(self.rng.gen());
                     let _ = self
                         .client_msg_handling
-                        .process_handshake(hs, src, send, &mut rng).await;
+                        .process_handshake(hs, src, send, &mut rng)
+                        .await;
 
                     None
                 }

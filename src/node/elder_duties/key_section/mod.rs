@@ -49,7 +49,12 @@ pub struct KeySection<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> KeySection<R> {
-    pub async fn new(info: &NodeInfo, rate_limit: RateLimit, routing: Network, rng: R) -> Result<Self> {
+    pub async fn new(
+        info: &NodeInfo,
+        rate_limit: RateLimit,
+        routing: Network,
+        rng: R,
+    ) -> Result<Self> {
         let gateway = ClientGateway::new(info, routing.clone(), rng).await?;
         let replica_manager = Self::new_replica_manager(info, routing.clone()).await?;
         let payments = Payments::new(info.keys.clone(), rate_limit, replica_manager.clone());
@@ -115,7 +120,10 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         None
     }
 
-    pub async fn process_key_section_duty(&mut self, duty: KeySectionDuty) -> Option<NodeOperation> {
+    pub async fn process_key_section_duty(
+        &mut self,
+        duty: KeySectionDuty,
+    ) -> Option<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {

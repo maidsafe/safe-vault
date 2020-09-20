@@ -8,7 +8,7 @@
 
 //! Utilities
 
-use crate::{config_handler::Config, node::state_db::Init, Network, Result};
+use crate::{config_handler::Config, Network, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use bytes::Bytes;
 use log::{error, trace};
@@ -101,4 +101,11 @@ pub fn init_logging(config: &Config) {
     async_log::Logger::wrap(logger, || 5433)
         .start(config.verbose().to_level_filter())
         .unwrap_or(());
+}
+
+/// Command that the user can send to a running node to control its execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Command {
+    /// Shutdown the vault
+    Shutdown,
 }

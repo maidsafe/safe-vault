@@ -18,7 +18,10 @@ use sn_data_types::{
     SequenceRead,
 };
 
-pub(super) async fn get_result(msg: MsgEnvelope, stores: &ElderStores) -> Option<NodeMessagingDuty> {
+pub(super) async fn get_result(
+    msg: MsgEnvelope,
+    stores: &ElderStores,
+) -> Option<NodeMessagingDuty> {
     use DataQuery::*;
     let msg_id = msg.id();
     let origin = msg.origin;

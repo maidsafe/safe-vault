@@ -26,8 +26,8 @@ impl RateLimit {
 
     /// Calculates the rate limit of write operations,
     /// as a cost to be paid for a certain number of bytes.
-    pub fn from(&self, bytes: u64) -> Option<Money> {
-        let prefix = self.network.our_prefix()?;
+    pub async fn from(&self, bytes: u64) -> Option<Money> {
+        let prefix = self.network.our_prefix().await?;
         let prefix_len = prefix.bit_count();
         let section_supply_share = MAX_SUPPLY as f64 / 2_f64.powf(prefix_len as f64);
 

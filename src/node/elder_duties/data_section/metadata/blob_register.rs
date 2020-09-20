@@ -84,15 +84,14 @@ impl BlobRegister {
         payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
     ) -> Option<NodeMessagingDuty> {
-        
-        fn cmd_error(error: NdError) {
-            self.wrapping.send(Message::CmdError {
-                error: CmdError::Data(error),
-                id: MessageId::new(),
-                cmd_origin: origin.address(),
-                correlation_id: msg_id,
-            })
-        };
+        // fn cmd_error(error: NdError) {
+        //     self.wrapping.send(Message::CmdError {
+        //         error: CmdError::Data(error),
+        //         id: MessageId::new(),
+        //         cmd_origin: origin.address(),
+        //         correlation_id: msg_id,
+        //     })
+        // };
 
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.

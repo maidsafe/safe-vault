@@ -74,7 +74,9 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
             }
             ProcessElderChange { prefix, .. } => self.elders_changed(prefix).await,
             RunAsKeySection(the_key_duty) => {
-                self.key_section.process_key_section_duty(the_key_duty).await
+                self.key_section
+                    .process_key_section_duty(the_key_duty)
+                    .await
             }
             RunAsDataSection(duty) => self.data_section.process_data_section_duty(duty).await,
         }

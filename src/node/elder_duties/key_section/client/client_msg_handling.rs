@@ -44,7 +44,7 @@ impl ClientMsgHandling {
         self.onboarding.get_public_key(peer_addr)
     }
 
-    pub fn process_handshake<G: CryptoRng + Rng>(
+    pub async fn process_handshake<G: CryptoRng + Rng>(
         &mut self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
@@ -54,7 +54,8 @@ impl ClientMsgHandling {
         let mut the_stream = stream;
         let result = self
             .onboarding
-            .onboard_client(handshake, peer_addr, &mut the_stream, rng);
+            .onboard_client(handshake, peer_addr, &mut the_stream, rng)
+            .await;
 
         // client has been onboarded or already exists
         if result.is_ok() {
@@ -85,7 +86,7 @@ impl ClientMsgHandling {
     // }
 
     ///
-    pub fn track_incoming(
+    pub async fn track_incoming(
         &mut self,
         msg: &Message,
         client_address: SocketAddr,
@@ -98,7 +99,7 @@ impl ClientMsgHandling {
         if let Some(msg) = self.tracked_outgoing.remove(&msg_id) {
             warn!("Tracking incoming: Prior group decision on msg found.");
 
-            self.match_outgoing(&msg);
+            self.match_outgoing(&msg).await;
         }
 
         if let Entry::Vacant(ve) = self.tracked_incoming.entry(msg_id) {
@@ -113,7 +114,7 @@ impl ClientMsgHandling {
         }
     }
 
-    pub fn match_outgoing(&mut self, msg: &MsgEnvelope) -> Result<()> {
+    pub async fn match_outgoing(&mut self, msg: &MsgEnvelope) -> Result<()> {
         match msg.destination() {
             Address::Client { .. } => (),
             _ => {
@@ -147,7 +148,7 @@ impl ClientMsgHandling {
             Some((peer_addr, mut stream)) => {
                 if is_query_response {
                     trace!("Sending QueryResponse on request's stream");
-                    send_message_on_stream(&msg, &mut stream)
+                    send_message_on_stream(&msg, &mut stream).await
                 } else {
                     trace!("Attempting to use bootstrap stream");
                     if let Some(pk) = self.get_public_key(peer_addr) {
@@ -157,7 +158,7 @@ impl ClientMsgHandling {
                             let mut used_streams = vec![];
                             for mut stream in streams {
                                 // send to each registered stream for that PK
-                                send_message_on_stream(&msg, &mut stream);
+                                send_message_on_stream(&msg, &mut stream).await;
                                 used_streams.push(stream);
                             }
 
@@ -184,11 +185,11 @@ impl ClientMsgHandling {
     }
 }
 
-fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) {
+async fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) {
     trace!("Senging message on stream");
     let bytes = utils::serialise(message);
 
-    let res = futures::executor::block_on(stream.send(bytes));
+    let res = stream.send(bytes).await;
 
     match res {
         Ok(()) => info!("Message sent successfully to client via stream"),

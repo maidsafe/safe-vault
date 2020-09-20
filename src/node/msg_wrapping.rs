@@ -52,7 +52,7 @@ impl NodeMsgWrapping {
     }
 
     pub async fn send(&self, message: Message) -> Option<NodeMessagingDuty> {
-        self.inner.send(message)
+        self.inner.send(message).await
     }
 }
 
@@ -82,7 +82,7 @@ impl ElderMsgWrapping {
         Self { inner }
     }
 
-    pub fn forward(&self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
+    pub async fn forward(&self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         let msg = self.inner.set_proxy(&msg).await;
         Some(NodeMessagingDuty::SendToSection(msg))
     }
@@ -130,7 +130,7 @@ impl MsgWrapping {
         msg: &MsgEnvelope,
     ) -> Option<NodeMessagingDuty> {
         let msg = self.set_proxy(&msg).await;
-        Some(MessagingDuty::SendToAdults { targets, msg })
+        Some(NodeMessagingDuty::SendToAdults { targets, msg })
     }
 
     pub async fn error(

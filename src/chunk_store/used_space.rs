@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::error::{Error, Result};
-// use crate::utils::Init;
-use crate::node::state_db::Init;
+use crate::utils::Init;
+// use crate::node::Init;
 use std::sync::{Arc, Mutex};
 use std::{
     fs::{File, OpenOptions},
