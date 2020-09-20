@@ -20,12 +20,12 @@ use std::io::Write;
 use std::{fs, path::Path};
 use unwrap::unwrap;
 
-const VAULT_MODULE_NAME: &str = "safe_vault";
-
 /// Specifies whether to try loading cached data from disk, or to just construct a new instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Init {
+    /// Load cached data from disk
     Load,
+    /// Start a new cache instance
     New,
 }
 

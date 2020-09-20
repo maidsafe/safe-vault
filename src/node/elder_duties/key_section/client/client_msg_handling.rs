@@ -61,7 +61,7 @@ impl ClientMsgHandling {
         if result.is_ok() {
             if let Some(pk) = self.get_public_key(peer_addr) {
                 let mut updated_streams = vec![];
-                let pk = pk.clone();
+                let pk = *pk;
 
                 // let's append to any existing known streams for this PK
                 if let Some(current_streams_for_pk) = self.notification_streams.remove(&pk) {
@@ -99,7 +99,7 @@ impl ClientMsgHandling {
         if let Some(msg) = self.tracked_outgoing.remove(&msg_id) {
             warn!("Tracking incoming: Prior group decision on msg found.");
 
-            self.match_outgoing(&msg).await;
+            let _ = self.match_outgoing(&msg).await;
         }
 
         if let Entry::Vacant(ve) = self.tracked_incoming.entry(msg_id) {
@@ -152,7 +152,7 @@ impl ClientMsgHandling {
                 } else {
                     trace!("Attempting to use bootstrap stream");
                     if let Some(pk) = self.get_public_key(peer_addr) {
-                        let pk = pk.clone();
+                        let pk = *pk;
                         // get the streams and ownership
                         if let Some(streams) = self.notification_streams.remove(&pk) {
                             let mut used_streams = vec![];
