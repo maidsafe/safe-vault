@@ -88,9 +88,13 @@ pub(crate) async fn key_pair(routing: Network) -> Result<Keypair> {
 pub fn init_logging(config: &Config) {
     // Custom formatter for logs
     let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
+        let handle = std::thread::current();
         write!(
             writer,
-            "{} {} [{}:{}] {}",
+            "[{}] {} {} [{}:{}] {}",
+            handle
+                .name()
+                .unwrap_or(&format!("Thread-{:?}", handle.id())),
             record.level(),
             clock.now().to_rfc3339(),
             record.file().unwrap_or_default(),
