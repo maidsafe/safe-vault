@@ -156,14 +156,13 @@ impl<R: CryptoRng + Rng> Node<R> {
             next_op = match op {
                 Single(operation) => self.process(operation).await,
                 Multiple(ops) => {
-                    let mut node_op = None;
+                    let mut node_ops = Vec::new();
                     for c in ops.into_iter() {
                         if let Some(op) = self.process(c).await {
-                            node_op = op;
-                            break;
+                            node_ops.push(op);
                         }
                     }
-                    Some(node_op)
+                    Some(node_ops.into())
                 }
                 None => break,
             }
