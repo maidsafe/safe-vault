@@ -809,11 +809,8 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
 dependencies = [
- "atty",
- "humantime",
  "log",
  "regex",
- "termcolor",
 ]
 
 [[package]]
@@ -2353,7 +2350,6 @@ dependencies = [
  "directories 2.0.2",
  "ed25519",
  "ed25519-dalek",
- "env_logger 0.7.1",
  "flexi_logger",
  "futures",
  "fxhash",

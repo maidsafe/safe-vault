@@ -11,6 +11,8 @@
 use crate::{config_handler::Config, Network, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use bytes::Bytes;
+use flexi_logger::{DeferredNow, Logger};
+use log::Record;
 use log::{error, trace};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
@@ -19,6 +21,8 @@ use sn_data_types::{BlsKeypairShare, Keypair};
 use std::io::Write;
 use std::{fs, path::Path};
 use unwrap::unwrap;
+
+const VAULT_MODULE_NAME: &str = "safe_vault";
 
 /// Specifies whether to try loading cached data from disk, or to just construct a new instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,25 +86,38 @@ pub(crate) async fn key_pair(routing: Network) -> Result<Keypair> {
 
 /// Initialize logging
 pub fn init_logging(config: &Config) {
-    let logger = env_logger::Builder::from_default_env()
-        .format(|buf, record| {
-            let style = buf.default_level_style(record.level());
-            let handle = std::thread::current();
-            writeln!(
-                buf,
-                "[{:?} {} {}:{:?}] {}",
-                handle.name().unwrap_or(""),
-                style.value(record.level()),
-                record.file().unwrap_or(""),
-                record.line().unwrap_or(0),
-                record.args()
-            )
-        })
-        .build();
+    // Custom formatter for logs
+    let do_format = move |writer: &mut dyn Write, clock: &mut DeferredNow, record: &Record| {
+        write!(
+            writer,
+            "{} {} [{}:{}] {}",
+            record.level(),
+            clock.now().to_rfc3339(),
+            record.file().unwrap_or_default(),
+            record.line().unwrap_or_default(),
+            record.args()
+        )
+    };
 
-    async_log::Logger::wrap(logger, || 5433)
-        .start(config.verbose().to_level_filter())
-        .unwrap_or(());
+    let level_filter = config.verbose().to_level_filter();
+    let module_log_filter = format!("{}={}", VAULT_MODULE_NAME, level_filter.to_string());
+    let logger = Logger::with_env_or_str(module_log_filter)
+        .format(do_format)
+        .suppress_timestamp();
+
+    let _ = if let Some(log_dir) = config.log_dir() {
+        logger.log_to_file().directory(log_dir)
+    } else {
+        logger
+    }
+    .start()
+    .map(|_| ())
+    .unwrap_or(());
+
+    // FIXME
+    // async_log::Logger::wrap(logger, || 5433)
+    //     .start(config.verbose().to_level_filter())
+    //     .unwrap_or(());
 }
 
 /// Command that the user can send to a running node to control its execution.
