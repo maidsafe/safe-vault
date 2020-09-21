@@ -17,6 +17,7 @@ use crate::node::{
     msg_wrapping::NodeMsgWrapping,
     node_duties::messaging::Messaging,
     node_ops::{NodeDuty, NodeOperation},
+    startup::Startup,
     state_db::NodeInfo,
 };
 use crate::Network;
@@ -44,21 +45,23 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
     duty_level: DutyLevel<R>,
     network_events: NetworkEvents,
     messaging: Messaging,
-    routing: Network,
+    network_api: Network,
     rng: Option<R>,
 }
 
 impl<R: CryptoRng + Rng> NodeDuties<R> {
-    pub fn new(node_info: NodeInfo, routing: Network, rng: R) -> Self {
-        let network_events = NetworkEvents::new(NetworkMsgAnalysis::new(routing.clone()));
+    pub fn new(node_info: NodeInfo, network_api: Network, rng: R) -> Self {
+        let startup = Startup::new(node_info.reward_key, network_api.clone());
+        let msg_analysis = NetworkMsgAnalysis::new(network_api.clone());
+        let network_events = NetworkEvents::new(startup, msg_analysis);
 
-        let messaging = Messaging::new(routing.clone());
+        let messaging = Messaging::new(network_api.clone());
         Self {
             node_info,
             duty_level: DutyLevel::Infant,
             network_events,
             messaging,
-            routing,
+            network_api,
             rng: Some(rng),
         }
     }
@@ -140,7 +143,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         if let Ok(duties) = ElderDuties::new(
             &self.node_info,
             &total_used_space,
-            self.routing.clone(),
+            self.network_api.clone(),
             self.rng.take()?,
         )
         .await

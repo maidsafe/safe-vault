@@ -14,6 +14,7 @@ mod keys;
 mod msg_wrapping;
 mod node_duties;
 mod node_ops;
+mod startup;
 
 use crate::{
     node::{
@@ -77,6 +78,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             /// An Adult would be using the space for chunks,
             /// while an Elder uses it for metadata.
             max_storage_capacity: config.max_capacity(),
+            reward_key,
         };
 
         let mut duties = NodeDuties::new(node_info, network_api.clone(), rng);
@@ -96,23 +98,13 @@ impl<R: CryptoRng + Rng> Node<R> {
             }
         };
 
-        let mut node = Self {
+        let node = Self {
             duties,
             network_api,
             network_events,
         };
 
-        node.register(reward_key).await;
-
         Ok(node)
-    }
-
-    async fn register(&mut self, reward_key: PublicKey) {
-        let result = self
-            .duties
-            .process_node_duty(NodeDuty::RegisterWallet(reward_key))
-            .await;
-        self.process_while_any(result).await
     }
 
     /// Returns our connection info.

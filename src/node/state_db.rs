@@ -69,6 +69,7 @@ pub struct NodeInfo {
     /// An Adult would be using the space for chunks,
     /// while an Elder uses it for metadata.
     pub max_storage_capacity: u64,
+    pub reward_key: sn_data_types::PublicKey,
 }
 
 impl NodeInfo {

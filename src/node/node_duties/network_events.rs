@@ -8,6 +8,7 @@
 
 use super::msg_analysis::NetworkMsgAnalysis;
 use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
+use crate::node::startup::Startup;
 use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
@@ -18,12 +19,13 @@ use xor_name::XorName;
 /// Maps events from the transport layer
 /// into domain messages for the various modules.
 pub struct NetworkEvents {
+    startup: Startup,
     analysis: NetworkMsgAnalysis,
 }
 
 impl NetworkEvents {
-    pub fn new(analysis: NetworkMsgAnalysis) -> Self {
-        Self { analysis }
+    pub fn new(startup: Startup, analysis: NetworkMsgAnalysis) -> Self {
+        Self { startup, analysis }
     }
 
     pub async fn process_network_event(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
@@ -71,7 +73,7 @@ impl NetworkEvents {
             }
             RoutingEvent::Connected(_) => {
                 info!("Node connected.");
-                None
+                self.startup.init().await
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
                 info!(
