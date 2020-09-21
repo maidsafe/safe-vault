@@ -107,16 +107,20 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
 
     ///
     async fn elders_changed(&mut self, prefix: Prefix) -> Option<NodeOperation> {
-        let mut ops = vec![
-            self.key_section.elders_changed().await,
-            self.data_section.elders_changed().await,
-        ];
-
+        let mut ops = Vec::new();
+        if let Some(op) = self.key_section.elders_changed().await {
+            ops.push(op)
+        };
+        if let Some(op) = self.data_section.elders_changed().await {
+            ops.push(op)
+        };
         if prefix != self.prefix {
-            // section has split!
-            self.prefix = prefix;
-            ops.push(self.key_section.section_split(prefix).await);
-            ops.push(self.data_section.section_split(prefix).await);
+            if let Some(op) = self.key_section.section_split(prefix).await {
+                ops.push(op)
+            };
+            if let Some(op) = self.data_section.section_split(prefix).await {
+                ops.push(op)
+            };
         }
 
         Some(ops.into())

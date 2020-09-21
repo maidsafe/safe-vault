@@ -84,6 +84,22 @@ impl Chunks {
     }
 }
 
+async fn put(
+    used_space: &Arc<Mutex<u64>>,
+    chunk_store: &mut ChunkStore<Data>,
+    chunks: &Chunks,
+    data: &Data,
+    size: u64,
+) {
+    let used_space_before = used_space.lock().await;
+    assert!(!chunk_store.has(&data.id));
+    unwrap!(chunk_store.put(data).await);
+    let used_space_after = used_space.lock().await;
+    assert_eq!(*used_space_after, *used_space_before + size);
+    assert!(chunk_store.has(&data.id));
+    assert!(*used_space_after <= chunks.total_size);
+}
+
 #[tokio::test]
 async fn successful_put() {
     let mut rng = new_rng();
@@ -98,24 +114,18 @@ async fn successful_put() {
         Init::New
     ));
 
-    let mut put = |data: &Data, size| {
-        let used_space_before = used_space.lock().await;
-        assert!(!chunk_store.has(&data.id));
-        unwrap!(chunk_store.put(data));
-        let used_space_after = used_space.lock().await;
-        assert_eq!(*used_space_after, *used_space_before + size);
-        assert!(chunk_store.has(&data.id));
-        assert!(*used_space_after <= chunks.total_size);
-    };
-
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         put(
+            &used_space,
+            &mut chunk_store,
+            &chunks,
             &Data {
                 id: Id(index as u64),
                 value: data.clone(),
             },
-            size,
-        );
+            *size,
+        )
+        .await;
     }
     assert_eq!(*used_space.lock().await, chunks.total_size);
 
@@ -150,10 +160,24 @@ async fn failed_put_when_not_enough_space() {
             .collect(),
     };
 
-    match chunk_store.put(&data) {
+    match chunk_store.put(&data).await {
         Err(Error::NotEnoughSpace) => (),
         x => panic!("Unexpected: {:?}", x),
     }
+}
+
+async fn put_and_delete(
+    chunk_store: &mut ChunkStore<Data>,
+    used_space: &Arc<Mutex<u64>>,
+    data: &Data,
+    size: u64,
+) {
+    unwrap!(chunk_store.put(data).await);
+    assert_eq!(*used_space.lock().await, size);
+    assert!(chunk_store.has(&data.id));
+    unwrap!(chunk_store.delete(&data.id).await);
+    assert!(!chunk_store.has(&data.id));
+    assert_eq!(*used_space.lock().await, 0);
 }
 
 #[tokio::test]
@@ -170,23 +194,17 @@ async fn delete() {
         Init::New
     ));
 
-    let mut put_and_delete = |data: &Data, size| {
-        unwrap!(chunk_store.put(data).await);
-        assert_eq!(*used_space.lock().await, size);
-        assert!(chunk_store.has(&data.id));
-        unwrap!(chunk_store.delete(&data.id).await);
-        assert!(!chunk_store.has(&data.id));
-        assert_eq!(*used_space.lock().await, 0);
-    };
-
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate() {
         put_and_delete(
+            &mut chunk_store,
+            &used_space,
             &Data {
                 id: Id(index as u64),
                 value: data.clone(),
             },
             *size,
-        );
+        )
+        .await;
     }
 }
 
@@ -205,10 +223,14 @@ async fn put_and_get_value_should_be_same() {
     ));
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
-        unwrap!(chunk_store.put(&Data {
-            id: Id(index as u64),
-            value: data.clone()
-        }))
+        unwrap!(
+            chunk_store
+                .put(&Data {
+                    id: Id(index as u64),
+                    value: data.clone()
+                })
+                .await
+        )
     }
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
@@ -225,7 +247,7 @@ async fn overwrite_value() -> Result<()> {
     let root = temp_dir();
     let used_space = Arc::new(Mutex::new(0));
     let mut chunk_store =
-        ChunkStore::new(root.path(), u64::MAX, Arc::clone(&used_space), Init::New).await?;
+        ChunkStore::new(root.path(), u64::MAX, Arc::clone(&used_space), Init::New)?;
 
     for (data, size) in chunks.data_and_sizes {
         chunk_store
