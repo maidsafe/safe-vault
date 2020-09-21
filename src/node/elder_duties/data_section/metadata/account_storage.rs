@@ -13,12 +13,13 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
+use futures::lock::Mutex;
 use sn_data_types::{
     Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,
     PublicKey, QueryResponse, Result as NdResult,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use xor_name::XorName;
 
 /// Operations over the data type Account.
@@ -103,6 +104,7 @@ impl AccountStorage {
             // also check the signature
             self.chunks
                 .put(account)
+                .await
                 .map_err(|error| error.to_string().into())
         };
         self.ok_or_error(result, msg_id, &origin).await
@@ -114,9 +116,8 @@ impl AccountStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
-        let result = self
-            .account(&origin.id(), updated_account.address())
-            .and_then(|existing_account| {
+        let result = match self.account(&origin.id(), updated_account.address()) {
+            Ok(existing_account) => {
                 if !updated_account.size_is_valid() {
                     Err(NdError::ExceededSize)
                 } else if updated_account.owner() != existing_account.owner() {
@@ -125,9 +126,12 @@ impl AccountStorage {
                     // also check the signature
                     self.chunks
                         .put(&updated_account)
+                        .await
                         .map_err(|err| err.to_string().into())
                 }
-            });
+            }
+            Err(error) => Err(error),
+        };
         self.ok_or_error(result, msg_id, &origin).await
     }
 

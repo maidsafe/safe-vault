@@ -13,6 +13,7 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
+use futures::lock::Mutex;
 use sn_data_types::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
     Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp, SequenceEntry, SequenceIndex,
@@ -20,7 +21,7 @@ use sn_data_types::{
     SequenceWrite,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
@@ -96,6 +97,7 @@ impl SequenceStorage {
         } else {
             self.chunks
                 .put(&data)
+                .await
                 .map_err(|error| error.to_string().into())
         };
         self.ok_or_error(result, msg_id, &origin).await
@@ -139,8 +141,7 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
-        //let requester_pk = *utils::own_key(&requester)?;
-        let result = self
+        let result = match self
             .chunks
             .get(&address)
             .map_err(|error| match error {
@@ -160,12 +161,14 @@ impl SequenceStorage {
                         Ok(())
                     }
                 }
-            })
-            .and_then(|_| {
-                self.chunks
-                    .delete(&address)
-                    .map_err(|error| error.to_string().into())
-            });
+            }) {
+            Ok(()) => self
+                .chunks
+                .delete(&address)
+                .await
+                .map_err(|error| error.to_string().into()),
+            Err(error) => Err(error),
+        };
 
         self.ok_or_error(result, msg_id, &origin).await
     }
@@ -335,15 +338,17 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
         let address = write_op.address;
-        let result = self.edit_chunk(
-            address,
-            SequenceAction::Admin,
-            origin,
-            move |mut sequence| {
-                sequence.apply_public_policy_op(write_op)?;
-                Ok(sequence)
-            },
-        );
+        let result = self
+            .edit_chunk(
+                address,
+                SequenceAction::Admin,
+                origin,
+                move |mut sequence| {
+                    sequence.apply_public_policy_op(write_op)?;
+                    Ok(sequence)
+                },
+            )
+            .await;
         self.ok_or_error(result, msg_id, &origin).await
     }
 
@@ -354,15 +359,17 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
         let address = write_op.address;
-        let result = self.edit_chunk(
-            address,
-            SequenceAction::Admin,
-            origin,
-            move |mut sequence| {
-                sequence.apply_private_policy_op(write_op)?;
-                Ok(sequence)
-            },
-        );
+        let result = self
+            .edit_chunk(
+                address,
+                SequenceAction::Admin,
+                origin,
+                move |mut sequence| {
+                    sequence.apply_private_policy_op(write_op)?;
+                    Ok(sequence)
+                },
+            )
+            .await;
         self.ok_or_error(result, msg_id, origin).await
     }
 
@@ -392,19 +399,21 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
         let address = write_op.address;
-        let result = self.edit_chunk(
-            address,
-            SequenceAction::Append,
-            origin,
-            move |mut sequence| {
-                sequence.apply_data_op(write_op)?;
-                Ok(sequence)
-            },
-        );
+        let result = self
+            .edit_chunk(
+                address,
+                SequenceAction::Append,
+                origin,
+                move |mut sequence| {
+                    sequence.apply_data_op(write_op)?;
+                    Ok(sequence)
+                },
+            )
+            .await;
         self.ok_or_error(result, msg_id, origin).await
     }
 
-    fn edit_chunk<F>(
+    async fn edit_chunk<F>(
         &mut self,
         address: SequenceAddress,
         action: SequenceAction,
@@ -414,13 +423,13 @@ impl SequenceStorage {
     where
         F: FnOnce(Sequence) -> NdResult<Sequence>,
     {
-        self.get_chunk(address, action, origin)
-            .and_then(write_fn)
-            .and_then(move |sequence| {
-                self.chunks
-                    .put(&sequence)
-                    .map_err(|error| error.to_string().into())
-            })
+        let result = self.get_chunk(address, action, origin)?;
+        let sequence = write_fn(result)?;
+
+        self.chunks
+            .put(&sequence)
+            .await
+            .map_err(|error| error.to_string().into())
     }
 
     async fn ok_or_error<T>(

@@ -14,8 +14,9 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
+use futures::lock::Mutex;
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// The main duty of an Adult node is
 /// storage and retrieval of data chunks.

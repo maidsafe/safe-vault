@@ -20,12 +20,13 @@ use crate::node::{
     state_db::NodeInfo,
 };
 use crate::Network;
+use futures::lock::Mutex;
 use log::{info, trace, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[allow(clippy::large_enum_variant)]
 pub enum DutyLevel<R: CryptoRng + Rng> {

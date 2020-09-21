@@ -21,9 +21,10 @@ mod used_space;
 use crate::{utils, utils::Init};
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
+use futures::lock::Mutex;
 use log::trace;
 use sn_data_types::{Account, Blob, Map, Sequence};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::{
     fs::{self, DirEntry, File, Metadata},
     io::{Read, Write},
@@ -106,29 +107,29 @@ impl<T: Chunk> ChunkStore<T> {
     /// an IO error, it returns `Error::Io`.
     ///
     /// If a chunk with the same id already exists, it will be overwritten.
-    pub fn put(&mut self, chunk: &T) -> Result<()> {
+    pub async fn put(&mut self, chunk: &T) -> Result<()> {
         let serialised_chunk = utils::serialise(chunk);
         let consumed_space = serialised_chunk.len() as u64;
-        if self.used_space.total().saturating_add(consumed_space) > self.max_capacity {
+        if self.used_space.total().await.saturating_add(consumed_space) > self.max_capacity {
             return Err(Error::NotEnoughSpace);
         }
 
         let file_path = self.file_path(chunk.id())?;
-        let _ = self.do_delete(&file_path);
+        let _ = self.do_delete(&file_path).await;
 
         let mut file = File::create(&file_path)?;
         file.write_all(&serialised_chunk)?;
         file.sync_data()?;
 
-        self.used_space.increase(consumed_space)
+        self.used_space.increase(consumed_space).await
     }
 
     /// Deletes the data chunk stored under `id`.
     ///
     /// If the data doesn't exist, it does nothing and returns `Ok`.  In the case of an IO error, it
     /// returns `Error::Io`.
-    pub fn delete(&mut self, id: &T::Id) -> Result<()> {
-        self.do_delete(&self.file_path(id)?)
+    pub async fn delete(&mut self, id: &T::Id) -> Result<()> {
+        self.do_delete(&self.file_path(id)?).await
     }
 
     /// Returns a data chunk previously stored under `id`.
@@ -171,9 +172,9 @@ impl<T: Chunk> ChunkStore<T> {
             .unwrap_or_else(|_| Vec::new())
     }
 
-    fn do_delete(&mut self, file_path: &Path) -> Result<()> {
+    async fn do_delete(&mut self, file_path: &Path) -> Result<()> {
         if let Ok(metadata) = fs::metadata(file_path) {
-            self.used_space.decrease(metadata.len())?;
+            self.used_space.decrease(metadata.len()).await?;
             fs::remove_file(file_path).map_err(From::from)
         } else {
             Ok(())

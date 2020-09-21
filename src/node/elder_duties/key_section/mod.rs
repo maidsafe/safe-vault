@@ -23,12 +23,13 @@ use crate::{
     node::state_db::NodeInfo,
     Network, Result,
 };
+use futures::lock::Mutex;
 use log::trace;
 use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
 use sn_routing::{Error, Prefix};
 use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use xor_name::XorName;
 
 /// A Key Section interfaces with clients,
@@ -85,7 +86,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let sec_key_share = self.routing.secret_key_share().await.ok()?;
         let proof_chain = self.routing.our_history().await?;
         let index = self.routing.our_index().await.ok()?;
-        match self.replica_manager.lock().unwrap().update_replica_keys(
+        match self.replica_manager.lock().await.update_replica_keys(
             sec_key_share,
             index,
             pub_key_set,
@@ -100,13 +101,13 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that
     /// the other group is now responsible for.
-    pub fn section_split(&mut self, prefix: Prefix) -> Option<NodeOperation> {
+    pub async fn section_split(&mut self, prefix: Prefix) -> Option<NodeOperation> {
         // Removes accounts that are no longer our section responsibility.
         let not_matching = |key: PublicKey| {
             let xorname: XorName = key.into();
             !prefix.matches(&XorName(xorname.0))
         };
-        let all_keys = self.replica_manager.lock().unwrap().all_keys()?;
+        let all_keys = self.replica_manager.lock().await.all_keys()?;
         let accounts = all_keys
             .iter()
             .filter(|key| not_matching(**key))
@@ -114,7 +115,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             .collect::<BTreeSet<PublicKey>>();
         self.replica_manager
             .lock()
-            .unwrap()
+            .await
             .drop_accounts(&accounts)
             .ok()?;
         None

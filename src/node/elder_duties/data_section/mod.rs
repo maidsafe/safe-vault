@@ -20,9 +20,10 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Network, Result,
 };
+use futures::lock::Mutex;
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use xor_name::XorName;
 
 /// A DataSection is responsible for

@@ -16,11 +16,12 @@ use crate::{
     node::state_db::NodeInfo,
     Error, Network, Result,
 };
+use futures::lock::Mutex;
 use log::trace;
 use rand::{CryptoRng, Rng};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
@@ -114,7 +115,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         if prefix != self.prefix {
             // section has split!
             self.prefix = prefix;
-            ops.push(self.key_section.section_split(prefix));
+            ops.push(self.key_section.section_split(prefix).await);
             ops.push(self.data_section.section_split(prefix).await);
         }
 

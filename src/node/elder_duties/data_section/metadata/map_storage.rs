@@ -13,13 +13,14 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
+use futures::lock::Mutex;
 use sn_data_types::{
     CmdError, Error as NdError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
     MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey, QueryResponse,
     Result as NdResult,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// Operations over the data type Map.
 pub(super) struct MapStorage {
@@ -128,19 +129,21 @@ impl MapStorage {
     where
         F: FnOnce(Map) -> NdResult<Map>,
     {
-        let result = self
-            .chunks
-            .get(address)
-            .map_err(|e| match e {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
-                error => error.to_string().into(),
-            })
-            .and_then(mutation_fn)
-            .and_then(|map| {
-                self.chunks
+        let result = match self.chunks.get(address).map_err(|e| match e {
+            ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+            error => error.to_string().into(),
+        }) {
+            Ok(data) => match mutation_fn(data) {
+                Ok(map) => self
+                    .chunks
                     .put(&map)
-                    .map_err(|error| error.to_string().into())
-            });
+                    .await
+                    .map_err(|error| error.to_string().into()),
+                Err(error) => Err(error),
+            },
+            Err(error) => Err(error),
+        };
+
         self.ok_or_error(result, msg_id, &origin).await
     }
 
@@ -156,6 +159,7 @@ impl MapStorage {
         } else {
             self.chunks
                 .put(&data)
+                .await
                 .map_err(|error| error.to_string().into())
         };
         self.ok_or_error(result, msg_id, origin).await
@@ -167,19 +171,19 @@ impl MapStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
-        let result = self
-            .chunks
-            .get(&address)
-            .map_err(|e| match e {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
-                error => error.to_string().into(),
-            })
-            .and_then(|map| {
-                map.check_is_owner(origin.id())?;
+        let result = match self.chunks.get(&address).map_err(|e| match e {
+            ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+            error => error.to_string().into(),
+        }) {
+            Ok(map) => {
+                map.check_is_owner(origin.id()).ok()?;
                 self.chunks
                     .delete(&address)
+                    .await
                     .map_err(|error| error.to_string().into())
-            });
+            }
+            Err(error) => Err(error),
+        };
 
         self.ok_or_error(result, msg_id, origin).await
     }

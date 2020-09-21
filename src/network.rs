@@ -9,6 +9,7 @@
 use crate::node::state_db::AgeGroup;
 use crate::{Config as NodeConfig, Error, Result};
 use bytes::Bytes;
+use futures::lock::Mutex;
 use sn_data_types::PublicKey;
 use sn_routing::{
     DstLocation, Error as RoutingError, EventStream, Node as RoutingNode,
@@ -16,7 +17,7 @@ use sn_routing::{
 };
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use xor_name::{Prefix, XorName};
 
 ///
@@ -50,7 +51,7 @@ impl Network {
         Some(PublicKey::Bls(
             self.routing
                 .lock()
-                .unwrap()
+                .await
                 .public_key_set()
                 .await
                 .ok()?
@@ -61,41 +62,41 @@ impl Network {
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .public_key_set()
             .await
             .map_err(Error::Routing)
     }
 
     pub async fn id(&self) -> PublicId {
-        self.routing.lock().unwrap().id().await
+        self.routing.lock().await.id().await
     }
 
-    pub fn is_genesis(&self) -> bool {
-        self.routing.lock().unwrap().is_genesis()
+    pub async fn is_genesis(&self) -> bool {
+        self.routing.lock().await.is_genesis()
     }
 
     pub async fn name(&self) -> XorName {
-        self.routing.lock().unwrap().name().await
+        self.routing.lock().await.name().await
     }
 
     pub async fn our_connection_info(&mut self) -> Result<SocketAddr> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .our_connection_info()
             .await
             .map_err(Error::Routing)
     }
 
     pub async fn our_prefix(&self) -> Option<Prefix> {
-        self.routing.lock().unwrap().our_prefix().await
+        self.routing.lock().await.our_prefix().await
     }
 
     pub async fn matches_our_prefix(&self, name: XorName) -> bool {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .matches_our_prefix(&XorName(name.0))
             .await
             .unwrap_or(false)
@@ -109,7 +110,7 @@ impl Network {
     ) -> Result<(), RoutingError> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .send_message(src, dst, content)
             .await
         // Ok(())
@@ -122,7 +123,7 @@ impl Network {
     ) -> Result<()> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .send_message_to_client(peer_addr, msg)
             .await
             .map_err(Error::Routing)
@@ -131,20 +132,20 @@ impl Network {
     pub async fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .secret_key_share()
             .await
             .map_err(Error::Routing)
     }
 
     pub async fn our_history(&self) -> Option<SectionProofChain> {
-        self.routing.lock().unwrap().our_history().await
+        self.routing.lock().await.our_history().await
     }
 
     pub async fn our_index(&self) -> Result<usize> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .our_index()
             .await
             .map_err(Error::Routing)
@@ -153,7 +154,7 @@ impl Network {
     pub async fn our_elder_names(&self) -> BTreeSet<XorName> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .our_elders()
             .await
             .iter()
@@ -164,7 +165,7 @@ impl Network {
     pub async fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .our_elders()
             .await
             .iter()
@@ -178,7 +179,7 @@ impl Network {
     ) -> Vec<(XorName, SocketAddr)> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .our_elders_sorted_by_distance_to(&XorName(name.0))
             .await
             .into_iter()
@@ -193,7 +194,7 @@ impl Network {
     ) -> Vec<XorName> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .our_elders_sorted_by_distance_to(&XorName(name.0))
             .await
             .into_iter()
@@ -209,7 +210,7 @@ impl Network {
     ) -> Vec<XorName> {
         self.routing
             .lock()
-            .unwrap()
+            .await
             .our_adults_sorted_by_distance_to(&XorName(name.0))
             .await
             .into_iter()
@@ -228,12 +229,12 @@ impl Network {
 
     async fn our_duties(&self) -> AgeGroup {
         let our_name = self.name().await;
-        if self.routing.lock().unwrap().is_elder().await {
+        if self.routing.lock().await.is_elder().await {
             AgeGroup::Elder
         } else if self
             .routing
             .lock()
-            .unwrap()
+            .await
             .our_adults()
             .await
             .iter()

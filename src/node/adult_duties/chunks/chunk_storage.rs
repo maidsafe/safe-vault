@@ -8,13 +8,14 @@
 
 use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty};
 use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
+use futures::lock::Mutex;
 use log::{error, info};
 use sn_data_types::{
     AdultDuties, Blob, BlobAddress, CmdError, Error as NdError, Message, MessageId, MsgSender,
     NodeCmdError, NodeDataError, NodeEvent, QueryResponse, Result as NdResult, Signature,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// Storage of data chunks.
 pub(crate) struct ChunkStorage {
@@ -40,7 +41,7 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
-        if let Err(error) = self.try_store(data) {
+        if let Err(error) = self.try_store(data).await {
             return self
                 .wrapping
                 .error(CmdError::Data(error), msg_id, &origin.address())
@@ -57,7 +58,7 @@ impl ChunkStorage {
         origin: &MsgSender,
         accumulated_signature: &Signature,
     ) -> Option<NodeMessagingDuty> {
-        let message = match self.try_store(data) {
+        let message = match self.try_store(data).await {
             Ok(()) => Message::NodeEvent {
                 event: NodeEvent::DuplicationComplete {
                     chunk: *data.address(),
@@ -79,7 +80,7 @@ impl ChunkStorage {
         self.wrapping.send(message).await
     }
 
-    fn try_store(&mut self, data: &Blob) -> NdResult<()> {
+    async fn try_store(&mut self, data: &Blob) -> NdResult<()> {
         if self.chunks.has(data.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
@@ -90,6 +91,7 @@ impl ChunkStorage {
         }
         self.chunks
             .put(&data)
+            .await
             .map_err(|error| error.to_string().into())
     }
 
@@ -151,6 +153,7 @@ impl ChunkStorage {
             Ok(Blob::Private(_)) => self
                 .chunks
                 .delete(&address)
+                .await
                 .map_err(|error| error.to_string().into()),
             Ok(_) => {
                 error!(

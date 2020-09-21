@@ -14,11 +14,12 @@ use crate::{
     node::node_ops::{NodeOperation, PaymentDuty},
     utils,
 };
+use futures::lock::Mutex;
 use sn_data_types::{
     Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// An Elder in a KeySection is responsible for
 /// data payment, and will receive write
@@ -69,7 +70,7 @@ impl Payments {
         // before executing the debit.
         // (We could also add a method that executes both
         // debit + credit atomically, but this is much simpler).
-        let recipient_is_not_section = match self.section_wallet_id() {
+        let recipient_is_not_section = match self.section_wallet_id().await {
             Ok(section) => payment.to() != section,
             _ => true, // this would be strange, is it even possible?
         };
@@ -86,9 +87,9 @@ impl Payments {
                 .await
                 .map(|c| c.into());
         }
-        let registration = self.replica_mut().register(&payment);
+        let registration = self.replica.lock().await.register(&payment);
         let result = match registration {
-            Ok(_) => match self.replica_mut().receive_propagated(&payment) {
+            Ok(_) => match self.replica.lock().await.receive_propagated(&payment) {
                 Ok(_) => Ok(()),
                 Err(error) => Err(error),
             },
@@ -131,15 +132,11 @@ impl Payments {
         result.map(|c| c.into())
     }
 
-    fn section_wallet_id(&self) -> Result<PublicKey> {
-        match self.replica.lock().unwrap().replicas_pk_set() {
+    async fn section_wallet_id(&self) -> Result<PublicKey> {
+        match self.replica.lock().await.replicas_pk_set() {
             Some(keys) => Ok(PublicKey::Bls(keys.public_key())),
             None => Err(Error::NoSuchKey),
         }
-    }
-
-    fn replica_mut(&mut self) -> std::sync::MutexGuard<ReplicaManager> {
-        self.replica.lock().unwrap()
     }
 }
 

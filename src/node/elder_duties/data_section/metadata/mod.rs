@@ -24,11 +24,12 @@ use crate::{
 use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
+use futures::lock::Mutex;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
 use sn_data_types::{ElderDuties, Message, MsgEnvelope};
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use xor_name::XorName;
 
 /// This module is called `Metadata`

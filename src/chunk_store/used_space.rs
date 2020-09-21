@@ -9,7 +9,8 @@
 use super::error::{Error, Result};
 use crate::utils::Init;
 // use crate::node::Init;
-use std::sync::{Arc, Mutex};
+use futures::lock::Mutex;
+use std::sync::Arc;
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Seek, SeekFrom},
@@ -58,15 +59,15 @@ impl UsedSpace {
     }
 
     /// Returns the total space consumed by all `ChunkStore`s including this one.
-    pub fn total(&self) -> u64 {
-        *self.total_value.lock().unwrap()
+    pub async fn total(&self) -> u64 {
+        *self.total_value.lock().await
     }
 
-    pub fn increase(&mut self, consumed: u64) -> Result<()> {
+    pub async fn increase(&mut self, consumed: u64) -> Result<()> {
         let new_total = self
             .total_value
             .lock()
-            .unwrap()
+            .await
             .checked_add(consumed)
             .ok_or(Error::NotEnoughSpace)?;
         let new_local = self
@@ -76,8 +77,8 @@ impl UsedSpace {
         self.record_new_values(new_total, new_local)
     }
 
-    pub fn decrease(&mut self, released: u64) -> Result<()> {
-        let new_total = self.total_value.lock().unwrap().saturating_sub(released);
+    pub async fn decrease(&mut self, released: u64) -> Result<()> {
+        let new_total = self.total_value.lock().await.saturating_sub(released);
         let new_local = self.local_value.saturating_sub(released);
         self.record_new_values(new_total, new_local)
     }

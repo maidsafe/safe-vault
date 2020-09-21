@@ -16,8 +16,9 @@ use chunk_storage::ChunkStorage;
 use log::trace;
 use sn_data_types::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
 
+use futures::lock::Mutex;
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// Operations on data chunks.
 pub(crate) struct Chunks {

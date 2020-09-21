@@ -15,6 +15,7 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
+use futures::lock::Mutex;
 use log::{debug, trace};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
@@ -25,7 +26,7 @@ use sn_data_types::{
     SignedTransfer, TransferError,
 };
 use std::fmt::{self, Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -73,7 +74,7 @@ impl Transfers {
         self.wrapping
             .send(Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(PublicKey::Bls(
-                    self.replica.lock().unwrap().replicas_pk_set()?.public_key(),
+                    self.replica.lock().await.replicas_pk_set()?.public_key(),
                 ))),
                 id: MessageId::new(),
             })
@@ -127,13 +128,13 @@ impl Transfers {
         use TransferCmd::*;
         debug!("Processing Transfer CMD in keysection");
         match cmd {
-            InitiateReplica(events) => self.initiate_replica(events),
+            InitiateReplica(events) => self.initiate_replica(events).await,
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
             SimulatePayout(transfer) => self
                 .replica
                 .lock()
-                .unwrap()
+                .await
                 .credit_without_proof(transfer.clone()),
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin).await
@@ -154,9 +155,9 @@ impl Transfers {
 
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
-    fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Option<NodeMessagingDuty> {
+    async fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Option<NodeMessagingDuty> {
         // We must be able to initiate the replica, otherwise this node cannot function.
-        match self.replica.lock().unwrap().initiate(events) {
+        match self.replica.lock().await.initiate(events) {
             Ok(()) => None,
             Err(e) => panic!(e), // Temporary brittle solution before lazy messaging impl.
         }
@@ -164,7 +165,7 @@ impl Transfers {
 
     /// Get all the events of the Replica.
     async fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<NodeMessagingDuty> {
-        let result = match self.replica.lock().unwrap().all_events() {
+        let result = match self.replica.lock().await.all_events() {
             None => Err(Error::NoSuchData),
             Some(events) => Ok(events),
         };
@@ -188,7 +189,7 @@ impl Transfers {
         origin: Address,
     ) -> Option<NodeMessagingDuty> {
         // validate signature
-        let result = match self.replica.lock().unwrap().replicas_pk_set() {
+        let result = match self.replica.lock().await.replicas_pk_set() {
             None => Err(Error::NoSuchKey),
             Some(keys) => Ok(keys),
         };
@@ -212,7 +213,7 @@ impl Transfers {
         let result = self
             .replica
             .lock()
-            .unwrap()
+            .await
             .balance(wallet_id)
             .ok_or(Error::NoSuchBalance);
         self.wrapping
@@ -236,7 +237,7 @@ impl Transfers {
         // validate signature
         let result = match self
             .replica
-            .lock().unwrap()
+            .lock().await
             .history(wallet_id) // since_version
         {
             None => Ok(vec![]),
@@ -262,7 +263,7 @@ impl Transfers {
         origin: Address,
     ) -> Option<NodeMessagingDuty> {
         debug!("Validating a transfer from msg_id: {:?}", msg_id);
-        let message = match self.replica.lock().unwrap().validate(transfer) {
+        let message = match self.replica.lock().await.validate(transfer) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::Event {
                 event: Event::TransferValidated {
@@ -291,7 +292,7 @@ impl Transfers {
         msg_id: MessageId,
         origin: Address,
     ) -> Option<NodeMessagingDuty> {
-        let message = match self.replica.lock().unwrap().validate(transfer) {
+        let message = match self.replica.lock().await.validate(transfer) {
             Ok(None) => return None,
             Ok(Some(event)) => Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(event),
@@ -319,7 +320,7 @@ impl Transfers {
         use NodeCmd::*;
         use NodeTransferCmd::*;
 
-        match self.replica.lock().unwrap().register(proof) {
+        match self.replica.lock().await.register(proof) {
             Ok(None) => None,
             Ok(Some(event)) => {
                 self.wrapping
@@ -353,7 +354,7 @@ impl Transfers {
     ) -> Option<NodeMessagingDuty> {
         use NodeTransferError::*;
         // We will just validate the proofs and then apply the event.
-        let message = match self.replica.lock().unwrap().receive_propagated(proof) {
+        let message = match self.replica.lock().await.receive_propagated(proof) {
             Ok(_) => return None,
             Err(err) => Message::NodeCmdError {
                 error: NodeCmdError::Transfers(TransferPropagation(err)),
@@ -367,8 +368,8 @@ impl Transfers {
 
     #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
-    pub fn pay(&mut self, transfer: Transfer) {
-        self.replica.lock().unwrap().debit_without_proof(transfer)
+    pub async fn pay(&mut self, transfer: Transfer) {
+        self.replica.lock().await.debit_without_proof(transfer)
     }
 }
 
