@@ -12,8 +12,8 @@ use crate::{config_handler::Config, Network, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use bytes::Bytes;
 use flexi_logger::{DeferredNow, Logger};
-use log::Record;
 use log::{error, trace};
+use log::{Log, Metadata, Record};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
@@ -105,19 +105,35 @@ pub fn init_logging(config: &Config) {
         .format(do_format)
         .suppress_timestamp();
 
-    let _ = if let Some(log_dir) = config.log_dir() {
+    let logger = if let Some(log_dir) = config.log_dir() {
         logger.log_to_file().directory(log_dir)
     } else {
         logger
-    }
-    .start()
-    .map(|_| ())
-    .unwrap_or(());
+    };
 
-    // FIXME
-    // async_log::Logger::wrap(logger, || 5433)
-    //     .start(config.verbose().to_level_filter())
-    //     .unwrap_or(());
+    if let Ok((logger, _)) = logger.build() {
+        let logger = LoggerWrapper(logger);
+
+        async_log::Logger::wrap(logger, || 5433)
+            .start(config.verbose().to_level_filter())
+            .unwrap_or(());
+    }
+}
+
+struct LoggerWrapper(Box<dyn Log>);
+
+impl Log for LoggerWrapper {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        self.0.enabled(metadata)
+    }
+
+    fn log(&self, record: &Record) {
+        self.0.log(record)
+    }
+
+    fn flush(&self) {
+        self.0.flush();
+    }
 }
 
 /// Command that the user can send to a running node to control its execution.
