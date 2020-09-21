@@ -236,7 +236,7 @@ impl Rewards {
         node_id: XorName,
     ) -> Option<NodeMessagingDuty> {
         // If we ever hit these errors, something is very odd
-        // most likely a bug, because we are receiving an event triggered by our cmd.
+        // most likely a bug, because we are receiving a response to our query.
         // So, it doesn't make much sense to send some error msg back on the wire.
         // Makes more sense to panic, or log and just drop the request.
         // But exact course to take there needs to be chiseled out.

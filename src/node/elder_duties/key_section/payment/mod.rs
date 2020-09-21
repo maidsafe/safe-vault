@@ -26,7 +26,7 @@ use std::sync::Arc;
 /// requests from clients.
 /// At Payments, a local request to Transfers module
 /// will clear the payment, and thereafter the node forwards
-/// the actual write request (without payment info) to a DataSection,
+/// the actual write request to a DataSection,
 /// which would be a section closest to the data
 /// (where it is then handled by Elders with Metadata duties).
 pub struct Payments {
@@ -98,9 +98,6 @@ impl Payments {
         let result = match result {
             Ok(_) => {
                 // Paying too little will see the amount be forfeited.
-                // This is because it is easy to know the cost by
-                // serializing the write and counting the num bytes,
-                // so you are forced to do the job properly.
                 // This prevents spam of the network.
                 let total_cost = self.rate_limit.from(num_bytes).await?;
                 if total_cost > payment.amount() {
