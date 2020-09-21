@@ -9,12 +9,12 @@
 pub mod state_db;
 
 mod adult_duties;
+mod duty_cfg;
 mod elder_duties;
 mod keys;
 mod msg_wrapping;
 mod node_duties;
 mod node_ops;
-mod startup;
 
 use crate::{
     node::{

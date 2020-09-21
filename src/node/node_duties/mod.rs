@@ -13,11 +13,11 @@ mod network_events;
 
 use crate::node::{
     adult_duties::AdultDuties,
+    duty_cfg::DutyConfig,
     elder_duties::ElderDuties,
     msg_wrapping::NodeMsgWrapping,
     node_duties::messaging::Messaging,
     node_ops::{NodeDuty, NodeOperation},
-    startup::Startup,
     state_db::NodeInfo,
 };
 use crate::Network;
@@ -51,9 +51,9 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> NodeDuties<R> {
     pub fn new(node_info: NodeInfo, network_api: Network, rng: R) -> Self {
-        let startup = Startup::new(node_info.reward_key, network_api.clone());
+        let duty_cfg = DutyConfig::new(node_info.reward_key, network_api.clone());
         let msg_analysis = NetworkMsgAnalysis::new(network_api.clone());
-        let network_events = NetworkEvents::new(startup, msg_analysis);
+        let network_events = NetworkEvents::new(duty_cfg, msg_analysis);
 
         let messaging = Messaging::new(network_api.clone());
         Self {

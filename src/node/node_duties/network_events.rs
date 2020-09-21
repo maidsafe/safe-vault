@@ -7,40 +7,42 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::NetworkMsgAnalysis;
-use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
-use crate::node::startup::Startup;
+use crate::node::{
+    duty_cfg::DutyConfig,
+    node_ops::{ElderDuty, NodeOperation},
+};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
 use sn_data_types::{MsgEnvelope, PublicKey};
+use sn_routing::event::Connected as ConnectionEvent;
 use sn_routing::event::Event as RoutingEvent;
 use xor_name::XorName;
 
 /// Maps events from the transport layer
 /// into domain messages for the various modules.
 pub struct NetworkEvents {
-    startup: Startup,
+    duty_cfg: DutyConfig,
     analysis: NetworkMsgAnalysis,
 }
 
 impl NetworkEvents {
-    pub fn new(startup: Startup, analysis: NetworkMsgAnalysis) -> Self {
-        Self { startup, analysis }
+    pub fn new(duty_cfg: DutyConfig, analysis: NetworkMsgAnalysis) -> Self {
+        Self { duty_cfg, analysis }
     }
 
     pub async fn process_network_event(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
         use ElderDuty::*;
-        use NodeDuty::*;
 
         trace!("Processing Routing Event: {:?}", event);
         match event {
             RoutingEvent::PromotedToAdult => {
                 info!("Node promoted to Adult");
-                Some(BecomeAdult.into())
+                self.duty_cfg.setup_as_adult()
             }
             RoutingEvent::PromotedToElder => {
                 info!("Node promoted to Elder");
-                Some(BecomeElder.into())
+                self.duty_cfg.setup_as_elder().await
             }
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
@@ -71,9 +73,13 @@ impl NetworkEvents {
                     .into(),
                 )
             }
-            RoutingEvent::Connected(_) => {
+            RoutingEvent::Connected(event) => {
                 info!("Node connected.");
-                self.startup.init().await
+                if let ConnectionEvent::First = event {
+                    self.duty_cfg.setup_as_first().await
+                } else {
+                    None
+                }
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
                 info!(
