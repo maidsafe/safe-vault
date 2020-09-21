@@ -101,7 +101,7 @@ async fn put(
 }
 
 #[tokio::test]
-async fn successful_put() {
+async fn successful_put() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng);
 
@@ -127,6 +127,7 @@ async fn successful_put() {
         )
         .await;
     }
+
     assert_eq!(*used_space.lock().await, chunks.total_size);
 
     let mut keys = chunk_store.keys();
@@ -137,10 +138,12 @@ async fn successful_put() {
             .collect::<Vec<_>>(),
         keys
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn failed_put_when_not_enough_space() {
+async fn failed_put_when_not_enough_space() -> Result<()> {
     let mut rng = new_rng();
     let root = temp_dir();
     let capacity = 32;
@@ -164,6 +167,8 @@ async fn failed_put_when_not_enough_space() {
         Err(Error::NotEnoughSpace) => (),
         x => panic!("Unexpected: {:?}", x),
     }
+
+    Ok(())
 }
 
 async fn put_and_delete(
@@ -181,18 +186,14 @@ async fn put_and_delete(
 }
 
 #[tokio::test]
-async fn delete() {
+async fn delete() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng);
 
     let root = temp_dir();
     let used_space = Arc::new(Mutex::new(0));
-    let mut chunk_store = unwrap!(ChunkStore::new(
-        root.path(),
-        u64::MAX,
-        Arc::clone(&used_space),
-        Init::New
-    ));
+    let mut chunk_store =
+        ChunkStore::new(root.path(), u64::MAX, Arc::clone(&used_space), Init::New)?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate() {
         put_and_delete(
@@ -206,10 +207,12 @@ async fn delete() {
         )
         .await;
     }
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn put_and_get_value_should_be_same() {
+async fn put_and_get_value_should_be_same() -> Result<()> {
     let mut rng = new_rng();
     let chunks = Chunks::gen(&mut rng);
 
@@ -223,20 +226,20 @@ async fn put_and_get_value_should_be_same() {
     ));
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
-        unwrap!(
-            chunk_store
-                .put(&Data {
-                    id: Id(index as u64),
-                    value: data.clone()
-                })
-                .await
-        )
+        chunk_store
+            .put(&Data {
+                id: Id(index as u64),
+                value: data.clone(),
+            })
+            .await?
     }
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         let retrieved_value = unwrap!(chunk_store.get(&Id(index as u64)));
         assert_eq!(*data, retrieved_value.value);
     }
+
+    Ok(())
 }
 
 #[tokio::test]
@@ -265,7 +268,7 @@ async fn overwrite_value() -> Result<()> {
 }
 
 #[tokio::test]
-async fn get_fails_when_key_does_not_exist() {
+async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let root = temp_dir();
     let used_space = Arc::new(Mutex::new(0));
     let chunk_store: ChunkStore<Data> = unwrap!(ChunkStore::new(
@@ -280,6 +283,8 @@ async fn get_fails_when_key_does_not_exist() {
         Err(Error::NoSuchChunk) => (),
         x => panic!("Unexpected {:?}", x),
     }
+
+    Ok(())
 }
 
 #[tokio::test]
