@@ -349,13 +349,10 @@ dependencies = [
 [[package]]
 name = "bls_signature_aggregator"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b5a679e22b583a2c5db9ec442746fa5429d0f37753a53bbbc18f73976cc4d8b"
+source = "git+https://github.com/madadam/bls_signature_aggregator.git?branch=repetition#70a7bea36ad07fe0a408d596404157ed0a7eb63d"
 dependencies = [
  "bincode",
  "err-derive",
- "fake_clock",
- "log",
  "rand 0.7.3",
  "serde",
  "threshold_crypto",
@@ -854,12 +851,6 @@ name = "fake-simd"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
-
-[[package]]
-name = "fake_clock"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a121cefff0e603c3a3477370e0fc965059d848bdab6b56554c1aa2b5b75bb320"
 
 [[package]]
 name = "ff"
@@ -2619,7 +2610,7 @@ checksum = "9b3bb89541a5068ba2861181892745587897765ea2724b78257eb5f289de16ab"
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/bochaco/sn_routing.git?branch=async-quic-p2p-api#621953d3894fc160a58f0b67e9233f904cbe36e7"
+source = "git+https://github.com/bochaco/sn_routing.git?branch=async-quic-p2p-api#a9a4b501b9a8d4cdf4e951f7a4e4688dcc81525d"
 dependencies = [
  "bincode",
  "bls_dkg",
