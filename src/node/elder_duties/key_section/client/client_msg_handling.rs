@@ -51,6 +51,7 @@ impl ClientMsgHandling {
         stream: SendStream,
         rng: &mut G,
     ) -> Result<()> {
+        trace!("Processing client handshake");
         let mut the_stream = stream;
         let result = self
             .onboarding
@@ -59,6 +60,7 @@ impl ClientMsgHandling {
 
         // client has been onboarded or already exists
         if result.is_ok() {
+            trace!("Client has been onboarded.");
             if let Some(pk) = self.get_public_key(peer_addr) {
                 let mut updated_streams = vec![];
                 let pk = *pk;
@@ -92,6 +94,8 @@ impl ClientMsgHandling {
         client_address: SocketAddr,
         stream: SendStream,
     ) -> Option<NodeMessagingDuty> {
+        trace!("Tracking incoming client message");
+
         let msg_id = msg.id();
 
         // We could have received a group decision containing a client msg,
@@ -115,6 +119,8 @@ impl ClientMsgHandling {
     }
 
     pub async fn match_outgoing(&mut self, msg: &MsgEnvelope) -> Result<()> {
+        trace!("Matching outgoing message");
+
         match msg.destination() {
             Address::Client { .. } => (),
             _ => {
@@ -186,7 +192,7 @@ impl ClientMsgHandling {
 }
 
 async fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) {
-    trace!("Senging message on stream");
+    trace!("Sending message on stream");
     let bytes = utils::serialise(message);
 
     let res = stream.send(bytes).await;

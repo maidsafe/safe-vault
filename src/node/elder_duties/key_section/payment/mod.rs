@@ -15,6 +15,7 @@ use crate::{
     utils,
 };
 use futures::lock::Mutex;
+use log::trace;
 use sn_data_types::{
     Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
 };
@@ -51,6 +52,8 @@ impl Payments {
 
     // The code in this method is a bit messy, needs to be cleaned up.
     pub async fn process_payment_duty(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
+        trace!("Processing payment duty");
+
         use PaymentDuty::*;
         match duty {
             ProcessPayment(msg) => self.process_payment(msg).await,
