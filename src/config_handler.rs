@@ -39,7 +39,7 @@ const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
 const ARGS: [&str; 17] = [
-    "wallet-address",
+    "wallet-id",
     "max-capacity",
     "root-dir",
     "verbose",
@@ -358,7 +358,7 @@ mod test {
 
         let app_name = Config::clap().get_name().to_string();
         let test_values = [
-            ["wallet-address", "86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103"],
+            ["wallet-id", "86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103"],
             ["max-capacity", "1"],
             ["root-dir", "dir"],
             ["verbose", "None"],
