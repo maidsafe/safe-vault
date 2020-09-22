@@ -17,10 +17,16 @@ use sn_data_types::PublicKey;
 ///
 /// These are calls made as part of
 /// a node initialising into a certain duty.
-/// As node: Register wallet at Elders.
-/// As Elder:
+/// Being first node:
 /// -> 1. Add own node id to rewards.
 /// -> 2. Add own wallet to rewards.
+/// Becoming an Adult:
+/// -> 1. Become Adult.
+/// -> 2. Register wallet at Elders.
+/// Becoming an Elder:
+/// -> 1. Become Elder.
+/// -> 2. Add own node id to rewards.
+/// -> 3. Add own wallet to rewards.
 pub struct DutyConfig {
     reward_key: PublicKey,
     network_api: Network,
