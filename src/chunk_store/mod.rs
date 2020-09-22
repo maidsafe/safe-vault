@@ -119,17 +119,25 @@ impl<T: Chunk> ChunkStore<T> {
         let file_path = self.file_path(chunk.id())?;
         let _ = self.do_delete(&file_path).await;
 
-        let mut file = File::create(&file_path)?;
-        file.write_all(&serialised_chunk)?;
-        file.sync_all()?;
-
+        // pre-reserve space
         self.used_space.increase(self.id, consumed_space).await?;
         println!(
             "use space total after adddddddd: {:?}",
             self.used_space.total().await
         );
 
-        Ok(())
+        let res = File::create(&file_path).and_then(|mut file| {
+            file.write_all(&serialised_chunk)?;
+            file.sync_all()
+        });
+
+        match res {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                self.used_space.decrease(self.id, consumed_space).await?;
+                Err(e.into())
+            }
+        }
     }
 
     /// Deletes the data chunk stored under `id`.
