@@ -2305,7 +2305,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe_core"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/safe_client_libs#deeecc62bb65e99663683f6b2712c1156420adbc"
+source = "git+https://github.com/maidsafe/safe_client_libs#357ca33290f3ab19edfbb3d08f6414004b5a142f"
 dependencies = [
  "async-trait",
  "bincode",
