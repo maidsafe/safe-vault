@@ -348,8 +348,8 @@ dependencies = [
 
 [[package]]
 name = "bls_signature_aggregator"
-version = "0.1.0"
-source = "git+https://github.com/madadam/bls_signature_aggregator.git?branch=repetition#70a7bea36ad07fe0a408d596404157ed0a7eb63d"
+version = "0.1.1"
+source = "git+https://github.com/madadam/bls_signature_aggregator.git?branch=repetition#6ea5a508180ded2247dc7c40b6deaa962c27db3b"
 dependencies = [
  "bincode",
  "err-derive",
@@ -1879,7 +1879,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.8.1"
-source = "git+https://github.com/maidsafe/qp2p#0a9bf09f7a628843e014302e81d21070af5a5566"
+source = "git+https://github.com/maidsafe/qp2p#a50506513a0f2623d0ae00a359b5d4ac167ccfb0"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2613,7 +2613,7 @@ checksum = "9b3bb89541a5068ba2861181892745587897765ea2724b78257eb5f289de16ab"
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/bochaco/sn_routing.git?branch=async-quic-p2p-api#a9a4b501b9a8d4cdf4e951f7a4e4688dcc81525d"
+source = "git+https://github.com/bochaco/sn_routing.git?branch=async-quic-p2p-api#10b847ee042312b407b360edf1b62d9060e80252"
 dependencies = [
  "bincode",
  "bls_dkg",
