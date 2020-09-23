@@ -62,7 +62,7 @@ impl Network {
             .unwrap();
         nodes.push((command_tx, handle));
         for i in 1..no_of_nodes {
-            thread::sleep(std::time::Duration::from_secs(30));
+            thread::sleep(std::time::Duration::from_secs(2));
             let mut runtime = tokio::runtime::Runtime::new().unwrap();
             let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
             let mut node_config = node_config.clone();
