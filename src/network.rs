@@ -72,10 +72,6 @@ impl Network {
         self.routing.lock().await.id().await
     }
 
-    pub async fn is_genesis(&self) -> bool {
-        self.routing.lock().await.is_genesis()
-    }
-
     pub async fn name(&self) -> XorName {
         self.routing.lock().await.name().await
     }
