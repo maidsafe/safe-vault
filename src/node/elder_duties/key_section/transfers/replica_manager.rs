@@ -165,9 +165,9 @@ impl ReplicaManager {
                 self.info.peer_replicas.clone(),
                 events,
             )?;
-            // make sure to indicate that we are no longer initiating
-            self.info.initiating = false;
         }
+        // make sure to indicate that we are no longer initiating
+        self.info.initiating = false;
         Ok(())
     }
 
