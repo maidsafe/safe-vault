@@ -29,6 +29,14 @@ async fn client_creation() {
     assert!(client_tests::client_creation().await.is_ok());
 }
 
+#[tokio::test]
+async fn client_creation_for_existing_sk() {
+    start_network();
+    assert!(client_tests::client_creation_for_existing_sk()
+        .await
+        .is_ok());
+}
+
 // #[tokio::test]
 // pub async fn pub_blob_test() {
 //     start_network();
