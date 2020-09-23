@@ -42,16 +42,7 @@ impl DutyConfig {
 
     /// When first node in network.
     pub async fn setup_as_first(&self) -> Option<NodeOperation> {
-        // 1. Add own node id to rewards.
-        let node_id = self.network_api.name().await;
-        let first: NodeOperation = RewardDuty::AddNewNode(node_id).into();
-        // 2. Add own wallet to rewards.
-        let second = RewardDuty::SetNodeWallet {
-            node_id,
-            wallet_id: self.reward_key,
-        }
-        .into();
-        Some(vec![first, second].into())
+        None
     }
 
     /// When becoming Adult.

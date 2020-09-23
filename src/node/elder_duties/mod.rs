@@ -53,9 +53,13 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn initiate(&mut self) -> Option<NodeOperation> {
+    pub async fn initiate(&mut self, first: bool) -> Option<NodeOperation> {
         // currently only key section needs to catch up
-        self.key_section.catchup_with_section().await
+        if first {
+            self.key_section.init_first().await
+        } else {
+            self.key_section.catchup_with_section().await
+        }
     }
 
     /// Processing of any Elder duty.

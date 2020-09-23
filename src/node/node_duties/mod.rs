@@ -149,7 +149,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         .await
         {
             let mut duties = duties;
-            let op = duties.initiate().await;
+            let op = duties.initiate(self.node_info.first).await;
             self.duty_level = Elder(duties);
             // NB: This is wrong, shouldn't write to disk here,
             // let it be upper layer resp.

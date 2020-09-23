@@ -71,6 +71,7 @@ impl<R: CryptoRng + Rng> Node<R> {
         let keys = NodeSigningKeys::new(network_api.clone());
 
         let node_info = NodeInfo {
+            first: config.is_first(),
             keys,
             root_dir: root_dir_buf,
             init_mode: Init::New,

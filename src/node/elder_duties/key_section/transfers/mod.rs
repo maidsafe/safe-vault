@@ -66,6 +66,11 @@ impl Transfers {
         Self { replica, wrapping }
     }
 
+    pub async fn init_first(&mut self) -> Option<NodeOperation> {
+        let result = self.initiate_replica(&[]).await;
+        result.map(|c| c.into())
+    }
+
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.

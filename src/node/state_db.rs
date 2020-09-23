@@ -62,6 +62,7 @@ pub enum AgeGroup {
 /// (among things).
 #[derive(Clone)]
 pub struct NodeInfo {
+    pub first: bool,
     pub keys: NodeSigningKeys,
     pub root_dir: PathBuf,
     pub init_mode: utils::Init,

@@ -72,6 +72,11 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         })
     }
 
+    /// Initiates as first node in a network.
+    pub async fn init_first(&mut self) -> Option<NodeOperation> {
+        self.transfers.init_first().await
+    }
+
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
