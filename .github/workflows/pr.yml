@@ -115,11 +115,20 @@ jobs:
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       # Run tests.
+      # Currently do not run client tests on mac
       - name: Cargo tests
         uses: actions-rs/cargo@v1
+        if: matrix.os != 'macos-latest'
         with:
           command: test
           args: --release  --features=simulated-payouts
+
+      - name: Basic mac tests
+        uses: actions-rs/cargo@v1
+        if: matrix.os == 'macos-latest'
+        with:
+          command: test
+          args: --release  
 
   # list all duplicate dependencies. Note that this does not error if duplicates found
   dependencies:
