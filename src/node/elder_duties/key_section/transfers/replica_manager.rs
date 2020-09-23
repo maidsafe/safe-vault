@@ -9,9 +9,9 @@
 use super::store::TransferStore;
 use crate::Result;
 use bls::{PublicKeySet, SecretKeyShare};
-use log::info;
 #[cfg(feature = "simulated-payouts")]
 use log::trace;
+use log::{info, warn};
 
 use sn_data_types::{
     DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey, PublicKey,
@@ -118,6 +118,7 @@ impl ReplicaManager {
     /// not be able to function properly together with the others.
     pub(crate) fn initiate(&mut self, events: &[ReplicaEvent]) -> NdResult<()> {
         if !self.info.initiating {
+            warn!("Is not initiating");
             // can only synch while initiating
             return Err(NdError::InvalidOperation);
         }
@@ -128,12 +129,17 @@ impl ReplicaManager {
                 balance,
                 PublicKey::Bls(self.info.peer_replicas.public_key()),
             )?;
-            match self.replica.genesis(&debit_proof, || None) {
+            let genesis_source = Some(PublicKey::Bls(debit_proof.replica_keys().public_key()));
+            match self.replica.genesis(&debit_proof, || genesis_source) {
                 Ok(Some(event)) => {
                     let event = ReplicaEvent::TransferPropagated(event);
                     self.persist(event)?;
                 }
-                Ok(None) | Err(_) => return Err(NdError::InvalidOperation), // todo: storage error
+                Ok(None) => info!("Already handled genesis."), // no change
+                Err(e) => {
+                    warn!("replica.genesis gave error: {}", e);
+                    return Err(NdError::InvalidOperation);
+                }
             };
         } else {
             let existing_events = self

@@ -165,7 +165,10 @@ impl Transfers {
         // We must be able to initiate the replica, otherwise this node cannot function.
         match self.replica.lock().await.initiate(events) {
             Ok(()) => None,
-            Err(e) => panic!(e), // Temporary brittle solution before lazy messaging impl.
+            Err(e) => {
+                println!("{}", e);
+                panic!(e); // Temporary brittle solution before lazy messaging impl.
+            }
         }
     }
 
