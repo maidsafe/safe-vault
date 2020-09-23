@@ -2624,7 +2624,7 @@ checksum = "9b3bb89541a5068ba2861181892745587897765ea2724b78257eb5f289de16ab"
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/bochaco/sn_routing.git?branch=async-quic-p2p-api#82aecf46426441e107bd1d013ccec9a5adf64f97"
+source = "git+https://github.com/bochaco/sn_routing.git?branch=async-quic-p2p-api#15b2142bf9974dfb645ddf1b4eef1cf6ee6b83ca"
 dependencies = [
  "async-recursion",
  "bincode",
