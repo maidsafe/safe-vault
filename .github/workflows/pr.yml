@@ -115,9 +115,11 @@ jobs:
           key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
 
       # Run tests.
-      - name: Run tests
-        shell: bash
-        run: ./scripts/tests
+      - name: Cargo tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release  --features=simulated-payouts
 
   # list all duplicate dependencies. Note that this does not error if duplicates found
   dependencies:

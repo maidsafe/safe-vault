@@ -1,5 +1,0 @@
-#!/bin/bash
-
-set -e -x
-
-RUSTFLAGS="-D warnings" cargo test "$@" --release
