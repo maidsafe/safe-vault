@@ -110,11 +110,8 @@ impl<T: Chunk> ChunkStore<T> {
         let consumed_space = serialised_chunk.len() as u64;
 
         println!("consumed space: {:?}", consumed_space);
-        println!("max : {:?}", self.max_capacity);
+        println!("max : {:?}", self.used_space.max_capacity().await);
         println!("use space total : {:?}", self.used_space.total().await);
-
-
-        // self.used_space.increase(consumed_space);
 
         let file_path = self.file_path(chunk.id())?;
         let _ = self.do_delete(&file_path).await;

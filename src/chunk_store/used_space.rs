@@ -45,11 +45,16 @@ impl UsedSpace {
         }
     }
 
+    /// Returns the maximum capacity (e.g. the maximum
+    /// value that total() can return)
+    pub async fn max_capacity(&self) -> u64 {
+        inner::UsedSpace::max_capacity(self.inner.clone()).await
+    }
+
     /// Returns the total used space as a snapshot
     /// Note, due to the async nature of this, the value
     /// may be stale by the time it is read if there are multiple
     /// writers
-    #[allow(unused)]
     pub async fn total(&self) -> u64 {
         inner::UsedSpace::total(self.inner.clone()).await
     }
@@ -122,11 +127,18 @@ mod inner {
     impl UsedSpace {
         pub fn new(max_capacity: u64) -> Self {
             Self {
-                max_capacity: max_capacity,
+                max_capacity,
                 total_value: 0u64,
                 local_stores: HashMap::new(),
                 next_id: 0u64,
             }
+        }
+
+        /// Returns the maximum capacity (e.g. the maximum
+        /// value that total() can return)
+        pub async fn max_capacity(used_space: Arc<Mutex<UsedSpace>>) -> u64 {
+            let used_space_lock = used_space.lock().await;
+            used_space_lock.max_capacity
         }
 
         /// Returns the total used space as a snapshot
@@ -311,7 +323,7 @@ mod tests {
         for chunk in bytes.as_slice().chunks_exact(std::mem::size_of::<u32>()) {
             let mut num = 0u32;
             for (i, component) in chunk.iter().enumerate() {
-                num = num | ((*component as u32) << (i * 8));
+                num |= (*component as u32) << (i * 8);
             }
             nums.push(num as u64);
         }
