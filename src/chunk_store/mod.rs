@@ -161,6 +161,7 @@ impl<T: Chunk> ChunkStore<T> {
         }
     }
 
+    #[cfg(test)]
     pub async fn total_used_space(&self) -> u64 {
         self.used_space.total().await
     }
