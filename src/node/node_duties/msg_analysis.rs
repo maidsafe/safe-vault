@@ -12,7 +12,7 @@ use crate::node::node_ops::{
     TransferCmd, TransferDuty, TransferQuery,
 };
 use crate::Network;
-use log::error;
+use log::{error, trace};
 use sn_data_types::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
     NodeDuties, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
@@ -386,6 +386,7 @@ impl NetworkMsgAnalysis {
 
     // Check internal transfer cmds.
     async fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
+        trace!("Trying transfer message");
         use NodeTransferCmd::*;
 
         // From Transfer module we get `PropagateTransfer`.
@@ -398,6 +399,8 @@ impl NetworkMsgAnalysis {
         };
         let shall_process =
             from_transfer_elder() && self.is_dst_for(msg).await && self.is_elder().await;
+
+        trace!("Node shall process msg");
 
         if shall_process {
             return match &msg.message {

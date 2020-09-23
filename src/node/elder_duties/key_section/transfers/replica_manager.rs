@@ -9,7 +9,7 @@
 use super::store::TransferStore;
 use crate::Result;
 use bls::{PublicKeySet, SecretKeyShare};
-use log::info;
+use log::{error, info};
 #[cfg(feature = "simulated-payouts")]
 use log::trace;
 
@@ -118,6 +118,8 @@ impl ReplicaManager {
     /// not be able to function properly together with the others.
     pub(crate) fn initiate(&mut self, events: &[ReplicaEvent]) -> NdResult<()> {
         if !self.info.initiating {
+            error!("No longer initing");
+
             // can only synch while initiating
             return Err(NdError::InvalidOperation);
         }
@@ -133,7 +135,11 @@ impl ReplicaManager {
                     let event = ReplicaEvent::TransferPropagated(event);
                     self.persist(event)?;
                 }
-                Ok(None) | Err(_) => return Err(NdError::InvalidOperation), // todo: storage error
+                Ok(None) | Err(_) =>{
+                    error!("Not genesis");
+
+                    return Err(NdError::InvalidOperation) // todo: storage error
+                } 
             };
         } else {
             let existing_events = self
@@ -191,7 +197,10 @@ impl ReplicaManager {
                 info!("Successfully updated Replica details on churn");
                 Ok(())
             }
-            Err(_e) => Err(NdError::InvalidOperation), // todo: storage error
+            Err(error) => {
+                error!("Error updating replica keys : {:?}", error);
+                Err(NdError::InvalidOperation)
+            }, // todo: storage error
         }
     }
 
@@ -310,7 +319,10 @@ impl ReplicaManager {
     /// retrieving events from the other Replicas,
     /// it will return an error on incoming cmds.
     fn check_init_status(&mut self) -> NdResult<()> {
+        trace!("Checking init status");
         if self.info.initiating {
+            error!("Still initiating");
+
             return Err(NdError::InvalidOperation);
         }
         Ok(())

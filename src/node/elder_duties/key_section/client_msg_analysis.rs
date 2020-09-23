@@ -8,7 +8,7 @@
 
 use crate::node::node_ops::{NodeOperation, PaymentDuty, TransferDuty};
 use crate::Network;
-use log::info;
+use log::{trace, warn, info};
 use sn_data_types::{Cmd, Message, MsgEnvelope, MsgSender, Query};
 
 /// Evaluates msgs sent directly from a client,
@@ -40,6 +40,8 @@ impl ClientMsgAnalysis {
     /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
     async fn try_data_payment(&self, msg: &MsgEnvelope) -> Option<PaymentDuty> {
+        trace!("Trying data payment");
+
         let from_client = || matches!(msg.origin, MsgSender::Client { .. });
 
         let is_data_write = || {
@@ -59,6 +61,7 @@ impl ClientMsgAnalysis {
     }
 
     async fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
+        trace!("Trying transfer");
         let from_client = || matches!(msg.origin, MsgSender::Client { .. });
 
         let duty = match &msg.message {
@@ -67,6 +70,7 @@ impl ClientMsgAnalysis {
                 ..
             } => {
                 if !(from_client() && self.is_dst_for(msg).await && self.is_elder().await) {
+                    info!("Message not for this node.");
                     return None;
                 }
                 TransferDuty::ProcessCmd {

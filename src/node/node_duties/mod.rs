@@ -76,7 +76,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
 
     pub fn elder_duties(&mut self) -> Option<&mut ElderDuties<R>> {
         use DutyLevel::*;
-
+        trace!("Checking if suited to elder duties");
         let level = match &mut self.duty_level {
             Elder(ref mut duties) => Some(duties),
             _ => None,
