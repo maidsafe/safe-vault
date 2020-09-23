@@ -110,9 +110,16 @@ impl<T: Chunk> ChunkStore<T> {
     pub async fn put(&mut self, chunk: &T) -> Result<()> {
         let serialised_chunk = utils::serialise(chunk);
         let consumed_space = serialised_chunk.len() as u64;
+
+        println!("consumed space: {:?}", consumed_space);
+        println!("max : {:?}", self.max_capacity);
+        println!("use space total : {:?}", self.used_space.total().await);
+
         if self.used_space.total().await.saturating_add(consumed_space) > self.max_capacity {
             return Err(Error::NotEnoughSpace);
         }
+
+        // self.used_space.increase(consumed_space);
 
         let file_path = self.file_path(chunk.id())?;
         let _ = self.do_delete(&file_path).await;
@@ -121,7 +128,13 @@ impl<T: Chunk> ChunkStore<T> {
         file.write_all(&serialised_chunk)?;
         file.sync_data()?;
 
-        self.used_space.increase(consumed_space).await
+        self.used_space.increase(consumed_space).await?;
+        println!(
+            "use space total after adddddddd: {:?}",
+            self.used_space.total().await
+        );
+
+        Ok(())
     }
 
     /// Deletes the data chunk stored under `id`.
@@ -146,6 +159,10 @@ impl<T: Chunk> ChunkStore<T> {
         } else {
             Err(Error::NoSuchChunk)
         }
+    }
+
+    pub async fn total_used_space(&self) -> u64 {
+        self.used_space.total().await
     }
 
     /// Tests if a data chunk has been previously stored under `id`.
@@ -174,6 +191,7 @@ impl<T: Chunk> ChunkStore<T> {
 
     async fn do_delete(&mut self, file_path: &Path) -> Result<()> {
         if let Ok(metadata) = fs::metadata(file_path) {
+            println!("deleting and freeing up space: {:?}", metadata.len());
             self.used_space.decrease(metadata.len()).await?;
             fs::remove_file(file_path).map_err(From::from)
         } else {

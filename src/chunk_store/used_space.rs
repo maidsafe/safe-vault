@@ -87,6 +87,7 @@ impl UsedSpace {
         self.local_record.set_len(0)?;
         let _ = self.local_record.seek(SeekFrom::Start(0))?;
         bincode::serialize_into(&self.local_record, &local)?;
+
         self.total_value = Arc::new(Mutex::new(total));
         self.local_value = local;
         Ok(())
