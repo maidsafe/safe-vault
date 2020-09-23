@@ -1,13 +1,13 @@
 [package]
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
-description = "Implementation of the 'Vault' node for the SAFE Network."
-documentation = "https://docs.rs/safe_vault"
+description = "Implementation of the nodes for the Safe Network."
+documentation = "https://docs.rs/sn_node"
 edition = "2018"
 homepage = "https://maidsafe.net"
 license = "GPL-3.0"
-name = "safe_vault"
+name = "sn_node"
 readme = "README.md"
-repository = "https://github.com/maidsafe/safe_vault"
+repository = "https://github.com/maidsafe/sn_node"
 version = "0.24.0"
 
 [patch.crates-io]
@@ -65,7 +65,7 @@ tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util
 futures = "~0.3.5"
 
 [[bin]]
-name = "safe_vault"
+name = "sn_node"
 doc = false
 
 [features]

@@ -7,13 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Network;
-use safe_core::client::{
-    blob_apis::exported_tests as blob_tests, exported_tests as client_tests,
-    map_apis::exported_tests as map_tests, sequence_apis::exported_tests as sequence_tests,
-};
+use safe_core::client::exported_tests as client_tests;
 use std::sync::Once;
 
-static mut NETWORK: Network = Network { vaults: Vec::new() };
+static mut NETWORK: Network = Network { nodes: Vec::new() };
 static START: Once = Once::new();
 
 #[allow(unsafe_code)]

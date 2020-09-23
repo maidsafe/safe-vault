@@ -22,7 +22,7 @@ use std::io::Write;
 use std::{fs, path::Path};
 use unwrap::unwrap;
 
-const VAULT_MODULE_NAME: &str = "safe_vault";
+const NODE_MODULE_NAME: &str = "sn_node";
 
 /// Specifies whether to try loading cached data from disk, or to just construct a new instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,7 +104,7 @@ pub fn init_logging(config: &Config) {
     };
 
     let level_filter = config.verbose().to_level_filter();
-    let module_log_filter = format!("{}={}", VAULT_MODULE_NAME, level_filter.to_string());
+    let module_log_filter = format!("{}={}", NODE_MODULE_NAME, level_filter.to_string());
     let logger = Logger::with_env_or_str(module_log_filter)
         .format(do_format)
         .suppress_timestamp();
@@ -143,6 +143,6 @@ impl Log for LoggerWrapper {
 /// Command that the user can send to a running node to control its execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
-    /// Shutdown the vault
+    /// Shutdown the node
     Shutdown,
 }

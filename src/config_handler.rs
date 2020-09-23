@@ -33,9 +33,9 @@ lazy_static! {
 
 const CONFIG_DIR_QUALIFIER: &str = "net";
 const CONFIG_DIR_ORGANISATION: &str = "MaidSafe";
-const CONFIG_DIR_APPLICATION: &str = "safe_vault";
-const CONFIG_FILE: &str = "vault.config";
-const CONNECTION_INFO_FILE: &str = "vault_connection_info.config";
+const CONFIG_DIR_APPLICATION: &str = "sn_node";
+const CONFIG_FILE: &str = "node.config";
+const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
 const ARGS: [&str; 17] = [
@@ -58,30 +58,30 @@ const ARGS: [&str; 17] = [
     "local",
 ];
 
-/// Vault configuration
+/// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, StructOpt)]
-#[structopt(rename_all = "kebab-case", bin_name = "safe_vault")]
+#[structopt(rename_all = "kebab-case", bin_name = "sn_node")]
 #[structopt(global_settings = &[structopt::clap::AppSettings::ColoredHelp])]
 pub struct Config {
-    /// The address to be credited when this vault farms SafeCoin.
+    /// The address to be credited when this node farms SafeCoin.
     /// A hex formatted BLS public key.
     #[structopt(short, long, parse(try_from_str))]
     wallet_id: Option<String>,
-    /// Upper limit in bytes for allowed network storage on this vault.
+    /// Upper limit in bytes for allowed network storage on this node.
     #[structopt(short, long)]
     max_capacity: Option<u64>,
     /// Root directory for ChunkStores and cached state. If not set, it defaults to "root_dir"
-    /// within the safe_vault project data directory, located at... Linux: $XDG_DATA_HOME/safe_vault
-    /// or $HOME/.local/share/safe_vault | Windows:
-    /// {FOLDERID_RoamingAppData}/MaidSafe/safe_vault/data | MacOS: $HOME/Library/Application
-    /// Support/net.MaidSafe.safe_vault
+    /// within the sn_node project data directory, located at... Linux: $XDG_DATA_HOME/sn_node
+    /// or $HOME/.local/share/sn_node | Windows:
+    /// {FOLDERID_RoamingAppData}/MaidSafe/sn_node/data | MacOS: $HOME/Library/Application
+    /// Support/net.MaidSafe.sn_node
     #[structopt(short, long, parse(from_os_str))]
     root_dir: Option<PathBuf>,
     /// Verbose output. `-v` is equivalent to logging with `warn`, `-vv` to `info`, `-vvv` to
     /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
     #[structopt(short, long, parse(from_occurrences))]
     verbose: u64,
-    /// Is the vault running for a local section?
+    /// Is the node running for a local section?
     #[structopt(short, long)]
     local: bool,
     /// Is this the first node in a section?
@@ -99,13 +99,13 @@ pub struct Config {
     /// Attempt to self-update?
     #[structopt(long)]
     update: bool,
-    /// Attempt to self-update without starting the vault process
+    /// Attempt to self-update without starting the node process
     #[structopt(long, name = "update-only")]
     update_only: bool,
 }
 
 impl Config {
-    /// Returns a new `Config` instance.  Tries to read from the default vault config file location,
+    /// Returns a new `Config` instance.  Tries to read from the default node config file location,
     /// and overrides values with any equivalent command line args.
     pub fn new() -> Self {
         let mut config = match Self::read_from_file() {
@@ -128,7 +128,7 @@ impl Config {
         config
     }
 
-    /// The address to be credited when this vault farms SafeCoin.
+    /// The address to be credited when this node farms SafeCoin.
     pub fn wallet_id(&self) -> Option<&String> {
         self.wallet_id.as_ref()
     }
@@ -138,12 +138,12 @@ impl Config {
         self.first
     }
 
-    /// Is the vault running for a local section?
+    /// Is the node running for a local section?
     pub fn is_local(&self) -> bool {
         self.local
     }
 
-    /// Upper limit in bytes for allowed network storage on this vault.
+    /// Upper limit in bytes for allowed network storage on this node.
     pub fn max_capacity(&self) -> u64 {
         self.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY)
     }
@@ -204,7 +204,7 @@ impl Config {
         self.update
     }
 
-    /// Attempt to self-update without starting the vault process
+    /// Attempt to self-update without starting the node process
     pub fn update_only(&self) -> bool {
         self.update_only
     }
@@ -270,7 +270,7 @@ impl Config {
         }
     }
 
-    /// Reads the default vault config file.
+    /// Reads the default node config file.
     fn read_from_file() -> Result<Option<Config>> {
         let path = project_dirs()?.config_dir().join(CONFIG_FILE);
 
@@ -292,12 +292,12 @@ impl Config {
         }
     }
 
-    /// Writes a Vault config file **for use by tests and examples**.
+    /// Writes a Node config file **for use by tests and examples**.
     ///
     /// The file is written to the `current_bin_dir()` with the appropriate file name.
     ///
     /// N.B. This method should only be used as a utility for test and examples.  In normal use cases,
-    /// the config file should be created by the Vault's installer.
+    /// the config file should be created by the Node's installer.
     #[cfg(test)]
     #[allow(dead_code)]
     pub fn write_config_file(&self) -> Result<PathBuf> {
@@ -417,7 +417,7 @@ mod test {
     #[ignore]
     #[test]
     fn parse_sample_config_file() {
-        let path = Path::new("installer/common/sample.vault.config").to_path_buf();
+        let path = Path::new("installer/common/sample.node.config").to_path_buf();
         let mut file = unwrap!(File::open(&path), "Error opening {}:", path.display());
         let mut encoded_contents = String::new();
         let _ = unwrap!(

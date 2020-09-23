@@ -40,17 +40,17 @@ RUN apt-get update -y && \
     CC=musl-gcc C_INCLUDE_PATH=/usr/local/musl/include/ make install && \
     mkdir /target && \
     chown maidsafe:maidsafe /target && \
-    mkdir /usr/src/safe_vault && \
-    chown maidsafe:maidsafe /usr/src/safe_vault && \
+    mkdir /usr/src/sn_node && \
+    chown maidsafe:maidsafe /usr/src/sn_node && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/src/safe_vault
+WORKDIR /usr/src/sn_node
 COPY . .
 
 # During the build process, ownership of the source directory needs changed in advance because
 # the tests write a file and you need permissions for that.
-RUN chown -R maidsafe:maidsafe /usr/src/safe_vault
+RUN chown -R maidsafe:maidsafe /usr/src/sn_node
 USER maidsafe:maidsafe
 ENV CARGO_TARGET_DIR=/target \
     RUST_BACKTRACE=1

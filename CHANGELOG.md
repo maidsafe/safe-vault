@@ -1,12 +1,12 @@
-# Safe Vault - Change Log
+# Changelog
 
 ## [0.24.0]
-- When a Vault starts, start it as an Adult. Create the additional modules required only when it is promoted to an Elder.
+- When a Node starts, start it as an Adult. Create the additional modules required only when it is promoted to an Elder.
 - Give Adults the responsibility of holding Immutable Data chunks.
 - Use routing's messaging API with signature accumulation for intra-section communication.
 - Implement chunk duplication if a node leaves the network. This will maintain the minimum number of copies required.
 - Update to the latest version of `quic-p2p` which enables automatic port forwarding using the IGD protocol.
-- Gracefully end the vault process on SIGINT.
+- Gracefully end the node process on SIGINT.
 - Use the latest version of `routing`.
 - Update to safe-nd 0.9.0 with refactored `Request` and `Response` enums.
 - Separate the Client Handler into smaller sub-modules.
@@ -36,7 +36,7 @@
 - Send UpdateLoginPacket req via consensus
 - update to safe-nd 0.4.0
 - refactor test to verify granulated app permissions
-- allow to use multiple vaults for tests
+- allow to use multiple nodes for tests
 - add consensus votes on CreateBalance requests
 - send insert and delete auth keys request via…
 - change usage of idata term "kind" to "data"
@@ -61,7 +61,7 @@
 - rename --dump-completions to --completions for consisten…
 - fix test case
 - fix smoke test failure.
-- make vault rng seeded from routing's
+- make node rng seeded from routing's
 - Merge pull request #912 from maqi/use_same_rng
 - add caching and other changes to GHA
 - resolve non-producable issue
@@ -73,13 +73,13 @@
 - update testing framework to new handshake format
 - Merge pull request #911 from octol/new-bootstrap-handshake-format
 - use real routing for the integration test
-- make client requests handled by vault network
+- make client requests handled by node network
 - enable tests with feature of mock
 - Small tidy up of imports for routing API cleanup
 - fix clippy::needless_pass_by_value
 - Re-order use and pub use statements.
 - include path info in error strings
-- fixup/vault: formatting
+- fixup/node: formatting
 - Merge pull request #919 from dirvine/vNext
 - Merge pull request #909 from dan-da/completions_pr
 - update routing dependecy

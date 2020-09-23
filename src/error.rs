@@ -13,7 +13,7 @@ use std::io;
 quick_error! {
     #[allow(clippy::large_enum_variant)]
     #[derive(Debug)]
-    /// Vault error variants.
+    /// Node error variants.
     pub enum Error {
         /// Error in ChunkStore.
         ChunkStore(error: chunk_store::error::Error) {
@@ -86,5 +86,5 @@ quick_error! {
     }
 }
 
-/// Specialisation of `std::Result` for Vault.
+/// Specialisation of `std::Result` for Node.
 pub type Result<T, E = Error> = std::result::Result<T, E>;

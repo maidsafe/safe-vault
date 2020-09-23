@@ -1,10 +1,10 @@
-# SAFE Vault
+# sn_node
 
 |Crate|Documentation|Safe Rust|
 |:---:|:-----------:|:-------:|
-|[![](http://meritbadge.herokuapp.com/safe_vault)](https://crates.io/crates/safe_vault)|[![Documentation](https://docs.rs/safe_vault/badge.svg)](https://docs.rs/safe_vault)|[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
+|[![](http://meritbadge.herokuapp.com/sn_node)](https://crates.io/crates/sn_node)|[![Documentation](https://docs.rs/sn_node/badge.svg)](https://docs.rs/sn_node)|[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 
-| [MaidSafe website](https://maidsafe.net) | [SAFE Dev Forum](https://forum.safedev.org) | [SAFE Network Forum](https://safenetforum.org) |
+| [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
 ## Overview
@@ -14,7 +14,7 @@ An autonomous network capable of data storage/publishing/sharing as well as comp
 ## Crate Dependencies
 Crate dependencies graph:
 
-![safe_vault MaidSafe dependencies](https://github.com/maidsafe/safe_vault/blob/png_generator/safe_vault_maidsafe_dependencies.png)
+![sn_node MaidSafe dependencies](https://github.com/maidsafe/sn_node/blob/png_generator/sn_node_maidsafe_dependencies.png)
 
 
 ### Legend
@@ -28,10 +28,10 @@ A dependency can be of more than one kind. In such cases, it is coloured with th
 `Regular -> Build -> Dev -> Optional`
 
 <details>
-<summary> View all safe_vault dependencies</summary>
+<summary> View all sn_node dependencies</summary>
 <p>
 
-![safe_vault all dependencies](https://github.com/maidsafe/safe_vault/blob/png_generator/safe_vault_all_dependencies.png)
+![sn_node all dependencies](https://github.com/maidsafe/sn_node/blob/png_generator/sn_node_all_dependencies.png)
 
 </p>
 </details>
@@ -40,11 +40,11 @@ Click [here](https://maidsafe.github.io/interdependency-svg-generator/) for an o
 
 ## License
 
-This SAFE Network library is licensed under the General Public License (GPL), version 3 ([LICENSE](LICENSE) https://www.gnu.org/licenses/gpl-3.0.en.html).
+This Safe Network library is licensed under the General Public License (GPL), version 3 ([LICENSE](LICENSE) https://www.gnu.org/licenses/gpl-3.0.en.html).
 
 ### Linking exception
 
-safe_vault is licensed under GPLv3 with linking exception. This means you can link to and use the library from any program, proprietary or open source; paid or gratis. However, if you modify safe_vault, you must distribute the source to your modified version under the terms of the GPLv3.
+sn_node is licensed under GPLv3 with linking exception. This means you can link to and use the library from any program, proprietary or open source; paid or gratis. However, if you modify sn_node, you must distribute the source to your modified version under the terms of the GPLv3.
 
 See [the LICENSE file](LICENSE) for more details.
 

@@ -2342,51 +2342,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "safe_vault"
-version = "0.24.0"
-dependencies = [
- "async-log",
- "base64 0.10.1",
- "bincode",
- "bytes 0.5.6",
- "crdts",
- "crossbeam-channel",
- "ctrlc",
- "directories 2.0.2",
- "ed25519",
- "ed25519-dalek",
- "flexi_logger",
- "futures",
- "fxhash",
- "hex",
- "hex_fmt",
- "lazy_static",
- "log",
- "maplit",
- "pickledb",
- "quick-error",
- "rand 0.7.3",
- "rand_chacha",
- "safe_core",
- "self_update",
- "serde",
- "serde_json",
- "sha2 0.8.2",
- "signature",
- "sn_data_types",
- "sn_fake_clock",
- "sn_routing",
- "sn_transfers",
- "structopt 0.3.17",
- "tempdir",
- "threshold_crypto",
- "tiny-keccak 1.5.0",
- "tokio",
- "unwrap",
- "xor_name",
-]
-
-[[package]]
 name = "safemem"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2620,6 +2575,51 @@ name = "sn_fake_clock"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b3bb89541a5068ba2861181892745587897765ea2724b78257eb5f289de16ab"
+
+[[package]]
+name = "sn_node"
+version = "0.24.0"
+dependencies = [
+ "async-log",
+ "base64 0.10.1",
+ "bincode",
+ "bytes 0.5.6",
+ "crdts",
+ "crossbeam-channel",
+ "ctrlc",
+ "directories 2.0.2",
+ "ed25519",
+ "ed25519-dalek",
+ "flexi_logger",
+ "futures",
+ "fxhash",
+ "hex",
+ "hex_fmt",
+ "lazy_static",
+ "log",
+ "maplit",
+ "pickledb",
+ "quick-error",
+ "rand 0.7.3",
+ "rand_chacha",
+ "safe_core",
+ "self_update",
+ "serde",
+ "serde_json",
+ "sha2 0.8.2",
+ "signature",
+ "sn_data_types",
+ "sn_fake_clock",
+ "sn_routing",
+ "sn_transfers",
+ "structopt 0.3.17",
+ "tempdir",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "tokio",
+ "unwrap",
+ "xor_name",
+]
 
 [[package]]
 name = "sn_routing"

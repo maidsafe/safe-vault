@@ -21,7 +21,7 @@ packages/
 .DS_Store
 *.back.aip
 .env
-installer/docker/safe_vault
-installer/docker/safe_vault.*.config
+installer/docker/sn_node
+installer/docker/sn_node.*.config
 installer/docker/.env
-vaults
+nodes
