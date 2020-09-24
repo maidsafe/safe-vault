@@ -150,7 +150,7 @@ jobs:
           chmod +x $HOME/.safe/safe-cli/safe
 
       - name: Check Safe Versions
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        if: matrix.os != 'macos-latest'
         run : |
           $HOME/.safe/vault/safe_vault -V
           safe --version
