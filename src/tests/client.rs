@@ -13,22 +13,26 @@ use std::sync::Once;
 static mut NETWORK: Network = Network { nodes: Vec::new() };
 static START: Once = Once::new();
 
-#[allow(unsafe_code)]
-fn start_network() {
-    START.call_once(|| unsafe {
-        NETWORK = futures::executor::block_on(Network::new(7));
-    });
-}
+// #[allow(unsafe_code)]
+// fn start_network() {
+//     START.call_once(|| {
+//         // NETWORK = 
+//         futures::executor::block_on(Network::new(7));
+//     });
+// }
 
 #[tokio::test]
 async fn client_creation() {
-    start_network();
+    // start_network();
+    Network::new(7).await;
+
     assert!(client_tests::client_creation().await.is_ok());
 }
 
 #[tokio::test]
 async fn client_creation_for_existing_sk() {
-    start_network();
+     // start_network();
+     Network::new(7).await;
     assert!(client_tests::client_creation_for_existing_sk()
         .await
         .is_ok());

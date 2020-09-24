@@ -15,6 +15,7 @@ use sn_routing::{NodeConfig as RoutingConfig, TransportConfig as NetworkConfig};
 use std::net::SocketAddr;
 use std::thread;
 use std::thread::JoinHandle;
+use tokio::time::{delay_for, Duration};
 
 #[derive(Default)]
 struct Network {
@@ -40,7 +41,7 @@ impl Network {
         let handle = std::thread::Builder::new()
             .name("node-genesis".to_string())
             .spawn(move || {
-                let mut runtime = tokio::runtime::Runtime::new().unwrap();
+                // let mut runtime = tokio::runtime::Runtime::new().unwrap();
                 genesis_config.set_flag("first", 1);
                 let path = path.join("genesis-node");
                 std::fs::create_dir_all(&path).expect("Cannot create genesis directory");
@@ -50,20 +51,22 @@ impl Network {
                 let mut routing_config = RoutingConfig::default();
                 routing_config.first = genesis_config.is_first();
                 routing_config.transport_config = genesis_config.network_config().clone();
-                let mut node = runtime
-                    .block_on(Node::new(&genesis_config, rand::rngs::OsRng::default()))
+                let mut node = futures::executor::block_on(Node::new(&genesis_config, rand::rngs::OsRng::default()))
                     .expect("Unable to start Node");
-                let our_conn_info = runtime
-                    .block_on(node.our_connection_info())
+                let our_conn_info = futures::executor::block_on(node.our_connection_info())
                     .expect("Could not get genesis info");
                 let _ = write_connection_info(&our_conn_info).unwrap();
-                let _ = runtime.block_on(node.run()).unwrap();
+                let _ = futures::executor::block_on(node.run()).unwrap();
             })
             .unwrap();
+
+            delay_for(Duration::from_secs(5)).await;
         nodes.push((command_tx, handle));
         for i in 1..no_of_nodes {
-            thread::sleep(std::time::Duration::from_secs(2));
-            let mut runtime = tokio::runtime::Runtime::new().unwrap();
+            // thread::sleep(std::time::Duration::from_secs(2));
+            delay_for(Duration::from_secs(5)).await;
+
+            // let mut runtime = tokio::runtime::Runtime::new().unwrap();
             let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
             let mut node_config = node_config.clone();
             let handle = thread::Builder::new()
@@ -82,13 +85,15 @@ impl Network {
                     let mut routing_config = RoutingConfig::default();
                     routing_config.transport_config = node_config.network_config().clone();
                     let rng = rand::rngs::OsRng::default();
-                    let mut node = runtime.block_on(Node::new(&node_config, rng)).unwrap();
-                    let _ = runtime.block_on(node.run()).unwrap();
+                    let mut node = futures::executor::block_on(Node::new(&node_config, rng)).unwrap();
+                    let _ = futures::executor::block_on(node.run()).unwrap();
                 })
                 .unwrap();
             nodes.push((command_tx, handle));
         }
-        thread::sleep(std::time::Duration::from_secs(2));
+        // thread::sleep(std::time::Duration::from_secs(2));
+        delay_for(Duration::from_secs(10)).await;
+
         Self { nodes }
     }
 }
