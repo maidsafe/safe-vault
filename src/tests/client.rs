@@ -29,10 +29,8 @@ async fn client_can_start() -> Result<()> {
 
     assert!(client_tests::client_creation().await.is_ok());
 
-
     Ok(())
 }
-
 
 #[tokio::test]
 async fn client_can_start_w_existing_sk() -> Result<()> {
