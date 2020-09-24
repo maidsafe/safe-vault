@@ -10,6 +10,7 @@ env:
   # Run all cargo commands with --verbose.
   CARGO_TERM_VERBOSE: true
   RUST_BACKTRACE: "full"
+  SAFE_CLI_VERSION: "0.11.0"
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
