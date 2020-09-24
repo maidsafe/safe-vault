@@ -63,6 +63,8 @@ safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "ma
 #safe_core = { path = "../safe_client_libs" }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util", "rt-threaded"] }
 futures = "~0.3.5"
+sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
+directories = "2.0.2"
 
 [[bin]]
 name = "sn_node"
