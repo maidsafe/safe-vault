@@ -1892,8 +1892,8 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.8.2"
-source = "git+https://github.com/maidsafe/qp2p#fa70f9a7379214cf71b4dd684afddf66e0b6f174"
+version = "0.8.3"
+source = "git+https://github.com/maidsafe/qp2p#de4b450ba33854b53d6cd0446a86891f735be8fe"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2640,7 +2640,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/bochaco/sn_routing.git?branch=async-quic-p2p-api#15b2142bf9974dfb645ddf1b4eef1cf6ee6b83ca"
+source = "git+https://github.com/maidsafe/sn_routing.git#9ad521735cff43e3ceeeeaab78105bf74271c46a"
 dependencies = [
  "async-recursion",
  "bincode",
