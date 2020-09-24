@@ -16,7 +16,7 @@ static START: Once = Once::new();
 // #[allow(unsafe_code)]
 // fn start_network() {
 //     START.call_once(|| {
-//         // NETWORK = 
+//         // NETWORK =
 //         futures::executor::block_on(Network::new(7));
 //     });
 // }
@@ -27,7 +27,6 @@ async fn client_tests() {
     Network::new(7).await;
 
     assert!(client_tests::client_creation().await.is_ok());
-
 
     assert!(client_tests::client_creation_for_existing_sk()
         .await

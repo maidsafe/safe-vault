@@ -61,12 +61,12 @@ impl Network {
                 let _ = runtime.block_on(node.run()).unwrap();
             })
             .unwrap();
-    delay_for(Duration::from_secs(10)).await;
+        delay_for(Duration::from_secs(10)).await;
 
         nodes.push((command_tx, handle));
         for i in 1..no_of_nodes {
             // thread::sleep(std::time::Duration::from_secs(2));
-                delay_for(Duration::from_secs(2)).await;
+            delay_for(Duration::from_secs(2)).await;
 
             let mut runtime = tokio::runtime::Runtime::new().unwrap();
             let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
@@ -94,7 +94,7 @@ impl Network {
             nodes.push((command_tx, handle));
         }
         // thread::sleep(std::time::Duration::from_secs(2));
-delay_for(Duration::from_secs(10)).await;
+        delay_for(Duration::from_secs(10)).await;
 
         Self { nodes }
     }
