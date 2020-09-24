@@ -22,17 +22,12 @@ static START: Once = Once::new();
 // }
 
 #[tokio::test]
-async fn client_creation() {
+async fn client_tests() {
     // start_network();
     Network::new(7).await;
 
     assert!(client_tests::client_creation().await.is_ok());
-}
 
-#[tokio::test]
-async fn client_creation_for_existing_sk() {
-     // start_network();
-     Network::new(7).await;
     assert!(client_tests::client_creation_for_existing_sk()
         .await
         .is_ok());
