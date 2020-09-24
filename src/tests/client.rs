@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Network;
+// use super::Network;
 use safe_core::client::exported_tests as client_tests;
 // use std::sync::Once;
 use crate::Result;
@@ -25,7 +25,7 @@ use crate::Result;
 #[tokio::test]
 async fn client_tests() -> Result<()> {
     // start_network();
-    let _ = Network::new(7).await?;
+    // let _ = Network::new(7).await?;
 
     assert!(client_tests::client_creation().await.is_ok());
 
