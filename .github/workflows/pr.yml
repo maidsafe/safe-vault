@@ -9,7 +9,7 @@ on: pull_request
 env:
   # Run all cargo commands with --verbose.
   CARGO_TERM_VERBOSE: true
-  RUST_BACKTRACE: 1
+  RUST_BACKTRACE: "full"
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
 
