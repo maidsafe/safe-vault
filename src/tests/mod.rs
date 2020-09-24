@@ -20,7 +20,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 #[cfg(target_os = "windows")]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
-static NODES_DIR: &str = "node-testing";
+static NODES_DIR: &str = "local-testing";
 static INTERVAL: &str = "3";
 
 fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
@@ -49,10 +49,12 @@ pub async fn node_run(// node_path: Option<PathBuf>,
     let node_path = Some(PathBuf::from("./target/release"));
     // let node_path = None;
     let node_path = get_node_bin_path(node_path)?;
+    
     // let ndoes_dir = NODES_DIR;
     let arg_node_path = node_path.join(SAFE_NODE_EXECUTABLE).display().to_string();
     debug!("Running node from {}", arg_node_path);
 
+    let base_log_dir = get_node_bin_path(None);
     let node_log_dir = node_path.join(NODES_DIR);
     if !node_log_dir.exists() {
         println!("Creating '{}' folder", node_log_dir.display());
