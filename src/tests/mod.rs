@@ -107,8 +107,8 @@ pub async fn node_run(// node_path: Option<PathBuf>,
 
     delay_for(interval_duration).await;
 
-    let ignore_errors = true;
-    let report_errors = false;
+    // let ignore_errors = true;
+    // let report_errors = false;
 
     Ok(())
 }
