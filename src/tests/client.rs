@@ -23,11 +23,21 @@ use crate::Result;
 // }
 
 #[tokio::test]
-async fn client_tests() -> Result<()> {
+async fn client_can_start() -> Result<()> {
     // start_network();
     // let _ = Network::new(7).await?;
 
     assert!(client_tests::client_creation().await.is_ok());
+
+
+    Ok(())
+}
+
+
+#[tokio::test]
+async fn client_can_start_w_existing_sk() -> Result<()> {
+    // start_network();
+    // let _ = Network::new(7).await?;
 
     assert!(client_tests::client_creation_for_existing_sk()
         .await

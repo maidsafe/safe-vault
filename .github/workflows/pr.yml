@@ -123,7 +123,7 @@ jobs:
 
       # TODO: update for _node_ once we have SNLT updated
       - name: Copy node bin to correct location
-        run: cp target/release/sn_node ~/.safe/vault
+        run: cp target/release/safe_vault ~/.safe/vault
 
 
       - name: Download Safe CLI Linux

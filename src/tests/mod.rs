@@ -92,7 +92,7 @@ impl Network {
                     let _ = runtime.block_on(node.run()).unwrap();
                 })
                 .unwrap();
-            vaults.push((command_tx, handle));
+            nodes.push((command_tx, handle));
         }
         // thread::sleep(std::time::Duration::from_secs(2));
         delay_for(Duration::from_secs(10)).await;
