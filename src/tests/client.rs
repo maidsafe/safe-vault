@@ -33,5 +33,5 @@ async fn client_tests() -> Result<()> {
         .await
         .is_ok());
 
-        Ok(())
+    Ok(())
 }

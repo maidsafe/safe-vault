@@ -9,6 +9,7 @@
 mod client;
 
 use crate::config_handler::write_connection_info;
+use crate::Result;
 use crate::{utils, utils::Command, Config, Node};
 use crossbeam_channel::Sender;
 use sn_routing::{NodeConfig as RoutingConfig, TransportConfig as NetworkConfig};
@@ -16,7 +17,6 @@ use std::net::SocketAddr;
 use std::thread;
 use std::thread::JoinHandle;
 use tokio::time::{delay_for, Duration};
-use crate::Result;
 
 #[derive(Default)]
 struct Network {
