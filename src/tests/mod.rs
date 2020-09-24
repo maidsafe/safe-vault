@@ -46,7 +46,8 @@ pub async fn node_run(// node_path: Option<PathBuf>,
     println!("STARTING NODES");
     let verbosity = 4;
     // let ip = None;
-    let node_path = None;
+    let node_path = Some(PathBuf::from("./target/release"));
+    // let node_path = None;
     let node_path = get_node_bin_path(node_path)?;
     // let ndoes_dir = NODES_DIR;
     let arg_node_path = node_path.join(SAFE_NODE_EXECUTABLE).display().to_string();

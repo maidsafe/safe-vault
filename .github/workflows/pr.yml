@@ -122,14 +122,14 @@ jobs:
           command: build
           args: --release  --features=simulated-payouts
 
-      # TODO: update for _node_ once we have SNLT updated
-      - name: Copy node bin to correct location
-        run: cp target/release/sn_node ~/.safe/node
+      # # TODO: update for _node_ once we have SNLT updated
+      # - name: Copy node bin to correct location
+      #   run: cp target/release/sn_node ~/.safe/node
 
 
-      - name: Check Safe Node Version
-        run : |
-          $HOME/.safe/node/sn_node -V
+      # - name: Check Safe Node Version
+      #   run : |
+      #     $HOME/.safe/node/sn_node -V
 
       - name: Cargo tests
         uses: actions-rs/cargo@v1
