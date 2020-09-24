@@ -16,6 +16,7 @@ use std::net::SocketAddr;
 use std::thread;
 use std::thread::JoinHandle;
 use tokio::time::{delay_for, Duration};
+use crate::Result;
 
 #[derive(Default)]
 struct Network {
@@ -24,7 +25,7 @@ struct Network {
 }
 
 impl Network {
-    pub async fn new(no_of_nodes: usize) -> Self {
+    pub async fn new(no_of_nodes: usize) -> Result<Self> {
         let path = std::path::Path::new("nodes");
         std::fs::remove_dir_all(&path).unwrap_or(()); // Delete nodes directory if it exists;
         std::fs::create_dir_all(&path).expect("Cannot create nodes directory");
@@ -96,6 +97,6 @@ impl Network {
         // thread::sleep(std::time::Duration::from_secs(2));
         delay_for(Duration::from_secs(10)).await;
 
-        Self { nodes }
+        Ok(Self { nodes })
     }
 }

@@ -8,10 +8,11 @@
 
 use super::Network;
 use safe_core::client::exported_tests as client_tests;
-use std::sync::Once;
+// use std::sync::Once;
+use crate::Result;
 
-static mut NETWORK: Network = Network { nodes: Vec::new() };
-static START: Once = Once::new();
+// static mut NETWORK: Network = Network { nodes: Vec::new() };
+// static START: Once = Once::new();
 
 // #[allow(unsafe_code)]
 // fn start_network() {
@@ -22,13 +23,15 @@ static START: Once = Once::new();
 // }
 
 #[tokio::test]
-async fn client_tests() {
+async fn client_tests() -> Result<()> {
     // start_network();
-    Network::new(7).await;
+    let _ = Network::new(7).await?;
 
     assert!(client_tests::client_creation().await.is_ok());
 
     assert!(client_tests::client_creation_for_existing_sk()
         .await
         .is_ok());
+
+        Ok(())
 }
