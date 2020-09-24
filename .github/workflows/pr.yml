@@ -152,7 +152,6 @@ jobs:
       - name: Check Safe Versions
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         run : |
-          $HOME/.safe/authd/safe-authd -V
           $HOME/.safe/vault/safe_vault -V
           safe --version
           cat native/Cargo.toml
