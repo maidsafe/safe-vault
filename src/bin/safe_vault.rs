@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! sn_node provides the interface to Safe routing.  The resulting executable is the node
-//! for the Safe network.
+//! SAFE Vault provides the interface to SAFE routing.  The resulting executable is the Vault node
+//! for the SAFE network.
 
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
@@ -28,8 +28,8 @@
 )]
 
 use log::{self, error, info};
+use safe_vault::{self, utils, write_connection_info, Config, Node};
 use self_update::{cargo_crate_version, Status};
-use sn_node::{self, utils, write_connection_info, Config, Node};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 use unwrap::unwrap;
@@ -37,7 +37,7 @@ use unwrap::unwrap;
 const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP is enabled in your router's settings and try again. \
                                 Note that not all routers are supported in this testnet. Visit https://safenetforum.org for more information.";
 
-/// Runs a Safe Network node.
+/// Runs a SAFE Network vault.
 #[tokio::main]
 async fn main() {
     let mut config = Config::new();
@@ -68,11 +68,11 @@ async fn main() {
         match update() {
             Ok(status) => {
                 if let Status::Updated { .. } = status {
-                    println!("Node has been updated. Please restart.");
+                    println!("Vault has been updated. Please restart.");
                     process::exit(0);
                 }
             }
-            Err(e) => error!("Updating node failed: {:?}", e),
+            Err(e) => error!("Updating vault failed: {:?}", e),
         }
 
         if config.update_only() {
@@ -88,23 +88,23 @@ async fn main() {
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
     let mut rng = rand::thread_rng();
-    let mut node = match Node::new(&config, &mut rng).await {
-        Ok(node) => node,
+    let mut vault = match Node::new(&config, &mut rng).await {
+        Ok(vault) => vault,
         Err(e) => {
-            println!("Cannot start node due to error: {:?}", e);
-            error!("Cannot start node due to error: {:?}", e);
+            println!("Cannot start vault due to error: {:?}", e);
+            error!("Cannot start vault due to error: {:?}", e);
             process::exit(1);
         }
     };
 
-    match node.our_connection_info().await {
+    match vault.our_connection_info().await {
         Ok(our_conn_info) => {
             println!(
-                "Node connection info:\n{}",
+                "Vault connection info:\n{}",
                 unwrap!(serde_json::to_string(&our_conn_info))
             );
             info!(
-                "Node connection info: {}",
+                "Vault connection info: {}",
                 unwrap!(serde_json::to_string(&our_conn_info))
             );
 
@@ -113,19 +113,19 @@ async fn main() {
             }
         }
         Err(e) => {
-            println!("Cannot start node due to error: {:?}", e);
-            error!("Cannot start node due to error: {:?}", e);
+            println!("Cannot start vault due to error: {:?}", e);
+            error!("Cannot start vault due to error: {:?}", e);
             error!("{}", IGD_ERROR_MESSAGE);
             println!("{}", IGD_ERROR_MESSAGE);
             process::exit(1);
         }
     }
 
-    match node.run().await {
+    match vault.run().await {
         Ok(()) => process::exit(0),
         Err(e) => {
-            println!("Cannot start node due to error: {:?}", e);
-            error!("Cannot start node due to error: {:?}", e);
+            println!("Cannot start vault due to error: {:?}", e);
+            error!("Cannot start vault due to error: {:?}", e);
             process::exit(1);
         }
     }
@@ -137,7 +137,7 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
 
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("maidsafe")
-        .repo_name("sn_node")
+        .repo_name("safe_vault")
         .with_target(&target)
         .build()?
         .fetch()?;
@@ -146,13 +146,13 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
         log::debug!("Target for update is {}", target);
         log::debug!("Found releases: {:#?}\n", releases);
         let bin_name = if target.contains("pc-windows") {
-            "sn_node.exe"
+            "safe_vault.exe"
         } else {
-            "sn_node"
+            "safe_vault"
         };
         let status = self_update::backends::github::Update::configure()
             .repo_owner("maidsafe")
-            .repo_name("sn_node")
+            .repo_name("safe_vault")
             .target(&target)
             .bin_name(&bin_name)
             .show_download_progress(true)

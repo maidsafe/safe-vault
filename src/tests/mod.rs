@@ -40,11 +40,11 @@ impl Network {
         let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
         let mut genesis_config = node_config.clone();
         let handle = std::thread::Builder::new()
-            .name("node-genesis".to_string())
+            .name("vault-genesis".to_string())
             .spawn(move || {
                 let mut runtime = tokio::runtime::Runtime::new().unwrap();
                 genesis_config.set_flag("first", 1);
-                let path = path.join("genesis-node");
+                let path = path.join("genesis-vault");
                 std::fs::create_dir_all(&path).expect("Cannot create genesis directory");
                 genesis_config.set_root_dir(&path);
                 genesis_config.listen_on_loopback();
@@ -54,7 +54,7 @@ impl Network {
                 routing_config.transport_config = genesis_config.network_config().clone();
                 let mut node = runtime
                     .block_on(Node::new(&genesis_config, rand::rngs::OsRng::default()))
-                    .expect("Unable to start Node");
+                    .expect("Unable to start vault Node");
                 let our_conn_info = runtime
                     .block_on(node.our_connection_info())
                     .expect("Could not get genesis info");
@@ -71,28 +71,28 @@ impl Network {
 
             let mut runtime = tokio::runtime::Runtime::new().unwrap();
             let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
-            let mut node_config = node_config.clone();
+            let mut vault_config = node_config.clone();
             let handle = thread::Builder::new()
-                .name(format!("node-{n}", n = i))
+                .name(format!("vault-{n}", n = i))
                 .spawn(move || {
-                    let node_path = path.join(format!("node-{}", i));
-                    println!("Starting new node: {:?}", &node_path);
-                    std::fs::create_dir_all(&node_path).expect("Cannot create node directory");
-                    node_config.set_root_dir(&node_path);
+                    let vault_path = path.join(format!("vault-{}", i));
+                    println!("Starting new vault: {:?}", &vault_path);
+                    std::fs::create_dir_all(&vault_path).expect("Cannot create vault directory");
+                    vault_config.set_root_dir(&vault_path);
 
                     let mut network_config = NetworkConfig::default();
                     let _ = network_config.hard_coded_contacts.insert(genesis_info);
-                    node_config.set_network_config(network_config);
-                    node_config.listen_on_loopback();
+                    vault_config.set_network_config(network_config);
+                    vault_config.listen_on_loopback();
 
                     let mut routing_config = RoutingConfig::default();
-                    routing_config.transport_config = node_config.network_config().clone();
+                    routing_config.transport_config = vault_config.network_config().clone();
                     let rng = rand::rngs::OsRng::default();
-                    let mut node = runtime.block_on(Node::new(&node_config, rng)).unwrap();
+                    let mut node = runtime.block_on(Node::new(&vault_config, rng)).unwrap();
                     let _ = runtime.block_on(node.run()).unwrap();
                 })
                 .unwrap();
-            nodes.push((command_tx, handle));
+            vaults.push((command_tx, handle));
         }
         // thread::sleep(std::time::Duration::from_secs(2));
         delay_for(Duration::from_secs(10)).await;
