@@ -15,6 +15,7 @@ use sn_routing::{NodeConfig as RoutingConfig, TransportConfig as NetworkConfig};
 use std::net::SocketAddr;
 use std::thread;
 use std::thread::JoinHandle;
+use tokio::time::{delay_for, Duration};
 
 #[derive(Default)]
 struct Network {
@@ -60,9 +61,13 @@ impl Network {
                 let _ = runtime.block_on(node.run()).unwrap();
             })
             .unwrap();
+    delay_for(Duration::from_secs(10)).await;
+
         nodes.push((command_tx, handle));
         for i in 1..no_of_nodes {
-            thread::sleep(std::time::Duration::from_secs(2));
+            // thread::sleep(std::time::Duration::from_secs(2));
+                delay_for(Duration::from_secs(2)).await;
+
             let mut runtime = tokio::runtime::Runtime::new().unwrap();
             let (command_tx, _command_rx) = crossbeam_channel::bounded(1);
             let mut node_config = node_config.clone();
@@ -88,7 +93,9 @@ impl Network {
                 .unwrap();
             nodes.push((command_tx, handle));
         }
-        thread::sleep(std::time::Duration::from_secs(2));
+        // thread::sleep(std::time::Duration::from_secs(2));
+delay_for(Duration::from_secs(10)).await;
+
         Self { nodes }
     }
 }

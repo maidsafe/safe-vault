@@ -28,6 +28,7 @@ async fn client_tests() {
 
     assert!(client_tests::client_creation().await.is_ok());
 
+
     assert!(client_tests::client_creation_for_existing_sk()
         .await
         .is_ok());
