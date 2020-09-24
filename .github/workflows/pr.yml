@@ -123,6 +123,7 @@ jobs:
 
       # TODO: update for _node_ once we have SNLT updated
       - name: Copy node bin to correct location
+        if: matrix.os != 'macos-latest'
         run: cp target/release/safe_vault ~/.safe/vault
 
 
@@ -139,6 +140,7 @@ jobs:
         run: wget "https://github.com/maidsafe/safe-api/releases/download/${{env.SAFE_CLI_VERSION}}/safe-cli-${{env.SAFE_CLI_VERSION}}-x86_64-pc-windows-msvc.tar.gz" -O ./safe.tar.gz;
 
       - name: Place Safe CLI
+        if: matrix.os != 'macos-latest'
         run:  |
           ls .
           mkdir -p $HOME/.safe/safe-cli
