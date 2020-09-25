@@ -1889,8 +1889,8 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.8.2"
-source = "git+https://github.com/maidsafe/qp2p#fa70f9a7379214cf71b4dd684afddf66e0b6f174"
+version = "0.8.3"
+source = "git+https://github.com/maidsafe/qp2p#de4b450ba33854b53d6cd0446a86891f735be8fe"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2305,7 +2305,7 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 [[package]]
 name = "safe_core"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/safe_client_libs#357ca33290f3ab19edfbb3d08f6414004b5a142f"
+source = "git+https://github.com/maidsafe/safe_client_libs#2bb66826586b73cde6b3b4a4a30509d3462e9e10"
 dependencies = [
  "async-trait",
  "bincode",
