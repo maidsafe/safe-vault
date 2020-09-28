@@ -38,7 +38,7 @@ impl UsedSpace {
     /// NOTE: this constructs a new async-safe instance,
     /// If you intend to create a new local `ChunkStore` tracking,
     /// then use `clone()` and `add_local_store()` to ensure
-    /// consistentcy across local `ChunkStore`s
+    /// consistency across local `ChunkStore`s
     pub fn new(max_capacity: u64) -> Self {
         Self {
             inner: Arc::new(Mutex::new(inner::UsedSpace::new(max_capacity))),

@@ -90,7 +90,7 @@ async fn successful_put() -> Result<()> {
     let root = temp_dir();
     let used_space = UsedSpace::new(u64::MAX);
     let mut chunk_store =
-        unwrap!(ChunkStore::<Data>::new(root.path(), used_space.clone(), Init::New).await);
+        ChunkStore::<Data>::new(root.path(), used_space.clone(), Init::New).await?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate().rev() {
         let the_data = &Data {
@@ -126,8 +126,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
     let root = temp_dir();
     let capacity = 32;
     let used_space = UsedSpace::new(capacity);
-    let mut chunk_store =
-        unwrap!(ChunkStore::new(root.path(), used_space.clone(), Init::New).await);
+    let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 
     let data = Data {
         id: Id(rng.gen()),
@@ -177,8 +176,7 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
 
     let root = temp_dir();
     let used_space = UsedSpace::new(u64::MAX);
-    let mut chunk_store =
-        unwrap!(ChunkStore::new(root.path(), used_space.clone(), Init::New).await);
+    let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
         chunk_store
@@ -226,7 +224,7 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let root = temp_dir();
     let used_space = UsedSpace::new(u64::MAX);
     let chunk_store: ChunkStore<Data> =
-        unwrap!(ChunkStore::new(root.path(), used_space.clone(), Init::New).await);
+        ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 
     let id = Id(new_rng().gen());
     match chunk_store.get(&id) {
