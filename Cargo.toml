@@ -70,3 +70,4 @@ doc = false
 
 [features]
 simulated-payouts = ["sn_data_types/simulated-payouts", "sn_transfers/simulated-payouts", "sn_client/simulated-payouts"]
+chaos = []

@@ -10,6 +10,7 @@ pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_m
 pub use super::onboarding::Onboarding;
 use crate::node::node_ops::NodeMessagingDuty;
 use crate::utils;
+use crate::with_chaos;
 use crate::{Error, Result};
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng};
@@ -53,6 +54,12 @@ impl ClientMsgHandling {
     ) -> Result<()> {
         trace!("Processing client handshake");
         let mut the_stream = stream;
+
+        with_chaos!({
+            debug!("Chaos: Dropping handshake");
+            return Ok(());
+        });
+
         let result = self
             .onboarding
             .onboard_client(handshake, peer_addr, &mut the_stream, rng)

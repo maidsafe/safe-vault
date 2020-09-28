@@ -30,6 +30,7 @@
 #![recursion_limit = "128"]
 
 mod capacity;
+mod chaos;
 mod chunk_store;
 mod config_handler;
 mod error;
