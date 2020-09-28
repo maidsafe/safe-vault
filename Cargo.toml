@@ -59,8 +59,8 @@ xor_name = "1.1.0"
 [dev_dependencies]
 maplit = "1.0.1"
 tempdir = "~0.3.7"
-safe_core = { git = "https://github.com/maidsafe/safe_client_libs", branch = "master" }
-#safe_core = { path = "../safe_client_libs" }
+sn_client = { git = "https://github.com/maidsafe/sn_client", branch = "master" }
+#sn_client = { path = "../sn_client" }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util", "rt-threaded"] }
 futures = "~0.3.5"
 
@@ -69,4 +69,4 @@ name = "sn_node"
 doc = false
 
 [features]
-simulated-payouts = ["sn_data_types/simulated-payouts", "sn_transfers/simulated-payouts", "safe_core/simulated-payouts"]
+simulated-payouts = ["sn_data_types/simulated-payouts", "sn_transfers/simulated-payouts", "sn_client/simulated-payouts"]

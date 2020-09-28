@@ -2312,45 +2312,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
-name = "safe_core"
-version = "0.42.1"
-source = "git+https://github.com/maidsafe/safe_client_libs#2bb66826586b73cde6b3b4a4a30509d3462e9e10"
-dependencies = [
- "async-trait",
- "bincode",
- "bytes 0.5.6",
- "chrono",
- "crdts",
- "crossbeam-channel",
- "directories 3.0.1",
- "env_logger 0.6.2",
- "futures",
- "futures-util",
- "lazy_static",
- "log",
- "log4rs",
- "lru",
- "miscreant",
- "qp2p",
- "rand 0.7.3",
- "regex",
- "self_encryption",
- "serde",
- "serde-value",
- "serde_json",
- "sha3",
- "sn_data_types",
- "sn_transfers",
- "threshold_crypto",
- "tiny-keccak 1.5.0",
- "tokio",
- "unwrap",
- "url",
- "ws",
- "xor_name",
-]
-
-[[package]]
 name = "safemem"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2568,6 +2529,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
+name = "sn_client"
+version = "0.42.1"
+source = "git+https://github.com/maidsafe/sn_client#40696480046217a3ab7e3bf9dea1d95c09b3289d"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "bytes 0.5.6",
+ "chrono",
+ "crdts",
+ "crossbeam-channel",
+ "directories 3.0.1",
+ "env_logger 0.6.2",
+ "futures",
+ "futures-util",
+ "lazy_static",
+ "log",
+ "log4rs",
+ "lru",
+ "miscreant",
+ "qp2p",
+ "rand 0.7.3",
+ "regex",
+ "self_encryption",
+ "serde",
+ "serde-value",
+ "serde_json",
+ "sha3",
+ "sn_data_types",
+ "sn_transfers",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "tokio",
+ "unwrap",
+ "url",
+ "ws",
+ "xor_name",
+]
+
+[[package]]
 name = "sn_data_types"
 version = "0.11.17"
 source = "git+https://github.com/maidsafe/sn_data_types.git#1b82200d46b85d40555cd5b34021cf554bbf7ff8"
@@ -2620,12 +2620,12 @@ dependencies = [
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",
- "safe_core",
  "self_update",
  "serde",
  "serde_json",
  "sha2 0.8.2",
  "signature",
+ "sn_client",
  "sn_data_types",
  "sn_fake_clock",
  "sn_routing",
