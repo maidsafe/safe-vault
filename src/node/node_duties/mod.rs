@@ -11,6 +11,7 @@ pub mod messaging;
 mod msg_analysis;
 mod network_events;
 
+use crate::chunk_store::UsedSpace;
 use crate::node::{
     adult_duties::AdultDuties,
     duty_cfg::DutyConfig,
@@ -21,13 +22,11 @@ use crate::node::{
     state_db::NodeInfo,
 };
 use crate::Network;
-use futures::lock::Mutex;
 use log::{info, trace, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
-use std::sync::Arc;
 
 #[allow(clippy::large_enum_variant)]
 pub enum DutyLevel<R: CryptoRng + Rng> {
@@ -95,7 +94,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         info!("Processing Node Duty: {:?}", duty);
         match duty {
             RegisterWallet(wallet) => self.register_wallet(wallet).await,
-            BecomeAdult => self.become_adult(),
+            BecomeAdult => self.become_adult().await,
             BecomeElder => self.become_elder().await,
             ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
             ProcessNetworkEvent(event) => self.network_events.process_network_event(event).await,
@@ -117,11 +116,11 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             .map(|c| c.into())
     }
 
-    fn become_adult(&mut self) -> Option<NodeOperation> {
+    async fn become_adult(&mut self) -> Option<NodeOperation> {
         trace!("Becoming Adult");
         use DutyLevel::*;
-        let total_used_space = Arc::new(Mutex::new(0));
-        if let Ok(duties) = AdultDuties::new(&self.node_info, &total_used_space) {
+        let used_space = UsedSpace::new(self.node_info.max_storage_capacity);
+        if let Ok(duties) = AdultDuties::new(&self.node_info, used_space).await {
             self.duty_level = Adult(duties);
             // NB: This is wrong, shouldn't write to disk here,
             // let it be upper layer resp.
@@ -135,14 +134,14 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         trace!("Becoming Elder");
 
         use DutyLevel::*;
-        let total_used_space = Arc::new(Mutex::new(0));
+        let used_space = UsedSpace::new(self.node_info.max_storage_capacity);
         info!("Attempting to assume Elder duties..");
         if matches!(self.duty_level, Elder(_)) {
             return None;
         }
         if let Ok(duties) = ElderDuties::new(
             &self.node_info,
-            &total_used_space,
+            used_space,
             self.network_api.clone(),
             self.rng.take()?,
         )

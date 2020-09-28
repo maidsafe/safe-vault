@@ -12,16 +12,15 @@ mod key_section;
 use self::{data_section::DataSection, key_section::KeySection};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
+    chunk_store::UsedSpace,
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
     Error, Network, Result,
 };
-use futures::lock::Mutex;
 use log::trace;
 use rand::{CryptoRng, Rng};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
 use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
@@ -34,7 +33,7 @@ pub struct ElderDuties<R: CryptoRng + Rng> {
 impl<R: CryptoRng + Rng> ElderDuties<R> {
     pub async fn new(
         info: &NodeInfo,
-        total_used_space: &Arc<Mutex<u64>>,
+        used_space: UsedSpace,
         network: Network,
         rng: R,
     ) -> Result<Self> {
@@ -42,7 +41,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
         let rate_limit = RateLimit::new(network.clone(), Capacity::new(dbs.clone()));
         let key_section = KeySection::new(info, rate_limit, network.clone(), rng).await?;
-        let data_section = DataSection::new(info, dbs, total_used_space, network).await?;
+        let data_section = DataSection::new(info, dbs, used_space, network).await?;
         Ok(Self {
             prefix,
             key_section,

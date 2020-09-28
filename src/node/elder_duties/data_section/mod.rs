@@ -16,14 +16,13 @@ use self::{
 
 use crate::{
     capacity::ChunkHolderDbs,
+    chunk_store::UsedSpace,
     node::node_ops::{DataSectionDuty, NodeOperation, RewardDuty},
     node::state_db::NodeInfo,
     utils, Network, Result,
 };
-use futures::lock::Mutex;
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
-use std::sync::Arc;
 use xor_name::XorName;
 
 /// A DataSection is responsible for
@@ -45,11 +44,11 @@ impl DataSection {
     pub async fn new(
         info: &NodeInfo,
         dbs: ChunkHolderDbs,
-        total_used_space: &Arc<Mutex<u64>>,
+        used_space: UsedSpace,
         network: Network,
     ) -> Result<Self> {
         // Metadata
-        let metadata = Metadata::new(info, dbs, &total_used_space, network.clone())?;
+        let metadata = Metadata::new(info, dbs, used_space, network.clone()).await?;
 
         // Rewards
         let keypair = utils::key_pair(network.clone()).await?;

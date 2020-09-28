@@ -8,15 +8,13 @@
 
 mod chunks;
 
-use self::chunks::Chunks;
+use self::chunks::{Chunks, UsedSpace};
 use crate::{
     node::node_ops::{AdultDuty, ChunkDuty, NodeOperation},
     node::state_db::NodeInfo,
     Result,
 };
-use futures::lock::Mutex;
 use std::fmt::{self, Display, Formatter};
-use std::sync::Arc;
 
 /// The main duty of an Adult node is
 /// storage and retrieval of data chunks.
@@ -25,8 +23,8 @@ pub struct AdultDuties {
 }
 
 impl AdultDuties {
-    pub fn new(node_info: &NodeInfo, total_used_space: &Arc<Mutex<u64>>) -> Result<Self> {
-        let chunks = Chunks::new(node_info, &total_used_space)?;
+    pub async fn new(node_info: &NodeInfo, used_space: UsedSpace) -> Result<Self> {
+        let chunks = Chunks::new(node_info, used_space).await?;
         Ok(Self { chunks })
     }
 
