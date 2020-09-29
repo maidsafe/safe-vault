@@ -55,6 +55,7 @@ ed25519 = "1.0.1"
 signature = "1.1.0"
 tokio = { version = "~0.2.5", features = ["macros", "fs", "sync"] }
 xor_name = "1.1.0"
+sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
 
 [dev_dependencies]
 maplit = "1.0.1"

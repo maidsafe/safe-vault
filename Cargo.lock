@@ -820,8 +820,11 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
 dependencies = [
+ "atty",
+ "humantime",
  "log",
  "regex",
+ "termcolor",
 ]
 
 [[package]]
@@ -2595,6 +2598,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36db4bb99ee5a030e784804baf120d4e93dc8122017228f8ed71ab123d9fe3d4"
 
 [[package]]
+name = "sn_launch_tool"
+version = "0.0.1"
+source = "git+https://github.com/maidsafe/sn_launch_tool.git#465bc54f995528123b0b38cd0b28bd3cfab3ed9d"
+dependencies = [
+ "directories 2.0.2",
+ "env_logger 0.7.1",
+ "log",
+ "regex",
+ "structopt 0.3.18",
+]
+
+[[package]]
 name = "sn_node"
 version = "0.24.0"
 dependencies = [
@@ -2628,6 +2643,7 @@ dependencies = [
  "sn_client",
  "sn_data_types",
  "sn_fake_clock",
+ "sn_launch_tool",
  "sn_routing",
  "sn_transfers",
  "structopt 0.3.18",
