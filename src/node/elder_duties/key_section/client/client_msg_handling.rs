@@ -107,9 +107,8 @@ impl ClientMsgHandling {
             debug!("Chaos: Dropping incoming message");
             return None;
         });
-        
-        let msg_id = msg.id();
 
+        let msg_id = msg.id();
 
         // We could have received a group decision containing a client msg,
         // before receiving the msg from that client directly.
