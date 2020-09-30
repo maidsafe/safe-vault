@@ -103,7 +103,13 @@ impl ClientMsgHandling {
     ) -> Option<NodeMessagingDuty> {
         trace!("Tracking incoming client message");
 
+        with_chaos!({
+            debug!("Chaos: Dropping incoming message");
+            return None;
+        });
+        
         let msg_id = msg.id();
+
 
         // We could have received a group decision containing a client msg,
         // before receiving the msg from that client directly.
