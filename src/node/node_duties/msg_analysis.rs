@@ -41,7 +41,11 @@ impl NetworkMsgAnalysis {
         self.self_is_handler_for(&msg.destination().xorname()).await
     }
 
-    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    pub async fn evaluate(
+        &mut self,
+        msg: &MsgEnvelope,
+        our_name: XorName,
+    ) -> Option<NodeOperation> {
         let msg = if self.should_accumulate(msg).await {
             self.accumulation.process_message_envelope(msg)?
         } else {
@@ -56,7 +60,7 @@ impl NetworkMsgAnalysis {
             // The auth cmd has been agreed by the Gateway section.
             // (All other client msgs are handled when received from client).
             duty.into()
-        } else if let Some(duty) = self.try_transfers(&msg).await {
+        } else if let Some(duty) = self.try_transfers(&msg, our_name).await {
             duty.into()
         } else if let Some(duty) = self.try_metadata(&msg).await {
             // Accumulated msg from `Payment`!
@@ -385,7 +389,7 @@ impl NetworkMsgAnalysis {
     }
 
     // Check internal transfer cmds.
-    async fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
+    async fn try_transfers(&self, msg: &MsgEnvelope, our_name: XorName) -> Option<TransferDuty> {
         use NodeTransferCmd::*;
 
         // From Transfer module we get `PropagateTransfer`.
@@ -410,16 +414,20 @@ impl NetworkMsgAnalysis {
                     origin: msg.origin.address(),
                 }),
                 Message::NodeQuery {
-                    query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(public_key)),
+                    query:
+                        NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents {
+                            section_key,
+                            requester,
+                        }),
                     id,
                 } => {
                     // This comparison is a good example of the need to use `lazy messaging`,
                     // as to handle that the expected public key is not the same as the current.
-                    if public_key == &self.routing.public_key().await? {
+                    if section_key == &self.routing.public_key().await? && *requester != our_name {
                         Some(TransferDuty::ProcessQuery {
                             query: TransferQuery::GetReplicaEvents,
                             msg_id: *id,
-                            origin: msg.origin.address(),
+                            origin: Address::Node(*requester),
                         })
                     } else {
                         None

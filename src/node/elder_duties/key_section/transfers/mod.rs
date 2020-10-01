@@ -16,7 +16,7 @@ use crate::{
     node::node_ops::{NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
 use futures::lock::Mutex;
-use log::{debug, trace};
+use log::{debug, error, trace};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
@@ -27,6 +27,7 @@ use sn_data_types::{
 };
 use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
+use xor_name::XorName;
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -74,13 +75,16 @@ impl Transfers {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub async fn catchup_with_replicas(&mut self) -> Option<NodeOperation> {
+    pub async fn catchup_with_replicas(&mut self, our_name: XorName) -> Option<NodeOperation> {
         // prepare replica init
         self.wrapping
             .send(Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(PublicKey::Bls(
-                    self.replica.lock().await.replicas_pk_set()?.public_key(),
-                ))),
+                query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents {
+                    section_key: PublicKey::Bls(
+                        self.replica.lock().await.replicas_pk_set()?.public_key(),
+                    ),
+                    requester: our_name,
+                }),
                 id: MessageId::new(),
             })
             .await
@@ -166,7 +170,7 @@ impl Transfers {
         match self.replica.lock().await.initiate(events) {
             Ok(()) => None,
             Err(e) => {
-                println!("{}", e);
+                error!("{}", e);
                 panic!(e); // Temporary brittle solution before lazy messaging impl.
             }
         }
@@ -181,7 +185,7 @@ impl Transfers {
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         self.wrapping
-            .send(Message::NodeQueryResponse {
+            .send_to_node(Message::NodeQueryResponse {
                 response: Transfers(GetReplicaEvents(result)),
                 id: MessageId::new(),
                 correlation_id: msg_id,

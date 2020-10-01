@@ -52,12 +52,12 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn initiate(&mut self, first: bool) -> Option<NodeOperation> {
+    pub async fn initiate(&mut self, first: bool, our_name: XorName) -> Option<NodeOperation> {
         // currently only key section needs to catch up
         if first {
             self.key_section.init_first().await
         } else {
-            self.key_section.catchup_with_section().await
+            self.key_section.catchup_with_section(our_name).await
         }
     }
 

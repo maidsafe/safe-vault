@@ -91,6 +91,10 @@ impl ElderMsgWrapping {
         self.inner.send(message).await
     }
 
+    pub async fn send_to_node(&self, message: Message) -> Option<NodeMessagingDuty> {
+        self.inner.send_to_node(message).await
+    }
+
     pub async fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
@@ -122,6 +126,16 @@ impl MsgWrapping {
             proxies: Default::default(),
         };
         Some(NodeMessagingDuty::SendToSection(msg))
+    }
+
+    pub async fn send_to_node(&self, message: Message) -> Option<NodeMessagingDuty> {
+        let origin = self.sign(&message).await;
+        let msg = MsgEnvelope {
+            message,
+            origin,
+            proxies: Default::default(),
+        };
+        Some(NodeMessagingDuty::SendToNode(msg))
     }
 
     pub async fn send_to_adults(

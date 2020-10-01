@@ -12,7 +12,7 @@ version = "0.24.0"
 
 [patch.crates-io]
 # sn_data_types = { path = "../safe-nd" }
-sn_data_types = { git = "https://github.com/maidsafe/sn_data_types.git", branch = "master" }
+sn_data_types = { git = "https://github.com/yoga07/sn_data_types.git", branch = "fix-transfers" }
 sn_transfers = { git = "https://github.com/maidsafe/sn_transfers.git" }
 self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", branch = "master" }
 

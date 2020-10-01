@@ -80,9 +80,9 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn catchup_with_section(&mut self) -> Option<NodeOperation> {
+    pub async fn catchup_with_section(&mut self, our_name: XorName) -> Option<NodeOperation> {
         // currently only at2 replicas need to catch up
-        self.transfers.catchup_with_replicas().await
+        self.transfers.catchup_with_replicas(our_name).await
     }
 
     // Update our replica with the latest keys

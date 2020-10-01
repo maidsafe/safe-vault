@@ -2572,8 +2572,8 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.17"
-source = "git+https://github.com/maidsafe/sn_data_types.git#1b82200d46b85d40555cd5b34021cf554bbf7ff8"
+version = "0.11.18"
+source = "git+https://github.com/yoga07/sn_data_types.git?branch=fix-transfers#d2f83cafccf29a449c8cf82f52cc1ec11db5c439"
 dependencies = [
  "bincode",
  "crdts",

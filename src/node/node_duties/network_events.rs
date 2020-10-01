@@ -31,7 +31,11 @@ impl NetworkEvents {
         Self { duty_cfg, analysis }
     }
 
-    pub async fn process_network_event(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
+    pub async fn process_network_event(
+        &mut self,
+        event: RoutingEvent,
+        our_name: XorName,
+    ) -> Option<NodeOperation> {
         use ElderDuty::*;
 
         trace!("Processing Routing Event: {:?}", event);
@@ -88,7 +92,7 @@ impl NetworkEvents {
                     src,
                     dst
                 );
-                self.evaluate_msg(content).await
+                self.evaluate_msg(content, our_name).await
             }
             RoutingEvent::EldersChanged {
                 key,
@@ -107,11 +111,11 @@ impl NetworkEvents {
         }
     }
 
-    async fn evaluate_msg(&mut self, content: Bytes) -> Option<NodeOperation> {
+    async fn evaluate_msg(&mut self, content: Bytes, our_name: XorName) -> Option<NodeOperation> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
             Ok(msg) => {
                 warn!("Message Envelope received. Contents: {:?}", &msg);
-                self.analysis.evaluate(&msg).await
+                self.analysis.evaluate(&msg, our_name).await
             }
             Err(e) => {
                 error!(

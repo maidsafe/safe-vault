@@ -8,7 +8,7 @@
 
 use crate::{node::node_ops::NodeMessagingDuty, utils, Network};
 use log::{error, info};
-use sn_data_types::{Address, MsgEnvelope};
+use sn_data_types::{Address, Message, MsgEnvelope};
 use sn_routing::{DstLocation, SrcLocation};
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -25,10 +25,14 @@ impl NetworkSender {
 
     pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
         let name = *self.routing.id().await.name();
-        let dst = match msg.destination() {
-            Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
-            Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg)),
-            Address::Client(_) => return None,
+        let dst = if let Message::NodeQueryResponse { query_origin, .. } = &msg.message {
+            DstLocation::Node(query_origin.clone().xorname())
+        } else {
+            match msg.destination() {
+                Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
+                Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg)),
+                Address::Client(_) => return None,
+            }
         };
         self.routing
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
