@@ -217,7 +217,7 @@ impl Rewards {
         let _ = self.node_rewards.insert(new_node_id, state);
 
         self.wrapping
-            .send(Message::NodeQuery {
+            .send_to_section(Message::NodeQuery {
                 query: Rewards(GetWalletId {
                     old_node_id,
                     new_node_id,
@@ -311,7 +311,7 @@ impl Rewards {
                 // (Could be a case for lazy messaging..)
                 return self
                     .wrapping
-                    .send(Message::NodeQueryResponse {
+                    .send_to_node(Message::NodeQueryResponse {
                         response: Rewards(GetWalletId(Err(Error::NetworkOther(
                             "Node is not being relocated.".to_string(),
                         )))),
@@ -334,7 +334,7 @@ impl Rewards {
         use NodeQueryResponse::*;
         use NodeRewardQueryResponse::*;
         self.wrapping
-            .send(Message::NodeQueryResponse {
+            .send_to_node(Message::NodeQueryResponse {
                 response: Rewards(GetWalletId(Ok((wallet, new_node_id)))),
                 id: MessageId::new(),
                 correlation_id: msg_id,

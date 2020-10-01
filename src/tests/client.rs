@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Network;
-use sn_client::client::exported_tests as client_tests;
+use safe_core::client::{blob_apis::exported_tests as blob_apis, exported_tests as client_tests};
 use std::sync::Once;
 
 static mut NETWORK: Network = Network { nodes: Vec::new() };
@@ -32,4 +32,10 @@ async fn client_creation_for_existing_sk() {
     assert!(client_tests::client_creation_for_existing_sk()
         .await
         .is_ok());
+}
+
+#[tokio::test]
+async fn pub_blob_test() {
+    start_network();
+    assert!(blob_apis::pub_blob_test().await.is_ok());
 }

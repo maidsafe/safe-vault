@@ -15,7 +15,7 @@ use crate::{
     utils,
 };
 use futures::lock::Mutex;
-use log::trace;
+use log::{info, trace, warn};
 use sn_data_types::{
     Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
 };
@@ -80,6 +80,7 @@ impl Payments {
 
         use TransferError::*;
         if recipient_is_not_section {
+            warn!("Payment: recipient is not section");
             return self
                 .wrapping
                 .error(
@@ -100,10 +101,16 @@ impl Payments {
         };
         let result = match result {
             Ok(_) => {
+                info!("Payment: registration and propagation succeeded.");
                 // Paying too little will see the amount be forfeited.
                 // This prevents spam of the network.
                 let total_cost = self.rate_limit.from(num_bytes).await?;
                 if total_cost > payment.amount() {
+                    warn!(
+                        "Payment: Too low payment: {}, expected: {}",
+                        payment.amount(),
+                        total_cost
+                    );
                     // todo, better error, like `TooLowPayment`
                     return self
                         .wrapping
@@ -115,11 +122,13 @@ impl Payments {
                         .await
                         .map(|c| c.into());
                 }
+                info!("Payment: forwarding data..");
                 // consider having the section actor be
                 // informed of this transfer as well..
                 self.wrapping.forward(msg).await
             }
             Err(error) => {
+                warn!("Payment: registration or propagation failed: {}", error);
                 self.wrapping
                     .error(
                         CmdError::Transfer(TransferRegistration(error)),

@@ -16,7 +16,7 @@ use crate::{
     node::node_ops::{NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
 use futures::lock::Mutex;
-use log::{debug, trace};
+use log::{debug, info, trace, warn};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
@@ -77,7 +77,7 @@ impl Transfers {
     pub async fn catchup_with_replicas(&mut self) -> Option<NodeOperation> {
         // prepare replica init
         self.wrapping
-            .send(Message::NodeQuery {
+            .send_to_section(Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(PublicKey::Bls(
                     self.replica.lock().await.replicas_pk_set()?.public_key(),
                 ))),
@@ -175,13 +175,23 @@ impl Transfers {
     /// Get all the events of the Replica.
     async fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<NodeMessagingDuty> {
         let result = match self.replica.lock().await.all_events() {
-            None => Err(Error::NoSuchData),
-            Some(events) => Ok(events),
+            None => {
+                warn!("Error! Could not fetch events.");
+                Err(Error::NoSuchData)
+            }
+            Some(events) => {
+                if events.len() > 0 {
+                    info!("Found {} replica events: {:?}", events.len(), events);
+                } else {
+                    info!("No events found!");
+                }
+                Ok(events)
+            }
         };
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         self.wrapping
-            .send(Message::NodeQueryResponse {
+            .send_to_node(Message::NodeQueryResponse {
                 response: Transfers(GetReplicaEvents(result)),
                 id: MessageId::new(),
                 correlation_id: msg_id,
@@ -203,7 +213,7 @@ impl Transfers {
             Some(keys) => Ok(keys),
         };
         self.wrapping
-            .send(Message::QueryResponse {
+            .send_to_section(Message::QueryResponse {
                 response: QueryResponse::GetReplicaKeys(result),
                 id: MessageId::new(),
                 correlation_id: msg_id,
@@ -226,7 +236,7 @@ impl Transfers {
             .balance(wallet_id)
             .ok_or(Error::NoSuchBalance);
         self.wrapping
-            .send(Message::QueryResponse {
+            .send_to_section(Message::QueryResponse {
                 response: QueryResponse::GetBalance(result),
                 id: MessageId::new(),
                 correlation_id: msg_id,
@@ -253,7 +263,7 @@ impl Transfers {
             Some(history) => Ok(history),
         };
         self.wrapping
-            .send(Message::QueryResponse {
+            .send_to_section(Message::QueryResponse {
                 response: QueryResponse::GetHistory(result),
                 id: MessageId::new(),
                 correlation_id: msg_id,
@@ -289,7 +299,7 @@ impl Transfers {
                 cmd_origin: origin,
             },
         };
-        self.wrapping.send(message).await
+        self.wrapping.send_to_section(message).await
     }
 
     /// This validation will render a signature over the
@@ -308,14 +318,14 @@ impl Transfers {
                 id: MessageId::new(),
                 correlation_id: msg_id,
             },
-            Err(error) => Message::CmdError {
+            Err(error) => Message::NodeCmdError {
                 id: MessageId::new(),
-                error: CmdError::Transfer(TransferError::TransferValidation(error)),
+                error: NodeCmdError::Transfers(NodeTransferError::TransferPropagation(error)), // TODO: SHOULD BE TRANSFERVALIDATION
                 correlation_id: msg_id,
                 cmd_origin: origin,
             },
         };
-        self.wrapping.send(message).await
+        self.wrapping.send_to_node(message).await
     }
 
     /// Registration of a transfer is requested,
@@ -333,7 +343,7 @@ impl Transfers {
             Ok(None) => None,
             Ok(Some(event)) => {
                 self.wrapping
-                    .send(Message::NodeCmd {
+                    .send_to_section(Message::NodeCmd {
                         cmd: Transfers(PropagateTransfer(event.debit_proof)),
                         id: MessageId::new(),
                     })
@@ -372,7 +382,7 @@ impl Transfers {
                 cmd_origin: origin,
             },
         };
-        self.wrapping.send(message).await
+        self.wrapping.send_to_node(message).await
     }
 
     #[allow(unused)]

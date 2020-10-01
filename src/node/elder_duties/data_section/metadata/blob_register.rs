@@ -85,7 +85,7 @@ impl BlobRegister {
         proxies: Vec<MsgSender>,
     ) -> Option<NodeMessagingDuty> {
         // fn cmd_error(error: NdError) {
-        //     self.wrapping.send(Message::CmdError {
+        //     self.wrapping.send_to_section(Message::CmdError {
         //         error: CmdError::Data(error),
         //         id: MessageId::new(),
         //         cmd_origin: origin.address(),
@@ -103,7 +103,7 @@ impl BlobRegister {
                 } else {
                     return self
                         .wrapping
-                        .send(Message::CmdError {
+                        .send_to_section(Message::CmdError {
                             error: CmdError::Data(NdError::DataExists),
                             id: MessageId::new(),
                             cmd_origin: origin.address(),
@@ -168,7 +168,7 @@ impl BlobRegister {
         proxies: Vec<MsgSender>,
     ) -> Option<NodeMessagingDuty> {
         let cmd_error = |error: NdError| {
-            self.wrapping.send(Message::CmdError {
+            self.wrapping.send_to_section(Message::CmdError {
                 error: CmdError::Data(error),
                 id: MessageId::new(),
                 cmd_origin: origin.address(),
@@ -342,7 +342,7 @@ impl BlobRegister {
             })
             .collect::<Vec<_>>();
         for message in messages {
-            if let Some(op) = self.wrapping.send(message).await.map(|c| c.into()) {
+            if let Some(op) = self.wrapping.send_to_node(message).await.map(|c| c.into()) {
                 node_ops.push(op);
             }
         }
@@ -370,7 +370,7 @@ impl BlobRegister {
         proxies: Vec<MsgSender>,
     ) -> Option<NodeMessagingDuty> {
         let query_error = |error: NdError| {
-            self.wrapping.send(Message::QueryResponse {
+            self.wrapping.send_to_section(Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
                 id: MessageId::new(),
                 query_origin: origin.address(),

@@ -26,23 +26,26 @@ impl NetworkSender {
     pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
         let name = *self.routing.id().await.name();
         let dst = match msg.destination() {
-            Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
+            Address::Node(xorname) => DstLocation::Node(xorname),
             Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg)),
             Address::Client(_) => return None,
         };
-        self.routing
+
+        let result = self
+            .routing
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
-            .await
-            .map_or_else(
-                |err| {
-                    error!("Unable to send MsgEnvelope to Peer: {:?}", err);
-                    None
-                },
-                |()| {
-                    info!("Sent MsgEnvelope to Peer {:?} from node {:?}", dst, name);
-                    None
-                },
-            )
+            .await;
+
+        result.map_or_else(
+            |err| {
+                error!("Unable to send MsgEnvelope to Peer: {:?}", err);
+                None
+            },
+            |()| {
+                info!("Sent MsgEnvelope to Peer {:?} from node {:?}", dst, name);
+                None
+            },
+        )
     }
 
     pub async fn send_to_nodes(
@@ -72,25 +75,25 @@ impl NetworkSender {
     }
 
     pub async fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
-        let name = *self.routing.id().await.name();
+        let name = self.routing.name().await;
         let dst = match msg.destination() {
-            Address::Node(xorname) => DstLocation::Node(XorName(xorname.0)),
-            Address::Client(xorname) | Address::Section(xorname) => {
-                DstLocation::Section(XorName(xorname.0))
-            }
+            Address::Node(xorname) => DstLocation::Node(xorname),
+            Address::Client(xorname) | Address::Section(xorname) => DstLocation::Section(xorname),
         };
-        self.routing
+        let result = self
+            .routing
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
-            .await
-            .map_or_else(
-                |err| {
-                    error!("Unable to send to section: {:?}", err);
-                    None
-                },
-                |()| {
-                    info!("Sent to section with: {:?}", msg);
-                    None
-                },
-            )
+            .await;
+
+        result.map_or_else(
+            |err| {
+                error!("Unable to send to section: {:?}", err);
+                None
+            },
+            |()| {
+                info!("Sent to section with: {:?}", msg);
+                None
+            },
+        )
     }
 }

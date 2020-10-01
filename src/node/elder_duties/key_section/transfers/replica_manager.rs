@@ -79,6 +79,9 @@ impl ReplicaManager {
     }
 
     pub(crate) fn all_events(&self) -> Option<Vec<ReplicaEvent>> {
+        if self.info.initiating {
+            warn!("Did not yet initiate!");
+        }
         self.store.try_load().ok()
     }
 
@@ -134,6 +137,7 @@ impl ReplicaManager {
                 Ok(Some(event)) => {
                     let event = ReplicaEvent::TransferPropagated(event);
                     self.persist(event)?;
+                    info!("Genesis replica initiated!")
                 }
                 Ok(None) => info!("Already handled genesis."), // no change
                 Err(e) => {
@@ -142,6 +146,7 @@ impl ReplicaManager {
                 }
             };
         } else {
+            info!("Node initiating with.. {:?}", events);
             let existing_events = self
                 .store
                 .try_load()
@@ -163,8 +168,14 @@ impl ReplicaManager {
                 self.info.secret_key.clone(),
                 self.info.key_index,
                 self.info.peer_replicas.clone(),
-                events,
+                self.store
+                    .try_load()
+                    .map_err(|e| NdError::NetworkOther(e.to_string()))?,
             )?;
+            info!(
+                "Node initiated {:?}",
+                self.info.secret_key.public_key_share()
+            );
         }
         // make sure to indicate that we are no longer initiating
         self.info.initiating = false;
@@ -317,6 +328,7 @@ impl ReplicaManager {
     /// it will return an error on incoming cmds.
     fn check_init_status(&mut self) -> NdResult<()> {
         if self.info.initiating {
+            warn!("Calling non-initiated replica");
             return Err(NdError::InvalidOperation);
         }
         Ok(())

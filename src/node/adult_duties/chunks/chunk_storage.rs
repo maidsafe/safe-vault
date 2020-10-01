@@ -71,7 +71,7 @@ impl ChunkStorage {
                 cmd_origin: origin.address(),
             },
         };
-        self.wrapping.send(message).await
+        self.wrapping.send_to_node(message).await
     }
 
     async fn try_store(&mut self, data: &Blob) -> NdResult<()> {
@@ -100,7 +100,7 @@ impl ChunkStorage {
             .get(address)
             .map_err(|error| error.to_string().into());
         self.wrapping
-            .send(Message::QueryResponse {
+            .send_to_section(Message::QueryResponse {
                 id: MessageId::new(),
                 response: QueryResponse::GetBlob(result),
                 correlation_id: msg_id,

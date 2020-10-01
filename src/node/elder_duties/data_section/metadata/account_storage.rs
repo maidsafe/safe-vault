@@ -62,7 +62,7 @@ impl AccountStorage {
             .account(&origin.id(), address)
             .map(Account::into_data_and_signature);
         self.wrapping
-            .send(Message::QueryResponse {
+            .send_to_section(Message::QueryResponse {
                 id: MessageId::new(),
                 response: QueryResponse::GetAccount(result),
                 correlation_id: msg_id,
@@ -154,7 +154,7 @@ impl AccountStorage {
         if let Err(error) = result {
             return self
                 .wrapping
-                .send(Message::CmdError {
+                .send_to_section(Message::CmdError {
                     id: MessageId::new(),
                     error: CmdError::Data(error),
                     correlation_id: msg_id,

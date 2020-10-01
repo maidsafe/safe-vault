@@ -102,7 +102,7 @@ impl SectionFunds {
                 } else {
                     // We ask of our Replicas to validate this transfer.
                     self.wrapping
-                        .send(Message::NodeCmd {
+                        .send_to_section(Message::NodeCmd {
                             cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
                             id: MessageId::new(),
                         })
@@ -141,7 +141,7 @@ impl SectionFunds {
                     self.state.payout_in_flight = Some(payout);
                     // We ask of our Replicas to validate this transfer.
                     self.wrapping
-                        .send(Message::NodeCmd {
+                        .send_to_section(Message::NodeCmd {
                             cmd: Transfers(ValidateSectionPayout(event.signed_transfer)),
                             id: MessageId::new(),
                         })
@@ -192,7 +192,7 @@ impl SectionFunds {
                     // We ask of our Replicas to register this transfer.
                     let reg_op = self
                         .wrapping
-                        .send(Message::NodeCmd {
+                        .send_to_section(Message::NodeCmd {
                             cmd: Transfers(RegisterSectionPayout(proof)),
                             id: MessageId::new(),
                         })

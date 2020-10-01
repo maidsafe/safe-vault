@@ -16,11 +16,11 @@ use log::error;
 use sn_data_types::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
     NodeDuties, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
-    NodeSystemCmd, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
+    NodeSystemCmd, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, PublicKey, Query,
 };
 use xor_name::XorName;
 
-// NB: This approach is not entirely good, so will be improved.
+// NB: This approach is not entirely good, so will need to be improved.
 
 /// Evaluates remote msgs from the network,
 /// i.e. not msgs sent directly from a client.
@@ -38,7 +38,24 @@ impl NetworkMsgAnalysis {
     }
 
     pub async fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
-        self.self_is_handler_for(&msg.destination().xorname()).await
+        let are_we_origin = self.are_we_origin(&msg).await;
+        !are_we_origin && self.self_is_handler_for(&msg.destination().xorname()).await
+    }
+
+    async fn are_we_origin(&self, msg: &MsgEnvelope) -> bool {
+        if let Ok(index) = self.routing.our_index().await {
+            if let Ok(set) = self.routing.public_key_set().await {
+                let share = set.public_key_share(index);
+                let us = PublicKey::BlsShare(share);
+                let origin = msg.origin.id();
+                let are_we_origin = origin == us;
+                // if are_we_origin {
+                //     println!("Received our own msg!");
+                // }
+                return are_we_origin;
+            }
+        }
+        false
     }
 
     pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
@@ -78,7 +95,7 @@ impl NetworkMsgAnalysis {
         use Address::*;
         let destined_for_network = match msg.destination() {
             Client(address) => !self.self_is_handler_for(&address).await,
-            Node(address) => address != self.routing.our_name().await,
+            Node(_) => self.are_we_origin(msg).await, // if we sent the msg, then it should go to network..
             Section(address) => !self.self_is_handler_for(&address).await,
         };
 
