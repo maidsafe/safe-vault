@@ -141,7 +141,7 @@ impl BlobRegister {
 
         let results: Vec<_> = (&target_holders)
             .iter()
-            .map(|holder| self.set_chunk_holder(*data.address(), *holder, origin.id()))
+            .map(|holder| self.set_chunk_holder(*data.address(), *holder, origin.id().public_key()))
             .filter(|res| res.is_err())
             .collect();
         if !results.is_empty() {}
@@ -182,7 +182,7 @@ impl BlobRegister {
         };
 
         if let Some(data_owner) = metadata.owner {
-            if data_owner != origin.id() {
+            if data_owner != origin.id().public_key() {
                 return cmd_error(NdError::AccessDenied).await;
             }
         };
@@ -384,7 +384,7 @@ impl BlobRegister {
         };
 
         if let Some(data_owner) = metadata.owner {
-            if data_owner != origin.id() {
+            if data_owner != origin.id().public_key() {
                 return query_error(NdError::AccessDenied).await;
             }
         };

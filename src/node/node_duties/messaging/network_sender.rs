@@ -25,7 +25,7 @@ impl NetworkSender {
 
     pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
         let name = *self.routing.id().await.name();
-        let dst = match msg.destination() {
+        let dst = match msg.destination().ok()? {
             Address::Node(xorname) => DstLocation::Node(xorname),
             Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg)),
             Address::Client(_) => return None,
@@ -76,7 +76,7 @@ impl NetworkSender {
 
     pub async fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
         let name = self.routing.name().await;
-        let dst = match msg.destination() {
+        let dst = match msg.destination().ok()? {
             Address::Node(xorname) => DstLocation::Node(xorname),
             Address::Client(xorname) | Address::Section(xorname) => DstLocation::Section(xorname),
         };

@@ -125,7 +125,7 @@ impl SequenceStorage {
             ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
             _ => error.to_string().into(),
         })?;
-        data.check_permission(action, origin.id())?;
+        data.check_permission(action, origin.id().public_key())?;
         Ok(data)
     }
 
@@ -149,7 +149,7 @@ impl SequenceStorage {
                 } else {
                     let version = sequence.policy_version();
                     let policy = sequence.private_policy(version)?;
-                    if policy.owner != origin.id() {
+                    if policy.owner != origin.id().public_key() {
                         Err(NdError::InvalidOwners)
                     } else {
                         Ok(())

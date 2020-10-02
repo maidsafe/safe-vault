@@ -8,10 +8,9 @@
 
 use crate::{utils, Network};
 use bls::PublicKeySet;
+use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use serde::Serialize;
-use sn_data_types::{
-    BlsProof, BlsProofShare, Ed25519Proof, Proof, PublicKey, Signature, SignatureShare,
-};
+use sn_data_types::{Signature, SignatureShare, TransientElderKey as ElderKey};
 
 #[derive(Clone)]
 pub struct NodeSigningKeys {
@@ -23,52 +22,21 @@ impl NodeSigningKeys {
         Self { routing }
     }
 
-    pub async fn public_key(&self) -> Option<PublicKey> {
-        let index = self.routing.our_index().await.ok()?;
-        let share = self
-            .routing
-            .public_key_set()
-            .await
-            .ok()?
-            .public_key_share(index);
-        Some(PublicKey::BlsShare(share))
+    pub async fn node_id(&self) -> Ed25519PublicKey {
+        *self.routing.id().await.public_key()
     }
 
-    /// Signs with the BLS if any, else the Ed25519.
-    pub async fn sign<T: Serialize>(&self, data: &T) -> Signature {
-        let data = utils::serialise(data);
-        if let Some(sig) = self.sign_using_bls(&data).await {
-            sig
-        } else {
-            self.sign_using_ed25519(&data)
-        }
-    }
+    pub async fn elder_key(&self) -> Option<ElderKey> {
+        let bls_share_index = self.routing.our_index().await.ok()?;
+        let bls_public_key_set = self.public_key_set().await?;
+        let bls_key = bls_public_key_set.public_key_share(bls_share_index);
 
-    pub async fn produce_proof<T: Serialize>(&self, data: &T) -> Proof {
-        match self.sign(data).await {
-            Signature::BlsShare(share) => Proof::BlsShare(BlsProofShare {
-                index: share.index,
-                signature_share: share.share,
-                public_key_set: match self.public_key_set().await {
-                    Some(key_set) => key_set,
-                    None => unreachable!(), // this is admittedly not very elegant code..
-                },
-            }),
-            Signature::Ed25519(signature) => Proof::Ed25519(Ed25519Proof {
-                public_key: match self.public_key().await {
-                    Some(PublicKey::Ed25519(key)) => key,
-                    _ => unreachable!(), // this is admittedly not very elegant code..
-                },
-                signature,
-            }),
-            Signature::Bls(signature) => Proof::Bls(BlsProof {
-                public_key: match self.public_key().await {
-                    Some(PublicKey::Bls(key)) => key,
-                    _ => unreachable!(), // this is admittedly not very elegant code..
-                },
-                signature,
-            }),
-        }
+        Some(ElderKey {
+            node_id: self.node_id().await,
+            bls_key,
+            bls_share_index,
+            bls_public_key_set,
+        })
     }
 
     async fn public_key_set(&self) -> Option<PublicKeySet> {
@@ -76,13 +44,13 @@ impl NodeSigningKeys {
     }
 
     /// Creates a detached Ed25519 signature of `data`.
-    fn sign_using_ed25519<T: AsRef<[u8]>>(&self, _data: &T) -> Signature {
-        unimplemented!()
-        //Signature::Ed25519(self.ed25519.sign(data.as_ref()))
+    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Signature {
+        self.routing.sign_as_node(data).await
     }
 
     /// Creates a detached BLS signature share of `data` if the `self` holds a BLS keypair share.
-    async fn sign_using_bls<T: AsRef<[u8]>>(&self, data: &T) -> Option<Signature> {
+    pub async fn sign_as_elder<T: Serialize>(&self, data: &T) -> Option<Signature> {
+        let data = utils::serialise(data);
         let index = self.routing.our_index().await.ok()?;
         let bls_secret_key = self.routing.secret_key_share().await.ok()?;
         Some(Signature::BlsShare(SignatureShare {

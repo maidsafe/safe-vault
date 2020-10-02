@@ -76,8 +76,8 @@ impl NodeInfo {
         self.root_dir.as_path()
     }
 
-    pub async fn public_key(&self) -> Option<sn_data_types::PublicKey> {
-        self.keys.public_key().await
+    pub async fn public_key(&self) -> sn_data_types::PublicKey {
+        sn_data_types::PublicKey::Ed25519(self.keys.node_id().await)
     }
 
     pub fn keys(&self) -> NodeSigningKeys {

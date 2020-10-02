@@ -8,7 +8,7 @@
 
 use bytes::Bytes;
 use log::info;
-use sn_data_types::{HandshakeRequest, Message, MsgEnvelope, MsgSender};
+use sn_data_types::{HandshakeRequest, Message, MsgEnvelope};
 use std::net::SocketAddr;
 
 /*
@@ -34,7 +34,6 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Option<MsgEnvelope> {
             @
             MsgEnvelope {
                 message: Message::Cmd { .. },
-                origin: MsgSender::Client { .. },
                 ..
             },
         )
@@ -43,13 +42,17 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Option<MsgEnvelope> {
             @
             MsgEnvelope {
                 message: Message::Query { .. },
-                origin: MsgSender::Client { .. },
                 ..
             },
         ) => msg,
         _ => return None, // Only cmds and queries from client are allowed through here.
     };
-    Some(msg)
+
+    if msg.origin.is_client() {
+        Some(msg)
+    } else {
+        None
+    }
 }
 
 pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Option<HandshakeRequest> {

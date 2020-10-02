@@ -17,13 +17,13 @@ use self::{
 use crate::{
     node::node_ops::{GatewayDuty, KeySectionDuty, NodeMessagingDuty, NodeOperation},
     node::state_db::NodeInfo,
-    utils, Error, Network, Result,
+    Network, Result,
 };
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
-use sn_data_types::{Address, MsgEnvelope, MsgSender};
+use sn_data_types::{Address, MsgEnvelope};
 use sn_routing::event::Event as RoutingEvent;
 use std::fmt::{self, Display, Formatter};
 
@@ -37,10 +37,7 @@ pub struct ClientGateway<R: CryptoRng + Rng> {
 
 impl<R: CryptoRng + Rng> ClientGateway<R> {
     pub async fn new(info: &NodeInfo, routing: Network, rng: R) -> Result<Self> {
-        let onboarding = Onboarding::new(
-            info.public_key().await.ok_or(Error::Logic)?,
-            routing.clone(),
-        );
+        let onboarding = Onboarding::new(info.public_key().await, routing.clone());
         let client_msg_handling = ClientMsgHandling::new(onboarding);
 
         let gateway = Self {
@@ -63,7 +60,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
 
     async fn try_find_client(&mut self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         trace!("trying to find client...");
-        if let Address::Client(xorname) = &msg.destination() {
+        if let Address::Client(xorname) = &msg.destination().ok()? {
             if self.routing.matches_our_prefix(*xorname).await {
                 trace!("Message matches gateway prefix");
                 let _ = self.client_msg_handling.match_outgoing(msg).await;
@@ -117,25 +114,19 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
 }
 
 fn validate_client_sig(msg: &MsgEnvelope) -> bool {
-    let signature = match &msg.origin {
-        MsgSender::Client(proof) => proof.signature(),
-        _ => return false,
-    };
-    match msg
-        .origin
-        .id()
-        .verify(&signature, utils::serialise(&msg.message))
-    {
-        Ok(_) => true,
-        Err(error) => {
-            warn!(
-                "{:?} from {} is invalid: {}",
-                msg.message.id(),
-                msg.origin.id(),
-                error
-            );
-            false
-        }
+    if !msg.origin.is_client() {
+        return false;
+    }
+    let valid = msg.verify();
+    if valid {
+        true
+    } else {
+        warn!(
+            "Msg {:?} from {:?} is invalid",
+            msg.message.id(),
+            msg.origin.address().xorname(),
+        );
+        false
     }
 }
 

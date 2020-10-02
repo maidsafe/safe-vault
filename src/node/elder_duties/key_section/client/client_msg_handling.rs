@@ -133,7 +133,7 @@ impl ClientMsgHandling {
     pub async fn match_outgoing(&mut self, msg: &MsgEnvelope) -> Result<()> {
         trace!("Matching outgoing message");
 
-        match msg.destination() {
+        match msg.destination()? {
             Address::Client { .. } => (),
             _ => {
                 error!(

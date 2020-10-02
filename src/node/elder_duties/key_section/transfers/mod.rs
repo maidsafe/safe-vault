@@ -180,10 +180,10 @@ impl Transfers {
                 Err(Error::NoSuchData)
             }
             Some(events) => {
-                if events.len() > 0 {
-                    info!("Found {} replica events: {:?}", events.len(), events);
-                } else {
+                if events.is_empty() {
                     info!("No events found!");
+                } else {
+                    info!("Found {} replica events: {:?}", events.len(), events);
                 }
                 Ok(events)
             }

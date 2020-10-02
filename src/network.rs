@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::state_db::AgeGroup;
-use crate::{Config as NodeConfig, Error, Result};
+use crate::{node::state_db::AgeGroup, utils, Config as NodeConfig, Error, Result};
 use bytes::Bytes;
 use futures::lock::Mutex;
-use sn_data_types::PublicKey;
+use serde::Serialize;
+use sn_data_types::{PublicKey, Signature};
 use sn_routing::{
     DstLocation, Error as RoutingError, EventStream, Node as RoutingNode,
     NodeConfig as RoutingConfig, PublicId, SectionProofChain, SrcLocation,
@@ -45,6 +45,12 @@ impl Network {
 
     pub async fn our_name(&self) -> XorName {
         XorName(self.name().await.0)
+    }
+
+    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Signature {
+        let data = utils::serialise(data);
+        let sig = self.routing.lock().await.sign(&data).await;
+        Signature::Ed25519(sig.0)
     }
 
     pub async fn public_key(&self) -> Option<PublicKey> {

@@ -162,7 +162,7 @@ impl ReplicaManager {
             // and that order should have been presereved.
             // (otherwise we can simply call sort on the vec.)
             self.store
-                .init(events.clone())
+                .init(events)
                 .map_err(|e| NdError::NetworkOther(e.to_string()))?;
             self.replica = Replica::from_history(
                 self.info.secret_key.clone(),

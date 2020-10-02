@@ -8,8 +8,8 @@
 
 use crate::node::node_ops::{MetadataDuty, NodeOperation, PaymentDuty, TransferDuty};
 use crate::Network;
-use log::info;
-use sn_data_types::{Cmd, Message, MsgEnvelope, MsgSender, Query};
+use log::{info, warn};
+use sn_data_types::{Cmd, Message, MsgEnvelope, Query};
 
 // NB: Just as with the msg_analysis.rs,
 // this approach is not entirely good, so will need to be improved.
@@ -39,14 +39,9 @@ impl ClientMsgAnalysis {
     }
 
     /// We do not accumulate these request, they are executed
-    /// at once (i.e. payment carried out) and sent on to
-    /// Metadata section. (They however, will accumulate those msgs.)
-    /// The reason for this is that the payment request is already signed
-    /// by the client and validated by its replicas,
-    /// so there is no reason to accumulate it here.
+    /// at once and sent on to Metadata section. They don't accumulate either,
+    /// just send back the response, for the client to accumulate.
     async fn try_data(&self, msg: &MsgEnvelope) -> Option<MetadataDuty> {
-        let from_client = || matches!(msg.origin, MsgSender::Client { .. });
-
         let is_data_read = || {
             matches!(msg.message, Message::Query {
                 query: Query::Data { .. },
@@ -54,9 +49,9 @@ impl ClientMsgAnalysis {
             })
         };
 
-        let shall_process = || is_data_read() && from_client();
+        let shall_process = || is_data_read() && msg.origin.is_client();
 
-        if !shall_process() || !self.is_dst_for(msg).await || !self.is_elder().await {
+        if !shall_process() || !self.is_dst_for(msg).await? || !self.is_elder().await {
             return None;
         }
 
@@ -70,8 +65,6 @@ impl ClientMsgAnalysis {
     /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
     async fn try_data_payment(&self, msg: &MsgEnvelope) -> Option<PaymentDuty> {
-        let from_client = || matches!(msg.origin, MsgSender::Client { .. });
-
         let is_data_write = || {
             matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
@@ -79,9 +72,9 @@ impl ClientMsgAnalysis {
             })
         };
 
-        let shall_process = || is_data_write() && from_client();
+        let shall_process = || is_data_write() && msg.origin.is_client();
 
-        if !shall_process() || !self.is_dst_for(msg).await || !self.is_elder().await {
+        if !shall_process() || !self.is_dst_for(msg).await? || !self.is_elder().await {
             return None;
         }
 
@@ -89,14 +82,13 @@ impl ClientMsgAnalysis {
     }
 
     async fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
-        let from_client = || matches!(msg.origin, MsgSender::Client { .. });
-
         let duty = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
                 ..
             } => {
-                if !from_client() || !self.is_dst_for(msg).await || !self.is_elder().await {
+                if !msg.origin.is_client() || !self.is_dst_for(msg).await? || !self.is_elder().await
+                {
                     return None;
                 }
                 TransferDuty::ProcessCmd {
@@ -109,7 +101,8 @@ impl ClientMsgAnalysis {
                 query: Query::Transfer(query),
                 ..
             } => {
-                if !from_client() || !self.is_dst_for(msg).await || !self.is_elder().await {
+                if !msg.origin.is_client() || !self.is_dst_for(msg).await? || !self.is_elder().await
+                {
                     return None;
                 }
                 TransferDuty::ProcessQuery {
@@ -123,10 +116,13 @@ impl ClientMsgAnalysis {
         Some(duty)
     }
 
-    async fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
-        self.routing
-            .matches_our_prefix(msg.destination().xorname())
-            .await
+    async fn is_dst_for(&self, msg: &MsgEnvelope) -> Option<bool> {
+        if let Ok(dst) = msg.destination() {
+            Some(self.routing.matches_our_prefix(dst.xorname()).await)
+        } else {
+            warn!("Invalid dst of msg: {:?}", msg);
+            None
+        }
     }
 
     async fn is_elder(&self) -> bool {

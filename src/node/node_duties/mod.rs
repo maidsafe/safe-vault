@@ -108,7 +108,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             .send_to_section(Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
                     wallet,
-                    section: self.node_info.public_key().await?.into(),
+                    section: self.node_info.public_key().await.into(),
                 }),
                 id: MessageId::new(),
             })

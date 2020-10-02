@@ -8,7 +8,9 @@
 
 use crate::utils;
 use log::{error, info};
-use sn_data_types::{BlsProof, MessageId, MsgEnvelope, MsgSender, Proof, SignatureShare};
+use sn_data_types::{
+    Duty, MessageId, MsgEnvelope, MsgSender, SignatureShare, TransientSectionKey as SectionKey,
+};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 type RequestInfo = (MsgEnvelope, MsgSender, Vec<SignatureShare>);
@@ -35,17 +37,16 @@ impl Accumulation {
             info!("Message already processed.");
             return None;
         }
-        let signature = match msg.most_recent_sender() {
-            MsgSender::Node {
-                proof: Proof::BlsShare(share),
-                ..
-            } => SignatureShare {
-                index: share.index,
-                share: share.signature_share.clone(),
-            },
-            MsgSender::Section { .. } => return Some(msg.clone()), // already group signed, no need to accumulate (check sig though?, or somewhere else, earlier on?)
-            _ => return None,                                      // no other variation is valid
-        };
+        if msg.most_recent_sender().is_section() {
+            return Some(msg.clone()); // already group signed, no need to accumulate (check sig though?, or somewhere else, earlier on?)
+        }
+
+        let sender = msg.most_recent_sender();
+        if !sender.is_elder() {
+            return None; // TODO: What Adult msgs are accumulated? There are indications that is not even correct.
+        }
+        let sig_share = sender.group_sig_share()?;
+
         info!(
             "{}: Accumulating signatures for {:?}",
             "should be id here",
@@ -54,11 +55,11 @@ impl Accumulation {
         );
         match self.messages.entry(msg.id()) {
             Entry::Vacant(entry) => {
-                let _ = entry.insert((msg.clone(), msg.origin.clone(), vec![signature]));
+                let _ = entry.insert((msg.clone(), msg.origin.clone(), vec![sig_share]));
             }
             Entry::Occupied(mut entry) => {
                 let (_, _, signatures) = entry.get_mut();
-                signatures.push(signature);
+                signatures.push(sig_share);
             }
         }
         self.try_aggregate(msg)
@@ -68,13 +69,11 @@ impl Accumulation {
         let msg_id = msg.id();
         let (_, _, signatures) = self.messages.get(&msg_id)?;
 
-        let public_key_set = match msg.most_recent_sender() {
-            MsgSender::Node {
-                proof: Proof::BlsShare(share),
-                ..
-            } => &share.public_key_set,
-            _ => return None,
-        };
+        let sender = msg.most_recent_sender();
+        if !sender.is_elder() {
+            return None; // TODO: What Adult msgs are accumulated? There are indications that is not even correct.
+        }
+        let public_key_set = sender.group_key_set()?;
 
         info!(
             "Got {} signatures. We need {}",
@@ -106,21 +105,21 @@ impl Accumulation {
         if public_key_set.public_key().verify(&signature, &signed_data) {
             let _ = self.completed.insert(msg_id);
 
-            let proof = BlsProof {
-                public_key: public_key_set.public_key(),
-                signature,
-            };
-
             // upgrade sender to Section, since it accumulated
-            let sender = match msg.most_recent_sender() {
-                MsgSender::Node { duty, .. } => MsgSender::Section { duty: *duty, proof },
-                _ => return None, // invalid use case, we only accumulate from Nodes
+            let section_key = SectionKey {
+                name: sender.address().xorname(),
+                bls_key: public_key_set.public_key(),
             };
-            // Replace the Node with the Section.
-            let mut msg = msg;
-            let _ = msg.proxies.pop();
-            msg.add_proxy(sender);
-            Some(msg)
+            if let Duty::Elder(duty) = sender.duty()? {
+                let sender = MsgSender::section(section_key, duty, signature).ok()?;
+                // Replace the Node with the Section.
+                let mut msg = msg;
+                let _ = msg.proxies.pop();
+                msg.add_proxy(sender);
+                Some(msg)
+            } else {
+                None
+            }
         // beware that we might have to forgo the proxies vector
         // and instead just have a most recent proxy, if we are seeing
         // different order on the proxies on the msgs to be accumulated
