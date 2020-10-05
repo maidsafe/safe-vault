@@ -139,7 +139,8 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         if matches!(self.duty_level, Elder(_)) {
             return None;
         }
-        if let Ok(duties) = ElderDuties::new(
+
+        match ElderDuties::new(
             &self.node_info,
             used_space,
             self.network_api.clone(),
@@ -147,18 +148,21 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         )
         .await
         {
-            let mut duties = duties;
-            let op = duties.initiate(self.node_info.first).await;
-            self.duty_level = Elder(duties);
-            // NB: This is wrong, shouldn't write to disk here,
-            // let it be upper layer resp.
-            // Also, "Error-to-Unit" is not a good conversion..
-            //dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
-            info!("Successfully assumed Elder duties!");
-            op
-        } else {
-            warn!("Was not able to assume Elder duties!");
-            None
+            Ok(duties) => {
+                let mut duties = duties;
+                let op = duties.initiate(self.node_info.first).await;
+                self.duty_level = Elder(duties);
+                // NB: This is wrong, shouldn't write to disk here,
+                // let it be upper layer resp.
+                // Also, "Error-to-Unit" is not a good conversion..
+                //dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
+                info!("Successfully assumed Elder duties!");
+                op
+            }
+            Err(e) => {
+                warn!("Was not able to assume Elder duties! {:?}", e);
+                None
+            }
         }
     }
 }

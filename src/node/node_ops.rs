@@ -11,12 +11,12 @@ use sn_data_types::Transfer;
 
 use serde::export::Formatter;
 use sn_data_types::{
-    Address, DebitAgreementProof, HandshakeResponse, MessageId, MsgEnvelope, PublicKey,
-    ReplicaEvent, SignedTransfer, TransferValidated,
+    Address, DebitAgreementProof, MessageId, MsgEnvelope, PublicKey, ReplicaEvent, SignedTransfer,
+    TransferValidated,
 };
 use sn_routing::{event::Event as RoutingEvent, Prefix};
+use std::collections::BTreeSet;
 use std::fmt::Debug;
-use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 
 /// Internal messages are what is passed along

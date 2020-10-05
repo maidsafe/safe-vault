@@ -120,12 +120,28 @@ impl ReplicaManager {
     /// are supposed to be passed in. Without them, this Replica will
     /// not be able to function properly together with the others.
     pub(crate) fn initiate(&mut self, events: &[ReplicaEvent]) -> NdResult<()> {
+        // Check if we are still in section start-up and drop messages repetitive/invalid messages.
+        // Genesis is an exception.
+        if self.all_events().is_some()
+            && self.info.section_proof_chain.len() <= 7
+            && self.info.section_proof_chain.len() != 1
+        {
+            // Safe to unwrap
+            let all_events = self.all_events().unwrap();
+            // Do nothing if we already have the same events or in case we get an empty event after initiating
+            if all_events == events || (!all_events.is_empty() && events.is_empty()) {
+                info!("Already initiated!");
+                return Ok(());
+            }
+        }
+
         if !self.info.initiating {
             warn!("Is not initiating");
             // can only synch while initiating
             return Err(NdError::InvalidOperation);
         }
         if events.is_empty() {
+            info!("Events are empty. Initiating Genesis replica.");
             // This means we are the first node in the network.
             let balance = u32::MAX as u64 * 1_000_000_000;
             let debit_proof = get_genesis(
@@ -179,6 +195,7 @@ impl ReplicaManager {
         }
         // make sure to indicate that we are no longer initiating
         self.info.initiating = false;
+        info!("Done initiating Replica and ReplicaManager.");
         Ok(())
     }
 
