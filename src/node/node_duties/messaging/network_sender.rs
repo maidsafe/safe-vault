@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::node_ops::NodeMessagingDuty, utils, Network};
+use crate::{
+    node::node_ops::{GatewayDuty, NodeMessagingDuty, NodeOperation},
+    utils, Network,
+};
 use log::{error, info};
 use sn_data_types::{Address, MsgEnvelope};
 use sn_routing::{DstLocation, SrcLocation};
@@ -15,24 +18,37 @@ use xor_name::XorName;
 
 /// Sending of msgs to other nodes in the network.
 pub(super) struct NetworkSender {
-    routing: Network,
+    network: Network,
 }
 
 impl NetworkSender {
-    pub fn new(routing: Network) -> Self {
-        Self { routing }
+    pub fn new(network: Network) -> Self {
+        Self { network }
     }
 
-    pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
-        let name = *self.routing.id().await.name();
+    pub async fn send_to_client(&mut self, msg: MsgEnvelope) -> Option<NodeOperation> {
+        let dst = match msg.destination().ok()? {
+            Address::Client(xorname) => xorname,
+            Address::Node(_) => return Some(NodeMessagingDuty::SendToNode(msg).into()),
+            Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg).into()),
+        };
+        if self.network.matches_our_prefix(dst).await {
+            Some(GatewayDuty::FindClientFor(msg).into())
+        } else {
+            Some(NodeMessagingDuty::SendToSection(msg).into())
+        }
+    }
+
+    pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<NodeOperation> {
+        let name = *self.network.id().await.name();
         let dst = match msg.destination().ok()? {
             Address::Node(xorname) => DstLocation::Node(xorname),
-            Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg)),
-            Address::Client(_) => return None,
+            Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg).into()),
+            Address::Client(_) => return self.send_to_client(msg).await,
         };
 
         let result = self
-            .routing
+            .network
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
             .await;
 
@@ -52,10 +68,10 @@ impl NetworkSender {
         &mut self,
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
-    ) -> Option<NodeMessagingDuty> {
-        let name = *self.routing.id().await.name();
+    ) -> Option<NodeOperation> {
+        let name = *self.network.id().await.name();
         for target in targets {
-            self.routing
+            self.network
                 .send_message(
                     SrcLocation::Node(name),
                     DstLocation::Node(XorName(target.0)),
@@ -74,14 +90,14 @@ impl NetworkSender {
         None
     }
 
-    pub async fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<NodeMessagingDuty> {
-        let name = self.routing.name().await;
+    pub async fn send_to_network(&mut self, msg: MsgEnvelope) -> Option<NodeOperation> {
+        let name = self.network.name().await;
         let dst = match msg.destination().ok()? {
             Address::Node(xorname) => DstLocation::Node(xorname),
             Address::Client(xorname) | Address::Section(xorname) => DstLocation::Section(xorname),
         };
         let result = self
-            .routing
+            .network
             .send_message(SrcLocation::Node(name), dst, utils::serialise(&msg))
             .await;
 

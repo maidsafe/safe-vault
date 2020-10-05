@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty};
+use crate::{
+    node::keys::NodeSigningKeys,
+    node::node_ops::{GatewayDuty, NodeMessagingDuty},
+};
 use log::info;
 use sn_data_types::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
@@ -95,6 +98,10 @@ impl ElderMsgWrapping {
         Some(NodeMessagingDuty::SendToSection(msg))
     }
 
+    pub async fn send_to_client(&self, message: Message) -> Option<NodeMessagingDuty> {
+        self.inner.send_to_client(message).await
+    }
+
     pub async fn send_to_section(&self, message: Message) -> Option<NodeMessagingDuty> {
         self.inner.send_to_section(message).await
     }
@@ -126,15 +133,15 @@ impl MsgWrapping {
         Self { keys, duty }
     }
 
-    // pub async fn send_to_client(&self, message: Message) -> Option<NodeMessagingDuty> {
-    //     let origin = self.sign(&message).await;
-    //     let msg = MsgEnvelope {
-    //         message,
-    //         origin,
-    //         proxies: Default::default(),
-    //     };
-    //     Some(NodeMessagingDuty::SendToClient(msg))
-    // }
+    pub async fn send_to_client(&self, message: Message) -> Option<NodeMessagingDuty> {
+        let origin = self.sign(&message).await?;
+        let msg = MsgEnvelope {
+            message,
+            origin,
+            proxies: Default::default(),
+        };
+        Some(NodeMessagingDuty::SendToClient(msg))
+    }
 
     pub async fn send_to_node(&self, message: Message) -> Option<NodeMessagingDuty> {
         let origin = self.sign(&message).await?;

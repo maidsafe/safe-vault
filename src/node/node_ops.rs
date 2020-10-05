@@ -134,6 +134,8 @@ impl Debug for NodeDuty {
 /// part of the system, that it can be considered domain.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeMessagingDuty {
+    /// Send to client
+    SendToClient(MsgEnvelope),
     /// Send to a single node.
     SendToNode(MsgEnvelope),
     /// Send to a section.
@@ -142,13 +144,6 @@ pub enum NodeMessagingDuty {
     SendToAdults {
         targets: BTreeSet<XorName>,
         msg: MsgEnvelope,
-    },
-    /// At a key section, connecting clients start the
-    /// interchange of handshakes. The network returns
-    /// handshake responses to the client.
-    SendHandshake {
-        address: SocketAddr,
-        response: HandshakeResponse,
     },
 }
 
@@ -164,14 +159,10 @@ impl Into<NodeOperation> for NodeMessagingDuty {
 impl Debug for NodeMessagingDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SendHandshake { address, .. } => write!(
-                f,
-                "SendHandshake [ address: {:?}, response: (...) ]",
-                address
-            ),
             Self::SendToAdults { targets, msg } => {
                 write!(f, "SendToAdults [ target: {:?}, msg: {:?} ]", targets, msg)
             }
+            Self::SendToClient(msg) => write!(f, "SendToClient [ msg: {:?} ]", msg),
             Self::SendToNode(msg) => write!(f, "SendToNode [ msg: {:?} ]", msg),
             Self::SendToSection(msg) => write!(f, "SendToSection [ msg: {:?} ]", msg),
         }

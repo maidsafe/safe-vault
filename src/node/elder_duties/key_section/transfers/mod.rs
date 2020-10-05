@@ -149,8 +149,12 @@ impl Transfers {
                 self.validate_section_payout(signed_transfer.clone(), msg_id, origin)
                     .await
             }
-            RegisterTransfer(debit_agreement) | RegisterSectionPayout(debit_agreement) => {
+            RegisterTransfer(debit_agreement) => {
                 self.register(&debit_agreement, msg_id, origin).await
+            }
+            RegisterSectionPayout(debit_agreement) => {
+                self.register_section_payout(&debit_agreement, msg_id, origin)
+                    .await
             }
             PropagateTransfer(debit_agreement) => {
                 self.receive_propagated(&debit_agreement, msg_id, origin)
@@ -213,7 +217,7 @@ impl Transfers {
             Some(keys) => Ok(keys),
         };
         self.wrapping
-            .send_to_section(Message::QueryResponse {
+            .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetReplicaKeys(result),
                 id: MessageId::new(),
                 correlation_id: msg_id,
@@ -236,7 +240,7 @@ impl Transfers {
             .balance(wallet_id)
             .ok_or(Error::NoSuchBalance);
         self.wrapping
-            .send_to_section(Message::QueryResponse {
+            .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetBalance(result),
                 id: MessageId::new(),
                 correlation_id: msg_id,
@@ -263,7 +267,7 @@ impl Transfers {
             Some(history) => Ok(history),
         };
         self.wrapping
-            .send_to_section(Message::QueryResponse {
+            .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetHistory(result),
                 id: MessageId::new(),
                 correlation_id: msg_id,
@@ -299,7 +303,7 @@ impl Transfers {
                 cmd_origin: origin,
             },
         };
-        self.wrapping.send_to_section(message).await
+        self.wrapping.send_to_client(message).await
     }
 
     /// This validation will render a signature over the
@@ -331,6 +335,39 @@ impl Transfers {
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
     async fn register(
+        &mut self,
+        proof: &DebitAgreementProof,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Option<NodeMessagingDuty> {
+        use NodeCmd::*;
+        use NodeTransferCmd::*;
+
+        match self.replica.lock().await.register(proof) {
+            Ok(None) => None,
+            Ok(Some(event)) => {
+                self.wrapping
+                    .send_to_client(Message::NodeCmd {
+                        cmd: Transfers(PropagateTransfer(event.debit_proof)),
+                        id: MessageId::new(),
+                    })
+                    .await
+            }
+            Err(error) => {
+                self.wrapping
+                    .error(
+                        CmdError::Transfer(TransferError::TransferRegistration(error)),
+                        msg_id,
+                        &origin,
+                    )
+                    .await
+            }
+        }
+    }
+
+    /// Registration of a transfer is requested,
+    /// with a proof of enough Elders having validated it.
+    async fn register_section_payout(
         &mut self,
         proof: &DebitAgreementProof,
         msg_id: MessageId,

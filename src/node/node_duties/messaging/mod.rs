@@ -31,13 +31,11 @@ impl Messaging {
     ) -> Option<NodeOperation> {
         use NodeMessagingDuty::*;
         info!("Sending message: {:?}", duty);
-        let result = match duty {
+        match duty {
+            SendToClient(msg) => self.network_sender.send_to_client(msg).await,
             SendToNode(msg) => self.network_sender.send_to_node(msg).await,
             SendToSection(msg) => self.network_sender.send_to_network(msg).await,
             SendToAdults { targets, msg } => self.network_sender.send_to_nodes(targets, &msg).await,
-            SendHandshake { .. } => None, // unreachable?
-        };
-
-        result.map(|c| c.into())
+        }
     }
 }
