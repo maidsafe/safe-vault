@@ -9,8 +9,6 @@
 #![allow(trivial_numeric_casts)] // FIXME
 
 use crate::Result;
-use directories::ProjectDirs;
-use lazy_static::lazy_static;
 use log::{debug, Level};
 use serde::{Deserialize, Serialize};
 use sn_routing::TransportConfig as NetworkConfig;
@@ -23,17 +21,6 @@ use std::{
 use structopt::StructOpt;
 use unwrap::unwrap;
 
-lazy_static! {
-    static ref PROJECT_DIRS: Option<ProjectDirs> = ProjectDirs::from(
-        CONFIG_DIR_QUALIFIER,
-        CONFIG_DIR_ORGANISATION,
-        CONFIG_DIR_APPLICATION,
-    );
-}
-
-const CONFIG_DIR_QUALIFIER: &str = "net";
-const CONFIG_DIR_ORGANISATION: &str = "MaidSafe";
-const CONFIG_DIR_APPLICATION: &str = "sn_node";
 const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
@@ -71,10 +58,10 @@ pub struct Config {
     #[structopt(short, long)]
     max_capacity: Option<u64>,
     /// Root directory for ChunkStores and cached state. If not set, it defaults to "root_dir"
-    /// within the sn_node project data directory, located at... Linux: $XDG_DATA_HOME/sn_node
-    /// or $HOME/.local/share/sn_node | Windows:
-    /// {FOLDERID_RoamingAppData}/MaidSafe/sn_node/data | MacOS: $HOME/Library/Application
-    /// Support/net.MaidSafe.sn_node
+    /// within the sn_node project data directory, located at:
+    /// Linux: $HOME/.safe/node/root_dir
+    /// Windows: {FOLDERID_Profile}/.safe/node/root_dir
+    /// MacOS: $HOME/.safe/node/root_dir
     #[structopt(short, long, parse(from_os_str))]
     root_dir: Option<PathBuf>,
     /// Verbose output. `-v` is equivalent to logging with `warn`, `-vv` to `info`, `-vvv` to
@@ -154,7 +141,7 @@ impl Config {
     pub fn root_dir(&self) -> Result<PathBuf> {
         Ok(match &self.root_dir {
             Some(root_dir) => root_dir.clone(),
-            None => project_dirs()?.data_dir().join(DEFAULT_ROOT_DIR_NAME),
+            None => project_dirs()?.join(DEFAULT_ROOT_DIR_NAME),
         })
     }
 
@@ -272,7 +259,7 @@ impl Config {
 
     /// Reads the default node config file.
     fn read_from_file() -> Result<Option<Config>> {
-        let path = project_dirs()?.config_dir().join(CONFIG_FILE);
+        let path = project_dirs()?.join(CONFIG_FILE);
 
         match File::open(&path) {
             Ok(file) => {
@@ -317,10 +304,9 @@ where
     T: Serialize,
 {
     let project_dirs = project_dirs()?;
-    let dir = project_dirs.config_dir();
-    fs::create_dir_all(dir)?;
+    fs::create_dir_all(project_dirs.clone())?;
 
-    let path = dir.join(file);
+    let path = project_dirs.join(file);
     let mut file = File::create(&path)?;
     serde_json::to_writer_pretty(&mut file, config)?;
     file.sync_all()?;
@@ -328,10 +314,14 @@ where
     Ok(path)
 }
 
-fn project_dirs() -> Result<&'static ProjectDirs> {
-    PROJECT_DIRS
-        .as_ref()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found").into())
+fn project_dirs() -> Result<PathBuf> {
+    let mut home_dir = dirs_next::home_dir()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found"))?;
+
+    home_dir.push(".safe");
+    home_dir.push("node");
+
+    Ok(home_dir)
 }
 
 #[cfg(test)]
@@ -410,7 +400,7 @@ mod test {
             } else {
                 config.set_flag(arg, occurrences);
             }
-            assert!(empty_config != config, "Failed to set_value() for {}", arg);
+            assert_ne!(empty_config, config, "Failed to set_value() for {}", arg);
         }
     }
 

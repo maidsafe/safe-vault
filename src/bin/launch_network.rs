@@ -27,7 +27,7 @@
     unused_results
 )]
 
-use directories::BaseDirs;
+use dirs_next::home_dir;
 use log::{debug, info};
 use sn_launch_tool::run_with;
 use std::{
@@ -60,10 +60,10 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
     match node_path {
         Some(p) => Ok(p),
         None => {
-            let base_dirs =
-                BaseDirs::new().ok_or_else(|| "Failed to obtain user's home path".to_string())?;
+            let home_dirs =
+                home_dir().ok_or_else(|| "Failed to obtain user's home path".to_string())?;
 
-            let mut path = PathBuf::from(base_dirs.home_dir());
+            let mut path = PathBuf::from(home_dirs);
             path.push(".safe");
             path.push("node");
             Ok(path)
