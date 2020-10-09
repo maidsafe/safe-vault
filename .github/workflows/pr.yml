@@ -129,8 +129,27 @@ jobs:
           name: nodes-data
           path: nodes
 
+  # list any unused dependencies using cargo-udeps
+  cargo-udeps:
+    name: Unused dependency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # Install Rust and required components
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      # Install and run cargo udeps to find unused cargo dependencies
+      - name: cargo-udeps duplicate dependency check
+        run: |
+          cargo install cargo-udeps --locked
+          cargo +nightly udeps --all-targets
+  
   # list all duplicate dependencies. Note that this does not error if duplicates found
-  dependencies:
+  duplicate-dependencies:
     name: List Duplicate Dependencies
     runs-on: ubuntu-latest
     steps:
