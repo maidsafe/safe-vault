@@ -8,12 +8,13 @@
 
 use crate::{node::state_db::AgeGroup, utils, Config as NodeConfig, Error, Result};
 use bytes::Bytes;
+use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use futures::lock::Mutex;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature};
 use sn_routing::{
     DstLocation, Error as RoutingError, EventStream, Node as RoutingNode,
-    NodeConfig as RoutingConfig, PublicId, SectionProofChain, SrcLocation,
+    NodeConfig as RoutingConfig, SectionProofChain, SrcLocation,
 };
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
@@ -50,10 +51,14 @@ impl Network {
     pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Signature {
         let data = utils::serialise(data);
         let sig = self.routing.lock().await.sign(&data).await;
-        Signature::Ed25519(sig.0)
+        Signature::Ed25519(sig)
     }
 
-    pub async fn public_key(&self) -> Option<PublicKey> {
+    pub async fn public_key(&self) -> Ed25519PublicKey {
+        self.routing.lock().await.public_key().await
+    }
+
+    pub async fn section_public_key(&self) -> Option<PublicKey> {
         Some(PublicKey::Bls(
             self.routing
                 .lock()
@@ -74,10 +79,6 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn id(&self) -> PublicId {
-        self.routing.lock().await.id().await
-    }
-
     pub async fn name(&self) -> XorName {
         self.routing.lock().await.name().await
     }
@@ -87,7 +88,6 @@ impl Network {
             .lock()
             .await
             .our_connection_info()
-            .await
             .map_err(Error::Routing)
     }
 
@@ -171,7 +171,7 @@ impl Network {
             .our_elders()
             .await
             .iter()
-            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
+            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.addr()))
             .collect::<Vec<_>>()
     }
 
@@ -185,7 +185,7 @@ impl Network {
             .our_elders_sorted_by_distance_to(&XorName(name.0))
             .await
             .into_iter()
-            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.peer_addr()))
+            .map(|p2p_node| (XorName(p2p_node.name().0), *p2p_node.addr()))
             .collect::<Vec<_>>()
     }
 

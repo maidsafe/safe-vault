@@ -60,13 +60,12 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
     match node_path {
         Some(p) => Ok(p),
         None => {
-            let home_dirs =
+            let mut home_dirs =
                 home_dir().ok_or_else(|| "Failed to obtain user's home path".to_string())?;
 
-            let mut path = PathBuf::from(home_dirs);
-            path.push(".safe");
-            path.push("node");
-            Ok(path)
+            home_dirs.push(".safe");
+            home_dirs.push("node");
+            Ok(home_dirs)
         }
     }
 }

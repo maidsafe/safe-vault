@@ -37,8 +37,7 @@ pickledb = "~0.4.0"
 quick-error = "1.2.2"
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
-#sn_routing = { path="../routing" }
-sn_routing = { git = "https://github.com/oetyng/sn_routing.git", branch = "async-quic-p2p-api" }
+sn_routing = { git = "https://github.com/yoga07/sn_routing.git", branch = "api-sign" }
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
@@ -60,8 +59,7 @@ sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
 [dev_dependencies]
 maplit = "1.0.1"
 tempdir = "~0.3.7"
-sn_client = { git = "https://github.com/maidsafe/sn_client", branch = "master" }
-#sn_client = { path = "../sn_client" }
+sn_client = { git = "https://github.com/yoga07/sn_client", branch = "update-replica" }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util", "rt-threaded"] }
 futures = "~0.3.5"
 

@@ -40,7 +40,7 @@ impl NetworkSender {
     }
 
     pub async fn send_to_node(&mut self, msg: MsgEnvelope) -> Option<NodeOperation> {
-        let name = *self.network.id().await.name();
+        let name = self.network.name().await;
         let dst = match msg.destination().ok()? {
             Address::Node(xorname) => DstLocation::Node(xorname),
             Address::Section(_) => return Some(NodeMessagingDuty::SendToSection(msg).into()),
@@ -69,7 +69,7 @@ impl NetworkSender {
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
     ) -> Option<NodeOperation> {
-        let name = *self.network.id().await.name();
+        let name = self.network.name().await;
         for target in targets {
             self.network
                 .send_message(

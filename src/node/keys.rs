@@ -23,7 +23,7 @@ impl NodeSigningKeys {
     }
 
     pub async fn node_id(&self) -> Ed25519PublicKey {
-        *self.routing.id().await.public_key()
+        self.routing.public_key().await
     }
 
     pub async fn elder_key(&self) -> Option<ElderKey> {

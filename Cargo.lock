@@ -336,9 +336,9 @@ dependencies = [
 
 [[package]]
 name = "bls_dkg"
-version = "0.1.1"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "101e6ff79365b19056b02e2bff48be9d82729990229b8c41c6f15792dedde6bc"
+checksum = "ea734caa83abb9d2a714f7cd17013e29f67a297eeb5673bb50320fd16d311793"
 dependencies = [
  "aes",
  "bincode",
@@ -355,16 +355,17 @@ dependencies = [
  "serde_derive",
  "threshold_crypto",
  "tmp-ed25519",
+ "xor_name",
 ]
 
 [[package]]
 name = "bls_signature_aggregator"
-version = "0.1.1"
-source = "git+https://github.com/madadam/bls_signature_aggregator.git?branch=repetition#6ea5a508180ded2247dc7c40b6deaa962c27db3b"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "972f5c6e8de74c45cf20de53d2459f570edfacfcf79fe5f97810c3b9dac6f7dc"
 dependencies = [
  "bincode",
  "err-derive",
- "rand 0.7.3",
  "serde",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
@@ -726,15 +727,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "551a778172a450d7fc12e629ca3b0428d00f6afa9a43da1b630d54604e97371c"
 dependencies = [
  "cfg-if",
- "dirs-sys",
-]
-
-[[package]]
-name = "directories"
-version = "3.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8fed639d60b58d0f53498ab13d26f621fd77569cc6edb031f4cc36a2ad9da0f"
-dependencies = [
  "dirs-sys",
 ]
 
@@ -2555,7 +2547,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client#3114c47bf94ca3be8c5645a42d8b69a999568f29"
+source = "git+https://github.com/yoga07/sn_client?branch=update-replica#cdb2a89802c59d04b41596a65cac3ffcfefb45b4"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2563,7 +2555,7 @@ dependencies = [
  "chrono",
  "crdts",
  "crossbeam-channel",
- "directories 3.0.1",
+ "dirs-next",
  "env_logger 0.6.2",
  "futures",
  "futures-util",
@@ -2680,14 +2672,13 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/oetyng/sn_routing.git?branch=async-quic-p2p-api#1b6c49693f12e7073ae3cb6af8d0effb0e694b9e"
+source = "git+https://github.com/yoga07/sn_routing.git?branch=api-sign#c803d4aea96e9f3a1441cf19fc68c2eb3f46397a"
 dependencies = [
  "async-recursion",
  "bincode",
  "bls_dkg",
  "bls_signature_aggregator",
  "bytes 0.5.6",
- "crossbeam-channel",
  "ed25519-dalek",
  "err-derive",
  "futures",
