@@ -487,6 +487,13 @@ pub enum TransferQuery {
         since_version: usize,
     },
     GetReplicaEvents,
+    /// Get the latest cost for writing given number of bytes to network.
+    GetStoreCost {
+        /// The requester's key.
+        requester: PublicKey,
+        ///
+        bytes: u64,
+    },
 }
 
 /// Cmds carried out on AT2 Replicas.
@@ -537,6 +544,9 @@ impl From<sn_data_types::TransferQuery> for TransferQuery {
             }
             sn_data_types::TransferQuery::GetHistory { at, since_version } => {
                 Self::GetHistory { at, since_version }
+            }
+            sn_data_types::TransferQuery::GetStoreCost { requester, bytes } => {
+                Self::GetStoreCost { requester, bytes }
             }
         }
     }

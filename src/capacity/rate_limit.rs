@@ -72,8 +72,8 @@ mod test {
     fn calculates_rate_limit() -> Result<()> {
         let bytes = 1_000;
         let prefix_len = 0;
-        let available_nodes = 122;
-        let full_nodes = 0;
+        let available_nodes = 8;
+        let full_nodes = 7;
         let section_supply_share =
             ((u32::MAX as u64 * 1_000_000_000) / 2_u64.pow(prefix_len as u32)) as f64;
         let rate_limit = RateLimit::rate_limit(

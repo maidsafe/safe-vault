@@ -21,6 +21,7 @@ use sn_data_types::{
 use sn_transfers::{get_genesis, TransferReplica as Replica};
 use std::collections::BTreeSet;
 
+use crate::capacity::RateLimit;
 use sn_routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use {
@@ -38,6 +39,7 @@ pub struct ReplicaManager {
     replica: Replica,
     store: TransferStore,
     info: ReplicaInfo,
+    rate_limit: RateLimit,
 }
 
 struct ReplicaInfo {
@@ -53,6 +55,7 @@ impl ReplicaManager {
         store: TransferStore,
         secret_key: &SecretKeyShare,
         key_index: usize,
+        rate_limit: RateLimit,
         peer_replicas: &PublicKeySet,
         section_proof_chain: SectionProofChain,
     ) -> Result<Self> {
@@ -71,6 +74,7 @@ impl ReplicaManager {
                 peer_replicas: peer_replicas.clone(),
                 section_proof_chain,
             },
+            rate_limit,
         })
     }
 
@@ -349,6 +353,10 @@ impl ReplicaManager {
             return Err(NdError::InvalidOperation);
         }
         Ok(())
+    }
+
+    pub async fn get_store_cost(&self, bytes: u64) -> Option<Money> {
+        self.rate_limit.from(bytes).await
     }
 }
 

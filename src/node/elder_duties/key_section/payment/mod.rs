@@ -8,7 +8,6 @@
 
 use super::transfers::replica_manager::ReplicaManager;
 use crate::{
-    capacity::RateLimit,
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeOperation, PaymentDuty},
@@ -32,22 +31,13 @@ use std::sync::Arc;
 /// (where it is then handled by Elders with Metadata duties).
 pub struct Payments {
     replica: Arc<Mutex<ReplicaManager>>,
-    rate_limit: RateLimit,
     wrapping: ElderMsgWrapping,
 }
 
 impl Payments {
-    pub fn new(
-        keys: NodeSigningKeys,
-        rate_limit: RateLimit,
-        replica: Arc<Mutex<ReplicaManager>>,
-    ) -> Self {
+    pub fn new(keys: NodeSigningKeys, replica: Arc<Mutex<ReplicaManager>>) -> Self {
         let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Payment);
-        Self {
-            replica,
-            rate_limit,
-            wrapping,
-        }
+        Self { replica, wrapping }
     }
 
     // The code in this method is a bit messy, needs to be cleaned up.
@@ -104,7 +94,7 @@ impl Payments {
                 info!("Payment: registration and propagation succeeded.");
                 // Paying too little will see the amount be forfeited.
                 // This prevents spam of the network.
-                let total_cost = self.rate_limit.from(num_bytes).await?;
+                let total_cost = self.replica.lock().await.get_store_cost(num_bytes).await?;
                 if total_cost > payment.amount() {
                     warn!(
                         "Payment: Too low payment: {}, expected: {}",
@@ -147,6 +137,10 @@ impl Payments {
             None => Err(Error::NoSuchKey),
         }
     }
+
+    // pub async fn get_store_cost(&mut self) -> Arc<RateLimit> {
+    //     Arc::clone(self.rate_limit)
+    // }
 }
 
 impl Display for Payments {

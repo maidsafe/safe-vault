@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Network;
-use safe_core::client::{blob_apis::exported_tests as blob_apis, exported_tests as client_tests};
+use sn_client::client::{blob_apis::exported_tests as blob_apis, exported_tests as client_tests};
 use std::sync::Once;
 
 static mut NETWORK: Network = Network { nodes: Vec::new() };

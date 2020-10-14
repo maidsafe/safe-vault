@@ -57,8 +57,8 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         rng: R,
     ) -> Result<Self> {
         let gateway = ClientGateway::new(info, routing.clone(), rng).await?;
-        let replica_manager = Self::new_replica_manager(info, routing.clone()).await?;
-        let payments = Payments::new(info.keys.clone(), rate_limit, replica_manager.clone());
+        let replica_manager = Self::new_replica_manager(info, routing.clone(), rate_limit).await?;
+        let payments = Payments::new(info.keys.clone(), replica_manager.clone());
         let transfers = Transfers::new(info.keys.clone(), replica_manager.clone());
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
 
@@ -143,6 +143,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     async fn new_replica_manager(
         info: &NodeInfo,
         routing: Network,
+        rate_limit: RateLimit,
     ) -> Result<Arc<Mutex<ReplicaManager>>> {
         let public_key_set = routing.public_key_set().await?;
         let secret_key_share = routing.secret_key_share().await?;
@@ -153,6 +154,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             store,
             &secret_key_share,
             key_index,
+            rate_limit,
             &public_key_set,
             proof_chain,
         )?;

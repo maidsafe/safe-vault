@@ -122,6 +122,7 @@ impl Transfers {
             GetHistory { at, since_version } => {
                 self.history(at, *since_version, msg_id, origin).await
             }
+            GetStoreCost { bytes, .. } => self.get_store_cost(*bytes, msg_id, origin).await,
         }
     }
 
@@ -204,6 +205,32 @@ impl Transfers {
             .await
     }
 
+    /// Get latest StoreCost for the given number of bytes
+    async fn get_store_cost(
+        &self,
+        bytes: u64,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Option<NodeMessagingDuty> {
+        info!("Computing StoreCost for {:?} bytes", bytes);
+        let result = self
+            .replica
+            .lock()
+            .await
+            .get_store_cost(bytes)
+            .await
+            .ok_or_else(|| Error::Unexpected("Could not compute latest StoreCost".to_string()));
+        info!("Got StoreCost {:?}", result.clone().unwrap());
+        self.wrapping
+            .send_to_client(Message::QueryResponse {
+                response: QueryResponse::GetStoreCost(result),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
+    }
+
     /// Get the PublicKeySet of our replicas
     async fn get_replica_pks(
         &self,
@@ -212,10 +239,12 @@ impl Transfers {
         origin: Address,
     ) -> Option<NodeMessagingDuty> {
         // validate signature
-        let result = match self.replica.lock().await.replicas_pk_set() {
-            None => Err(Error::NoSuchKey),
-            Some(keys) => Ok(keys),
-        };
+        let result = self
+            .replica
+            .lock()
+            .await
+            .replicas_pk_set()
+            .ok_or_else(|| Error::NoSuchKey);
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetReplicaKeys(result),
