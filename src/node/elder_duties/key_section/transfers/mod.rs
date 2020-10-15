@@ -376,7 +376,7 @@ impl Transfers {
             Ok(None) => None,
             Ok(Some(event)) => {
                 self.wrapping
-                    .send_to_client(Message::NodeCmd {
+                    .send_to_section(Message::NodeCmd {
                         cmd: Transfers(PropagateTransfer(event.debit_proof)),
                         id: MessageId::new(),
                     })

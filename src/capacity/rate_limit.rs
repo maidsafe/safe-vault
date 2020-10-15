@@ -84,7 +84,7 @@ mod test {
             prefix_len,
         )
         .as_nano();
-        assert!(rate_limit == 2075);
+        assert_eq!(rate_limit, 2075);
         Ok(())
     }
 }
