@@ -32,12 +32,12 @@ impl RateLimit {
         let section_supply_share = MAX_SUPPLY as f64 / 2_f64.powf(prefix_len as f64);
 
         let full_nodes = self.capacity.full_nodes();
-        let available_nodes = self.capacity.node_count();
+        let all_nodes = self.network.our_adults().await.len() as u8;
 
         Some(RateLimit::rate_limit(
             bytes,
             full_nodes,
-            available_nodes,
+            all_nodes,
             section_supply_share,
             prefix_len,
         ))
@@ -46,14 +46,14 @@ impl RateLimit {
     fn rate_limit(
         bytes: u64,
         full_nodes: u8,
-        available_nodes: u8,
+        all_nodes: u8,
         section_supply_share: f64,
         prefix_len: usize,
     ) -> Money {
-        let nodes = (available_nodes + full_nodes) as f64;
+        let available_nodes = (all_nodes - full_nodes) as f64;
         let supply_demand_factor = 0.001
-            + (1_f64 / available_nodes as f64).powf(8_f64)
-            + ((full_nodes + 30) as f64 / nodes).powf(88_f64);
+            + (1_f64 / available_nodes).powf(8_f64)
+            + ((full_nodes + 0) as f64 / all_nodes as f64).powf(88_f64);
         let data_size_factor = (bytes as f64 / MAX_CHUNK_SIZE as f64).powf(2_f64)
             + (bytes as f64 / MAX_CHUNK_SIZE as f64);
         let steepness_reductor = prefix_len as f64 + 1_f64;

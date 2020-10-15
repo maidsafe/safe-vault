@@ -205,6 +205,18 @@ impl Network {
             .collect::<Vec<_>>()
     }
 
+    pub async fn our_adults(&self) -> Vec<XorName> {
+        self.routing
+            .lock()
+            .await
+            .our_adults_sorted_by_distance_to(&XorName::default())
+            .await
+            .into_iter()
+            .take(u8::MAX as usize)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
+    }
+
     pub async fn our_adults_sorted_by_distance_to(
         &self,
         name: &XorName,

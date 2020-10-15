@@ -31,7 +31,7 @@ impl Capacity {
     }
 
     /// Total number of chunk storing nodes in the section.
-    pub fn node_count(&self) -> u8 {
+    pub fn chunk_storing_nodes(&self) -> u8 {
         self.dbs.holders.borrow().total_keys() as u8
     }
 }
