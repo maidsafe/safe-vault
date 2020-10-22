@@ -77,12 +77,15 @@ impl Transfers {
     pub async fn catchup_with_replicas(&mut self) -> Option<NodeOperation> {
         // prepare replica init
         self.wrapping
-            .send_to_section(Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(PublicKey::Bls(
-                    self.replica.lock().await.replicas_pk_set()?.public_key(),
-                ))),
-                id: MessageId::new(),
-            })
+            .send_to_section(
+                Message::NodeQuery {
+                    query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(
+                        PublicKey::Bls(self.replica.lock().await.replicas_pk_set()?.public_key()),
+                    )),
+                    id: MessageId::new(),
+                },
+                true,
+            )
             .await
             .map(|c| c.into())
     }
@@ -376,10 +379,13 @@ impl Transfers {
             Ok(None) => None,
             Ok(Some(event)) => {
                 self.wrapping
-                    .send_to_section(Message::NodeCmd {
-                        cmd: Transfers(PropagateTransfer(event.debit_proof)),
-                        id: MessageId::new(),
-                    })
+                    .send_to_section(
+                        Message::NodeCmd {
+                            cmd: Transfers(PropagateTransfer(event.debit_proof)),
+                            id: MessageId::new(),
+                        },
+                        true,
+                    )
                     .await
             }
             Err(error) => {
@@ -409,10 +415,13 @@ impl Transfers {
             Ok(None) => None,
             Ok(Some(event)) => {
                 self.wrapping
-                    .send_to_section(Message::NodeCmd {
-                        cmd: Transfers(PropagateTransfer(event.debit_proof)),
-                        id: MessageId::new(),
-                    })
+                    .send_to_section(
+                        Message::NodeCmd {
+                            cmd: Transfers(PropagateTransfer(event.debit_proof)),
+                            id: MessageId::new(),
+                        },
+                        true,
+                    )
                     .await
             }
             Err(error) => {

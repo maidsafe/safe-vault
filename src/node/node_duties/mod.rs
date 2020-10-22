@@ -105,13 +105,16 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
         let wrapping =
             NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
         wrapping
-            .send_to_section(Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
-                    wallet,
-                    section: self.node_info.public_key().await.into(),
-                }),
-                id: MessageId::new(),
-            })
+            .send_to_section(
+                Message::NodeCmd {
+                    cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
+                        wallet,
+                        section: self.node_info.public_key().await.into(),
+                    }),
+                    id: MessageId::new(),
+                },
+                true,
+            )
             .await
             .map(|c| c.into())
     }

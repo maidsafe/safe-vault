@@ -68,7 +68,10 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                 return None;
             }
         }
-        Some(NodeMessagingDuty::SendToSection(msg.clone()))
+        Some(NodeMessagingDuty::SendToSection {
+            msg: msg.clone(),
+            as_node: true,
+        })
     }
 
     /// This is where client input is parsed.

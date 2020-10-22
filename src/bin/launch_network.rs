@@ -105,6 +105,8 @@ pub async fn run_network() -> Result<(), String> {
         "--interval",
         &INTERVAL,
         "--local",
+        "--num-nodes",
+        "11",
     ];
 
     let interval_as_int = &INTERVAL.parse::<u64>().unwrap();

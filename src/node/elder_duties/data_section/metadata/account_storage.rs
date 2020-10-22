@@ -62,12 +62,15 @@ impl AccountStorage {
             .account(&origin.id().public_key(), address)
             .map(Account::into_data_and_signature);
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                id: MessageId::new(),
-                response: QueryResponse::GetAccount(result),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    id: MessageId::new(),
+                    response: QueryResponse::GetAccount(result),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 
@@ -154,12 +157,15 @@ impl AccountStorage {
         if let Err(error) = result {
             return self
                 .wrapping
-                .send_to_section(Message::CmdError {
-                    id: MessageId::new(),
-                    error: CmdError::Data(error),
-                    correlation_id: msg_id,
-                    cmd_origin: origin.address(),
-                })
+                .send_to_section(
+                    Message::CmdError {
+                        id: MessageId::new(),
+                        error: CmdError::Data(error),
+                        correlation_id: msg_id,
+                        cmd_origin: origin.address(),
+                    },
+                    true,
+                )
                 .await;
         }
         None

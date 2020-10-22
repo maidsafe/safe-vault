@@ -100,12 +100,15 @@ impl ChunkStorage {
             .get(address)
             .map_err(|error| error.to_string().into());
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                id: MessageId::new(),
-                response: QueryResponse::GetBlob(result),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    id: MessageId::new(),
+                    response: QueryResponse::GetBlob(result),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 

@@ -38,6 +38,7 @@ impl Accumulation {
             return None;
         }
         if msg.most_recent_sender().is_section() {
+            info!("Received message sent by a Section. No need to accumulate");
             return Some(msg.clone()); // already group signed, no need to accumulate (check sig though?, or somewhere else, earlier on?)
         }
 

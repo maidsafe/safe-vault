@@ -139,7 +139,12 @@ pub enum NodeMessagingDuty {
     /// Send to a single node.
     SendToNode(MsgEnvelope),
     /// Send to a section.
-    SendToSection(MsgEnvelope),
+    SendToSection {
+        /// Msg to be sent
+        msg: MsgEnvelope,
+        /// Send as a Node.(send as Section if set to false)
+        as_node: bool,
+    },
     /// Send the same request to each individual Adult.
     SendToAdults {
         targets: BTreeSet<XorName>,
@@ -164,7 +169,7 @@ impl Debug for NodeMessagingDuty {
             }
             Self::SendToClient(msg) => write!(f, "SendToClient [ msg: {:?} ]", msg),
             Self::SendToNode(msg) => write!(f, "SendToNode [ msg: {:?} ]", msg),
-            Self::SendToSection(msg) => write!(f, "SendToSection [ msg: {:?} ]", msg),
+            Self::SendToSection { msg, .. } => write!(f, "SendToSection [ msg: {:?} ]", msg),
         }
     }
 }

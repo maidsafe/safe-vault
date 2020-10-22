@@ -13,8 +13,8 @@ use futures::lock::Mutex;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature};
 use sn_routing::{
-    DstLocation, Error as RoutingError, EventStream, Node as RoutingNode,
-    NodeConfig as RoutingConfig, SectionProofChain, SrcLocation,
+    Config as RoutingConfig, DstLocation, Error as RoutingError, EventStream,
+    Routing as RoutingNode, SectionProofChain, SrcLocation,
 };
 use std::collections::BTreeSet;
 use std::net::SocketAddr;

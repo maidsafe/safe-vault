@@ -217,13 +217,16 @@ impl Rewards {
         let _ = self.node_rewards.insert(new_node_id, state);
 
         self.wrapping
-            .send_to_section(Message::NodeQuery {
-                query: Rewards(GetWalletId {
-                    old_node_id,
-                    new_node_id,
-                }),
-                id: MessageId::new(),
-            })
+            .send_to_section(
+                Message::NodeQuery {
+                    query: Rewards(GetWalletId {
+                        old_node_id,
+                        new_node_id,
+                    }),
+                    id: MessageId::new(),
+                },
+                true,
+            )
             .await
     }
 

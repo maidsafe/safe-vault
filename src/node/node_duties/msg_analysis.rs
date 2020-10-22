@@ -93,7 +93,10 @@ impl NetworkMsgAnalysis {
         };
 
         if destined_for_network {
-            Some(NodeMessagingDuty::SendToSection(msg.clone())) // Forwards without stamping the duty (was not processed).
+            Some(NodeMessagingDuty::SendToSection {
+                msg: msg.clone(),
+                as_node: true,
+            }) // Forwards without stamping the duty (was not processed).
         } else {
             None
         }

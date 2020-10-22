@@ -103,12 +103,15 @@ impl BlobRegister {
                 } else {
                     return self
                         .wrapping
-                        .send_to_section(Message::CmdError {
-                            error: CmdError::Data(NdError::DataExists),
-                            id: MessageId::new(),
-                            cmd_origin: origin.address(),
-                            correlation_id: msg_id,
-                        })
+                        .send_to_section(
+                            Message::CmdError {
+                                error: CmdError::Data(NdError::DataExists),
+                                id: MessageId::new(),
+                                cmd_origin: origin.address(),
+                                correlation_id: msg_id,
+                            },
+                            true,
+                        )
                         .await;
                 }
             } else {
@@ -168,12 +171,15 @@ impl BlobRegister {
         proxies: Vec<MsgSender>,
     ) -> Option<NodeMessagingDuty> {
         let cmd_error = |error: NdError| {
-            self.wrapping.send_to_section(Message::CmdError {
-                error: CmdError::Data(error),
-                id: MessageId::new(),
-                cmd_origin: origin.address(),
-                correlation_id: msg_id,
-            })
+            self.wrapping.send_to_section(
+                Message::CmdError {
+                    error: CmdError::Data(error),
+                    id: MessageId::new(),
+                    cmd_origin: origin.address(),
+                    correlation_id: msg_id,
+                },
+                true,
+            )
         };
 
         let metadata = match self.get_metadata_for(address) {
@@ -370,12 +376,15 @@ impl BlobRegister {
         proxies: Vec<MsgSender>,
     ) -> Option<NodeMessagingDuty> {
         let query_error = |error: NdError| {
-            self.wrapping.send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetBlob(Err(error)),
-                id: MessageId::new(),
-                query_origin: origin.address(),
-                correlation_id: msg_id,
-            })
+            self.wrapping.send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetBlob(Err(error)),
+                    id: MessageId::new(),
+                    query_origin: origin.address(),
+                    correlation_id: msg_id,
+                },
+                true,
+            )
         };
 
         let metadata = match self.get_metadata_for(address) {

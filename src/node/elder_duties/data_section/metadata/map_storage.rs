@@ -243,12 +243,15 @@ impl MapStorage {
     ) -> Option<NodeMessagingDuty> {
         let result = self.get_chunk(&address, origin, MapAction::Read)?;
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetMap(result),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetMap(result),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 
@@ -263,12 +266,15 @@ impl MapStorage {
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.shell());
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetMapShell(result),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetMapShell(result),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 
@@ -283,12 +289,15 @@ impl MapStorage {
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.version());
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetMapVersion(result),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetMapVersion(result),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 
@@ -314,12 +323,15 @@ impl MapStorage {
                 .ok_or_else(|| NdError::NoSuchEntry),
         });
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetMapValue(result),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetMapValue(result),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 
@@ -334,12 +346,15 @@ impl MapStorage {
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.keys());
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::ListMapKeys(result),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::ListMapKeys(result),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 
@@ -356,12 +371,15 @@ impl MapStorage {
             Map::Unseq(map) => map.values().into(),
         });
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::ListMapValues(result),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::ListMapValues(result),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 
@@ -378,12 +396,15 @@ impl MapStorage {
             Map::Unseq(map) => map.entries().clone().into(),
         });
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::ListMapEntries(result),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::ListMapEntries(result),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 
@@ -398,12 +419,15 @@ impl MapStorage {
             .get_chunk(&address, origin, MapAction::Read)?
             .map(|data| data.permissions());
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::ListMapPermissions(result),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::ListMapPermissions(result),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 
@@ -419,12 +443,15 @@ impl MapStorage {
             .get_chunk(&address, origin, MapAction::Read)?
             .and_then(|data| data.user_permissions(user).map(MapPermissionSet::clone));
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::ListMapUserPermissions(result),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                query_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::ListMapUserPermissions(result),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    query_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 

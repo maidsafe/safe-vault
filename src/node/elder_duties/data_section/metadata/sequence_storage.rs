@@ -105,12 +105,15 @@ impl SequenceStorage {
     ) -> Option<NodeMessagingDuty> {
         let result = self.get_chunk(address, SequenceAction::Read, origin);
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetSequence(result),
-                id: MessageId::new(),
-                query_origin: origin.address(),
-                correlation_id: msg_id,
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetSequence(result),
+                    id: MessageId::new(),
+                    query_origin: origin.address(),
+                    correlation_id: msg_id,
+                },
+                true,
+            )
             .await
     }
 
@@ -182,12 +185,15 @@ impl SequenceStorage {
                     .ok_or(NdError::NoSuchEntry)
             });
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetSequenceRange(result),
-                id: MessageId::new(),
-                query_origin: origin.address(),
-                correlation_id: msg_id,
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetSequenceRange(result),
+                    id: MessageId::new(),
+                    query_origin: origin.address(),
+                    correlation_id: msg_id,
+                },
+                true,
+            )
             .await
     }
 
@@ -204,12 +210,15 @@ impl SequenceStorage {
                 None => Err(NdError::NoSuchEntry),
             });
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetSequenceLastEntry(result),
-                id: MessageId::new(),
-                query_origin: origin.address(),
-                correlation_id: msg_id,
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetSequenceLastEntry(result),
+                    id: MessageId::new(),
+                    query_origin: origin.address(),
+                    correlation_id: msg_id,
+                },
+                true,
+            )
             .await
     }
 
@@ -233,12 +242,15 @@ impl SequenceStorage {
                 }
             });
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetSequenceOwner(result),
-                id: MessageId::new(),
-                query_origin: origin.address(),
-                correlation_id: msg_id,
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetSequenceOwner(result),
+                    id: MessageId::new(),
+                    query_origin: origin.address(),
+                    correlation_id: msg_id,
+                },
+                true,
+            )
             .await
     }
 
@@ -256,12 +268,15 @@ impl SequenceStorage {
                 sequence.permissions(user, index)
             });
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetSequenceUserPermissions(result),
-                id: MessageId::new(),
-                query_origin: origin.address(),
-                correlation_id: msg_id,
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetSequenceUserPermissions(result),
+                    id: MessageId::new(),
+                    query_origin: origin.address(),
+                    correlation_id: msg_id,
+                },
+                true,
+            )
             .await
     }
 
@@ -286,12 +301,15 @@ impl SequenceStorage {
                 Ok(res)
             });
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetSequencePublicPolicy(result),
-                id: MessageId::new(),
-                query_origin: origin.address(),
-                correlation_id: msg_id,
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetSequencePublicPolicy(result),
+                    id: MessageId::new(),
+                    query_origin: origin.address(),
+                    correlation_id: msg_id,
+                },
+                true,
+            )
             .await
     }
 
@@ -316,12 +334,15 @@ impl SequenceStorage {
                 Ok(res)
             });
         self.wrapping
-            .send_to_section(Message::QueryResponse {
-                response: QueryResponse::GetSequencePrivatePolicy(result),
-                id: MessageId::new(),
-                query_origin: origin.address(),
-                correlation_id: msg_id,
-            })
+            .send_to_section(
+                Message::QueryResponse {
+                    response: QueryResponse::GetSequencePrivatePolicy(result),
+                    id: MessageId::new(),
+                    query_origin: origin.address(),
+                    correlation_id: msg_id,
+                },
+                true,
+            )
             .await
     }
 
@@ -437,12 +458,15 @@ impl SequenceStorage {
             Err(error) => error,
         };
         self.wrapping
-            .send_to_section(Message::CmdError {
-                id: MessageId::new(),
-                error: CmdError::Data(error),
-                correlation_id: msg_id,
-                cmd_origin: origin.address(),
-            })
+            .send_to_section(
+                Message::CmdError {
+                    id: MessageId::new(),
+                    error: CmdError::Data(error),
+                    correlation_id: msg_id,
+                    cmd_origin: origin.address(),
+                },
+                true,
+            )
             .await
     }
 }

@@ -51,8 +51,12 @@ impl NodeMsgWrapping {
         Self { inner }
     }
 
-    pub async fn send_to_section(&self, message: Message) -> Option<NodeMessagingDuty> {
-        self.inner.send_to_section(message).await
+    pub async fn send_to_section(
+        &self,
+        message: Message,
+        as_node: bool,
+    ) -> Option<NodeMessagingDuty> {
+        self.inner.send_to_section(message, as_node).await
     }
 
     // pub async fn send_to_node(&self, message: Message) -> Option<NodeMessagingDuty> {
@@ -66,8 +70,12 @@ impl AdultMsgWrapping {
         Self { inner }
     }
 
-    pub async fn send_to_section(&self, message: Message) -> Option<NodeMessagingDuty> {
-        self.inner.send_to_section(message).await
+    pub async fn send_to_section(
+        &self,
+        message: Message,
+        as_node: bool,
+    ) -> Option<NodeMessagingDuty> {
+        self.inner.send_to_section(message, as_node).await
     }
 
     pub async fn send_to_node(&self, message: Message) -> Option<NodeMessagingDuty> {
@@ -92,15 +100,19 @@ impl ElderMsgWrapping {
 
     pub async fn forward(&self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         let msg = self.inner.set_proxy(&msg).await?;
-        Some(NodeMessagingDuty::SendToSection(msg))
+        Some(NodeMessagingDuty::SendToSection { msg, as_node: true })
     }
 
     pub async fn send_to_client(&self, message: Message) -> Option<NodeMessagingDuty> {
         self.inner.send_to_client(message).await
     }
 
-    pub async fn send_to_section(&self, message: Message) -> Option<NodeMessagingDuty> {
-        self.inner.send_to_section(message).await
+    pub async fn send_to_section(
+        &self,
+        message: Message,
+        as_node: bool,
+    ) -> Option<NodeMessagingDuty> {
+        self.inner.send_to_section(message, as_node).await
     }
 
     pub async fn send_to_node(&self, message: Message) -> Option<NodeMessagingDuty> {
@@ -150,14 +162,18 @@ impl MsgWrapping {
         Some(NodeMessagingDuty::SendToNode(msg))
     }
 
-    pub async fn send_to_section(&self, message: Message) -> Option<NodeMessagingDuty> {
+    pub async fn send_to_section(
+        &self,
+        message: Message,
+        as_node: bool,
+    ) -> Option<NodeMessagingDuty> {
         let origin = self.sign(&message).await?;
         let msg = MsgEnvelope {
             message,
             origin,
             proxies: Default::default(),
         };
-        Some(NodeMessagingDuty::SendToSection(msg))
+        Some(NodeMessagingDuty::SendToSection { msg, as_node })
     }
 
     pub async fn send_to_adults(
@@ -176,12 +192,15 @@ impl MsgWrapping {
         origin: &Address,
     ) -> Option<NodeMessagingDuty> {
         info!("Error {:?}", error);
-        self.send_to_section(Message::CmdError {
-            id: MessageId::new(),
-            error,
-            correlation_id: msg_id,
-            cmd_origin: origin.clone(),
-        })
+        self.send_to_section(
+            Message::CmdError {
+                id: MessageId::new(),
+                error,
+                correlation_id: msg_id,
+                cmd_origin: origin.clone(),
+            },
+            true,
+        )
         .await
     }
 
