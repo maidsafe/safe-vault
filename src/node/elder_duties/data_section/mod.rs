@@ -24,6 +24,7 @@ use crate::{
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use xor_name::XorName;
+use std::sync::Arc;
 
 /// A DataSection is responsible for
 /// the storage and retrieval of data,
@@ -53,7 +54,7 @@ impl DataSection {
         // Rewards
         let keypair = utils::key_pair(network.clone()).await?;
         let public_key_set = network.public_key_set().await?;
-        let actor = TransferActor::new(keypair, public_key_set, Validator {});
+        let actor = TransferActor::new(Arc::new(keypair), public_key_set, Validator {});
         let reward_calc = RewardCalc::new(network.clone());
         let rewards = Rewards::new(info.keys.clone(), actor, reward_calc);
 
@@ -79,7 +80,7 @@ impl DataSection {
     pub async fn elders_changed(&mut self) -> Option<NodeOperation> {
         let pub_key_set = self.network.public_key_set().await.ok()?;
         let keypair = utils::key_pair(self.network.clone()).await.ok()?;
-        let actor = TransferActor::new(keypair, pub_key_set, Validator {});
+        let actor = TransferActor::new(Arc::new(keypair), pub_key_set, Validator {});
         self.rewards.transition(actor).await
     }
 

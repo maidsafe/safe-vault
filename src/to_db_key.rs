@@ -9,7 +9,7 @@
 use crate::utils;
 use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{
-    BlobAddress, ClientPublicId, MapAddress, PublicId, PublicKey, SequenceAddress,
+    BlobAddress, Keypair, MapAddress, PublicKey, SequenceAddress,
 };
 use xor_name::XorName;
 
@@ -28,10 +28,9 @@ pub fn from_db_key<T: DeserializeOwned>(key: &str) -> Option<T> {
 }
 
 impl ToDbKey for SequenceAddress {}
-impl ToDbKey for ClientPublicId {}
+impl ToDbKey for Keypair {}
 impl ToDbKey for BlobAddress {}
 impl ToDbKey for MapAddress {}
-impl ToDbKey for PublicId {}
 impl ToDbKey for PublicKey {}
 impl ToDbKey for XorName {}
 
