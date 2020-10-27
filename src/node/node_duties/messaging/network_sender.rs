@@ -110,7 +110,7 @@ impl NetworkSender {
         let src = if as_node {
             SrcLocation::Node(self.network.name().await)
         } else {
-            SrcLocation::Section(self.network.our_prefix().await?)
+            SrcLocation::Section(self.network.our_prefix().await)
         };
         let result = self
             .network

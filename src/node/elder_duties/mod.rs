@@ -15,7 +15,7 @@ use crate::{
     chunk_store::UsedSpace,
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Error, Network, Result,
+    Network, Result,
 };
 use log::trace;
 use rand::{CryptoRng, Rng};
@@ -37,7 +37,7 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         network: Network,
         rng: R,
     ) -> Result<Self> {
-        let prefix = network.our_prefix().await.ok_or(Error::Logic)?;
+        let prefix = network.our_prefix().await;
         let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
         let rate_limit = RateLimit::new(network.clone(), Capacity::new(dbs.clone()));
         let key_section = KeySection::new(info, rate_limit, network.clone(), rng).await?;

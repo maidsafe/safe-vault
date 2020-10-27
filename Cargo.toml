@@ -10,15 +10,10 @@ readme = "README.md"
 repository = "https://github.com/maidsafe/sn_node"
 version = "0.24.0"
 
-[patch.crates-io]
-sn_data_types = { git = "https://github.com/Yoga07/sn_data_types", branch = "store-cost" }
-sn_transfers = { git = "https://github.com/maidsafe/sn_transfers.git" }
-self_encryption = { git = "https://github.com/maidsafe/self_encryption.git", branch = "master" }
-
 [dependencies]
 async-log = "2.0.0"
 base64 = "~0.10.1"
-# Ensure bincode version is identical to that in SAFE Client Libs and SAFE Network Data.
+# Ensure bincode version is identical to that in sn_client and sn_data_types.
 bincode = "1.2.1"
 bytes = { version = "~0.5.4", features = ["serde"] }
 crossbeam-channel = "~0.4.2"
@@ -37,6 +32,7 @@ quick-error = "1.2.2"
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
 sn_routing = { git = "https://github.com/maidsafe/sn_routing.git" }
+self_encryption = "~0.19.3"
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
@@ -47,8 +43,8 @@ unwrap = "1.2.1"
 crdts = "4.2.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-sn_data_types = "~0.11.12"
-sn_transfers = "~0.2.0"
+sn_data_types = "~0.11.23"
+sn_transfers = "~0.2.1"
 ed25519 = "1.0.1"
 signature = "1.1.0"
 tokio = { version = "~0.2.5", features = ["macros", "fs", "sync"] }
@@ -58,7 +54,7 @@ sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
 [dev_dependencies]
 maplit = "1.0.1"
 tempdir = "~0.3.7"
-sn_client = { git = "https://github.com/yoga07/sn_client", branch = "update-replica" }
+sn_client = { git = "https://github.com/maidsafe/sn_client" }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util", "rt-threaded"] }
 futures = "~0.3.5"
 

@@ -27,7 +27,7 @@ use futures::lock::Mutex;
 use log::trace;
 use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
-use sn_routing::{Error, Prefix};
+use sn_routing::Prefix;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use xor_name::XorName;
@@ -89,7 +89,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     pub async fn elders_changed(&mut self) -> Option<NodeOperation> {
         let pub_key_set = self.routing.public_key_set().await.ok()?;
         let sec_key_share = self.routing.secret_key_share().await.ok()?;
-        let proof_chain = self.routing.our_history().await?;
+        let proof_chain = self.routing.our_history().await;
         let index = self.routing.our_index().await.ok()?;
         match self.replica_manager.lock().await.update_replica_keys(
             sec_key_share,
@@ -148,7 +148,7 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         let public_key_set = routing.public_key_set().await?;
         let secret_key_share = routing.secret_key_share().await?;
         let key_index = routing.our_index().await?;
-        let proof_chain = routing.our_history().await.ok_or(Error::InvalidState)?;
+        let proof_chain = routing.our_history().await;
         let store = TransferStore::new(info.root_dir.clone(), info.init_mode)?;
         let replica_manager = ReplicaManager::new(
             store,

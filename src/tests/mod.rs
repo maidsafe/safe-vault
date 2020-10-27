@@ -11,7 +11,7 @@ mod client;
 use crate::config_handler::write_connection_info;
 use crate::{utils, utils::Command, Config, Node};
 use crossbeam_channel::Sender;
-use sn_routing::{NodeConfig as RoutingConfig, TransportConfig as NetworkConfig};
+use sn_routing::{Config as RoutingConfig, TransportConfig as NetworkConfig};
 use std::net::SocketAddr;
 use std::thread;
 use std::thread::JoinHandle;

@@ -100,7 +100,10 @@ impl ElderMsgWrapping {
 
     pub async fn forward(&self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
         let msg = self.inner.set_proxy(&msg).await?;
-        Some(NodeMessagingDuty::SendToSection { msg, as_node: true })
+        Some(NodeMessagingDuty::SendToSection {
+            msg,
+            as_node: false,
+        })
     }
 
     pub async fn send_to_client(&self, message: Message) -> Option<NodeMessagingDuty> {

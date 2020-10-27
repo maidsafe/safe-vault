@@ -91,7 +91,7 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn our_prefix(&self) -> Option<Prefix> {
+    pub async fn our_prefix(&self) -> Prefix {
         self.routing.lock().await.our_prefix().await
     }
 
@@ -101,7 +101,6 @@ impl Network {
             .await
             .matches_our_prefix(&XorName(name.0))
             .await
-            .unwrap_or(false)
     }
 
     pub async fn send_message(
@@ -140,7 +139,7 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn our_history(&self) -> Option<SectionProofChain> {
+    pub async fn our_history(&self) -> SectionProofChain {
         self.routing.lock().await.our_history().await
     }
 
