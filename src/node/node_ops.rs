@@ -544,9 +544,7 @@ impl From<sn_data_types::TransferQuery> for TransferQuery {
             sn_data_types::TransferQuery::GetReplicaKeys(transfer) => {
                 Self::GetReplicaKeys(transfer)
             }
-            sn_data_types::TransferQuery::GetBalance(public_key) => {
-                Self::GetBalance(public_key)
-            }
+            sn_data_types::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
             sn_data_types::TransferQuery::GetHistory { at, since_version } => {
                 Self::GetHistory { at, since_version }
             }

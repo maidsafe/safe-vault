@@ -2559,7 +2559,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/joshuef/sn_client?branch=RemoveIDsConceptually#6fff0bad2124674b013248713e768e7b7512bd46"
+source = "git+https://github.com/maidsafe/sn_client#6b16e2d3c395532ba7f27080fa062126f28ce846"
 dependencies = [
  "async-trait",
  "bincode",

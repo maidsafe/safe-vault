@@ -23,8 +23,8 @@ use crate::{
 };
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
-use xor_name::XorName;
 use std::sync::Arc;
+use xor_name::XorName;
 
 /// A DataSection is responsible for
 /// the storage and retrieval of data,
