@@ -33,7 +33,6 @@ impl Network {
         let mut node_config = RoutingConfig::default();
         node_config.first = config.is_first();
         node_config.transport_config = config.network_config().clone();
-        node_config.network_params.recommended_section_size = 500;
         let (routing, event_stream) = RoutingNode::new(node_config).await?;
 
         Ok((

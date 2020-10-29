@@ -2685,7 +2685,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/sn_routing.git#b1baf2fbf04cb5b00871cf4e64288ad303fd3774"
+source = "git+https://github.com/madadam/routing?branch=startup-tweaks#d8f420f239ef3c2e0311681f4b620c230326d250"
 dependencies = [
  "bincode",
  "bls_dkg",
