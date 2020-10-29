@@ -128,7 +128,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     }
 
     /// Returns whether routing node is in elder state.
-    pub async fn is_elder(&mut self) -> bool {
+    pub async fn is_elder(&self) -> bool {
         self.network_api.is_elder().await
     }
 

@@ -88,7 +88,7 @@ impl Network {
                 .unwrap();
             nodes.push((command_tx, handle));
         }
-        thread::sleep(std::time::Duration::from_secs(5));
+        thread::sleep(std::time::Duration::from_secs(180));
         Self { nodes }
     }
 }

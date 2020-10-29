@@ -2559,7 +2559,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client#6b16e2d3c395532ba7f27080fa062126f28ce846"
+source = "git+https://github.com/maidsafe/sn_client#f22e8a32d68dfdfc6f4c4fcacbd8d122e0baf26b"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2662,7 +2662,6 @@ dependencies = [
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",
- "self_encryption",
  "self_update",
  "serde",
  "serde_json",
@@ -2686,7 +2685,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/sn_routing.git#c24919f9039e83f79c0dffd49797d519cbc0ebf7"
+source = "git+https://github.com/maidsafe/sn_routing.git#b1baf2fbf04cb5b00871cf4e64288ad303fd3774"
 dependencies = [
  "bincode",
  "bls_dkg",
