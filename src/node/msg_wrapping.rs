@@ -10,7 +10,7 @@ use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty};
 use log::info;
 use sn_data_types::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NodeDuties, Signature,
+    NodeDuties, Signature, TransientSectionKey,
 };
 use xor_name::XorName;
 
@@ -99,9 +99,9 @@ impl ElderMsgWrapping {
     }
 
     pub async fn forward(&self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
-        let msg = self.inner.set_proxy(&msg).await?;
+        let msg = self.inner.set_proxy(&msg, true).await?;
         Some(NodeMessagingDuty::SendToSection {
-            msg,
+            msg: msg.clone(),
             as_node: false,
         })
     }
@@ -146,7 +146,7 @@ impl MsgWrapping {
     }
 
     pub async fn send_to_client(&self, message: Message) -> Option<NodeMessagingDuty> {
-        let origin = self.sign(&message).await?;
+        let origin = self.sign(&message, true).await?;
         let msg = MsgEnvelope {
             message,
             origin,
@@ -156,7 +156,7 @@ impl MsgWrapping {
     }
 
     pub async fn send_to_node(&self, message: Message) -> Option<NodeMessagingDuty> {
-        let origin = self.sign(&message).await?;
+        let origin = self.sign(&message, false).await?;
         let msg = MsgEnvelope {
             message,
             origin,
@@ -170,7 +170,7 @@ impl MsgWrapping {
         message: Message,
         as_node: bool,
     ) -> Option<NodeMessagingDuty> {
-        let origin = self.sign(&message).await?;
+        let origin = self.sign(&message, !as_node).await?;
         let msg = MsgEnvelope {
             message,
             origin,
@@ -184,7 +184,7 @@ impl MsgWrapping {
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
     ) -> Option<NodeMessagingDuty> {
-        let msg = self.set_proxy(&msg).await?;
+        let msg = self.set_proxy(&msg, false).await?;
         Some(NodeMessagingDuty::SendToAdults { targets, msg })
     }
 
@@ -207,18 +207,23 @@ impl MsgWrapping {
         .await
     }
 
-    async fn sign<T: Serialize>(&self, data: &T) -> Option<MsgSender> {
+    async fn sign<T: Serialize>(&self, data: &T, as_section: bool) -> Option<MsgSender> {
         let sender = match self.duty {
             Duty::Adult(duty) => {
                 let (key, sig) = self.ed_key_sig(data).await?;
                 MsgSender::adult(key, duty, sig).ok()?
             }
             Duty::Elder(duty) => {
-                let key = self.keys.elder_key().await?;
-                if let Signature::BlsShare(sig) = self.keys.sign_as_elder(data).await? {
-                    MsgSender::elder(key, duty, sig.share).ok()?
+                if as_section {
+                    let bls_key = self.keys.public_key_set().await?.public_key();
+                    MsgSender::section(TransientSectionKey { bls_key }, duty).ok()?
                 } else {
-                    return None;
+                    let key = self.keys.elder_key().await?;
+                    if let Signature::BlsShare(sig) = self.keys.sign_as_elder(data).await? {
+                        MsgSender::elder(key, duty, sig.share).ok()?
+                    } else {
+                        return None;
+                    }
                 }
             }
             Duty::Node(_) => {
@@ -242,10 +247,10 @@ impl MsgWrapping {
         Some((key, sig))
     }
 
-    async fn set_proxy(&self, msg: &MsgEnvelope) -> Option<MsgEnvelope> {
+    async fn set_proxy(&self, msg: &MsgEnvelope, as_section: bool) -> Option<MsgEnvelope> {
         // origin signs the message, while proxies sign the envelope
         let mut msg = msg.clone();
-        msg.add_proxy(self.sign(&msg).await?);
+        msg.add_proxy(self.sign(&msg, as_section).await?);
 
         Some(msg)
     }

@@ -13,6 +13,7 @@ use crate::node::node_ops::{
 };
 use crate::Network;
 use log::error;
+use log::info;
 use sn_data_types::{
     Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, NodeCmd, NodeDuties,
     NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
@@ -48,7 +49,7 @@ impl NetworkMsgAnalysis {
 
     async fn are_we_origin(&self, msg: &MsgEnvelope) -> bool {
         let origin = msg.origin.address().xorname();
-        origin == self.routing.our_name().await
+        origin == self.routing.name().await
     }
 
     pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
@@ -196,6 +197,7 @@ impl NetworkMsgAnalysis {
         let shall_process = is_our_client_msg && self.is_elder().await;
 
         if !shall_process {
+            info!("Returning None! Is client msg && We are Elder");
             return None;
         }
 

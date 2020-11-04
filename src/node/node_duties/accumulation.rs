@@ -108,11 +108,10 @@ impl Accumulation {
 
             // upgrade sender to Section, since it accumulated
             let section_key = SectionKey {
-                name: sender.address().xorname(),
                 bls_key: public_key_set.public_key(),
             };
             if let Duty::Elder(duty) = sender.duty()? {
-                let sender = MsgSender::section(section_key, duty, signature).ok()?;
+                let sender = MsgSender::section(section_key, duty).ok()?;
                 // Replace the Node with the Section.
                 let mut msg = msg;
                 let _ = msg.proxies.pop();

@@ -31,7 +31,7 @@ pickledb = "~0.4.0"
 quick-error = "1.2.2"
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
-sn_routing = { git = "https://github.com/madadam/routing", branch = "startup-tweaks" }
+sn_routing = { git = "https://github.com/maidsafe/sn_routing" }
 self_update = { version = "~0.16.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate"] }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
@@ -49,6 +49,9 @@ signature = "1.1.0"
 tokio = { version = "~0.2.5", features = ["macros", "fs", "sync"] }
 xor_name = "1.1.0"
 sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
+
+[patch.crates-io]
+sn_data_types = { git = "https://github.com/Yoga07/sn_data_types", branch = "msg-sender" }
 
 [dev_dependencies]
 maplit = "1.0.1"

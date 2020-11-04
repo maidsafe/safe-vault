@@ -11,6 +11,7 @@ use bls::PublicKeySet;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use serde::Serialize;
 use sn_data_types::{Signature, SignatureShare, TransientElderKey as ElderKey};
+use xor_name::XorName;
 
 #[derive(Clone)]
 pub struct NodeSigningKeys {
@@ -39,9 +40,13 @@ impl NodeSigningKeys {
         })
     }
 
-    async fn public_key_set(&self) -> Option<PublicKeySet> {
+    pub async fn public_key_set(&self) -> Option<PublicKeySet> {
         Some(self.routing.public_key_set().await.ok()?)
     }
+
+    // pub async fn section_name(&self) -> XorName {
+    //     self.routing.section_name().await
+    // }
 
     /// Creates a detached Ed25519 signature of `data`.
     pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Signature {

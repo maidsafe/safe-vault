@@ -43,10 +43,6 @@ impl Network {
         ))
     }
 
-    pub async fn our_name(&self) -> XorName {
-        XorName(self.name().await.0)
-    }
-
     pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Signature {
         let data = utils::serialise(data);
         let sig = self.routing.lock().await.sign(&data).await;
@@ -81,6 +77,10 @@ impl Network {
     pub async fn name(&self) -> XorName {
         self.routing.lock().await.name().await
     }
+
+    // pub async fn section_name(&self) -> Option<XorName> {
+    //     XorName(self.routing.lock().await.public_key_set().await.ok()?.public_key().to_bytes())
+    // }
 
     pub async fn our_connection_info(&mut self) -> Result<SocketAddr> {
         self.routing

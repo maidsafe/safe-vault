@@ -11,6 +11,7 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::{NodeMessagingDuty, NodeOperation};
+use log::info;
 use sn_data_types::{
     AccountWrite, BlobWrite, Cmd, DataCmd, DebitAgreementProof, MapWrite, Message, MessageId,
     MsgEnvelope, MsgSender, SequenceWrite,
@@ -24,6 +25,7 @@ pub(super) async fn get_result(
     let msg_id = msg.id();
     let msg_origin = msg.origin;
     let proxies = msg.proxies;
+    info!("Writing Data");
     let result = match msg.message {
         Message::Cmd {
             cmd: Cmd::Data {
@@ -33,6 +35,7 @@ pub(super) async fn get_result(
             ..
         } => match data_cmd {
             Blob(write) => {
+                info!("Writing Blob");
                 blob(
                     write,
                     stores.blob_register_mut(),
@@ -43,11 +46,16 @@ pub(super) async fn get_result(
                 )
                 .await
             }
-            Map(write) => map(write, stores.map_storage_mut(), msg_id, msg_origin).await,
+            Map(write) => {
+                info!("Writing Map");
+                map(write, stores.map_storage_mut(), msg_id, msg_origin).await
+            }
             Sequence(write) => {
+                info!("Writing Sequence");
                 sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await
             }
             Account(write) => {
+                info!("Writing Account");
                 account(write, stores.account_storage_mut(), msg_id, msg_origin).await
             }
         },

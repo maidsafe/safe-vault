@@ -21,7 +21,7 @@ mod used_space;
 use crate::{utils, utils::Init};
 use chunk::{Chunk, ChunkId};
 use error::{Error, Result};
-use log::trace;
+use log::{info, trace};
 use sn_data_types::{Account, Blob, Map, Sequence};
 use std::{
     fs::{self, DirEntry, File, Metadata},
@@ -106,19 +106,20 @@ impl<T: Chunk> ChunkStore<T> {
     ///
     /// If a chunk with the same id already exists, it will be overwritten.
     pub async fn put(&mut self, chunk: &T) -> Result<()> {
+        info!("PUTTING Sequence chunk");
         let serialised_chunk = utils::serialise(chunk);
         let consumed_space = serialised_chunk.len() as u64;
 
-        println!("consumed space: {:?}", consumed_space);
-        println!("max : {:?}", self.used_space.max_capacity().await);
-        println!("use space total : {:?}", self.used_space.total().await);
+        info!("consumed space: {:?}", consumed_space);
+        info!("max : {:?}", self.used_space.max_capacity().await);
+        info!("use space total : {:?}", self.used_space.total().await);
 
         let file_path = self.file_path(chunk.id())?;
         let _ = self.do_delete(&file_path).await;
 
         // pre-reserve space
         self.used_space.increase(self.id, consumed_space).await?;
-        println!(
+        info!(
             "use space total after adddddddd: {:?}",
             self.used_space.total().await
         );

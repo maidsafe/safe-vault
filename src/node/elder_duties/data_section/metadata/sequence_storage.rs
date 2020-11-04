@@ -13,6 +13,7 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
+use log::info;
 use sn_data_types::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
     Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp, SequenceEntry, SequenceIndex,
@@ -66,9 +67,13 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
         use SequenceWrite::*;
+        info!("Matching Sequence Write");
         match write {
             New(data) => self.store(&data, msg_id, origin).await,
-            Edit(operation) => self.edit(operation, msg_id, origin).await,
+            Edit(operation) => {
+                info!("Editing Sequence");
+                self.edit(operation, msg_id, origin).await
+            }
             Delete(address) => self.delete(address, msg_id, origin).await,
             SetPublicPolicy(operation) => {
                 self.set_public_permissions(operation, msg_id, origin).await
@@ -414,6 +419,7 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
         let address = write_op.address;
+        info!("Editing Sequence chunk");
         let result = self
             .edit_chunk(
                 address,
@@ -425,6 +431,11 @@ impl SequenceStorage {
                 },
             )
             .await;
+        if result.is_ok() {
+            info!("Editing Sequence chunk SUCCESSFUL!");
+        } else {
+            info!("Editing Sequence chunk FAILEDDD!");
+        }
         self.ok_or_error(result, msg_id, origin).await
     }
 
@@ -438,9 +449,10 @@ impl SequenceStorage {
     where
         F: FnOnce(Sequence) -> NdResult<Sequence>,
     {
+        info!("Getting Sequence chunk for Edit");
         let result = self.get_chunk(address, action, origin)?;
         let sequence = write_fn(result)?;
-
+        info!("Edited Sequence chunk successfully");
         self.chunks
             .put(&sequence)
             .await
@@ -455,7 +467,10 @@ impl SequenceStorage {
     ) -> Option<NodeMessagingDuty> {
         let error = match result {
             Ok(_) => return None,
-            Err(error) => error,
+            Err(error) => {
+                info!("Error on writing Sequence! {:?}", error);
+                error
+            }
         };
         self.wrapping
             .send_to_section(
@@ -465,7 +480,7 @@ impl SequenceStorage {
                     correlation_id: msg_id,
                     cmd_origin: origin.address(),
                 },
-                true,
+                false,
             )
             .await
     }
