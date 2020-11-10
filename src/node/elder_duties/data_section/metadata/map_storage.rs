@@ -13,6 +13,7 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
+use log::info;
 use sn_data_types::{
     CmdError, Error as NdError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
     MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey, QueryResponse,
@@ -171,13 +172,19 @@ impl MapStorage {
             ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
             error => error.to_string().into(),
         }) {
-            Ok(map) => {
-                map.check_is_owner(origin.id().public_key()).ok()?;
-                self.chunks
-                    .delete(&address)
-                    .await
-                    .map_err(|error| error.to_string().into())
-            }
+            Ok(map) => match map.check_is_owner(origin.id().public_key()) {
+                Ok(()) => {
+                    info!("Deleting Map");
+                    self.chunks
+                        .delete(&address)
+                        .await
+                        .map_err(|error| error.to_string().into())
+                }
+                Err(e) => {
+                    info!("Error: Delete Map called by non-owner");
+                    Err(e.to_string().into())
+                }
+            },
             Err(error) => Err(error),
         };
 
@@ -462,10 +469,12 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Option<NodeMessagingDuty> {
         if let Err(error) = result {
+            info!("MapStorage: Writing chunk FAILED!");
             self.wrapping
                 .error(CmdError::Data(error), msg_id, &origin.address())
                 .await
         } else {
+            info!("MapStorage: Writing chunk PASSED!");
             None
         }
     }

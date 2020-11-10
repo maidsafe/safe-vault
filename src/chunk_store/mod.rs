@@ -106,7 +106,7 @@ impl<T: Chunk> ChunkStore<T> {
     ///
     /// If a chunk with the same id already exists, it will be overwritten.
     pub async fn put(&mut self, chunk: &T) -> Result<()> {
-        info!("PUTTING Sequence chunk");
+        info!("Writing chunk");
         let serialised_chunk = utils::serialise(chunk);
         let consumed_space = serialised_chunk.len() as u64;
 
@@ -130,8 +130,12 @@ impl<T: Chunk> ChunkStore<T> {
         });
 
         match res {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                info!("Writing chunk succeeded!");
+                Ok(())
+            }
             Err(e) => {
+                info!("Writing chunk failed!");
                 self.used_space.decrease(self.id, consumed_space).await?;
                 Err(e.into())
             }
