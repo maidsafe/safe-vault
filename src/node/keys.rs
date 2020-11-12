@@ -11,7 +11,6 @@ use bls::PublicKeySet;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use serde::Serialize;
 use sn_data_types::{Signature, SignatureShare, TransientElderKey as ElderKey};
-use xor_name::XorName;
 
 #[derive(Clone)]
 pub struct NodeSigningKeys {

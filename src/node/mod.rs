@@ -30,7 +30,7 @@ use bls::SecretKey;
 use log::info;
 use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
-use sn_routing::{event::Event, EventStream};
+use sn_routing::{Event, EventStream};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,

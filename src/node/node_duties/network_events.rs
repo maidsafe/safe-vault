@@ -15,8 +15,7 @@ use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
 use sn_data_types::{MsgEnvelope, PublicKey};
-use sn_routing::event::Connected as ConnectionEvent;
-use sn_routing::event::Event as RoutingEvent;
+use sn_routing::Event as RoutingEvent;
 use xor_name::XorName;
 
 /// Maps events from the transport layer
@@ -54,29 +53,25 @@ impl NetworkEvents {
                     .into(),
                 )
             }
-            RoutingEvent::InfantJoined { name, .. } => {
-                trace!("New node has joined the network");
-                Some(ProcessNewMember(XorName(name.0)).into())
-            }
             RoutingEvent::MemberJoined {
                 name,
                 previous_name,
                 age,
+                startup_relocation,
             } => {
                 trace!("New member has joined the section");
-                Some(
-                    ProcessRelocatedMember {
-                        old_node_id: XorName(name.0),
-                        new_node_id: XorName(previous_name.0),
-                        age,
-                    }
-                    .into(),
-                )
-            }
-            RoutingEvent::Connected(event) => {
-                info!("Node connected.");
-                if let ConnectionEvent::First = event {
-                    self.duty_cfg.setup_as_first().await
+                if startup_relocation {
+                    trace!("New node has joined the network");
+                    Some(ProcessNewMember(XorName(name.0)).into())
+                } else if let Some(prev_name) = previous_name {
+                    Some(
+                        ProcessRelocatedMember {
+                            old_node_id: XorName(name.0),
+                            new_node_id: XorName(prev_name.0),
+                            age,
+                        }
+                        .into(),
+                    )
                 } else {
                     None
                 }

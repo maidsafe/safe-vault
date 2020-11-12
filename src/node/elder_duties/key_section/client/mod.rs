@@ -24,7 +24,7 @@ use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
 use sn_data_types::{Address, MsgEnvelope};
-use sn_routing::event::Event as RoutingEvent;
+use sn_routing::Event as RoutingEvent;
 use std::fmt::{self, Display, Formatter};
 
 /// A client gateway routes messages
