@@ -1937,9 +1937,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.8.6"
+version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "403b35df5ca0afb2c3b1f2ba5687550bf0baa8b2d0e89d3ea1b5092f00236f11"
+checksum = "de4f96863d3c90d53ed002975f325cd537bf6015142dca44727be3e60679ec3a"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2681,7 +2681,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/maidsafe/sn_routing#4dfd981943d6184bea80459c13400e75221a207d"
+source = "git+https://github.com/yoga07/sn_routing?branch=start-up#ccb7edeeffc1cba8154699566c9ac6a83ec56568"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2696,7 +2696,7 @@ dependencies = [
  "lru_time_cache",
  "qp2p",
  "rand 0.7.3",
- "rand_xorshift",
+ "rand_chacha",
  "serde",
  "threshold_crypto",
  "tiny-keccak 2.0.2",

@@ -14,7 +14,7 @@ use sn_data_types::{
     Address, DebitAgreementProof, MessageId, MsgEnvelope, PublicKey, ReplicaEvent, SignedTransfer,
     TransferValidated,
 };
-use sn_routing::{event::Event as RoutingEvent, Prefix};
+use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use xor_name::XorName;

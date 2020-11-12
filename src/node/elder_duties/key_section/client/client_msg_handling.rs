@@ -15,7 +15,7 @@ use crate::{Error, Result};
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng};
 use sn_data_types::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
-use sn_routing::event::SendStream;
+use sn_routing::SendStream;
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
