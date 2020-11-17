@@ -24,7 +24,7 @@ use xor_name::Prefix;
 use {
     crate::node::node_ops::NodeMessagingDuty,
     bls::{SecretKey, SecretKeySet, SecretKeyShare},
-    log::{trace, debug},
+    log::{debug, trace},
     rand::thread_rng,
     sn_data_types::{Signature, SignatureShare, SignedCredit, SignedDebit, Transfer},
 };
@@ -304,11 +304,11 @@ impl Replicas {
             Some(val) => {
                 debug!("Got lockkkkk");
                 Ok(val.clone())
-            },
+            }
             None => {
                 debug!("Nooooooooooooooo lock");
                 Err(Error::Logic("Key does not exist among locks.".to_string()))
-            },
+            }
         }
     }
 
@@ -339,7 +339,10 @@ impl Replicas {
 
     #[cfg(feature = "simulated-payouts")]
     pub async fn credit_without_proof(&mut self, transfer: Transfer) -> Result<NodeMessagingDuty> {
-        debug!("!!!!!!!!!!!!!!!!!!!!!Performing credit without proof {:?}", transfer);
+        debug!(
+            "!!!!!!!!!!!!!!!!!!!!!Performing credit without proof {:?}",
+            transfer
+        );
         let debit = transfer.debit();
         let credit = transfer.credit()?;
 
@@ -349,7 +352,6 @@ impl Replicas {
         let key_lock = match self.load_key_lock(id).await {
             Ok(lock) => lock,
             Err(_) => {
-
                 debug!("making lock ourselves");
                 let store = TransferStore::new(id.into(), &self.root_dir, Init::New)?;
                 let lock = Arc::new(Mutex::new(store));
@@ -358,7 +360,6 @@ impl Replicas {
                 // .filter_map(|id| .ok())
 
                 lock
-
             }
         };
         let mut store = key_lock.lock().await;

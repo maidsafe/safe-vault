@@ -9,14 +9,13 @@
 use super::{
     chunk::{Chunk, ChunkId},
     error::Error,
-    ChunkStore, Subdir, UsedSpace,
+    ChunkStore, Result as ChunkStoreResult, Subdir, UsedSpace,
 };
 use crate::{utils::Init, Result, ToDbKey};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, u64};
 use tempdir::TempDir;
-use unwrap::unwrap;
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct Data {
@@ -49,8 +48,8 @@ fn new_rng() -> ThreadRng {
     rand::thread_rng()
 }
 
-fn temp_dir() -> TempDir {
-    unwrap!(TempDir::new("test"))
+fn temp_dir() -> ChunkStoreResult<TempDir> {
+    TempDir::new("test").map_err(|e| Error::Other(e.to_string()))
 }
 
 struct Chunks {
@@ -61,7 +60,7 @@ struct Chunks {
 impl Chunks {
     // Construct random amount of randomly-sized chunks, keeping track of the total size of all
     // chunks when serialised.
-    fn gen<R: Rng>(rng: &mut R) -> Self {
+    fn gen<R: Rng>(rng: &mut R) -> Result<Self> {
         let mut chunks = Self {
             data_and_sizes: vec![],
             total_size: 0,
@@ -73,21 +72,21 @@ impl Chunks {
                 id: Id(0),
                 value: rng.sample_iter(&Standard).take(size as usize).collect(),
             };
-            let serialised_size = unwrap!(bincode::serialized_size(&data));
+            let serialised_size = bincode::serialized_size(&data).map_err(Error::Bincode)?;
 
             chunks.total_size += serialised_size;
             chunks.data_and_sizes.push((data.value, serialised_size));
         }
-        chunks
+        Ok(chunks)
     }
 }
 
 #[tokio::test]
 async fn successful_put() -> Result<()> {
     let mut rng = new_rng();
-    let chunks = Chunks::gen(&mut rng);
+    let chunks = Chunks::gen(&mut rng)?;
 
-    let root = temp_dir();
+    let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
     let mut chunk_store =
         ChunkStore::<Data>::new(root.path(), used_space.clone(), Init::New).await?;
@@ -99,7 +98,7 @@ async fn successful_put() -> Result<()> {
         };
         let used_space_before = chunk_store.total_used_space().await;
         assert!(!chunk_store.has(&the_data.id));
-        unwrap!(chunk_store.put(the_data).await);
+        chunk_store.put(the_data).await?;
         let used_space_after = chunk_store.total_used_space().await;
         assert_eq!(used_space_after, used_space_before + size);
         assert!(chunk_store.has(&the_data.id));
@@ -123,7 +122,7 @@ async fn successful_put() -> Result<()> {
 #[tokio::test]
 async fn failed_put_when_not_enough_space() -> Result<()> {
     let mut rng = new_rng();
-    let root = temp_dir();
+    let root = temp_dir()?;
     let capacity = 32;
     let used_space = UsedSpace::new(capacity);
     let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
@@ -147,9 +146,9 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
 #[tokio::test]
 async fn delete() -> Result<()> {
     let mut rng = new_rng();
-    let chunks = Chunks::gen(&mut rng);
+    let chunks = Chunks::gen(&mut rng)?;
 
-    let root = temp_dir();
+    let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
     let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 
@@ -172,9 +171,9 @@ async fn delete() -> Result<()> {
 #[tokio::test]
 async fn put_and_get_value_should_be_same() -> Result<()> {
     let mut rng = new_rng();
-    let chunks = Chunks::gen(&mut rng);
+    let chunks = Chunks::gen(&mut rng)?;
 
-    let root = temp_dir();
+    let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
     let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 
@@ -188,7 +187,7 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
     }
 
     for (index, (data, _)) in chunks.data_and_sizes.iter().enumerate() {
-        let retrieved_value = unwrap!(chunk_store.get(&Id(index as u64)));
+        let retrieved_value = chunk_store.get(&Id(index as u64))?;
         assert_eq!(*data, retrieved_value.value);
     }
 
@@ -198,9 +197,9 @@ async fn put_and_get_value_should_be_same() -> Result<()> {
 #[tokio::test]
 async fn overwrite_value() -> Result<()> {
     let mut rng = new_rng();
-    let chunks = Chunks::gen(&mut rng);
+    let chunks = Chunks::gen(&mut rng)?;
 
-    let root = temp_dir();
+    let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
     let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 
@@ -212,7 +211,7 @@ async fn overwrite_value() -> Result<()> {
             })
             .await?;
         assert_eq!(chunk_store.total_used_space().await, size);
-        let retrieved_data = unwrap!(chunk_store.get(&Id(0)));
+        let retrieved_data = chunk_store.get(&Id(0))?;
         assert_eq!(data, retrieved_data.value);
     }
 
@@ -221,7 +220,7 @@ async fn overwrite_value() -> Result<()> {
 
 #[tokio::test]
 async fn get_fails_when_key_does_not_exist() -> Result<()> {
-    let root = temp_dir();
+    let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
     let chunk_store: ChunkStore<Data> =
         ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
@@ -238,9 +237,9 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
 #[tokio::test]
 async fn keys() -> Result<()> {
     let mut rng = new_rng();
-    let chunks = Chunks::gen(&mut rng);
+    let chunks = Chunks::gen(&mut rng)?;
 
-    let root = temp_dir();
+    let root = temp_dir()?;
     let used_space = UsedSpace::new(u64::MAX);
     let mut chunk_store = ChunkStore::new(root.path(), used_space.clone(), Init::New).await?;
 

@@ -8,10 +8,13 @@
 
 #![allow(trivial_numeric_casts)] // FIXME
 
-use crate::Result;
+use crate::{Error, Result};
 use log::{debug, Level};
 use serde::{Deserialize, Serialize};
 use sn_routing::TransportConfig as NetworkConfig;
+use std::convert::Infallible;
+use std::net::AddrParseError;
+use std::num::ParseIntError;
 use std::{
     fs::{self, File},
     io::{self, BufReader},
@@ -19,7 +22,6 @@ use std::{
     path::PathBuf,
 };
 use structopt::StructOpt;
-use unwrap::unwrap;
 
 const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
@@ -94,7 +96,7 @@ pub struct Config {
 impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default node config file location,
     /// and overrides values with any equivalent command line args.
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, Error> {
         let mut config = match Self::read_from_file() {
             Ok(Some(config)) => config,
             Ok(None) | Err(_) => Default::default(),
@@ -105,14 +107,14 @@ impl Config {
             let occurrences = command_line_args.occurrences_of(arg);
             if occurrences != 0 {
                 if let Some(cla) = command_line_args.value_of(arg) {
-                    config.set_value(arg, cla);
+                    config.set_value(arg, cla)?;
                 } else {
                     config.set_flag(arg, occurrences);
                 }
             }
         }
 
-        config
+        Ok(config)
     }
 
     /// The address to be credited when this node farms SafeCoin.
@@ -201,36 +203,72 @@ impl Config {
         self.network_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
-    pub(crate) fn set_value(&mut self, arg: &str, value: &str) {
+    pub(crate) fn set_value(&mut self, arg: &str, value: &str) -> Result<(), Error> {
         if arg == ARGS[0] {
-            self.wallet_id = Some(value.parse().unwrap());
+            self.wallet_id =
+                Some(value.parse().map_err(|e: Infallible| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else if arg == ARGS[1] {
-            self.max_capacity = Some(value.parse().unwrap());
+            self.max_capacity =
+                Some(value.parse().map_err(|e: ParseIntError| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else if arg == ARGS[2] {
-            self.root_dir = Some(value.parse().unwrap());
+            self.root_dir =
+                Some(value.parse().map_err(|e: Infallible| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else if arg == ARGS[3] {
-            self.verbose = value.parse().unwrap();
+            self.verbose = value
+                .parse()
+                .map_err(|e: ParseIntError| Error::Logic(format!("Config file error: {:?}", e)))?;
         } else if arg == ARGS[4] {
-            self.network_config.hard_coded_contacts = unwrap!(serde_json::from_str(value));
+            self.network_config.hard_coded_contacts = serde_json::from_str(value)
+                .map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
         } else if arg == ARGS[5] {
-            self.network_config.port = Some(value.parse().unwrap());
+            self.network_config.port =
+                Some(value.parse().map_err(|e: ParseIntError| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else if arg == ARGS[6] {
-            self.network_config.ip = Some(value.parse().unwrap());
+            self.network_config.ip = Some(value.parse().map_err(|e: AddrParseError| {
+                Error::Logic(format!("Config file error: {:?}", e))
+            })?);
         } else if arg == ARGS[11] {
-            self.completions = Some(value.parse().unwrap());
+            self.completions =
+                Some(value.parse().map_err(|e: Infallible| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else if arg == ARGS[12] {
-            self.log_dir = Some(value.parse().unwrap());
+            self.log_dir =
+                Some(value.parse().map_err(|e: Infallible| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else if arg == ARGS[7] {
-            self.network_config.max_msg_size_allowed = Some(value.parse().unwrap());
+            self.network_config.max_msg_size_allowed =
+                Some(value.parse().map_err(|e: ParseIntError| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else if arg == ARGS[8] {
-            self.network_config.idle_timeout_msec = Some(value.parse().unwrap());
+            self.network_config.idle_timeout_msec =
+                Some(value.parse().map_err(|e: ParseIntError| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else if arg == ARGS[9] {
-            self.network_config.keep_alive_interval_msec = Some(value.parse().unwrap());
+            self.network_config.keep_alive_interval_msec =
+                Some(value.parse().map_err(|e: ParseIntError| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else if arg == ARGS[15] {
-            self.network_config.upnp_lease_duration = Some(value.parse().unwrap());
+            self.network_config.upnp_lease_duration =
+                Some(value.parse().map_err(|e: ParseIntError| {
+                    Error::Logic(format!("Config file error: {:?}", e))
+                })?);
         } else {
             println!("ERROR");
         }
+        Ok(())
     }
 
     pub(crate) fn set_flag(&mut self, arg: &str, occurrences: u64) {
@@ -318,14 +356,13 @@ fn project_dirs() -> Result<PathBuf> {
 
 #[cfg(test)]
 mod test {
-    use super::Config;
     use super::ARGS;
+    use super::{Config, Error, Result};
     use std::{fs::File, io::Read, path::Path};
     use structopt::StructOpt;
-    use unwrap::unwrap;
 
     #[test]
-    fn smoke() {
+    fn smoke() -> Result<()> {
         let app_name = Config::clap().get_name().to_string();
         let test_values = [
             ["wallet-id", "86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103"],
@@ -376,30 +413,27 @@ mod test {
             };
             let empty_config = config.clone();
             if let Some(val) = matches.value_of(arg) {
-                config.set_value(arg, val);
+                config.set_value(arg, val)?;
             } else {
                 config.set_flag(arg, occurrences);
             }
             assert_ne!(empty_config, config, "Failed to set_value() for {}", arg);
         }
+        Ok(())
     }
 
     #[ignore]
     #[test]
-    fn parse_sample_config_file() {
+    fn parse_sample_config_file() -> Result<(), Error> {
         let path = Path::new("installer/common/sample.node.config").to_path_buf();
-        let mut file = unwrap!(File::open(&path), "Error opening {}:", path.display());
+        let mut file =
+            File::open(&path).map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
         let mut encoded_contents = String::new();
-        let _ = unwrap!(
-            file.read_to_string(&mut encoded_contents),
-            "Error reading {}:",
-            path.display()
-        );
-        let config: Config = unwrap!(
-            serde_json::from_str(&encoded_contents),
-            "Error parsing {} as JSON:",
-            path.display()
-        );
+        let _ = file
+            .read_to_string(&mut encoded_contents)
+            .map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
+        let config: Config = serde_json::from_str(&encoded_contents)
+            .map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
 
         assert!(
             config.wallet_id.is_some(),
@@ -416,5 +450,6 @@ mod test {
             "{} is missing `root_dir` field.",
             path.display()
         );
+        Ok(())
     }
 }

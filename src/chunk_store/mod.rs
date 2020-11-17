@@ -107,7 +107,7 @@ impl<T: Chunk> ChunkStore<T> {
     /// If a chunk with the same id already exists, it will be overwritten.
     pub async fn put(&mut self, chunk: &T) -> Result<()> {
         info!("Writing chunk");
-        let serialised_chunk = utils::serialise(chunk);
+        let serialised_chunk = utils::serialise(chunk).map_err(|e| Error::Other(e.to_string()))?;
         let consumed_space = serialised_chunk.len() as u64;
 
         info!("consumed space: {:?}", consumed_space);
@@ -205,7 +205,9 @@ impl<T: Chunk> ChunkStore<T> {
     }
 
     fn file_path(&self, id: &T::Id) -> Result<PathBuf> {
-        Ok(self.dir.join(&hex::encode(utils::serialise(id))))
+        Ok(self.dir.join(&hex::encode(
+            utils::serialise(id).map_err(|e| Error::Other(e.to_string()))?,
+        )))
     }
 }
 

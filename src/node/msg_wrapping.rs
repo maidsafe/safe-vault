@@ -111,7 +111,7 @@ impl AdultMsgWrapping {
             .inner
             .keys
             .sign_as_node(msg)
-            .await
+            .await?
             .into_ed()
             .ok_or_else(|| Error::Logic("Could not sign message as Node".to_string()))?;
         Ok((pk, sign))
@@ -297,8 +297,8 @@ impl MsgWrapping {
         data: &T,
     ) -> Option<(ed25519_dalek::PublicKey, ed25519_dalek::Signature)> {
         let key = self.keys.node_id().await;
-        let sig = match self.keys.sign_as_node(data).await {
-            Signature::Ed25519(key) => key,
+        let sig = match self.keys.sign_as_node(data).await.ok() {
+            Some(Signature::Ed25519(key)) => key,
             _ => return None,
         };
         Some((key, sig))

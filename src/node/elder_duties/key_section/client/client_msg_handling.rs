@@ -162,7 +162,7 @@ impl ClientMsgHandling {
             Some((_, (peer_addr, mut stream))) => {
                 if is_query_response {
                     trace!("Sending QueryResponse on request's stream");
-                    send_message_on_stream(&msg, &mut stream).await
+                    send_message_on_stream(&msg, &mut stream).await?
                 } else {
                     trace!("Attempting to use bootstrap stream");
                     if let Some(pk) = self.get_public_key(peer_addr) {
@@ -171,7 +171,7 @@ impl ClientMsgHandling {
                             let mut used_streams = vec![];
                             for mut stream in streams {
                                 // send to each registered stream for that PK
-                                send_message_on_stream(&msg, &mut stream).await;
+                                send_message_on_stream(&msg, &mut stream).await?;
                                 used_streams.push(stream);
                             }
 
@@ -198,9 +198,9 @@ impl ClientMsgHandling {
     }
 }
 
-async fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) {
+async fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) -> Result<()> {
     trace!("Sending message on stream");
-    let bytes = utils::serialise(message);
+    let bytes = utils::serialise(message)?;
 
     let res = stream.send_user_msg(bytes).await;
 
@@ -211,6 +211,7 @@ async fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) 
             error
         ),
     };
+    Ok(())
 }
 
 impl Display for ClientMsgHandling {

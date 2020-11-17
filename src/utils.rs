@@ -8,7 +8,7 @@
 
 //! Utilities
 
-use crate::{config_handler::Config, Network, Result};
+use crate::{config_handler::Config, Error, Network, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use bytes::Bytes;
 use flexi_logger::{DeferredNow, Logger};
@@ -20,7 +20,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{BlsKeypairShare, Keypair};
 use std::{fs, path::Path};
 use std::{io::Write, time::Duration};
-use unwrap::unwrap;
 
 const NODE_MODULE_NAME: &str = "sn_node";
 const PERIODIC_DUMP_INTERVAL: Duration = Duration::from_secs(60);
@@ -97,13 +96,13 @@ pub(crate) fn random_vec<R: CryptoRng + Rng>(rng: &mut R, size: usize) -> Vec<u8
     rng.sample_iter(&Standard).take(size).collect()
 }
 
-pub(crate) fn serialise<T: Serialize>(data: &T) -> Bytes {
-    let serialised_data = unwrap!(bincode::serialize(data));
-    Bytes::copy_from_slice(serialised_data.as_slice())
+pub(crate) fn serialise<T: Serialize>(data: &T) -> Result<Bytes> {
+    let serialised_data = bincode::serialize(data).map_err(Error::Bincode)?;
+    Ok(Bytes::copy_from_slice(serialised_data.as_slice()))
 }
 
-pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> T {
-    unwrap!(bincode::deserialize(bytes))
+pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
+    bincode::deserialize(bytes).map_err(Error::Bincode)
 }
 
 // NB: needs to allow for nodes not having a key share yet?

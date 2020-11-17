@@ -121,7 +121,7 @@ impl Accumulation {
                 )));
             }
         };
-        let signed_data = utils::serialise(&msg.message);
+        let signed_data = utils::serialise(&msg.message)?;
         for sig in &signatures {
             if !public_key_set
                 .public_key_share(sig.index)

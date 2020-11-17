@@ -95,7 +95,10 @@ impl KeySection {
         self.transfers.section_split(prefix).await
     }
 
-    pub async fn process_key_section_duty(&mut self, duty: KeySectionDuty) -> Result<NodeOperation> {
+    pub async fn process_key_section_duty(
+        &mut self,
+        duty: KeySectionDuty,
+    ) -> Result<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {

@@ -140,10 +140,7 @@ impl Transfers {
         match query {
             GetReplicaEvents => self.all_events(msg_id, origin).await,
             GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await,
-            GetBalance(wallet_id) => {
-                self.balance(*wallet_id, msg_id, origin).await
-
-            } 
+            GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await,
             GetHistory { at, since_version } => {
                 self.history(at, *since_version, msg_id, origin).await
             }
@@ -165,10 +162,10 @@ impl Transfers {
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
             SimulatePayout(transfer) => {
-                let res =  self.replicas.credit_without_proof(transfer.clone()).await;
+                let res = self.replicas.credit_without_proof(transfer.clone()).await;
                 debug!("Simu payoput res: {:?}", res);
                 res
-            },
+            }
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin).await
             }
@@ -211,7 +208,7 @@ impl Transfers {
             Message::Cmd {
                 cmd: Cmd::Data { payment, cmd },
                 ..
-            } => (payment, utils::serialise(cmd).len() as u64),
+            } => (payment, utils::serialise(cmd)?.len() as u64),
             _ => return Ok(NodeMessagingDuty::NoOp),
         };
 

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Network};
+use crate::{utils, Network, Result};
 use bls::PublicKeySet;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use serde::Serialize;
@@ -53,13 +53,13 @@ impl NodeSigningKeys {
     // }
 
     /// Creates a detached Ed25519 signature of `data`.
-    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Signature {
+    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
         self.routing.sign_as_node(data).await
     }
 
     /// Creates a detached BLS signature share of `data` if the `self` holds a BLS keypair share.
     pub async fn sign_as_elder<T: Serialize>(&self, data: &T) -> Option<Signature> {
-        let data = utils::serialise(data);
+        let data = utils::serialise(data).ok()?;
         let index = self.routing.our_index().await.ok()?;
         let bls_secret_key = self.routing.secret_key_share().await.ok()?;
         Some(Signature::BlsShare(SignatureShare {

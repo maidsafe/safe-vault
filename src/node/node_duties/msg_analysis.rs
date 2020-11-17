@@ -390,7 +390,7 @@ impl NetworkMsgAnalysis {
 
                     // Verify that the message was
                     let verify_section_authority =
-                        section_authority.verify(&utils::serialise(&message));
+                        section_authority.verify(&utils::serialise(&message)?);
 
                     let given_section_pk =
                         &section_authority.id().public_key().bls().ok_or_else(|| {
