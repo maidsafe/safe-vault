@@ -35,6 +35,10 @@ quick_error! {
         NoSuchChunk {
             display("Chunk not found")
         }
+        /// Other ChunkStore errors
+        Other(error: String) {
+            display("Error: {:?}", error)
+        }
     }
 }
 

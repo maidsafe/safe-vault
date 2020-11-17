@@ -278,7 +278,11 @@ impl SectionFunds {
 
         use sn_data_types::ReplicaEvent::*;
         // Set the next actor to be our current.
-        self.actor = self.state.next_actor.take().unwrap();
+        self.actor = self
+            .state
+            .next_actor
+            .take()
+            .ok_or_else(|| Error::Logic("Could not set the next actor".to_string()))?;
         // We checked above that next_actor was some,
         // only case this could fail is if we're multi threading here.
         // (which we don't really have reason for here)

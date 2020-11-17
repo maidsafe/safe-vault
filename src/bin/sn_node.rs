@@ -32,7 +32,6 @@ use self_update::{cargo_crate_version, Status};
 use sn_node::{self, utils, write_connection_info, Config, Node};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
-use unwrap::unwrap;
 
 const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP is enabled in your router's settings and try again. \
                                 Note that not all routers are supported in this testnet. Visit https://safenetforum.org for more information.";
@@ -40,7 +39,10 @@ const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP
 /// Runs a Safe Network node.
 #[tokio::main]
 async fn main() {
-    let mut config = Config::new();
+    let mut config = match Config::new() {
+        Ok(cfg) => cfg,
+        Err(e) => panic!("Failed to create Config: {:?}", e),
+    };
 
     if let Some(c) = &config.completions() {
         match c.parse::<clap::Shell>() {
@@ -102,15 +104,15 @@ async fn main() {
         Ok(our_conn_info) => {
             println!(
                 "Node connection info:\n{}",
-                unwrap!(serde_json::to_string(&our_conn_info))
+                serde_json::to_string(&our_conn_info).unwrap()
             );
             info!(
                 "Node connection info: {}",
-                unwrap!(serde_json::to_string(&our_conn_info))
+                serde_json::to_string(&our_conn_info).unwrap()
             );
 
             if config.is_first() {
-                unwrap!(write_connection_info(&our_conn_info));
+                let _ = write_connection_info(&our_conn_info).unwrap();
             }
         }
         Err(e) => {
