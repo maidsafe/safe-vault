@@ -2568,7 +2568,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client#f22e8a32d68dfdfc6f4c4fcacbd8d122e0baf26b"
+source = "git+https://github.com/maidsafe/sn_client#f61875b93c31c332717af7ef180a5437428a482b"
 dependencies = [
  "async-trait",
  "bincode",

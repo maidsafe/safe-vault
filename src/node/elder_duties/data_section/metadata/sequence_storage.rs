@@ -154,20 +154,20 @@ impl SequenceStorage {
             .and_then(|sequence| {
                 // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
                 if sequence.address().is_pub() {
-                    Err(NdError::InvalidOperation)
-                } else {
-                    if origin.is_client() {
-                        let pk = origin.id().public_key();
-                        let policy = sequence.private_policy(Some(pk.clone()))?;
+                    return Err(NdError::InvalidOperation);
+                }
 
-                        if policy.owner != pk {
-                            Err(NdError::InvalidOwners)
-                        } else {
-                            Ok(())
-                        }
-                    } else {
+                if origin.is_client() {
+                    let pk = origin.id().public_key();
+                    let policy = sequence.private_policy(Some(pk))?;
+
+                    if policy.owner != pk {
                         Err(NdError::InvalidOwners)
+                    } else {
+                        Ok(())
                     }
+                } else {
+                    Err(NdError::InvalidOwners)
                 }
             }) {
             Ok(()) => self
