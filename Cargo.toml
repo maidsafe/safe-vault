@@ -42,17 +42,13 @@ unwrap = "1.2.1"
 crdts = "4.2.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-sn_data_types = "~0.11.29"
+sn_data_types = "~0.11.30"
 sn_transfers = "~0.2.2"
 ed25519 = "1.0.1"
 signature = "1.1.0"
 tokio = { version = "~0.2.5", features = ["macros", "fs", "sync"] }
 xor_name = "1.1.0"
 sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
-
-[patch.crates-io]
-sn_data_types = { path="../sn_data_types"}
-
 
 [dev_dependencies]
 maplit = "1.0.1"

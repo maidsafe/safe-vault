@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::NetworkMsgAnalysis;
+use crate::node::state_db::AgeGroup;
 use crate::node::{
     duty_cfg::DutyConfig,
     node_ops::{ElderDuty, NodeOperation},
@@ -37,7 +38,11 @@ impl NetworkEvents {
         match event {
             RoutingEvent::PromotedToAdult => {
                 info!("Node promoted to Adult");
-                self.duty_cfg.setup_as_adult()
+                if let AgeGroup::Adult = self.duty_cfg.status() {
+                    None
+                } else {
+                    self.duty_cfg.setup_as_adult()
+                }
             }
             RoutingEvent::PromotedToElder => {
                 info!("Node promoted to Elder");
@@ -66,8 +71,8 @@ impl NetworkEvents {
                 } else if let Some(prev_name) = previous_name {
                     Some(
                         ProcessRelocatedMember {
-                            old_node_id: XorName(name.0),
-                            new_node_id: XorName(prev_name.0),
+                            old_node_id: XorName(prev_name.0),
+                            new_node_id: XorName(name.0),
                             age,
                         }
                         .into(),

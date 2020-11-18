@@ -123,7 +123,7 @@ impl Onboarding {
         };
         let bytes = utils::serialise(&HandshakeResponse::Join(elders));
         // Hmmmm, what to do about this response.... we don't need a duty response here?
-        let res = futures::executor::block_on(stream.send(bytes));
+        let res = futures::executor::block_on(stream.send_user_msg(bytes));
 
         match res {
             Ok(()) => Ok(()),
@@ -167,7 +167,7 @@ impl Onboarding {
             let bytes = utils::serialise(&HandshakeResponse::Challenge(self.node_id, challenge));
 
             // Q: Hmmmm, what to do about this response.... do we need a duty response here?
-            let res = futures::executor::block_on(stream.send(bytes));
+            let res = futures::executor::block_on(stream.send_user_msg(bytes));
 
             match res {
                 Ok(()) => Ok(()),

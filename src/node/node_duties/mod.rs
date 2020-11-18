@@ -12,6 +12,7 @@ mod msg_analysis;
 mod network_events;
 
 use crate::chunk_store::UsedSpace;
+use crate::node::state_db::AgeGroup;
 use crate::node::{
     adult_duties::AdultDuties,
     duty_cfg::DutyConfig,
@@ -49,8 +50,16 @@ pub struct NodeDuties<R: CryptoRng + Rng> {
 }
 
 impl<R: CryptoRng + Rng> NodeDuties<R> {
-    pub fn new(node_info: NodeInfo, network_api: Network, rng: R) -> Self {
-        let duty_cfg = DutyConfig::new(node_info.reward_key, network_api.clone());
+    pub async fn new(node_info: NodeInfo, network_api: Network, rng: R) -> Self {
+        let age_grp = if network_api.is_elder().await {
+            AgeGroup::Elder
+        } else if network_api.is_adult().await {
+            AgeGroup::Adult
+        } else {
+            AgeGroup::Infant
+        };
+
+        let duty_cfg = DutyConfig::new(node_info.reward_key, network_api.clone(), age_grp);
         let msg_analysis = NetworkMsgAnalysis::new(network_api.clone());
         let network_events = NetworkEvents::new(duty_cfg, msg_analysis);
 

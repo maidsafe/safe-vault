@@ -87,6 +87,7 @@ impl Network {
             .lock()
             .await
             .our_connection_info()
+            .await
             .map_err(Error::Routing)
     }
 

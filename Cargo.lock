@@ -733,6 +733,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dirs-next"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
+dependencies = [
+ "cfg-if 1.0.0",
+ "dirs-sys-next",
+]
+
+[[package]]
 name = "dirs-sys"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1937,16 +1947,17 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de4f96863d3c90d53ed002975f325cd537bf6015142dca44727be3e60679ec3a"
+checksum = "48cba41584031476cfb9a4d00f99dbfcb571ac0fceecbeba0ee78c7b8dc35c39"
 dependencies = [
  "base64 0.12.3",
  "bincode",
  "bytes 0.5.6",
  "crossbeam-channel",
- "directories 2.0.2",
+ "dirs-next 2.0.0",
  "err-derive",
+ "flexi_logger",
  "futures",
  "igd 0.11.1",
  "log",
@@ -2565,7 +2576,7 @@ dependencies = [
  "chrono",
  "crdts",
  "crossbeam-channel",
- "dirs-next",
+ "dirs-next 1.0.2",
  "env_logger 0.6.2",
  "futures",
  "futures-util",
@@ -2595,7 +2606,9 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.29"
+version = "0.11.30"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32188b5848787e17f795b86a8801839210077d98dda52cfcd9ee92352828676c"
 dependencies = [
  "bincode",
  "crdts",
@@ -2643,7 +2656,7 @@ dependencies = [
  "crdts",
  "crossbeam-channel",
  "ctrlc",
- "dirs-next",
+ "dirs-next 1.0.2",
  "ed25519",
  "ed25519-dalek",
  "flexi_logger",
@@ -2681,7 +2694,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/yoga07/sn_routing?branch=start-up#ccb7edeeffc1cba8154699566c9ac6a83ec56568"
+source = "git+https://github.com/yoga07/sn_routing?branch=start-up#46217b90bdb77bf5380952fc10f2e7d5a47a860e"
 dependencies = [
  "bincode",
  "bls_dkg",

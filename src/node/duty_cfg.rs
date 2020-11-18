@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::state_db::AgeGroup;
 use crate::{
     node::node_ops::{NodeDuty, NodeOperation, RewardDuty},
     Network,
@@ -30,13 +31,15 @@ use sn_data_types::PublicKey;
 pub struct DutyConfig {
     reward_key: PublicKey,
     network_api: Network,
+    status: AgeGroup,
 }
 
 impl DutyConfig {
-    pub fn new(reward_key: PublicKey, network_api: Network) -> Self {
+    pub fn new(reward_key: PublicKey, network_api: Network, status: AgeGroup) -> Self {
         Self {
             reward_key,
             network_api,
+            status,
         }
     }
 
@@ -46,7 +49,8 @@ impl DutyConfig {
     }
 
     /// When becoming Adult.
-    pub fn setup_as_adult(&self) -> Option<NodeOperation> {
+    pub fn setup_as_adult(&mut self) -> Option<NodeOperation> {
+        self.status = AgeGroup::Adult;
         // 1. Becomde Adult.
         let first: NodeOperation = NodeDuty::BecomeAdult.into();
         // 2. Register wallet at Elders.
@@ -55,7 +59,8 @@ impl DutyConfig {
     }
 
     /// When becoming Elder.
-    pub async fn setup_as_elder(&self) -> Option<NodeOperation> {
+    pub async fn setup_as_elder(&mut self) -> Option<NodeOperation> {
+        self.status = AgeGroup::Elder;
         // 1. Become Elder.
         let first: NodeOperation = NodeDuty::BecomeElder.into();
         // 2. Add own node id to rewards.
@@ -68,5 +73,9 @@ impl DutyConfig {
         }
         .into();
         Some(vec![first, second, third].into())
+    }
+
+    pub fn status(&self) -> AgeGroup {
+        self.status.clone()
     }
 }
