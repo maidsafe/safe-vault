@@ -44,6 +44,7 @@ impl DutyConfig {
     }
 
     /// When first node in network.
+    #[allow(dead_code)]
     pub async fn setup_as_first(&self) -> Option<NodeOperation> {
         None
     }
