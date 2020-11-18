@@ -133,7 +133,8 @@ impl SequenceStorage {
             ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
             _ => error.to_string().into(),
         })?;
-        data.check_permission(action, origin.id().public_key())?;
+
+        data.check_permission(action, Some(origin.id().public_key()), None)?;
         Ok(data)
     }
 
@@ -155,12 +156,17 @@ impl SequenceStorage {
                 if sequence.address().is_pub() {
                     Err(NdError::InvalidOperation)
                 } else {
-                    let version = sequence.policy_version();
-                    let policy = sequence.private_policy(version)?;
-                    if policy.owner != origin.id().public_key() {
-                        Err(NdError::InvalidOwners)
+                    if origin.is_client() {
+                        let pk = origin.id().public_key();
+                        let policy = sequence.private_policy(Some(pk.clone()))?;
+
+                        if policy.owner != pk {
+                            Err(NdError::InvalidOwners)
+                        } else {
+                            Ok(())
+                        }
                     } else {
-                        Ok(())
+                        Err(NdError::InvalidOwners)
                     }
                 }
             }) {
@@ -186,7 +192,7 @@ impl SequenceStorage {
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
                 sequence
-                    .in_range(range.0, range.1)
+                    .in_range(range.0, range.1, Some(origin.id().public_key()))?
                     .ok_or(NdError::NoSuchEntry)
             });
         self.wrapping
@@ -210,10 +216,15 @@ impl SequenceStorage {
     ) -> Option<NodeMessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
-            .and_then(|sequence| match sequence.last_entry() {
-                Some(entry) => Ok((sequence.len() - 1, entry.to_vec())),
-                None => Err(NdError::NoSuchEntry),
-            });
+            .and_then(
+                |sequence| match sequence.last_entry(Some(origin.id().public_key()))? {
+                    Some(entry) => Ok((
+                        sequence.len(Some(origin.id().public_key()))? - 1,
+                        entry.to_vec(),
+                    )),
+                    None => Err(NdError::NoSuchEntry),
+                },
+            );
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -236,13 +247,11 @@ impl SequenceStorage {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
-                let version = sequence.policy_version() - 1;
-
                 if sequence.is_pub() {
-                    let policy = sequence.public_policy(version)?;
+                    let policy = sequence.public_policy()?;
                     Ok(policy.owner)
                 } else {
-                    let policy = sequence.private_policy(version)?;
+                    let policy = sequence.private_policy(Some(origin.id().public_key()))?;
                     Ok(policy.owner)
                 }
             });
@@ -268,10 +277,7 @@ impl SequenceStorage {
     ) -> Option<NodeMessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
-            .and_then(|sequence| {
-                let index = sequence.policy_version() - 1;
-                sequence.permissions(user, index)
-            });
+            .and_then(|sequence| sequence.permissions(user, Some(origin.id().public_key())));
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -294,9 +300,8 @@ impl SequenceStorage {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
-                let index = sequence.policy_version() - 1;
                 let res = if sequence.is_pub() {
-                    let policy = sequence.public_policy(index)?;
+                    let policy = sequence.public_policy()?;
                     policy.clone()
                 } else {
                     return Err(NdError::from(
@@ -327,9 +332,8 @@ impl SequenceStorage {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
-                let index = sequence.policy_version() - 1;
                 let res = if !sequence.is_pub() {
-                    let policy = sequence.private_policy(index)?;
+                    let policy = sequence.private_policy(Some(origin.id().public_key()))?;
                     policy.clone()
                 } else {
                     return Err(NdError::from(

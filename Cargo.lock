@@ -2595,8 +2595,7 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.24"
-source = "git+https://github.com/Yoga07/sn_data_types?branch=msg-sender#249e0f7a728bbf7dab0499c61ac98c48ccb8d924"
+version = "0.11.29"
 dependencies = [
  "bincode",
  "crdts",

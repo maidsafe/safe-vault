@@ -42,7 +42,7 @@ unwrap = "1.2.1"
 crdts = "4.2.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-sn_data_types = "~0.11.24"
+sn_data_types = "~0.11.29"
 sn_transfers = "~0.2.2"
 ed25519 = "1.0.1"
 signature = "1.1.0"
@@ -51,7 +51,8 @@ xor_name = "1.1.0"
 sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
 
 [patch.crates-io]
-sn_data_types = { git = "https://github.com/Yoga07/sn_data_types", branch = "msg-sender" }
+sn_data_types = { path="../sn_data_types"}
+
 
 [dev_dependencies]
 maplit = "1.0.1"
