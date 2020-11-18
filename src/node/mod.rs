@@ -93,7 +93,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             reward_key,
         };
 
-        let mut duties = NodeDuties::new(node_info, network_api.clone(), rng);
+        let mut duties = NodeDuties::new(node_info, network_api.clone(), rng).await;
 
         use AgeGroup::*;
         let _ = match age_group {

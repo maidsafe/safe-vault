@@ -207,7 +207,7 @@ async fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) 
     trace!("Sending message on stream");
     let bytes = utils::serialise(message);
 
-    let res = stream.send(bytes).await;
+    let res = stream.send_user_msg(bytes).await;
 
     match res {
         Ok(()) => info!("Message sent successfully to client via stream"),
