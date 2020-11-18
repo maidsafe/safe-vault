@@ -2694,7 +2694,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/yoga07/sn_routing?branch=start-up#46217b90bdb77bf5380952fc10f2e7d5a47a860e"
+source = "git+https://github.com/yoga07/sn_routing?branch=start-up#7e4fe662556405d33fa2a331ad2330fe97a1b741"
 dependencies = [
  "bincode",
  "bls_dkg",
