@@ -64,6 +64,8 @@ async fn main() {
 
     utils::init_logging(&config);
 
+    info!("Node PID is: {:?}", std::process::id());
+
     if config.update() || config.update_only() {
         match update() {
             Ok(status) => {

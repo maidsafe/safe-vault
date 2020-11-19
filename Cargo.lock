@@ -1947,17 +1947,15 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.8.8"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48cba41584031476cfb9a4d00f99dbfcb571ac0fceecbeba0ee78c7b8dc35c39"
+checksum = "b7d1ec1570ff0d058fb06b55ae452afd022631d071ecc2947552083c65d125b9"
 dependencies = [
  "base64 0.12.3",
  "bincode",
  "bytes 0.5.6",
- "crossbeam-channel",
  "dirs-next 2.0.0",
  "err-derive",
- "flexi_logger",
  "futures",
  "igd 0.11.1",
  "log",
@@ -1968,7 +1966,6 @@ dependencies = [
  "serde_json",
  "structopt 0.3.20",
  "tokio",
- "unwrap",
  "webpki",
 ]
 
@@ -2568,7 +2565,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client#f61875b93c31c332717af7ef180a5437428a482b"
+source = "git+https://github.com/joshuef/sn_client?branch=update-qp2p#41958b3a0bbcbcc6be9b3ff853d858ae476680d1"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2694,7 +2691,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/yoga07/sn_routing?branch=start-up#7e4fe662556405d33fa2a331ad2330fe97a1b741"
+source = "git+https://github.com/joshuef/routing?branch=Lost-conn-startup#e6304fbd23f76034ca24fe0c8b286d1a6e9f15a3"
 dependencies = [
  "bincode",
  "bls_dkg",

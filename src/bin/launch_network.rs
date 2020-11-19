@@ -43,7 +43,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 static NODES_DIR: &str = "local-test-network";
-static INTERVAL: &str = "3";
+static INTERVAL: &str = "1";
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
