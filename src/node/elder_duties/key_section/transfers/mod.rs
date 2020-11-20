@@ -247,7 +247,7 @@ impl Transfers {
             .lock()
             .await
             .replicas_pk_set()
-            .ok_or_else(|| Error::NoSuchKey);
+            .ok_or(Error::NoSuchKey);
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetReplicaKeys(result),

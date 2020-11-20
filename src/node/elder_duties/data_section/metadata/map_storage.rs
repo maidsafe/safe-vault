@@ -322,12 +322,12 @@ impl MapStorage {
                 .get(key)
                 .cloned()
                 .map(MapValue::from)
-                .ok_or_else(|| NdError::NoSuchEntry),
+                .ok_or(NdError::NoSuchEntry),
             Map::Unseq(map) => map
                 .get(key)
                 .cloned()
                 .map(MapValue::from)
-                .ok_or_else(|| NdError::NoSuchEntry),
+                .ok_or(NdError::NoSuchEntry),
         });
         self.wrapping
             .send_to_section(
