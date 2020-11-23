@@ -33,9 +33,10 @@ use sn_launch_tool::run_with;
 use std::{
     fs::{create_dir_all, remove_dir_all},
     path::PathBuf,
-    process::Command,
+    process::{Command, Stdio},
 };
 use tokio::time::{delay_for, Duration};
+
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node";
@@ -55,6 +56,8 @@ async fn main() -> Result<(), String> {
     println!("Building current sn_node");
     let _child = Command::new("cargo")
         .args(args.clone())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .output()
         .map_err(|err| {
             format!(
@@ -64,6 +67,7 @@ async fn main() -> Result<(), String> {
         })?;
 
     println!("sn_node built successfully");
+    
 
     let _ = run_network().await?;
 
