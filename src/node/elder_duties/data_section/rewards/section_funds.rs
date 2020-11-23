@@ -17,10 +17,10 @@ use sn_data_types::{
 };
 use xor_name::XorName;
 
+use log::error;
 use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
 use ActorEvent::*;
-use log::error;
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
 pub(super) struct SectionFunds {
@@ -116,9 +116,9 @@ impl SectionFunds {
             Ok(None) => None, // Would indicate that this apparently has already been done, so no change.
             Err(error) => {
                 error!("Panic at creating transfer during transition");
-                
+
                 panic!(error)
-            }, // This would be a bug! Cannot move on from here, only option is to crash!
+            } // This would be a bug! Cannot move on from here, only option is to crash!
         }
     }
 

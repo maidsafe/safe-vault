@@ -16,7 +16,7 @@ use crate::{
     node::node_ops::{NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
 use futures::lock::Mutex;
-use log::{debug, info, trace, warn, error};
+use log::{debug, error, info, trace, warn};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{

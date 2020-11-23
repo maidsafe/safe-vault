@@ -37,7 +37,6 @@ use std::{
 };
 use tokio::time::{delay_for, Duration};
 
-
 #[cfg(not(target_os = "windows"))]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 
@@ -67,7 +66,6 @@ async fn main() -> Result<(), String> {
         })?;
 
     println!("sn_node built successfully");
-    
 
     let _ = run_network().await?;
 

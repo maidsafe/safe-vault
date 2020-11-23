@@ -24,7 +24,7 @@ use crate::{
     Network, Result,
 };
 use futures::lock::Mutex;
-use log::{trace, error};
+use log::{error, trace};
 use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
 use sn_routing::Prefix;
@@ -100,8 +100,8 @@ impl<R: CryptoRng + Rng> KeySection<R> {
             Ok(()) => None,
             Err(e) => {
                 error!("Error at elders changed event.... panic happens");
-                panic!(e) 
-            }, // Temporary brittle solution before lazy messaging impl.
+                panic!(e)
+            } // Temporary brittle solution before lazy messaging impl.
         }
     }
 
