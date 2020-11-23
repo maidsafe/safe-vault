@@ -53,8 +53,7 @@ sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
 [dev_dependencies]
 maplit = "1.0.1"
 tempdir = "~0.3.7"
-sn_client = { path="../sn_client"}
-# sn_client = { git = "https://github.com/maidsafe/sn_client", branch="master" }
+sn_client = { git = "https://github.com/maidsafe/sn_client", branch="master" }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util", "rt-threaded"] }
 futures = "~0.3.5"
 
