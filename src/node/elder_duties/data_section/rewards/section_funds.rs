@@ -20,7 +20,7 @@ use xor_name::XorName;
 use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
 use ActorEvent::*;
-
+use log::error;
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
 pub(super) struct SectionFunds {
@@ -98,6 +98,7 @@ impl SectionFunds {
                 if applied.is_err() {
                     // This would be a bug!
                     // send some error, log, crash .. or something
+                    error!("Panic at transfer applied err during transition");
                     panic!(applied)
                 } else {
                     // We ask of our Replicas to validate this transfer.
@@ -113,7 +114,11 @@ impl SectionFunds {
                 }
             }
             Ok(None) => None, // Would indicate that this apparently has already been done, so no change.
-            Err(error) => panic!(error), // This would be a bug! Cannot move on from here, only option is to crash!
+            Err(error) => {
+                error!("Panic at creating transfer during transition");
+                
+                panic!(error)
+            }, // This would be a bug! Cannot move on from here, only option is to crash!
         }
     }
 

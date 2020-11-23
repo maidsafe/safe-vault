@@ -16,7 +16,7 @@ use crate::{
     node::node_ops::{NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
 use futures::lock::Mutex;
-use log::{debug, info, trace, warn};
+use log::{debug, info, trace, warn, error};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
@@ -174,6 +174,7 @@ impl Transfers {
         match self.replica.lock().await.initiate(events) {
             Ok(()) => None,
             Err(e) => {
+                error!("Error instantiating replica for transfers....");
                 println!("{}", e);
                 panic!(e); // Temporary brittle solution before lazy messaging impl.
             }

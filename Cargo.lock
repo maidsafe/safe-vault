@@ -2565,7 +2565,6 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/joshuef/sn_client?branch=update-qp2p#41958b3a0bbcbcc6be9b3ff853d858ae476680d1"
 dependencies = [
  "async-trait",
  "bincode",
