@@ -33,6 +33,7 @@ use sn_launch_tool::run_with;
 use std::{
     fs::{create_dir_all, remove_dir_all},
     path::PathBuf,
+    process::Command,
 };
 use tokio::time::{delay_for, Duration};
 
@@ -44,12 +45,25 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 static NODES_DIR: &str = "local-test-network";
 static INTERVAL: &str = "3";
-
 #[tokio::main]
 async fn main() -> Result<(), String> {
     let path = std::path::Path::new("nodes");
     remove_dir_all(&path).unwrap_or(()); // Delete nodes directory if it exists;
     create_dir_all(&path).expect("Cannot create nodes directory");
+
+    let args: Vec<&str> = vec!["build", "--features=simulated-payouts", "--release"];
+    println!("Building current sn_node");
+    let _child = Command::new("cargo")
+        .args(args.clone())
+        .output()
+        .map_err(|err| {
+            format!(
+                "Failed to run build command with args '{:?}': {}",
+                args, err
+            )
+        })?;
+
+    println!("sn_node built successfully");
 
     let _ = run_network().await?;
 
