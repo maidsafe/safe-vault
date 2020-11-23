@@ -620,16 +620,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctrlc"
-version = "3.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b57a92e9749e10f25a171adcebfafe72991d45e7ec2dcb853e8f83d9dafaeb08"
-dependencies = [
- "nix",
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "curve25519-dalek"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1699,18 +1689,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nix"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83450fe6a6142ddd95fb064b746083fc4ef1705fe81f64a64e1d4b39f54a1055"
-dependencies = [
- "bitflags",
- "cc",
- "cfg-if 0.1.10",
- "libc",
-]
-
-[[package]]
 name = "num-bigint"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2664,15 +2642,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "sn_fake_clock"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9905409773adfa18bd77c51123f451b349ba12bd3ecaef78fb344576bab890ed"
-
-[[package]]
 name = "sn_launch_tool"
-version = "0.0.4"
-source = "git+https://github.com/maidsafe/sn_launch_tool.git#924e089c0a155d92e636c001e93a5e2baf535bcc"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a5207f56d56ec0590437060aa074f6b26bd670b41de49b8a493e04e6b4224cc"
 dependencies = [
  "directories 2.0.2",
  "env_logger 0.7.1",
@@ -2691,7 +2664,6 @@ dependencies = [
  "bytes 0.5.6",
  "crdts",
  "crossbeam-channel",
- "ctrlc",
  "dirs-next 1.0.2",
  "ed25519",
  "ed25519-dalek",
@@ -2714,7 +2686,6 @@ dependencies = [
  "signature",
  "sn_client",
  "sn_data_types",
- "sn_fake_clock",
  "sn_launch_tool",
  "sn_routing",
  "sn_transfers",
@@ -2729,8 +2700,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.37.0"
-source = "git+https://github.com/yoga07/sn_routing?branch=start-up#80eea9b03661245177380a4db70c0c5f270369c0"
+version = "0.38.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc028836322b8a344485995bbb833d57ac2a77c3a20a42929d18ff67324d6b00"
 dependencies = [
  "bincode",
  "bls_dkg",
