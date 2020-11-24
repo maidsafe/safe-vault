@@ -19,21 +19,29 @@ pub(super) async fn get_result(
     storage: &mut ChunkStorage,
 ) -> Option<NodeMessagingDuty> {
     use BlobWrite::*;
+    let verification = msg.verify();
     match &write {
         New(data) => {
-            if msg.verify() {
+            if let Ok(true) = verification {
                 storage.store(&data, msg.id(), &msg.origin).await
             } else {
-                error!("Accumulated signature for {:?} is invalid!", &msg.id());
+                error!(
+                    "Accumulated signature for {:?} is invalid! Verification: {:?}",
+                    &msg.id(),
+                    verification
+                );
                 None
             }
         }
         DeletePrivate(address) => {
-            if msg.verify() {
+            if let Ok(true) = verification {
                 // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
                 storage.delete(*address, msg.id(), &msg.origin).await
             } else {
-                error!("Accumulated signature is invalid!");
+                error!(
+                    "Accumulated signature is invalid! Verification: {:?}",
+                    verification
+                );
                 None
             }
         }

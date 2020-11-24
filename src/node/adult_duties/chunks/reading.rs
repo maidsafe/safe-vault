@@ -20,10 +20,14 @@ pub(super) async fn get_result(
 ) -> Option<NodeMessagingDuty> {
     let BlobRead::Get(address) = read;
     if let Address::Section(_) = msg.most_recent_sender().address() {
-        if msg.verify() {
+        let verification = msg.verify();
+        if let Ok(true) = verification {
             storage.get(address, msg.id(), &msg.origin).await
         } else {
-            error!("Accumulated signature is invalid!");
+            error!(
+                "Accumulated signature is invalid! Verification: {:?}",
+                verification
+            );
             None
         }
     // } else if matches!(self.requester, PublicId::Node(_)) {

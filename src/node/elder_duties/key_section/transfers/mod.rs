@@ -463,7 +463,7 @@ impl Transfers {
 
     #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
-    pub async fn pay(&mut self, transfer: Transfer) {
+    pub async fn pay(&mut self, transfer: Transfer) -> Result<(), Error> {
         self.replica.lock().await.debit_without_proof(transfer)
     }
 }

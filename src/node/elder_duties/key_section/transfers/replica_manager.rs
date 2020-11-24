@@ -364,7 +364,7 @@ impl ReplicaManager {
 impl ReplicaManager {
     pub fn credit_without_proof(&mut self, transfer: Transfer) -> Option<NodeMessagingDuty> {
         trace!("Performing credit without proof");
-        self.replica.credit_without_proof(transfer.clone());
+        self.replica.credit_without_proof(transfer.clone()).ok()?;
         let dummy_msg = "DUMMY MSG";
         let mut rng = thread_rng();
         let sec_key_set = SecretKeySet::random(7, &mut rng);
@@ -395,7 +395,7 @@ impl ReplicaManager {
         None
     }
 
-    pub fn debit_without_proof(&mut self, transfer: Transfer) {
+    pub fn debit_without_proof(&mut self, transfer: Transfer) -> NdResult<()> {
         self.replica.debit_without_proof(transfer)
     }
 }

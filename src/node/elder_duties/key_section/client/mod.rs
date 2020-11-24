@@ -120,14 +120,15 @@ fn validate_client_sig(msg: &MsgEnvelope) -> bool {
     if !msg.origin.is_client() {
         return false;
     }
-    let valid = msg.verify();
-    if valid {
+    let verification = msg.verify();
+    if let Ok(true) = verification {
         true
     } else {
         warn!(
-            "Msg {:?} from {:?} is invalid",
+            "Msg {:?} from {:?} is invalid. Verification: {:?}",
             msg.message.id(),
             msg.origin.address().xorname(),
+            verification
         );
         false
     }
