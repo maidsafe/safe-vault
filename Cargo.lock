@@ -2691,7 +2691,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.37.0"
-source = "git+https://github.com/joshuef/routing?branch=Lost-conn-startup#49b29cc1281860a9c81e6e66b690b500071d167d"
+source = "git+https://github.com/yoga07/sn_routing?branch=start-up#80eea9b03661245177380a4db70c0c5f270369c0"
 dependencies = [
  "bincode",
  "bls_dkg",

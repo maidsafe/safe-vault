@@ -49,6 +49,10 @@ impl Network {
         Signature::Ed25519(sig)
     }
 
+    pub async fn age(&self) -> u8 {
+        self.routing.lock().await.age().await
+    }
+
     pub async fn public_key(&self) -> Ed25519PublicKey {
         self.routing.lock().await.public_key().await
     }
@@ -77,10 +81,6 @@ impl Network {
     pub async fn name(&self) -> XorName {
         self.routing.lock().await.name().await
     }
-
-    // pub async fn section_name(&self) -> Option<XorName> {
-    //     XorName(self.routing.lock().await.public_key_set().await.ok()?.public_key().to_bytes())
-    // }
 
     pub async fn our_connection_info(&mut self) -> Result<SocketAddr> {
         self.routing

@@ -75,8 +75,4 @@ impl DutyConfig {
         .into();
         Some(vec![first, second, third].into())
     }
-
-    pub fn status(&self) -> AgeGroup {
-        self.status.clone()
-    }
 }

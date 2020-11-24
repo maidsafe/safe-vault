@@ -7,16 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::NetworkMsgAnalysis;
-use crate::node::state_db::AgeGroup;
 use crate::node::{
     duty_cfg::DutyConfig,
     node_ops::{ElderDuty, NodeOperation},
 };
+use crate::Network;
 use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
 use sn_data_types::{MsgEnvelope, PublicKey};
-use sn_routing::Event as RoutingEvent;
+use sn_routing::{Event as RoutingEvent, MIN_AGE};
 use xor_name::XorName;
 
 /// Maps events from the transport layer
@@ -31,19 +31,15 @@ impl NetworkEvents {
         Self { duty_cfg, analysis }
     }
 
-    pub async fn process_network_event(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
+    pub async fn process_network_event(
+        &mut self,
+        event: RoutingEvent,
+        network: &Network,
+    ) -> Option<NodeOperation> {
         use ElderDuty::*;
 
         trace!("Processing Routing Event: {:?}", event);
         match event {
-            RoutingEvent::PromotedToAdult => {
-                info!("Node promoted to Adult");
-                if let AgeGroup::Adult = self.duty_cfg.status() {
-                    None
-                } else {
-                    self.duty_cfg.setup_as_adult()
-                }
-            }
             RoutingEvent::PromotedToElder => {
                 info!("Node promoted to Elder");
                 self.duty_cfg.setup_as_elder().await
@@ -102,6 +98,30 @@ impl NetworkEvents {
                 }
                 .into(),
             ),
+            RoutingEvent::Relocated { .. } => {
+                // Check our current status
+                let age = network.age().await;
+                if age > MIN_AGE {
+                    info!("Node promoted to Adult");
+                    info!("Our Age: {:?}", age);
+                    self.duty_cfg.setup_as_adult()
+                } else {
+                    info!("Our AGE: {:?}", age);
+                    None
+                }
+            }
+            RoutingEvent::Demoted => {
+                let age = network.age().await;
+                if age > MIN_AGE {
+                    info!("Node promoted to Adult");
+                    info!("Our Age: {:?}", age);
+                    self.duty_cfg.setup_as_adult()
+                } else {
+                    info!("We are not Adult, do nothing");
+                    info!("Our Age: {:?}", age);
+                    None
+                }
+            }
             // Ignore all other events
             _ => None,
         }

@@ -106,7 +106,11 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
             BecomeAdult => self.become_adult().await,
             BecomeElder => self.become_elder().await,
             ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
-            ProcessNetworkEvent(event) => self.network_events.process_network_event(event).await,
+            ProcessNetworkEvent(event) => {
+                self.network_events
+                    .process_network_event(event, &self.network_api)
+                    .await
+            }
         }
     }
 
