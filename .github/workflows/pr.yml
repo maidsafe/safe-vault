@@ -120,7 +120,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --release  --features=simulated-payouts,chaos
+          args: --release  --features=simulated-payouts
 
       - name: Upload node data on fail
         if: ${{ failure() }}
