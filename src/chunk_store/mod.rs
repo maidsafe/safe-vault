@@ -197,7 +197,6 @@ impl<T: Chunk> ChunkStore<T> {
 
     async fn do_delete(&mut self, file_path: &Path) -> Result<()> {
         if let Ok(metadata) = fs::metadata(file_path) {
-            println!("deleting and freeing up space: {:?}", metadata.len());
             self.used_space.decrease(self.id, metadata.len()).await?;
             fs::remove_file(file_path).map_err(From::from)
         } else {
