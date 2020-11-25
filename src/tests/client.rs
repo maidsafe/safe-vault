@@ -38,7 +38,7 @@ async fn client_creation() {
 #[tokio::test]
 async fn client_creation_for_existing_sk() {
     start_network();
-    assert!(client_tests::client_creation_for_existing_sk()
+    assert!(client_tests::client_creation_with_existing_keypair()
         .await
         .is_ok());
 }
