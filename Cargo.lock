@@ -563,8 +563,7 @@ dependencies = [
 [[package]]
 name = "crdts"
 version = "4.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71539d73d24504c101d5eaf61902a7888e4ec13fa21ec294858b81d22e818563"
+source = "git+https://github.com/joshuef/rust-crdt?branch=Remove-LseqdefaultApply#ef31e8d346d3e3d34416e76b25140e4966b554b0"
 dependencies = [
  "bitvec",
  "num-bigint",
@@ -2644,9 +2643,9 @@ dependencies = [
 
 [[package]]
 name = "sn_data_types"
-version = "0.11.31"
+version = "0.11.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9754e36fc6e8c6a5c0ca1945758d18e4a1654055de106368af2cce50c8341d4"
+checksum = "d13919752c9fd2f92f09964619dc47348b35b93c917854455425f8baa14c5779"
 dependencies = [
  "bincode",
  "crdts",

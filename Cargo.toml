@@ -64,3 +64,6 @@ doc = false
 [features]
 simulated-payouts = ["sn_data_types/simulated-payouts", "sn_transfers/simulated-payouts", "sn_client/simulated-payouts"]
 chaos = []
+
+[patch.crates-io]
+crdts = { git = "https://github.com/joshuef/rust-crdt", branch="Remove-LseqdefaultApply" }
