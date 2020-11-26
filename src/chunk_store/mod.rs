@@ -119,8 +119,8 @@ impl<T: Chunk> ChunkStore<T> {
 
         // pre-reserve space
         self.used_space.increase(self.id, consumed_space).await?;
-        info!(
-            "use space total after adddddddd: {:?}",
+        trace!(
+            "use space total after add: {:?}",
             self.used_space.total().await
         );
 

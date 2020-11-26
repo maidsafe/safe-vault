@@ -22,7 +22,7 @@ struct Network {
     nodes: Vec<(Sender<Command>, JoinHandle<()>)>,
 }
 
-static NODE_STARTUP_INTERVAL: u64 = 20;
+static NODE_STARTUP_INTERVAL: u64 = 3;
 
 impl Network {
     pub async fn new(no_of_nodes: usize) -> Self {

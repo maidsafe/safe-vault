@@ -197,7 +197,7 @@ impl NetworkMsgAnalysis {
         let shall_process = is_our_client_msg && self.is_elder().await;
 
         if !shall_process {
-            info!("Returning None! Is client msg && We are Elder");
+            info!("Not processing message");
             return None;
         }
 

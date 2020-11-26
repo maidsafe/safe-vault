@@ -44,7 +44,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 static NODES_DIR: &str = "local-test-network";
-static INTERVAL: &str = "10";
+static INTERVAL: &str = "3";
 #[tokio::main]
 async fn main() -> Result<(), String> {
     let path = std::path::Path::new("nodes");
