@@ -2605,7 +2605,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/joshuef/sn_client?branch=Feat-NoSeqCache#e7d58d4a5775e8bc43224efd38fba8045cc5c63d"
+source = "git+https://github.com/maidsafe/sn_client#cf4db2c465aade7ab45443758bd2ae0ebc2a5ed9"
 dependencies = [
  "async-trait",
  "bincode",
