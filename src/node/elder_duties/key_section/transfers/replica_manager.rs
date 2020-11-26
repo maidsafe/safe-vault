@@ -362,7 +362,7 @@ impl ReplicaManager {
 
 #[cfg(feature = "simulated-payouts")]
 impl ReplicaManager {
-    pub fn credit_without_proof(&mut self, transfer: Transfer) -> Option<NodeMessagingDuty> {
+    pub fn credit_without_proof(&mut self, transfer: Transfer) -> Outcome<NodeMessagingDuty> {
         trace!("Performing credit without proof");
         self.replica.credit_without_proof(transfer.clone()).ok()?;
         let dummy_msg = "DUMMY MSG";
@@ -390,9 +390,8 @@ impl ReplicaManager {
                     index: 0,
                     share: dummy_sig,
                 },
-            }))
-            .ok()?;
-        None
+            }))?;
+        Ok(None)
     }
 
     pub fn debit_without_proof(&mut self, transfer: Transfer) -> NdResult<()> {

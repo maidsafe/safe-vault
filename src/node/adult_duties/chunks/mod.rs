@@ -11,6 +11,7 @@ mod reading;
 mod writing;
 
 use crate::{node::node_ops::NodeMessagingDuty, node::state_db::NodeInfo, Result};
+use crate::{Error, Outcome, TernaryResult};
 use chunk_storage::ChunkStorage;
 
 use log::trace;
@@ -31,7 +32,7 @@ impl Chunks {
         Ok(Self { chunk_storage })
     }
 
-    pub async fn receive_msg(&mut self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
+    pub async fn receive_msg(&mut self, msg: &MsgEnvelope) -> Outcome<NodeMessagingDuty> {
         trace!(
             "{}: Received ({:?} from src {:?}",
             self,
@@ -51,7 +52,7 @@ impl Chunks {
                     },
                 ..
             } => writing::get_result(write, msg, &mut self.chunk_storage).await,
-            _ => None,
+            _ => Outcome::error(Error::Logic),
         }
     }
 
@@ -62,7 +63,7 @@ impl Chunks {
     //     requester: PublicId,
     //     message_id: MessageId,
     //     proof: Option<(Request, Signature)>,
-    // ) -> Option<NodeMessagingDuty> {
+    // ) -> Outcome<NodeMessagingDuty> {
     //     use Response::*;
     //     trace!(
     //         "{}: Received ({:?} {:?}) from {}",

@@ -9,6 +9,7 @@
 mod client_input_parse;
 mod client_msg_handling;
 mod onboarding;
+
 use self::{
     client_input_parse::{try_deserialize_handshake, try_deserialize_msg},
     client_msg_handling::ClientMsgHandling,
@@ -19,11 +20,11 @@ use crate::{
     node::state_db::NodeInfo,
     Network, Result,
 };
+use crate::{Error, Outcome, TernaryResult};
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-
-use sn_data_types::{Address, MsgEnvelope};
+use sn_data_types::{Address, Error as NdError, MsgEnvelope};
 use sn_routing::Event as RoutingEvent;
 use std::fmt::{self, Display, Formatter};
 
@@ -49,7 +50,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         Ok(gateway)
     }
 
-    pub async fn process_as_gateway(&mut self, cmd: GatewayDuty) -> Option<NodeOperation> {
+    pub async fn process_as_gateway(&mut self, cmd: GatewayDuty) -> Outcome<NodeOperation> {
         trace!("Processing as gateway");
         use GatewayDuty::*;
         match cmd {
@@ -58,24 +59,26 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         }
     }
 
-    async fn try_find_client(&mut self, msg: &MsgEnvelope) -> Option<NodeMessagingDuty> {
+    async fn try_find_client(&mut self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
         trace!("trying to find client...");
-        if let Address::Client(xorname) = &msg.destination().ok()? {
+        if let Address::Client(xorname) = &msg.destination()? {
             if self.routing.matches_our_prefix(*xorname).await {
                 trace!("Message matches gateway prefix");
                 let _ = self.client_msg_handling.match_outgoing(msg).await;
-
-                return None;
+                return Ok(None);
             }
         }
-        Some(NodeMessagingDuty::SendToSection {
-            msg: msg.clone(),
-            as_node: true,
-        })
+        Outcome::oki(
+            NodeMessagingDuty::SendToSection {
+                msg: msg.clone(),
+                as_node: true,
+            }
+            .into(),
+        )
     }
 
     /// This is where client input is parsed.
-    async fn process_client_event(&mut self, event: RoutingEvent) -> Option<NodeOperation> {
+    async fn process_client_event(&mut self, event: RoutingEvent) -> Outcome<NodeOperation> {
         trace!("Processing client event");
         match event {
             RoutingEvent::ClientMessageReceived {
@@ -87,30 +90,33 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
                     info!("Deserialized client msg from {}", public_key);
                     trace!("Deserialized client msg is {:?}", msg.message);
                     if !validate_client_sig(&msg) {
-                        return None;
+                        return Outcome::error(Error::NetworkData(NdError::InvalidSignature));
                     }
                     match self
                         .client_msg_handling
                         .track_incoming(&msg.message, src, send)
                         .await
                     {
-                        Some(c) => Some(c.into()),
-                        None => Some(KeySectionDuty::EvaluateClientMsg(msg).into()),
+                        Ok(()) => Outcome::oki(KeySectionDuty::EvaluateClientMsg(msg).into()),
+                        Err(e) => Outcome::error(e),
                     }
                 } else {
-                    let hs = try_deserialize_handshake(&content, src)?;
-                    let mut rng = ChaChaRng::from_seed(self.rng.gen());
-                    let _ = self
-                        .client_msg_handling
-                        .process_handshake(hs, src, send, &mut rng)
-                        .await;
-
-                    None
+                    match try_deserialize_handshake(&content, src) {
+                        Ok(hs) => {
+                            let mut rng = ChaChaRng::from_seed(self.rng.gen());
+                            let _ = self
+                                .client_msg_handling
+                                .process_handshake(hs, src, send, &mut rng)
+                                .await;
+                            Ok(None)
+                        }
+                        Err(e) => Outcome::error(e),
+                    }
                 }
             }
             other => {
                 error!("NOT SUPPORTED YET: {:?}", other);
-                None
+                Outcome::error(Error::Logic)
             }
         }
     }

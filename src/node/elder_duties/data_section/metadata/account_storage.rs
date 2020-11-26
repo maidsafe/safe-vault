@@ -13,6 +13,7 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
+use crate::{Outcome, TernaryResult};
 use sn_data_types::{
     Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,
     PublicKey, QueryResponse, Result as NdResult,
@@ -45,7 +46,7 @@ impl AccountStorage {
         read: &AccountRead,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use AccountRead::*;
         match read {
             Get(ref address) => self.get(address, msg_id, origin).await,
@@ -57,7 +58,7 @@ impl AccountStorage {
         address: &XorName,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = self
             .account(&origin.id().public_key(), address)
             .map(Account::into_data_and_signature);
@@ -79,7 +80,7 @@ impl AccountStorage {
         write: AccountWrite,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use AccountWrite::*;
         match write {
             New(ref account) => self.create(account, msg_id, &origin).await,
@@ -92,7 +93,7 @@ impl AccountStorage {
         account: &Account,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = if self.chunks.has(account.address()) {
             Err(NdError::LoginPacketExists)
         } else if account.owner() != &origin.id().public_key() {
@@ -112,7 +113,7 @@ impl AccountStorage {
         updated_account: &Account,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = match self.account(&origin.id().public_key(), updated_account.address()) {
             Ok(existing_account) => {
                 if !updated_account.size_is_valid() {
@@ -153,7 +154,7 @@ impl AccountStorage {
         result: NdResult<()>,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         if let Err(error) = result {
             return self
                 .wrapping
@@ -168,7 +169,7 @@ impl AccountStorage {
                 )
                 .await;
         }
-        None
+        Outcome::oki_no_value()
     }
 }
 

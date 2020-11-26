@@ -12,7 +12,7 @@ use self::chunks::{Chunks, UsedSpace};
 use crate::{
     node::node_ops::{AdultDuty, ChunkDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Result,
+    Outcome, Result, TernaryResult,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -28,7 +28,7 @@ impl AdultDuties {
         Ok(Self { chunks })
     }
 
-    pub async fn process_adult_duty(&mut self, duty: &AdultDuty) -> Option<NodeOperation> {
+    pub async fn process_adult_duty(&mut self, duty: &AdultDuty) -> Outcome<NodeOperation> {
         use AdultDuty::*;
         use ChunkDuty::*;
         let RunAsChunks(chunk_duty) = duty;
@@ -36,7 +36,7 @@ impl AdultDuties {
             ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
         };
 
-        result.map(|c| c.into())
+        result.asdf()
     }
 }
 

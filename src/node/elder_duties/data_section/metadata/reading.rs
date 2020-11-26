@@ -13,6 +13,7 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::NodeMessagingDuty;
+use crate::Outcome;
 use sn_data_types::{
     AccountRead, BlobRead, DataQuery, MapRead, Message, MessageId, MsgEnvelope, MsgSender, Query,
     SequenceRead,
@@ -21,7 +22,7 @@ use sn_data_types::{
 pub(super) async fn get_result(
     msg: MsgEnvelope,
     stores: &ElderStores,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     use DataQuery::*;
     let msg_id = msg.id();
     let origin = msg.origin;
@@ -46,7 +47,7 @@ async fn blob(
     msg_id: MessageId,
     origin: MsgSender,
     proxies: Vec<MsgSender>,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     register.read(read, msg_id, origin, proxies).await // since the data is sent on to adults, the entire msg is passed in
 }
 
@@ -55,7 +56,7 @@ async fn map(
     storage: &MapStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     storage.read(read, msg_id, &origin).await // map data currently stay at elders, so the msg is not needed
 }
 
@@ -64,7 +65,7 @@ async fn sequence(
     storage: &SequenceStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     storage.read(read, msg_id, &origin).await // sequence data currently stay at elders, so the msg is not needed
 }
 
@@ -73,6 +74,6 @@ async fn account(
     storage: &AccountStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     storage.read(read, msg_id, &origin).await // account data currently stay at elders, so the msg is not needed
 }

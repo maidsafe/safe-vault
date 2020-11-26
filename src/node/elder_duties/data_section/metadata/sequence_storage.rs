@@ -13,6 +13,7 @@ use crate::{
     node::state_db::NodeInfo,
     Result,
 };
+use crate::{Outcome, TernaryResult};
 use log::info;
 use sn_data_types::{
     CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
@@ -44,7 +45,7 @@ impl SequenceStorage {
         read: &SequenceRead,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use SequenceRead::*;
         match read {
             Get(address) => self.get(*address, msg_id, &origin).await,
@@ -65,7 +66,7 @@ impl SequenceStorage {
         write: SequenceWrite,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use SequenceWrite::*;
         info!("Matching Sequence Write");
         match write {
@@ -90,7 +91,7 @@ impl SequenceStorage {
         data: &Sequence,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = if self.chunks.has(data.address()) {
             Err(NdError::DataExists)
         } else {
@@ -107,7 +108,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = self.get_chunk(address, SequenceAction::Read, origin);
         self.wrapping
             .send_to_section(
@@ -143,7 +144,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = match self
             .chunks
             .get(&address)
@@ -187,7 +188,7 @@ impl SequenceStorage {
         range: (SequenceIndex, SequenceIndex),
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
@@ -213,7 +214,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(
@@ -243,7 +244,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
@@ -274,7 +275,7 @@ impl SequenceStorage {
         user: SequenceUser,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| sequence.permissions(user, Some(origin.id().public_key())));
@@ -296,7 +297,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
@@ -328,7 +329,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
@@ -360,7 +361,7 @@ impl SequenceStorage {
         write_op: SequencePolicyWriteOp<SequencePublicPolicy>,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let address = write_op.address;
         let result = self
             .edit_chunk(
@@ -381,7 +382,7 @@ impl SequenceStorage {
         write_op: SequencePolicyWriteOp<SequencePrivatePolicy>,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let address = write_op.address;
         let result = self
             .edit_chunk(
@@ -402,7 +403,7 @@ impl SequenceStorage {
     //     write_op: SequenceDataWriteOp<SequenceOwner>,
     //     msg_id: MessageId,
     //     origin: &MsgSender,
-    // ) -> Option<NodeMessagingDuty> {
+    // ) -> Outcome<NodeMessagingDuty> {
     //     let address = write_op.address;
     //     let result = self.edit_chunk(
     //         address,
@@ -421,7 +422,7 @@ impl SequenceStorage {
         write_op: SequenceDataWriteOp<SequenceEntry>,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let address = write_op.address;
         info!("Editing Sequence chunk");
         let result = self
@@ -468,9 +469,9 @@ impl SequenceStorage {
         result: NdResult<T>,
         msg_id: MessageId,
         origin: &MsgSender,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let error = match result {
-            Ok(_) => return None,
+            Ok(_) => return Outcome::oki_no_change(),
             Err(error) => {
                 info!("Error on writing Sequence! {:?}", error);
                 error

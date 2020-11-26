@@ -24,10 +24,10 @@ use crate::{
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup, NodeInfo},
     },
     utils::Init,
-    Config, Network, Result,
+    Config, Error, Network, Outcome, Result, TernaryResult,
 };
 use bls::SecretKey;
-use log::info;
+use log::{error, info};
 use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
 use sn_routing::{Event, EventStream};
@@ -97,7 +97,7 @@ impl<R: CryptoRng + Rng> Node<R> {
 
         use AgeGroup::*;
         let _ = match age_group {
-            Infant => None,
+            Infant => Ok(None),
             Adult => {
                 duties
                     .process_node_duty(node_ops::NodeDuty::BecomeAdult)
@@ -146,43 +146,55 @@ impl<R: CryptoRng + Rng> Node<R> {
             } else {
                 NodeDuty::ProcessNetworkEvent(event).into()
             };
-            self.process_while_any(Some(duty)).await;
+            self.process_while_any(Outcome::oki(duty)).await;
         }
 
         Ok(())
     }
 
     /// Keeps processing resulting node operations.
-    async fn process_while_any(&mut self, op: Option<NodeOperation>) {
+    async fn process_while_any(&mut self, op: Outcome<NodeOperation>) {
         use NodeOperation::*;
         let mut next_op = op;
-        while let Some(op) = next_op {
+        while let Ok(Some(op)) = next_op {
             next_op = match op {
                 Single(operation) => self.process(operation).await,
                 Multiple(ops) => {
                     let mut node_ops = Vec::new();
                     for c in ops.into_iter() {
-                        if let Some(op) = self.process(c).await {
-                            node_ops.push(op);
-                        }
+                        match self.process(c).await {
+                            Ok(None) | Ok(Some(NoOp)) => (),
+                            Ok(Some(op)) => node_ops.push(op),
+                            Err(_error) => unimplemented!("Handle errors.."),
+                        };
                     }
-                    Some(node_ops.into())
+                    Outcome::oki(node_ops.into())
                 }
-                None => break,
+                NoOp => break,
             }
         }
     }
 
-    async fn process(&mut self, duty: NetworkDuty) -> Option<NodeOperation> {
+    async fn process(&mut self, duty: NetworkDuty) -> Outcome<NodeOperation> {
         use NetworkDuty::*;
         match duty {
             RunAsAdult(duty) => {
                 info!("Running as Adult: {:?}", duty);
-                self.duties.adult_duties()?.process_adult_duty(&duty).await
+                if let Some(duties) = self.duties.adult_duties() {
+                    duties.process_adult_duty(&duty).await
+                } else {
+                    error!("Currently not an Adult!");
+                    Outcome::error(Error::Logic)
+                }
             }
             RunAsElder(duty) => {
                 info!("Running as Elder: {:?}", duty);
-                self.duties.elder_duties()?.process_elder_duty(duty).await
+                if let Some(duties) = self.duties.elder_duties() {
+                    duties.process_elder_duty(duty).await
+                } else {
+                    error!("Currently not an Elder!");
+                    Outcome::error(Error::Logic)
+                }
             }
             RunAsNode(duty) => {
                 info!("Running as Node: {:?}", duty);

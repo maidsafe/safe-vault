@@ -23,10 +23,10 @@ impl RewardCalc {
 
     /// Calculates the reward for a node
     /// when it has reached a certain age.
-    pub async fn reward(&self, age: Age) -> Option<Money> {
+    pub async fn reward(&self, age: Age) -> Money {
         let prefix = self.network.our_prefix().await;
         let prefix_len = prefix.bit_count();
-        Some(RewardCalc::reward_from(age, prefix_len))
+        RewardCalc::reward_from(age, prefix_len)
     }
 
     fn reward_from(age: Age, prefix_len: usize) -> Money {

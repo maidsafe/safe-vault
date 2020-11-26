@@ -9,6 +9,7 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
+use crate::Outcome;
 use serde::export::Formatter;
 use sn_data_types::{
     Address, DebitAgreementProof, MessageId, MsgEnvelope, PublicKey, ReplicaEvent, SignedTransfer,
@@ -35,6 +36,7 @@ use xor_name::XorName;
 /// The main operation type
 /// which encompasses all duties
 /// carried out by the node in the network.
+#[derive(Debug)]
 pub enum NodeOperation {
     /// A single operation.
     Single(NetworkDuty),
@@ -42,14 +44,14 @@ pub enum NodeOperation {
     /// be carried out sequentially.
     Multiple(Vec<NetworkDuty>),
     // No op.
-    None,
+    NoOp,
 }
 
 impl NodeOperation {
     fn from_many(ops: Vec<NodeOperation>) -> NodeOperation {
         use NodeOperation::*;
         if ops.is_empty() {
-            return None;
+            return NoOp;
         }
         if ops.len() == 1 {
             let mut ops = ops;
@@ -60,7 +62,7 @@ impl NodeOperation {
             .map(|c| match c {
                 Single(duty) => vec![duty],
                 Multiple(duties) => duties,
-                None => vec![],
+                NoOp => vec![],
             })
             .flatten()
             .collect();
@@ -74,9 +76,10 @@ impl Into<NodeOperation> for Vec<NodeOperation> {
     }
 }
 
-impl Into<NodeOperation> for Vec<Option<NodeOperation>> {
+impl Into<NodeOperation> for Vec<Outcome<NodeOperation>> {
+    /// NB: This drops errors!
     fn into(self) -> NodeOperation {
-        NodeOperation::from_many(self.into_iter().filter_map(|c| c).collect())
+        NodeOperation::from_many(self.into_iter().flatten().flatten().collect())
     }
 }
 
@@ -152,12 +155,12 @@ pub enum NodeMessagingDuty {
     },
 }
 
-impl Into<NodeOperation> for NodeMessagingDuty {
-    fn into(self) -> NodeOperation {
+impl From<NodeMessagingDuty> for NodeOperation {
+    fn from(duty: NodeMessagingDuty) -> Self {
         use NetworkDuty::*;
         use NodeDuty::*;
         use NodeOperation::*;
-        Single(RunAsNode(ProcessMessaging(self)))
+        Single(RunAsNode(ProcessMessaging(duty)))
     }
 }
 
@@ -379,6 +382,9 @@ pub enum ChunkDuty {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum RewardDuty {
+    /// Initiates a new SectionActor with the
+    /// state of existing Replicas in the group.
+    InitiateSectionActor(Vec<ReplicaEvent>),
     /// With the node id.
     AddNewNode(XorName),
     /// Set the account for a node.

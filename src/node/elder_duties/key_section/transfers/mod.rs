@@ -15,15 +15,16 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery},
 };
+use crate::{Error, Outcome, TernaryResult};
 use futures::lock::Mutex;
 use log::{debug, error, info, trace, warn};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
-    Address, CmdError, DebitAgreementProof, ElderDuties, Error, Event, Message, MessageId, NodeCmd,
-    NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
-    NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse, ReplicaEvent,
-    SignedTransfer, TransferError,
+    Address, CmdError, DebitAgreementProof, ElderDuties, Error as NdError, Event, Message,
+    MessageId, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd,
+    NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, PublicKey, QueryResponse,
+    ReplicaEvent, SignedTransfer, TransferError,
 };
 use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
@@ -66,33 +67,35 @@ impl Transfers {
         Self { replica, wrapping }
     }
 
-    pub async fn init_first(&mut self) -> Option<NodeOperation> {
+    pub async fn init_first(&mut self) -> Outcome<NodeOperation> {
         let result = self.initiate_replica(&[]).await;
-        result.map(|c| c.into())
+        result.asdf()
     }
 
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub async fn catchup_with_replicas(&mut self) -> Option<NodeOperation> {
+    pub async fn catchup_with_replicas(&mut self) -> Outcome<NodeOperation> {
         // prepare replica init
+        let pub_key = match self.replica.lock().await.replicas_pk_set() {
+            Some(set) => PublicKey::Bls(set.public_key()),
+            _ => return Outcome::error(Error::Logic),
+        };
         self.wrapping
             .send_to_section(
                 Message::NodeQuery {
-                    query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(
-                        PublicKey::Bls(self.replica.lock().await.replicas_pk_set()?.public_key()),
-                    )),
+                    query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents(pub_key)),
                     id: MessageId::new(),
                 },
                 true,
             )
             .await
-            .map(|c| c.into())
+            .asdf()
     }
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub async fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Option<NodeOperation> {
+    pub async fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Outcome<NodeOperation> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
         let result = match duty {
@@ -108,7 +111,7 @@ impl Transfers {
             } => self.process_cmd(cmd, *msg_id, origin.clone()).await,
         };
 
-        result.map(|c| c.into())
+        result.asdf()
     }
 
     async fn process_query(
@@ -116,7 +119,7 @@ impl Transfers {
         query: &TransferQuery,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use TransferQuery::*;
         match query {
             GetReplicaEvents => self.all_events(msg_id, origin).await,
@@ -134,7 +137,7 @@ impl Transfers {
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use TransferCmd::*;
         debug!("Processing Transfer CMD in keysection");
         match cmd {
@@ -169,24 +172,23 @@ impl Transfers {
 
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
-    async fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Option<NodeMessagingDuty> {
+    async fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Outcome<NodeMessagingDuty> {
         // We must be able to initiate the replica, otherwise this node cannot function.
         match self.replica.lock().await.initiate(events) {
-            Ok(()) => None,
+            Ok(()) => Ok(None),
             Err(e) => {
                 error!("Error instantiating replica for transfers....");
-                println!("{}", e);
-                panic!(e); // Temporary brittle solution before lazy messaging impl.
+                Outcome::error(Error::NetworkData(e))
             }
         }
     }
 
     /// Get all the events of the Replica.
-    async fn all_events(&self, msg_id: MessageId, origin: Address) -> Option<NodeMessagingDuty> {
+    async fn all_events(&self, msg_id: MessageId, origin: Address) -> Outcome<NodeMessagingDuty> {
         let result = match self.replica.lock().await.all_events() {
             None => {
                 warn!("Error! Could not fetch events.");
-                Err(Error::NoSuchData)
+                Err(NdError::NoSuchData)
             }
             Some(events) => {
                 if events.is_empty() {
@@ -215,7 +217,7 @@ impl Transfers {
         bytes: u64,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         info!("Computing StoreCost for {:?} bytes", bytes);
         let result = self
             .replica
@@ -223,7 +225,7 @@ impl Transfers {
             .await
             .get_store_cost(bytes)
             .await
-            .ok_or_else(|| Error::Unexpected("Could not compute latest StoreCost".to_string()));
+            .ok_or_else(|| NdError::Unexpected("Could not compute latest StoreCost".to_string()));
         info!("Got StoreCost {:?}", result.clone().unwrap());
         self.wrapping
             .send_to_client(Message::QueryResponse {
@@ -241,14 +243,14 @@ impl Transfers {
         _wallet_id: &PublicKey,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         // validate signature
         let result = self
             .replica
             .lock()
             .await
             .replicas_pk_set()
-            .ok_or(Error::NoSuchKey);
+            .ok_or(NdError::NoSuchKey);
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetReplicaKeys(result),
@@ -264,14 +266,14 @@ impl Transfers {
         wallet_id: &PublicKey,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         // validate signature
         let result = self
             .replica
             .lock()
             .await
             .balance(wallet_id)
-            .ok_or(Error::NoSuchBalance);
+            .ok_or(NdError::NoSuchBalance);
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetBalance(result),
@@ -288,7 +290,7 @@ impl Transfers {
         _since_version: usize,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         trace!("Handling GetHistory");
         // validate signature
         let result = match self
@@ -317,10 +319,10 @@ impl Transfers {
         transfer: SignedTransfer,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         debug!("Validating a transfer from msg_id: {:?}", msg_id);
         let message = match self.replica.lock().await.validate(transfer) {
-            Ok(None) => return None,
+            Ok(None) => return Outcome::oki_no_change(),
             Ok(Some(event)) => Message::Event {
                 event: Event::TransferValidated {
                     client: origin.xorname(),
@@ -347,9 +349,9 @@ impl Transfers {
         transfer: SignedTransfer,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let message = match self.replica.lock().await.validate(transfer) {
-            Ok(None) => return None,
+            Ok(None) => return Outcome::oki_no_change(),
             Ok(Some(event)) => Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(event),
                 id: MessageId::new(),
@@ -372,12 +374,11 @@ impl Transfers {
         proof: &DebitAgreementProof,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
-
         match self.replica.lock().await.register(proof) {
-            Ok(None) => None,
+            Ok(None) => Outcome::oki_no_change(),
             Ok(Some(event)) => {
                 self.wrapping
                     .send_to_section(
@@ -408,12 +409,11 @@ impl Transfers {
         proof: &DebitAgreementProof,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
-
         match self.replica.lock().await.register(proof) {
-            Ok(None) => None,
+            Ok(None) => Outcome::oki_no_change(),
             Ok(Some(event)) => {
                 self.wrapping
                     .send_to_section(
@@ -446,11 +446,11 @@ impl Transfers {
         proof: &DebitAgreementProof,
         msg_id: MessageId,
         origin: Address,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use NodeTransferError::*;
         // We will just validate the proofs and then apply the event.
         let message = match self.replica.lock().await.receive_propagated(proof) {
-            Ok(_) => return None,
+            Ok(_) => return Outcome::oki_no_change(),
             Err(err) => Message::NodeCmdError {
                 error: NodeCmdError::Transfers(TransferPropagation(err)),
                 id: MessageId::new(),

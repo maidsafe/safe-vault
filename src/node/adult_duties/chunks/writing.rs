@@ -10,14 +10,15 @@
 
 use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::NodeMessagingDuty;
+use crate::{Error, Outcome, TernaryResult};
 use log::error;
-use sn_data_types::{BlobWrite, MsgEnvelope};
+use sn_data_types::{BlobWrite, Error as NdError, MsgEnvelope};
 
 pub(super) async fn get_result(
     write: &BlobWrite,
     msg: &MsgEnvelope,
     storage: &mut ChunkStorage,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     use BlobWrite::*;
     let verification = msg.verify();
     match &write {
@@ -30,7 +31,7 @@ pub(super) async fn get_result(
                     &msg.id(),
                     verification
                 );
-                None
+                Outcome::error(Error::NetworkData(NdError::InvalidSignature))
             }
         }
         DeletePrivate(address) => {
@@ -42,7 +43,7 @@ pub(super) async fn get_result(
                     "Accumulated signature is invalid! Verification: {:?}",
                     verification
                 );
-                None
+                Outcome::error(Error::NetworkData(NdError::InvalidSignature))
             }
         }
     }

@@ -11,6 +11,7 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::{NodeMessagingDuty, NodeOperation};
+use crate::{Outcome, TernaryResult};
 use log::info;
 use sn_data_types::{
     AccountWrite, BlobWrite, Cmd, DataCmd, DebitAgreementProof, MapWrite, Message, MessageId,
@@ -20,7 +21,7 @@ use sn_data_types::{
 pub(super) async fn get_result(
     msg: MsgEnvelope,
     stores: &mut ElderStores,
-) -> Option<NodeOperation> {
+) -> Outcome<NodeOperation> {
     use DataCmd::*;
     let msg_id = msg.id();
     let msg_origin = msg.origin;
@@ -61,7 +62,7 @@ pub(super) async fn get_result(
         },
         _ => unreachable!("Logic error"),
     };
-    result.map(|c| c.into())
+    result.asdf()
 }
 
 async fn blob(
@@ -71,7 +72,7 @@ async fn blob(
     origin: MsgSender,
     payment: DebitAgreementProof,
     proxies: Vec<MsgSender>,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     register
         .write(write, msg_id, origin, payment, proxies)
         .await
@@ -82,7 +83,7 @@ async fn map(
     storage: &mut MapStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     storage.write(write, msg_id, &origin).await
 }
 
@@ -91,7 +92,7 @@ async fn sequence(
     storage: &mut SequenceStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     storage.write(write, msg_id, &origin).await
 }
 
@@ -100,6 +101,6 @@ async fn account(
     storage: &mut AccountStorage,
     msg_id: MessageId,
     origin: MsgSender,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     storage.write(write, msg_id, &origin).await
 }

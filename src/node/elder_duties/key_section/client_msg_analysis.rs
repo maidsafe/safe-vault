@@ -8,6 +8,7 @@
 
 use crate::node::node_ops::{MetadataDuty, NodeOperation, PaymentDuty, TransferDuty};
 use crate::Network;
+use crate::{Error, Outcome, TernaryResult};
 use log::{info, warn};
 use sn_data_types::{Cmd, Message, MsgEnvelope, Query};
 
@@ -25,37 +26,37 @@ impl ClientMsgAnalysis {
         Self { routing }
     }
 
-    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
         info!("Evaluation of client msg envelope: {:?}", msg);
-        if let Some(duty) = self.try_data(msg).await {
-            Some(duty.into())
-        } else if let Some(duty) = self.try_data_payment(msg).await {
-            Some(duty.into())
-        } else if let Some(duty) = self.try_transfers(msg).await {
-            Some(duty.into())
+        let op = if let Ok(Some(duty)) = self.try_data(msg).await {
+            duty.into()
+        } else if let Ok(Some(duty)) = self.try_data_payment(msg).await {
+            duty.into()
+        } else if let Ok(Some(duty)) = self.try_transfers(msg).await {
+            duty.into()
         } else {
-            None
-        }
+            return Outcome::error(Error::Logic);
+        };
+        Outcome::oki(op)
     }
 
     /// We do not accumulate these request, they are executed
     /// at once and sent on to Metadata section. They don't accumulate either,
     /// just send back the response, for the client to accumulate.
-    async fn try_data(&self, msg: &MsgEnvelope) -> Option<MetadataDuty> {
+    async fn try_data(&self, msg: &MsgEnvelope) -> Outcome<MetadataDuty> {
         let is_data_read = || {
             matches!(msg.message, Message::Query {
                 query: Query::Data { .. },
                 ..
             })
         };
-
         let shall_process = || is_data_read() && msg.origin.is_client();
 
-        if !shall_process() || !self.is_dst_for(msg).await? || !self.is_elder().await {
-            return None;
+        if !shall_process() || !self.is_dst_for(msg).await || !self.is_elder().await {
+            return Ok(None);
         }
 
-        Some(MetadataDuty::ProcessRead(msg.clone())) // TODO: Fix these for type safety
+        Outcome::oki(MetadataDuty::ProcessRead(msg.clone())) // TODO: Fix these for type safety
     }
 
     /// We do not accumulate these request, they are executed
@@ -64,7 +65,7 @@ impl ClientMsgAnalysis {
     /// The reason for this is that the payment request is already signed
     /// by the client and validated by its replicas,
     /// so there is no reason to accumulate it here.
-    async fn try_data_payment(&self, msg: &MsgEnvelope) -> Option<PaymentDuty> {
+    async fn try_data_payment(&self, msg: &MsgEnvelope) -> Outcome<PaymentDuty> {
         let is_data_write = || {
             matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
@@ -74,22 +75,22 @@ impl ClientMsgAnalysis {
 
         let shall_process = || is_data_write() && msg.origin.is_client();
 
-        if !shall_process() || !self.is_dst_for(msg).await? || !self.is_elder().await {
-            return None;
+        if !shall_process() || !self.is_dst_for(msg).await || !self.is_elder().await {
+            return Ok(None);
         }
 
-        Some(PaymentDuty::ProcessPayment(msg.clone())) // TODO: Fix these for type safety
+        Outcome::oki(PaymentDuty::ProcessPayment(msg.clone())) // TODO: Fix these for type safety
     }
 
-    async fn try_transfers(&self, msg: &MsgEnvelope) -> Option<TransferDuty> {
+    async fn try_transfers(&self, msg: &MsgEnvelope) -> Outcome<TransferDuty> {
         let duty = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
                 ..
             } => {
-                if !msg.origin.is_client() || !self.is_dst_for(msg).await? || !self.is_elder().await
+                if !msg.origin.is_client() || !self.is_dst_for(msg).await || !self.is_elder().await
                 {
-                    return None;
+                    return Ok(None);
                 }
                 TransferDuty::ProcessCmd {
                     cmd: cmd.clone().into(),
@@ -101,9 +102,9 @@ impl ClientMsgAnalysis {
                 query: Query::Transfer(query),
                 ..
             } => {
-                if !msg.origin.is_client() || !self.is_dst_for(msg).await? || !self.is_elder().await
+                if !msg.origin.is_client() || !self.is_dst_for(msg).await || !self.is_elder().await
                 {
-                    return None;
+                    return Ok(None);
                 }
                 TransferDuty::ProcessQuery {
                     query: query.clone().into(),
@@ -111,17 +112,17 @@ impl ClientMsgAnalysis {
                     origin: msg.origin.address(),
                 }
             }
-            _ => return None,
+            _ => return Ok(None),
         };
-        Some(duty)
+        Outcome::oki(duty)
     }
 
-    async fn is_dst_for(&self, msg: &MsgEnvelope) -> Option<bool> {
+    async fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
         if let Ok(dst) = msg.destination() {
-            Some(self.routing.matches_our_prefix(dst.xorname()).await)
+            self.routing.matches_our_prefix(dst.xorname()).await
         } else {
             warn!("Invalid dst of msg: {:?}", msg);
-            None
+            false
         }
     }
 

@@ -13,10 +13,12 @@ use crate::{
     node::node_ops::{NodeOperation, PaymentDuty},
     utils,
 };
+use crate::{Error, Outcome, TernaryResult};
 use futures::lock::Mutex;
 use log::{info, trace, warn};
 use sn_data_types::{
-    Cmd, CmdError, ElderDuties, Error, Message, MsgEnvelope, PublicKey, Result, TransferError,
+    Cmd, CmdError, ElderDuties, Error as NdError, Message, MsgEnvelope, PublicKey, Result,
+    TransferError,
 };
 use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
@@ -41,7 +43,7 @@ impl Payments {
     }
 
     // The code in this method is a bit messy, needs to be cleaned up.
-    pub async fn process_payment_duty(&mut self, duty: &PaymentDuty) -> Option<NodeOperation> {
+    pub async fn process_payment_duty(&mut self, duty: &PaymentDuty) -> Outcome<NodeOperation> {
         trace!("Processing payment duty");
 
         use PaymentDuty::*;
@@ -50,13 +52,13 @@ impl Payments {
         }
     }
 
-    async fn process_payment(&mut self, msg: &MsgEnvelope) -> Option<NodeOperation> {
+    async fn process_payment(&mut self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
         let (payment, num_bytes) = match &msg.message {
             Message::Cmd {
                 cmd: Cmd::Data { payment, cmd },
                 ..
             } => (payment, utils::serialise(cmd).len() as u64),
-            _ => return None,
+            _ => return Outcome::oki_no_change(),
         };
 
         // Make sure we are actually at the correct replicas,
@@ -74,12 +76,12 @@ impl Payments {
             return self
                 .wrapping
                 .error(
-                    CmdError::Transfer(TransferRegistration(Error::NoSuchRecipient)),
+                    CmdError::Transfer(TransferRegistration(NdError::NoSuchRecipient)),
                     msg.id(),
                     &msg.origin.address(),
                 )
                 .await
-                .map(|c| c.into());
+                .asdf();
         }
         let registration = self.replica.lock().await.register(&payment);
         let result = match registration {
@@ -94,7 +96,14 @@ impl Payments {
                 info!("Payment: registration and propagation succeeded.");
                 // Paying too little will see the amount be forfeited.
                 // This prevents spam of the network.
-                let total_cost = self.replica.lock().await.get_store_cost(num_bytes).await?;
+                let total_cost =
+                    if let Some(res) = self.replica.lock().await.get_store_cost(num_bytes).await {
+                        res
+                    } else {
+                        return Outcome::error(Error::NetworkData(NdError::Unexpected(
+                            "Could not calculate store cost.".to_string(),
+                        )));
+                    };
                 if total_cost > payment.amount() {
                     warn!(
                         "Payment: Too low payment: {}, expected: {}",
@@ -105,12 +114,12 @@ impl Payments {
                     return self
                         .wrapping
                         .error(
-                            CmdError::Transfer(TransferRegistration(Error::InsufficientBalance)),
+                            CmdError::Transfer(TransferRegistration(NdError::InsufficientBalance)),
                             msg.id(),
                             &msg.origin.address(),
                         )
                         .await
-                        .map(|c| c.into());
+                        .asdf();
                 }
                 info!("Payment: forwarding data..");
                 // consider having the section actor be
@@ -128,13 +137,13 @@ impl Payments {
                     .await
             }
         };
-        result.map(|c| c.into())
+        result.asdf()
     }
 
     async fn section_wallet_id(&self) -> Result<PublicKey> {
         match self.replica.lock().await.replicas_pk_set() {
             Some(keys) => Ok(PublicKey::Bls(keys.public_key())),
-            None => Err(Error::NoSuchKey),
+            None => Err(NdError::NoSuchKey),
         }
     }
 

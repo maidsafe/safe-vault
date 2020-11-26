@@ -8,7 +8,6 @@
 
 pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_msg};
 pub use super::onboarding::Onboarding;
-use crate::node::node_ops::NodeMessagingDuty;
 use crate::utils;
 use crate::with_chaos;
 use crate::{Error, Result};
@@ -100,12 +99,12 @@ impl ClientMsgHandling {
         msg: &Message,
         client_address: SocketAddr,
         stream: SendStream,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Result<()> {
         trace!("Tracking incoming client message");
 
         with_chaos!({
             debug!("Chaos: Dropping incoming message");
-            return None;
+            return Ok(());
         });
 
         let msg_id = msg.id();
@@ -114,20 +113,18 @@ impl ClientMsgHandling {
         // before receiving the msg from that client directly.
         if let Some(msg) = self.tracked_outgoing.remove(&msg_id) {
             warn!("Tracking incoming: Prior group decision on msg found.");
-
             let _ = self.match_outgoing(&msg).await;
         }
 
         if let Entry::Vacant(ve) = self.tracked_incoming.entry(msg_id) {
             let _ = ve.insert((client_address, stream));
-            None
         } else {
             info!(
                 "Pending MessageId {:?} reused - ignoring client message.",
                 msg_id
             );
-            None
         }
+        Ok(())
     }
 
     pub async fn match_outgoing(&mut self, msg: &MsgEnvelope) -> Result<()> {

@@ -8,8 +8,9 @@
 
 use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::NodeMessagingDuty;
+use crate::{Error, Outcome, TernaryResult};
 use log::error;
-use sn_data_types::{Address, BlobRead, MsgEnvelope};
+use sn_data_types::{Address, BlobRead, Error as NdError, MsgEnvelope};
 
 /// Read operations on data chunks.
 
@@ -17,7 +18,7 @@ pub(super) async fn get_result(
     read: &BlobRead,
     msg: &MsgEnvelope,
     storage: &ChunkStorage,
-) -> Option<NodeMessagingDuty> {
+) -> Outcome<NodeMessagingDuty> {
     let BlobRead::Get(address) = read;
     if let Address::Section(_) = msg.most_recent_sender().address() {
         let verification = msg.verify();
@@ -28,7 +29,7 @@ pub(super) async fn get_result(
                 "Accumulated signature is invalid! Verification: {:?}",
                 verification
             );
-            None
+            Outcome::error(Error::NetworkData(NdError::InvalidSignature))
         }
     // } else if matches!(self.requester, PublicId::Node(_)) {
     //     if self.verify(&address) {
@@ -45,6 +46,7 @@ pub(super) async fn get_result(
     //         None
     //     }
     } else {
-        None
+        // only receiving these requests from other sections
+        Outcome::error(Error::Logic)
     }
 }

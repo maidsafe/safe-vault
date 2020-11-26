@@ -12,6 +12,7 @@ use crate::{
     node::node_ops::{NodeMessagingDuty, NodeOperation},
     Network, Result, ToDbKey,
 };
+use crate::{Outcome, TernaryResult};
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
@@ -68,7 +69,7 @@ impl BlobRegister {
         origin: MsgSender,
         payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use BlobWrite::*;
         match write {
             New(data) => self.store(data, msg_id, origin, payment, proxies).await,
@@ -83,7 +84,7 @@ impl BlobRegister {
         origin: MsgSender,
         payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         // fn cmd_error(error: NdError) {
         //     self.wrapping.send_to_section(Message::CmdError {
         //         error: CmdError::Data(error),
@@ -99,7 +100,7 @@ impl BlobRegister {
             if metadata.holders.len() == CHUNK_COPY_COUNT {
                 if data.is_pub() {
                     trace!("{}: All good, {:?}, chunk already exists.", self, data);
-                    return None;
+                    return Outcome::oki_no_change();
                 } else {
                     return self
                         .wrapping
@@ -169,7 +170,7 @@ impl BlobRegister {
         origin: MsgSender,
         payment: DebitAgreementProof,
         proxies: Vec<MsgSender>,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let cmd_error = |error: NdError| {
             self.wrapping.send_to_section(
                 Message::CmdError {
@@ -306,18 +307,18 @@ impl BlobRegister {
         Ok(())
     }
 
-    pub(super) async fn duplicate_chunks(&mut self, holder: XorName) -> Option<NodeOperation> {
+    pub(super) async fn duplicate_chunks(&mut self, holder: XorName) -> Outcome<NodeOperation> {
         trace!("Duplicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder) {
             Ok(chunks) => chunks,
-            _ => return None,
+            _ => return Outcome::oki_no_change(),
         };
         let mut cmds = Vec::new();
         for (address, holders) in chunks_stored {
             cmds.extend(self.get_duplication_msgs(address, holders).await);
         }
-        Some(cmds.into())
+        Outcome::oki(cmds.into())
     }
 
     async fn get_duplication_msgs(
@@ -348,8 +349,8 @@ impl BlobRegister {
             })
             .collect::<Vec<_>>();
         for message in messages {
-            if let Some(op) = self.wrapping.send_to_node(message).await.map(|c| c.into()) {
-                node_ops.push(op);
+            if let Ok(Some(op)) = self.wrapping.send_to_node(message).await {
+                node_ops.push(op.into());
             }
         }
         node_ops
@@ -361,7 +362,7 @@ impl BlobRegister {
         msg_id: MessageId,
         origin: MsgSender,
         proxies: Vec<MsgSender>,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         use BlobRead::*;
         match read {
             Get(address) => self.get(*address, msg_id, origin, proxies).await,
@@ -374,7 +375,7 @@ impl BlobRegister {
         msg_id: MessageId,
         origin: MsgSender,
         proxies: Vec<MsgSender>,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let query_error = |error: NdError| {
             self.wrapping.send_to_section(
                 Message::QueryResponse {
@@ -415,7 +416,7 @@ impl BlobRegister {
         holder: XorName,
         result: NdResult<()>,
         message_id: MessageId,
-    ) -> Option<NodeMessagingDuty> {
+    ) -> Outcome<NodeMessagingDuty> {
         let mut chunk_metadata = self.get_metadata_for(address).unwrap_or_default();
         let _ = chunk_metadata.holders.insert(holder);
         if let Err(error) = self
@@ -440,7 +441,7 @@ impl BlobRegister {
             );
         }
         info!("Duplication process completed for: {:?}", message_id);
-        None
+        Outcome::oki_no_value()
     }
 
     // Updates the metadata of the chunks help by a node that left.

@@ -23,8 +23,9 @@ use crate::{
     node::state_db::NodeInfo,
     Network, Result,
 };
+use crate::{Error, Outcome, TernaryResult};
 use futures::lock::Mutex;
-use log::{error, trace};
+use log::trace;
 use rand::{CryptoRng, Rng};
 use sn_data_types::PublicKey;
 use sn_routing::Prefix;
@@ -73,35 +74,32 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     }
 
     /// Initiates as first node in a network.
-    pub async fn init_first(&mut self) -> Option<NodeOperation> {
+    pub async fn init_first(&mut self) -> Outcome<NodeOperation> {
         self.transfers.init_first().await
     }
 
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn catchup_with_section(&mut self) -> Option<NodeOperation> {
+    pub async fn catchup_with_section(&mut self) -> Outcome<NodeOperation> {
         // currently only at2 replicas need to catch up
         self.transfers.catchup_with_replicas().await
     }
 
     // Update our replica with the latest keys
-    pub async fn elders_changed(&mut self) -> Option<NodeOperation> {
-        let pub_key_set = self.routing.public_key_set().await.ok()?;
-        let sec_key_share = self.routing.secret_key_share().await.ok()?;
+    pub async fn elders_changed(&mut self) -> Outcome<NodeOperation> {
+        let pub_key_set = self.routing.public_key_set().await?;
+        let sec_key_share = self.routing.secret_key_share().await?;
         let proof_chain = self.routing.our_history().await;
-        let index = self.routing.our_index().await.ok()?;
+        let index = self.routing.our_index().await?;
         match self.replica_manager.lock().await.update_replica_keys(
             sec_key_share,
             index,
             pub_key_set,
             proof_chain,
         ) {
-            Ok(()) => None,
-            Err(e) => {
-                error!("Error at elders changed event.... panic happens");
-                panic!(e)
-            } // Temporary brittle solution before lazy messaging impl.
+            Ok(()) => Outcome::oki_no_change(),
+            Err(e) => Outcome::error(Error::NetworkData(e)),
         }
     }
 
@@ -109,30 +107,29 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that
     /// the other group is now responsible for.
-    pub async fn section_split(&mut self, prefix: Prefix) -> Option<NodeOperation> {
+    pub async fn section_split(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
         // Removes accounts that are no longer our section responsibility.
         let not_matching = |key: PublicKey| {
             let xorname: XorName = key.into();
             !prefix.matches(&XorName(xorname.0))
         };
-        let all_keys = self.replica_manager.lock().await.all_keys()?;
-        let accounts = all_keys
-            .iter()
-            .filter(|key| not_matching(**key))
-            .copied()
-            .collect::<BTreeSet<PublicKey>>();
-        self.replica_manager
-            .lock()
-            .await
-            .drop_accounts(&accounts)
-            .ok()?;
-        None
+        if let Some(all_keys) = self.replica_manager.lock().await.all_keys() {
+            let accounts = all_keys
+                .iter()
+                .filter(|key| not_matching(**key))
+                .copied()
+                .collect::<BTreeSet<PublicKey>>();
+            self.replica_manager.lock().await.drop_accounts(&accounts)?;
+            Outcome::oki_no_change()
+        } else {
+            Outcome::error(Error::Logic)
+        }
     }
 
     pub async fn process_key_section_duty(
         &mut self,
         duty: KeySectionDuty,
-    ) -> Option<NodeOperation> {
+    ) -> Outcome<NodeOperation> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {

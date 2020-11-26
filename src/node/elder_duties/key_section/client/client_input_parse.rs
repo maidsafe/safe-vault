@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::{Error, Result};
 use bytes::Bytes;
 use log::info;
-use sn_data_types::{HandshakeRequest, Message, MsgEnvelope};
+use sn_data_types::{Error as NdError, HandshakeRequest, Message, MsgEnvelope};
 use std::net::SocketAddr;
 
 /*
@@ -27,7 +28,7 @@ kinds of input; messages and handshake requests.
 /// client, in order to use the services
 /// of the network.
 
-pub fn try_deserialize_msg(bytes: &Bytes) -> Option<MsgEnvelope> {
+pub fn try_deserialize_msg(bytes: &Bytes) -> Result<MsgEnvelope> {
     let msg = match bincode::deserialize(&bytes) {
         Ok(
             msg
@@ -45,17 +46,17 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Option<MsgEnvelope> {
                 ..
             },
         ) => msg,
-        _ => return None, // Only cmds and queries from client are allowed through here.
+        _ => return Err(Error::Logic), // Only cmds and queries from client are allowed through here.
     };
 
     if msg.origin.is_client() {
-        Some(msg)
+        Ok(msg)
     } else {
-        None
+        Err(Error::Logic)
     }
 }
 
-pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Option<HandshakeRequest> {
+pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Result<HandshakeRequest> {
     let hs = match bincode::deserialize(&bytes) {
         Ok(hs @ HandshakeRequest::Bootstrap(_))
         | Ok(hs @ HandshakeRequest::Join(_))
@@ -65,8 +66,11 @@ pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Option
                 "Failed to deserialize client input from {} as a handshake: {}",
                 peer_addr, err
             );
-            return None;
+            return Err(Error::NetworkData(NdError::FailedToParse(format!(
+                "Failed to deserialize client input from {} as a handshake: {}",
+                peer_addr, err
+            ))));
         }
     };
-    Some(hs)
+    Ok(hs)
 }

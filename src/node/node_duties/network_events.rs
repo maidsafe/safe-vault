@@ -11,7 +11,7 @@ use crate::node::{
     duty_cfg::DutyConfig,
     node_ops::{ElderDuty, NodeOperation},
 };
-use crate::Network;
+use crate::{Error, Network, Outcome, TernaryResult};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace, warn};
@@ -35,7 +35,7 @@ impl NetworkEvents {
         &mut self,
         event: RoutingEvent,
         network: &Network,
-    ) -> Option<NodeOperation> {
+    ) -> Outcome<NodeOperation> {
         use ElderDuty::*;
 
         trace!("Processing Routing Event: {:?}", event);
@@ -46,7 +46,7 @@ impl NetworkEvents {
             }
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
-                Some(
+                Outcome::oki(
                     ProcessLostMember {
                         name: XorName(name.0),
                         age,
@@ -60,12 +60,12 @@ impl NetworkEvents {
                 age,
                 startup_relocation,
             } => {
-                trace!("New member has joined the section");
                 if startup_relocation {
                     trace!("New node has joined the network");
-                    Some(ProcessNewMember(XorName(name.0)).into())
+                    Outcome::oki(ProcessNewMember(XorName(name.0)).into())
                 } else if let Some(prev_name) = previous_name {
-                    Some(
+                    trace!("New member has joined the section");
+                    Outcome::oki(
                         ProcessRelocatedMember {
                             old_node_id: XorName(prev_name.0),
                             new_node_id: XorName(name.0),
@@ -74,7 +74,8 @@ impl NetworkEvents {
                         .into(),
                     )
                 } else {
-                    None
+                    trace!("Invalid member config");
+                    Outcome::error(Error::Logic)
                 }
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
@@ -90,7 +91,7 @@ impl NetworkEvents {
                 key,
                 elders,
                 prefix,
-            } => Some(
+            } => Outcome::oki(
                 ProcessElderChange {
                     prefix,
                     key: PublicKey::Bls(key),
@@ -107,7 +108,7 @@ impl NetworkEvents {
                     self.duty_cfg.setup_as_adult()
                 } else {
                     info!("Our AGE: {:?}", age);
-                    None
+                    Outcome::oki_no_change()
                 }
             }
             RoutingEvent::Demoted => {
@@ -119,15 +120,15 @@ impl NetworkEvents {
                 } else {
                     info!("We are not Adult, do nothing");
                     info!("Our Age: {:?}", age);
-                    None
+                    Outcome::oki_no_change()
                 }
             }
             // Ignore all other events
-            _ => None,
+            _ => Outcome::oki_no_change(),
         }
     }
 
-    async fn evaluate_msg(&mut self, content: Bytes) -> Option<NodeOperation> {
+    async fn evaluate_msg(&mut self, content: Bytes) -> Outcome<NodeOperation> {
         match bincode::deserialize::<MsgEnvelope>(&content) {
             Ok(msg) => {
                 warn!("Message Envelope received. Contents: {:?}", &msg);
@@ -138,7 +139,7 @@ impl NetworkEvents {
                     "Error deserializing received network message into MsgEnvelope type: {:?}",
                     e
                 );
-                None
+                Outcome::error(Error::Logic)
             }
         }
     }

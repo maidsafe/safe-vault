@@ -13,7 +13,6 @@ use self::{
     metadata::Metadata,
     rewards::{RewardCalc, Rewards, Validator},
 };
-
 use crate::{
     capacity::ChunkHolderDbs,
     chunk_store::UsedSpace,
@@ -21,6 +20,7 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Network, Result,
 };
+use crate::{Outcome, TernaryResult};
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use std::sync::Arc;
@@ -68,7 +68,7 @@ impl DataSection {
     pub async fn process_data_section_duty(
         &mut self,
         duty: DataSectionDuty,
-    ) -> Option<NodeOperation> {
+    ) -> Outcome<NodeOperation> {
         use DataSectionDuty::*;
         match duty {
             RunAsMetadata(duty) => self.metadata.process_metadata_duty(duty).await,
@@ -77,15 +77,15 @@ impl DataSection {
     }
 
     // Transition the section funds account to the new key.
-    pub async fn elders_changed(&mut self) -> Option<NodeOperation> {
-        let pub_key_set = self.network.public_key_set().await.ok()?;
-        let keypair = utils::key_pair(self.network.clone()).await.ok()?;
+    pub async fn elders_changed(&mut self) -> Outcome<NodeOperation> {
+        let pub_key_set = self.network.public_key_set().await?;
+        let keypair = utils::key_pair(self.network.clone()).await?;
         let actor = TransferActor::new(Arc::new(keypair), pub_key_set, Validator {});
         self.rewards.transition(actor).await
     }
 
     // At section split, all Elders get their reward payout.
-    pub async fn section_split(&mut self, prefix: Prefix) -> Option<NodeOperation> {
+    pub async fn section_split(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
         // First remove nodes that are no longer in our section.
         let to_remove = self
             .rewards
@@ -101,7 +101,7 @@ impl DataSection {
     }
 
     /// When a new node joins, it is registered for receiving rewards.
-    pub async fn new_node_joined(&mut self, id: XorName) -> Option<NodeOperation> {
+    pub async fn new_node_joined(&mut self, id: XorName) -> Outcome<NodeOperation> {
         self.rewards
             .process_reward_duty(RewardDuty::AddNewNode(id))
             .await
@@ -115,7 +115,7 @@ impl DataSection {
         old_node_id: XorName,
         new_node_id: XorName,
         age: u8,
-    ) -> Option<NodeOperation> {
+    ) -> Outcome<NodeOperation> {
         // Adds the relocated account.
         let first = self
             .rewards
@@ -126,12 +126,12 @@ impl DataSection {
             })
             .await;
         let second = self.metadata.trigger_chunk_duplication(new_node_id).await;
-        Some(vec![first, second].into())
+        Outcome::oki(vec![first, second].into())
     }
 
     /// Name of the node
     /// Age of the node
-    pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Option<NodeOperation> {
+    pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Outcome<NodeOperation> {
         // marks the reward account as
         // awaiting claiming of the counter
         let first = self
@@ -139,6 +139,6 @@ impl DataSection {
             .process_reward_duty(RewardDuty::DeactivateNode(node_id))
             .await;
         let second = self.metadata.trigger_chunk_duplication(node_id).await;
-        Some(vec![first, second].into())
+        Outcome::oki(vec![first, second].into())
     }
 }
