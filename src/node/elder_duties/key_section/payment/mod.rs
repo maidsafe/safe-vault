@@ -81,7 +81,7 @@ impl Payments {
                     &msg.origin.address(),
                 )
                 .await
-                .asdf();
+                .convert();
         }
         let registration = self.replica.lock().await.register(&payment);
         let result = match registration {
@@ -119,7 +119,7 @@ impl Payments {
                             &msg.origin.address(),
                         )
                         .await
-                        .asdf();
+                        .convert();
                 }
                 info!("Payment: forwarding data..");
                 // consider having the section actor be
@@ -137,7 +137,7 @@ impl Payments {
                     .await
             }
         };
-        result.asdf()
+        result.convert()
     }
 
     async fn section_wallet_id(&self) -> Result<PublicKey> {

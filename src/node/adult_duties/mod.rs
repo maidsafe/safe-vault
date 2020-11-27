@@ -36,7 +36,7 @@ impl AdultDuties {
             ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
         };
 
-        result.asdf()
+        result.convert()
     }
 }
 

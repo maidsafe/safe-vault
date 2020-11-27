@@ -69,7 +69,7 @@ impl Transfers {
 
     pub async fn init_first(&mut self) -> Outcome<NodeOperation> {
         let result = self.initiate_replica(&[]).await;
-        result.asdf()
+        result.convert()
     }
 
     /// Issues a query to existing Replicas
@@ -90,7 +90,7 @@ impl Transfers {
                 true,
             )
             .await
-            .asdf()
+            .convert()
     }
 
     /// When handled by Elders in the dst
@@ -111,7 +111,7 @@ impl Transfers {
             } => self.process_cmd(cmd, *msg_id, origin.clone()).await,
         };
 
-        result.asdf()
+        result.convert()
     }
 
     async fn process_query(
@@ -464,7 +464,11 @@ impl Transfers {
     #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
     pub async fn pay(&mut self, transfer: Transfer) -> Result<(), Error> {
-        self.replica.lock().await.debit_without_proof(transfer)
+        self.replica
+            .lock()
+            .await
+            .debit_without_proof(transfer)
+            .map_err(|e| Error::NetworkData(e))
     }
 }
 

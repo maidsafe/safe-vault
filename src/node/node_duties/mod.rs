@@ -128,7 +128,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
                 true,
             )
             .await
-            .asdf()
+            .convert()
     }
 
     async fn become_adult(&mut self) -> Outcome<NodeOperation> {

@@ -155,6 +155,9 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Keeps processing resulting node operations.
     async fn process_while_any(&mut self, op: Outcome<NodeOperation>) {
         use NodeOperation::*;
+        if let Some(e) = op.get_error() {
+            return self.handle_error(e);
+        }
         let mut next_op = op;
         while let Ok(Some(op)) = next_op {
             next_op = match op {
@@ -165,7 +168,7 @@ impl<R: CryptoRng + Rng> Node<R> {
                         match self.process(c).await {
                             Ok(None) | Ok(Some(NoOp)) => (),
                             Ok(Some(op)) => node_ops.push(op),
-                            Err(_error) => unimplemented!("Handle errors.."),
+                            Err(e) => self.handle_error(&e),
                         };
                     }
                     Outcome::oki(node_ops.into())
@@ -201,6 +204,10 @@ impl<R: CryptoRng + Rng> Node<R> {
                 self.duties.process_node_duty(duty).await
             }
         }
+    }
+
+    fn handle_error(&self, err: &Error) {
+        info!("unimplemented: Handle errors.. {}", err)
     }
 }
 

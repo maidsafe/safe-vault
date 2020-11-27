@@ -62,7 +62,7 @@ pub(super) async fn get_result(
         },
         _ => unreachable!("Logic error"),
     };
-    result.asdf()
+    result.convert()
 }
 
 async fn blob(

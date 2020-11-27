@@ -9,8 +9,7 @@
 use super::store::TransferStore;
 use crate::Result;
 use bls::{PublicKeySet, SecretKeyShare};
-#[cfg(feature = "simulated-payouts")]
-use log::trace;
+
 use log::{info, warn};
 
 use sn_data_types::{
@@ -26,7 +25,9 @@ use sn_routing::SectionProofChain;
 #[cfg(feature = "simulated-payouts")]
 use {
     crate::node::node_ops::NodeMessagingDuty,
+    crate::Outcome,
     bls::{SecretKey, SecretKeySet},
+    log::trace,
     rand::thread_rng,
     sn_data_types::{Signature, SignatureShare, Transfer},
 };
@@ -364,7 +365,7 @@ impl ReplicaManager {
 impl ReplicaManager {
     pub fn credit_without_proof(&mut self, transfer: Transfer) -> Outcome<NodeMessagingDuty> {
         trace!("Performing credit without proof");
-        self.replica.credit_without_proof(transfer.clone()).ok()?;
+        self.replica.credit_without_proof(transfer.clone())?;
         let dummy_msg = "DUMMY MSG";
         let mut rng = thread_rng();
         let sec_key_set = SecretKeySet::random(7, &mut rng);

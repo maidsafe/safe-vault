@@ -64,7 +64,7 @@ trait TernaryResult<T> {
     fn has_value(&self) -> bool;
     fn get_value(&self) -> Option<&T>;
     fn get_error(&self) -> Option<&Error>;
-    fn asdf<K: From<T>>(self) -> Outcome<K>;
+    fn convert<K: From<T>>(self) -> Outcome<K>;
 }
 
 impl<T> TernaryResult<T> for Outcome<T> {
@@ -97,7 +97,7 @@ impl<T> TernaryResult<T> for Outcome<T> {
             None
         }
     }
-    fn asdf<K: From<T>>(self) -> Outcome<K> {
+    fn convert<K: From<T>>(self) -> Outcome<K> {
         self.map(|c| c.map(|d| d.into()))
     }
 }
