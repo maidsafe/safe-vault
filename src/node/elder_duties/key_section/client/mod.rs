@@ -54,7 +54,7 @@ impl<R: CryptoRng + Rng> ClientGateway<R> {
         trace!("Processing as gateway");
         use GatewayDuty::*;
         match cmd {
-            FindClientFor(msg) => self.try_find_client(&msg).await.map(|c| c.into()),
+            FindClientFor(msg) => self.try_find_client(&msg).await,
             ProcessClientEvent(event) => self.process_client_event(event).await,
         }
     }

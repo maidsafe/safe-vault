@@ -461,7 +461,7 @@ impl Transfers {
         self.wrapping.send_to_node(message).await
     }
 
-    #[allow(unused)]
+    #[allow(unused, clippy::redundant_closure)]
     #[cfg(feature = "simulated-payouts")]
     pub async fn pay(&mut self, transfer: Transfer) -> Result<(), Error> {
         self.replica
