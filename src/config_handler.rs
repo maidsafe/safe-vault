@@ -220,23 +220,15 @@ impl Config {
             self.completions = Some(value.parse().unwrap());
         } else if arg == ARGS[12] {
             self.log_dir = Some(value.parse().unwrap());
+        } else if arg == ARGS[7] {
+            self.network_config.max_msg_size_allowed = Some(value.parse().unwrap());
+        } else if arg == ARGS[8] {
+            self.network_config.idle_timeout_msec = Some(value.parse().unwrap());
+        } else if arg == ARGS[9] {
+            self.network_config.keep_alive_interval_msec = Some(value.parse().unwrap());
+        } else if arg == ARGS[15] {
+            self.network_config.upnp_lease_duration = Some(value.parse().unwrap());
         } else {
-            #[cfg(not(feature = "mock_base"))]
-            {
-                if arg == ARGS[7] {
-                    self.network_config.max_msg_size_allowed = Some(value.parse().unwrap());
-                } else if arg == ARGS[8] {
-                    self.network_config.idle_timeout_msec = Some(value.parse().unwrap());
-                } else if arg == ARGS[9] {
-                    self.network_config.keep_alive_interval_msec = Some(value.parse().unwrap());
-                } else if arg == ARGS[15] {
-                    self.network_config.upnp_lease_duration = Some(value.parse().unwrap());
-                } else {
-                    println!("ERROR");
-                }
-            }
-
-            #[cfg(feature = "mock_base")]
             println!("ERROR");
         }
     }
@@ -327,25 +319,13 @@ fn project_dirs() -> Result<PathBuf> {
 #[cfg(test)]
 mod test {
     use super::Config;
-    #[cfg(not(feature = "mock_base"))]
     use super::ARGS;
-    #[cfg(not(feature = "mock_base"))]
-    use std::mem;
     use std::{fs::File, io::Read, path::Path};
-    #[cfg(not(feature = "mock_base"))]
     use structopt::StructOpt;
     use unwrap::unwrap;
 
-    #[cfg(not(feature = "mock_base"))]
     #[test]
     fn smoke() {
-        let expected_size = 280;
-        assert_eq!(
-            expected_size,
-            mem::size_of::<Config>(),
-            "Ensure that any changes to `Config` are reflected in `ARGS`."
-        );
-
         let app_name = Config::clap().get_name().to_string();
         let test_values = [
             ["wallet-id", "86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103"],
