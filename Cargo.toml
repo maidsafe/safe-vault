@@ -51,9 +51,9 @@ xor_name = "1.1.0"
 sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
 
 [dev_dependencies]
+sn_client = { git = "https://github.com/maidsafe/sn_client"}
 maplit = "1.0.1"
 tempdir = "~0.3.7"
-sn_client = { git = "https://github.com/maidsafe/sn_client" }
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util", "rt-threaded"] }
 futures = "~0.3.5"
 
@@ -62,8 +62,10 @@ name = "sn_node"
 doc = false
 
 [features]
-simulated-payouts = ["sn_data_types/simulated-payouts", "sn_transfers/simulated-payouts", "sn_client/simulated-payouts"]
+simulated-payouts = ["sn_data_types/simulated-payouts", "sn_transfers/simulated-payouts"]
+client-tests = ["simulated-payouts", "sn_client/simulated-payouts"]
 chaos = []
 
 [patch.crates-io]
 crdts = { git = "https://github.com/joshuef/rust-crdt", branch="Remove-LseqdefaultApply" }
+# sn_data_types = {path="../sn_data_types"}
