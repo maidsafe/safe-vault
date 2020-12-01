@@ -55,6 +55,5 @@ USER maidsafe:maidsafe
 ENV CARGO_TARGET_DIR=/target \
     RUST_BACKTRACE=1
 RUN rustup component add rustfmt clippy && \
-    rustup target add x86_64-unknown-linux-musl && \
-    scripts/tests --verbose
+    rustup target add x86_64-unknown-linux-musl
 ENTRYPOINT ["fixuid"]
