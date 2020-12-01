@@ -51,7 +51,7 @@ xor_name = "1.1.0"
 sn_launch_tool = { git = "https://github.com/maidsafe/sn_launch_tool.git" }
 
 [dev_dependencies]
-sn_client = { git = "https://github.com/maidsafe/sn_client"}
+sn_client = { git = "https://github.com/maidsafe/sn_client", features=["simulated-payouts"]}
 maplit = "1.0.1"
 tempdir = "~0.3.7"
 tokio = { version="~0.2.21", features=["rt-core", "blocking", "stream", "rt-util", "rt-threaded"] }
@@ -63,7 +63,6 @@ doc = false
 
 [features]
 simulated-payouts = ["sn_data_types/simulated-payouts", "sn_transfers/simulated-payouts"]
-client-tests = ["simulated-payouts", "sn_client/simulated-payouts"]
 chaos = []
 
 [patch.crates-io]
