@@ -139,9 +139,26 @@ impl Transfers {
         origin: Address,
     ) -> Outcome<NodeMessagingDuty> {
         use TransferCmd::*;
-        debug!("Processing Transfer CMD in keysection");
+        debug!("Processing Transfer CMD in keysection {:?}", &cmd);
         match cmd {
-            InitiateReplica(events) => self.initiate_replica(events).await,
+            InitiateReplica(events) => {
+                let mut res = self.initiate_replica(&events).await;
+                let mut attempts = 0;
+                while res.is_err() && attempts < 3 {
+
+                    error!("================Error inititating replica, retry count is: {:?}", attempts);
+
+                    res = self.initiate_replica(&events).await;
+                    attempts += 1;
+                    // Ok(duty) => Ok(duty), 
+                    // Err(error) => {
+
+                    // }
+                }
+
+                res
+
+            },
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
             SimulatePayout(transfer) => self
@@ -173,14 +190,26 @@ impl Transfers {
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
     async fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Outcome<NodeMessagingDuty> {
-        // We must be able to initiate the replica, otherwise this node cannot function.
         match self.replica.lock().await.initiate(events) {
             Ok(()) => Ok(None),
             Err(e) => {
                 error!("Error instantiating replica for transfers....");
-                Outcome::error(Error::NetworkData(e))
+                Outcome::error(Error::Onboarding)
+                // We must be able to initiate the replica, otherwise this node cannot function.
             }
         }
+    }
+    /// Initiates a new Replica with the
+    /// state of existing Replicas in the group.
+    async fn initiate_replica_broken(&mut self, events: &[ReplicaEvent]) -> Outcome<NodeMessagingDuty> {
+        error!("Error innnstantiating replica for transfers....");
+        Outcome::error(Error::Onboarding)
+        // // We must be able to initiate the replica, otherwise this node cannot function.
+        // match self.replica.lock().await.initiate(events) {
+        //     Ok(()) => Ok(None),
+        //     Err(e) => {
+        //     }
+        // }
     }
 
     /// Get all the events of the Replica.

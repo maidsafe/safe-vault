@@ -155,11 +155,17 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Keeps processing resulting node operations.
     async fn process_while_any(&mut self, op: Outcome<NodeOperation>) {
         use NodeOperation::*;
+        info!("poooooooooooooooooooooooooooooocess");
         if let Some(e) = op.get_error() {
+            println!("!!!!!!!!!!!!!1thiserrrr");
+            info!("!!!!!!!!!!!!!ERROR PROC");
+            
             return self.handle_error(e);
         }
+
         let mut next_op = op;
         while let Ok(Some(op)) = next_op {
+            // let op_for_retry = op.clone()
             next_op = match op {
                 Single(operation) => self.process(operation).await,
                 Multiple(ops) => {
@@ -168,13 +174,20 @@ impl<R: CryptoRng + Rng> Node<R> {
                         match self.process(c).await {
                             Ok(None) | Ok(Some(NoOp)) => (),
                             Ok(Some(op)) => node_ops.push(op),
-                            Err(e) => self.handle_error(&e),
+                            Err(e) => {
+                            println!("**************************************That errrr");
+                            info!("********************ERROR PROC");
+                             
+                                self.handle_error(&e)
+                            }
                         };
                     }
                     Outcome::oki(node_ops.into())
                 }
                 NoOp => break,
-            }
+            };
+
+            info!("&&&&&&&&&&&NExt op: {:?}", next_op);
         }
     }
 
