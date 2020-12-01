@@ -28,7 +28,7 @@ fn start_network() {
 }
 
 // --------------------------------------------
-#[cfg(feature = "client-tests")]
+#[cfg(feature = "simulated-payouts")]
 mod test {
     use super::*;
     #[tokio::test]
