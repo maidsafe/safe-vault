@@ -45,8 +45,7 @@ jobs:
 
       # Run Clippy.
       - name: Clippy checks
-        shell: bash
-        run: ./scripts/clippy
+        run: cargo clippy --all-targets
 
   coverage:
     name: Code coverage check

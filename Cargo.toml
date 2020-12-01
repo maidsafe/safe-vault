@@ -60,6 +60,7 @@ name = "sn_node"
 doc = false
 
 [features]
+default = ["simulated-payouts"]
 simulated-payouts = ["sn_data_types/simulated-payouts", "sn_transfers/simulated-payouts"]
 chaos = []
 
@@ -68,4 +69,4 @@ crdts = { git = "https://github.com/joshuef/rust-crdt", branch="Remove-Lseqdefau
 # sn_data_types = {path="../sn_data_types"}
 
 [package.metadata.cargo-udeps.ignore]
-development = ["sn_client"]
+development = ["sn_client", "maplit"]
