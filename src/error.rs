@@ -73,10 +73,14 @@ quick_error! {
         /// Onboarding error
         Onboarding{
             display("Onboarding error")
+            from()
+
         }
         /// Replica error
         Replica{
             display("At2 Replica init error")
+            from()
+
         }
         /// Message is invalid.
         InvalidMessage {}
