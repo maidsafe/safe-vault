@@ -155,11 +155,8 @@ impl<R: CryptoRng + Rng> Node<R> {
     /// Keeps processing resulting node operations.
     async fn process_while_any(&mut self, op: Outcome<NodeOperation>) {
         use NodeOperation::*;
-        info!("poooooooooooooooooooooooooooooocess");
         if let Some(e) = op.get_error() {
-            println!("!!!!!!!!!!!!!1thiserrrr {:?}", e);
-            info!("!!!!!!!!!!!!!ERROR PROC {:?}", e);
-
+            error!("Error at op pre loop...");
             return self.handle_error(e);
         }
 
@@ -176,11 +173,9 @@ impl<R: CryptoRng + Rng> Node<R> {
                             Ok(Some(op)) => node_ops.push(op),
                             Err(e) => {
                                 println!(
-                                    "**************************************That errrr {:?}",
+                                    "************************************** Error while looping {:?}",
                                     e
                                 );
-                                info!("********************ERROR PROC {:?}", e);
-
                                 self.handle_error(&e)
                             }
                         };
@@ -223,7 +218,7 @@ impl<R: CryptoRng + Rng> Node<R> {
     }
 
     fn handle_error(&self, err: &Error) {
-        info!("unimplemented: Handle errors.. {}", err)
+        error!("unimplemented: Handle errors.. {}", err)
     }
 }
 
