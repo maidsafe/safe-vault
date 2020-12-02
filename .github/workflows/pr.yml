@@ -12,6 +12,7 @@ env:
   RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
+  TEST_STARTUP_INTERVAL: "20"
 
 jobs:
   clippy:
