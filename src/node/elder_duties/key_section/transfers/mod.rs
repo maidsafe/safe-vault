@@ -28,6 +28,8 @@ use sn_data_types::{
 };
 use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
+use crate::with_chaos;
+
 /*
 Transfers is the layer that manages
 interaction with an AT2 Replica.
@@ -144,17 +146,19 @@ impl Transfers {
             InitiateReplica(events) => {
                 let mut res = self.initiate_replica(&events).await;
                 let mut attempts = 0;
-                while res.is_err() && attempts < 3 {
+
+                // We must be able to initiate the replica, otherwise this node cannot function.
+                while res.is_err() && attempts < 11 {
 
                     error!("================Error inititating replica, retry count is: {:?}", attempts);
 
                     res = self.initiate_replica(&events).await;
+                    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+                    warn!("slept...");
                     attempts += 1;
-                    // Ok(duty) => Ok(duty), 
-                    // Err(error) => {
-
-                    // }
+                    
                 }
+                warn!("info inititttteedd...");
 
                 res
 
@@ -190,27 +194,21 @@ impl Transfers {
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
     async fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Outcome<NodeMessagingDuty> {
+        with_chaos!({
+            debug!("Chaos: failing replica init");
+            return Outcome::error(Error::Onboarding)
+        });
+
+
         match self.replica.lock().await.initiate(events) {
             Ok(()) => Ok(None),
             Err(e) => {
                 error!("Error instantiating replica for transfers....");
                 Outcome::error(Error::Onboarding)
-                // We must be able to initiate the replica, otherwise this node cannot function.
             }
         }
     }
-    /// Initiates a new Replica with the
-    /// state of existing Replicas in the group.
-    async fn initiate_replica_broken(&mut self, events: &[ReplicaEvent]) -> Outcome<NodeMessagingDuty> {
-        error!("Error innnstantiating replica for transfers....");
-        Outcome::error(Error::Onboarding)
-        // // We must be able to initiate the replica, otherwise this node cannot function.
-        // match self.replica.lock().await.initiate(events) {
-        //     Ok(()) => Ok(None),
-        //     Err(e) => {
-        //     }
-        // }
-    }
+
 
     /// Get all the events of the Replica.
     async fn all_events(&self, msg_id: MessageId, origin: Address) -> Outcome<NodeMessagingDuty> {
