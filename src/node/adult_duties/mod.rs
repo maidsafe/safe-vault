@@ -32,11 +32,15 @@ impl AdultDuties {
         use AdultDuty::*;
         use ChunkDuty::*;
         let RunAsChunks(chunk_duty) = duty;
-        let result = match chunk_duty {
-            ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
+        let ops = match chunk_duty {
+            ReadChunk(msg) | WriteChunk(msg) => {
+                let first: Outcome<NodeOperation> = self.chunks.receive_msg(msg).await.convert();
+                let second = self.chunks.check_storage().await;
+                vec![first, second]
+            }
         };
 
-        result.convert()
+        Outcome::oki(ops.into())
     }
 }
 

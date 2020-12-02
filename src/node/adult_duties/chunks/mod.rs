@@ -19,10 +19,13 @@ use sn_data_types::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
 
 use std::fmt::{self, Display, Formatter};
 
+pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.8;
+
 /// Operations on data chunks.
 pub(crate) struct Chunks {
     chunk_storage: ChunkStorage,
 }
+use crate::node::node_ops::{NodeDuty, NodeOperation};
 pub use chunk_storage::UsedSpace;
 
 impl Chunks {
@@ -53,6 +56,14 @@ impl Chunks {
                 ..
             } => writing::get_result(write, msg, &mut self.chunk_storage).await,
             _ => Outcome::error(Error::Logic),
+        }
+    }
+
+    pub async fn check_storage(&self) -> Outcome<NodeOperation> {
+        if self.chunk_storage.remaining_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
+            Outcome::oki(NodeDuty::StorageFull.into())
+        } else {
+            Outcome::oki_no_change()
         }
     }
 

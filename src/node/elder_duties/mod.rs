@@ -23,6 +23,7 @@ use rand::{CryptoRng, Rng};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
+use sn_data_types::PublicKey;
 
 /// Duties carried out by an Elder node.
 pub struct ElderDuties<R: CryptoRng + Rng> {
@@ -83,12 +84,20 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
                     .await
             }
             RunAsDataSection(duty) => self.data_section.process_data_section_duty(duty).await,
+            StorageFull{ node_id } => {
+                self.increase_full_node_count(node_id).await;
+                Outcome::oki_no_change()
+            }
         }
     }
 
     ///
     async fn new_node_joined(&mut self, name: XorName) -> Outcome<NodeOperation> {
         self.data_section.new_node_joined(name).await
+    }
+
+    async fn increase_full_node_count(&mut self, node_id: PublicKey) {
+        self.key_section.increase_full_node_count(node_id).await;
     }
 
     ///

@@ -73,6 +73,11 @@ impl<R: CryptoRng + Rng> KeySection<R> {
         })
     }
 
+    ///
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
+        self.replica_manager.lock().await.increase_full_node_count(node_id)
+    }
+
     /// Initiates as first node in a network.
     pub async fn init_first(&mut self) -> Outcome<NodeOperation> {
         self.transfers.init_first().await

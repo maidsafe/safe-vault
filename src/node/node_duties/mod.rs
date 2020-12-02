@@ -110,7 +110,26 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
                     .process_network_event(event, &self.network_api)
                     .await
             }
+            StorageFull => self.notify_section_of_our_storage().await,
         }
+    }
+
+    async fn notify_section_of_our_storage(&mut self) -> Outcome<NodeOperation> {
+        let wrapping =
+            NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
+        wrapping
+            .send_to_section(
+                Message::NodeCmd {
+                    cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
+                        section: self.node_info.public_key().await.into(),
+                        node_id: self.node_info.public_key().await,
+                    }),
+                    id: MessageId::new(),
+                },
+                true,
+            )
+            .await
+            .convert()
     }
 
     async fn register_wallet(&mut self, wallet: PublicKey) -> Outcome<NodeOperation> {

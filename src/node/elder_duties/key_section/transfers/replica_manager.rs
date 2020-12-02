@@ -204,6 +204,11 @@ impl ReplicaManager {
         Ok(())
     }
 
+    ///
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) {
+        self.rate_limit.increase_full_node_count(node_id)
+    }
+
     pub(crate) fn update_replica_keys(
         &mut self,
         secret_key: SecretKeyShare,

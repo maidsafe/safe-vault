@@ -132,7 +132,9 @@ impl NetworkEvents {
         match bincode::deserialize::<MsgEnvelope>(&content) {
             Ok(msg) => {
                 warn!("Message Envelope received. Contents: {:?}", &msg);
-                self.analysis.evaluate(&msg).await
+                let res = self.analysis.evaluate(&msg).await;
+                info!("PERFORMING!: \n {:?}", res);
+                res
             }
             Err(e) => {
                 error!(
