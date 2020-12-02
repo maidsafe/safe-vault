@@ -147,19 +147,19 @@ impl Transfers {
                 let mut res = self.initiate_replica(&events).await;
                 let mut attempts = 0;
 
-                // We must be able to initiate the replica, otherwise this node cannot function.
-                while res.is_err() && attempts < 11 {
-                    error!(
-                        "================Error inititating replica, retry count is: {:?}",
-                        attempts
-                    );
+                // // We must be able to initiate the replica, otherwise this node cannot function.
+                // while res.is_err() && attempts < 11 {
+                //     error!(
+                //         "================Error inititating replica, retry count is: {:?}",
+                //         attempts
+                //     );
 
-                    res = self.initiate_replica(&events).await;
-                    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
-                    warn!("slept...");
-                    attempts += 1;
-                }
-                warn!("info inititttteedd...");
+                //     res = self.initiate_replica(&events).await;
+                //     tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+                //     warn!("slept...");
+                //     attempts += 1;
+                // }
+                // warn!("info inititttteedd...");
 
                 res
             }
