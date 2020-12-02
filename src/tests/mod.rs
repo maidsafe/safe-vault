@@ -23,7 +23,7 @@ struct Network {
     nodes: Vec<(Sender<Command>, JoinHandle<()>)>,
 }
 
-static DEFAULT_NODE_STARTUP_INTERVAL: u64 = 3;
+static DEFAULT_NODE_STARTUP_INTERVAL: u64 = 1;
 
 impl Network {
     pub async fn new(no_of_nodes: usize) -> Self {
@@ -79,7 +79,10 @@ impl Network {
                 .name(format!("node-{n}", n = i))
                 .spawn(move || {
                     let node_path = path.join(format!("node-{}", i));
-                    println!("Starting new node: {:?}", &node_path);
+                    println!(
+                        "Starting new node: {:?} with interval {:?}",
+                        &node_path, &interval
+                    );
                     std::fs::create_dir_all(&node_path).expect("Cannot create node directory");
                     node_config.set_root_dir(&node_path);
 
@@ -97,7 +100,7 @@ impl Network {
                 .unwrap();
             nodes.push((command_tx, handle));
         }
-        thread::sleep(std::time::Duration::from_secs(interval * 10));
+        thread::sleep(std::time::Duration::from_secs(interval * 12));
         Self { nodes }
     }
 }

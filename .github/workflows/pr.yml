@@ -12,7 +12,7 @@ env:
   RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
-  TEST_STARTUP_INTERVAL: "20"
+  TEST_STARTUP_INTERVAL: "40"
 
 jobs:
   clippy:
@@ -76,6 +76,7 @@ jobs:
         uses: actions-rs/tarpaulin@master
         with:
           args: '-v --release --out Lcov'
+          timeout: 800
       - name: Push code coverage results to coveralls.io
         uses: coverallsapp/github-action@master
         with:
