@@ -10,7 +10,7 @@ pub mod replica_manager;
 pub mod store;
 
 pub use self::replica_manager::ReplicaManager;
-use crate::with_chaos;
+// use crate::with_chaos;
 use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
@@ -142,7 +142,7 @@ impl Transfers {
     ) -> Outcome<NodeMessagingDuty> {
         use TransferCmd::*;
         debug!("Processing Transfer CMD in keysection {:?}", &cmd);
-        match cmd {
+        match &cmd {
             InitiateReplica(events) => {
                 let mut res = self.initiate_replica(&events).await;
                 let mut attempts = 0;
@@ -194,16 +194,16 @@ impl Transfers {
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
     async fn initiate_replica(&mut self, events: &[ReplicaEvent]) -> Outcome<NodeMessagingDuty> {
-        with_chaos!({
-            debug!("Chaos: failing replica init");
-            return Outcome::error(Error::Onboarding);
-        });
+        // with_chaos!({
+        //     debug!("Chaos: failing replica init");
+        //     return Outcome::error(Error::Onboarding);
+        // });
 
         match self.replica.lock().await.initiate(events) {
             Ok(()) => Ok(None),
             Err(_e) => {
                 error!("Error instantiating replica for transfers....");
-                Outcome::error(Error::Onboarding)
+                Outcome::error(Error::Replica)
             }
         }
     }

@@ -157,8 +157,8 @@ impl<R: CryptoRng + Rng> Node<R> {
         use NodeOperation::*;
         info!("poooooooooooooooooooooooooooooocess");
         if let Some(e) = op.get_error() {
-            println!("!!!!!!!!!!!!!1thiserrrr");
-            info!("!!!!!!!!!!!!!ERROR PROC");
+            println!("!!!!!!!!!!!!!1thiserrrr {:?}", e);
+            info!("!!!!!!!!!!!!!ERROR PROC {:?}", e);
 
             return self.handle_error(e);
         }
@@ -175,8 +175,11 @@ impl<R: CryptoRng + Rng> Node<R> {
                             Ok(None) | Ok(Some(NoOp)) => (),
                             Ok(Some(op)) => node_ops.push(op),
                             Err(e) => {
-                                println!("**************************************That errrr");
-                                info!("********************ERROR PROC");
+                                println!(
+                                    "**************************************That errrr {:?}",
+                                    e
+                                );
+                                info!("********************ERROR PROC {:?}", e);
 
                                 self.handle_error(&e)
                             }

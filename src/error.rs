@@ -74,6 +74,10 @@ quick_error! {
         Onboarding{
             display("Onboarding error")
         }
+        /// Replica error
+        Replica{
+            display("At2 Replica init error")
+        }
         /// Message is invalid.
         InvalidMessage {}
         /// Account doesn't exist.

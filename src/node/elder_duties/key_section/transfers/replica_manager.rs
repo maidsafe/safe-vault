@@ -135,13 +135,13 @@ impl ReplicaManager {
             let all_events = self.all_events().unwrap();
             // Do nothing if we already have the same events or in case we get an empty event after initiating
             if all_events == events || (!all_events.is_empty() && events.is_empty()) {
-                info!("Already initiated!");
+                info!("Already initiated replica!");
                 return Ok(());
             }
         }
 
         if !self.info.initiating {
-            warn!("Is not initiating");
+            warn!("Replica is not initiating");
             // can only synch while initiating
             return Err(NdError::InvalidOperation);
         }
