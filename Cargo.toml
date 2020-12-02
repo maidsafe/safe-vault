@@ -105,4 +105,4 @@ git = "https://github.com/joshuef/rust-crdt"
 branch = "Remove-LseqdefaultApply"
 
 [patch.crates-io]
-sn_data_types = { path = "../../sn_data_types" }
+sn_data_types = { git = "https://github.com/Yoga07/sn_data_types", branch = "storage-check" }

@@ -13,7 +13,7 @@ use crate::{
     node::node_ops::{NodeOperation, PaymentDuty},
     utils,
 };
-use crate::{Error, Outcome, TernaryResult};
+use crate::{Outcome, TernaryResult};
 use futures::lock::Mutex;
 use log::{info, trace, warn};
 use sn_data_types::{
@@ -96,14 +96,7 @@ impl Payments {
                 info!("Payment: registration and propagation succeeded.");
                 // Paying too little will see the amount be forfeited.
                 // This prevents spam of the network.
-                let total_cost =
-                    if let Some(res) = self.replica.lock().await.get_store_cost(num_bytes).await {
-                        res
-                    } else {
-                        return Outcome::error(Error::NetworkData(NdError::Unexpected(
-                            "Could not calculate store cost.".to_string(),
-                        )));
-                    };
+                let total_cost = self.replica.lock().await.get_store_cost(num_bytes).await;
                 if total_cost > payment.amount() {
                     warn!(
                         "Payment: Too low payment: {}, expected: {}",
@@ -146,10 +139,6 @@ impl Payments {
             None => Err(NdError::NoSuchKey),
         }
     }
-
-    // pub async fn get_store_cost(&mut self) -> Arc<RateLimit> {
-    //     Arc::clone(self.rate_limit)
-    // }
 }
 
 impl Display for Payments {

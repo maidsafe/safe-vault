@@ -10,6 +10,7 @@ pub mod replica_manager;
 pub mod store;
 
 pub use self::replica_manager::ReplicaManager;
+use crate::node::node_ops::ElderDuty;
 use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
@@ -98,7 +99,7 @@ impl Transfers {
     pub async fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Outcome<NodeOperation> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
-        let result = match duty {
+        match duty {
             ProcessQuery {
                 query,
                 msg_id,
@@ -108,10 +109,11 @@ impl Transfers {
                 cmd,
                 msg_id,
                 origin,
-            } => self.process_cmd(cmd, *msg_id, origin.clone()).await,
-        };
-
-        result.convert()
+            } => self
+                .process_cmd(cmd, *msg_id, origin.clone())
+                .await
+                .convert(),
+        }
     }
 
     async fn process_query(
@@ -119,16 +121,22 @@ impl Transfers {
         query: &TransferQuery,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Outcome<NodeOperation> {
         use TransferQuery::*;
         match query {
-            GetReplicaEvents => self.all_events(msg_id, origin).await,
-            GetReplicaKeys(wallet_id) => self.get_replica_pks(wallet_id, msg_id, origin).await,
-            GetBalance(wallet_id) => self.balance(wallet_id, msg_id, origin).await,
-            GetHistory { at, since_version } => {
-                self.history(at, *since_version, msg_id, origin).await
+            GetReplicaEvents => self.all_events(msg_id, origin).await.convert(),
+            GetReplicaKeys(wallet_id) => self
+                .get_replica_pks(wallet_id, msg_id, origin)
+                .await
+                .convert(),
+            GetBalance(wallet_id) => self.balance(wallet_id, msg_id, origin).await.convert(),
+            GetHistory { at, since_version } => self
+                .history(at, *since_version, msg_id, origin)
+                .await
+                .convert(),
+            GetStoreCost { bytes, .. } => {
+                self.get_store_cost(*bytes, msg_id, origin).await.convert()
             }
-            GetStoreCost { bytes, .. } => self.get_store_cost(*bytes, msg_id, origin).await,
         }
     }
 
@@ -211,30 +219,32 @@ impl Transfers {
             .await
     }
 
-    /// Get latest StoreCost for the given number of bytes
+    /// Get latest StoreCost for the given number of bytes.
+    /// Also check for Section storage capacity and report accordingly.
     async fn get_store_cost(
         &self,
         bytes: u64,
         msg_id: MessageId,
         origin: Address,
-    ) -> Outcome<NodeMessagingDuty> {
+    ) -> Outcome<NodeOperation> {
         info!("Computing StoreCost for {:?} bytes", bytes);
-        let result = self
-            .replica
-            .lock()
-            .await
-            .get_store_cost(bytes)
-            .await
-            .ok_or_else(|| NdError::Unexpected("Could not compute latest StoreCost".to_string()));
-        info!("Got StoreCost {:?}", result.clone().unwrap());
-        self.wrapping
+        let replica = self.replica.lock().await;
+        let result = replica.get_store_cost(bytes).await;
+        info!("Got StoreCost {:?}", result.clone());
+        let first: Outcome<NodeOperation> = self
+            .wrapping
             .send_to_client(Message::QueryResponse {
-                response: QueryResponse::GetStoreCost(result),
+                response: QueryResponse::GetStoreCost(Ok(result)),
                 id: MessageId::new(),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
             .await
+            .convert();
+        let second: Outcome<NodeOperation> =
+            Outcome::oki(ElderDuty::SwitchNodeJoin(replica.check_network_storage().await).into());
+
+        Outcome::oki(vec![first, second].into())
     }
 
     /// Get the PublicKeySet of our replicas

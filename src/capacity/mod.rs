@@ -33,6 +33,10 @@ impl Capacity {
 
     ///
     pub fn increase_full_node_count(&mut self, node_id: PublicKey) {
-        let _ = self.dbs.full_adults.borrow_mut().ladd(&node_id.to_string(), &"");
+        let _ = self
+            .dbs
+            .full_adults
+            .borrow_mut()
+            .ladd(&node_id.to_string(), &"");
     }
 }

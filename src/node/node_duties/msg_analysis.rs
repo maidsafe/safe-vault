@@ -107,21 +107,17 @@ impl NetworkMsgAnalysis {
             cmd: NodeCmd::System(NodeSystemCmd::StorageFull { .. }) , ..
             }) {
                 let node_id = match &msg.message {
-                    Message::NodeCmd { cmd, .. } => {
-                        match cmd {
-                            NodeCmd::System(system_cmd) => {
-                                match system_cmd {
-                                    NodeSystemCmd::StorageFull { node_id, .. } => node_id.clone(),
-                                    _ => return Outcome::error(Error::Logic)
-                                }
-                            },
-                            _ => return Outcome::error(Error::Logic)
-                        }
+                    Message::NodeCmd { cmd, .. } => match cmd {
+                        NodeCmd::System(system_cmd) => match system_cmd {
+                            NodeSystemCmd::StorageFull { node_id, .. } => node_id.clone(),
+                            _ => return Outcome::error(Error::Logic),
+                        },
+                        _ => return Outcome::error(Error::Logic),
                     },
-                    _ => return Outcome::error(Error::Logic)
+                    _ => return Outcome::error(Error::Logic),
                 };
                 Outcome::oki(NodeOperation::Single(NetworkDuty::RunAsElder(
-                    ElderDuty::StorageFull{ node_id },
+                    ElderDuty::StorageFull { node_id },
                 )))
             } else {
                 Outcome::oki_no_change()

@@ -75,7 +75,10 @@ impl<R: CryptoRng + Rng> KeySection<R> {
 
     ///
     pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
-        self.replica_manager.lock().await.increase_full_node_count(node_id)
+        self.replica_manager
+            .lock()
+            .await
+            .increase_full_node_count(node_id)
     }
 
     /// Initiates as first node in a network.
@@ -89,6 +92,13 @@ impl<R: CryptoRng + Rng> KeySection<R> {
     pub async fn catchup_with_section(&mut self) -> Outcome<NodeOperation> {
         // currently only at2 replicas need to catch up
         self.transfers.catchup_with_replicas().await
+    }
+
+    pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Outcome<NodeOperation> {
+        match self.routing.set_node_join(joins_allowed).await {
+            Ok(()) => Outcome::oki_no_change(),
+            Err(e) => Outcome::error(e),
+        }
     }
 
     // Update our replica with the latest keys
