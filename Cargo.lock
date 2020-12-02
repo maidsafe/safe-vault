@@ -2656,7 +2656,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.25.4"
+version = "0.25.5"
 dependencies = [
  "async-log",
  "base64 0.10.1",

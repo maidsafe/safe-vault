@@ -22,7 +22,7 @@ struct Network {
     nodes: Vec<(Sender<Command>, JoinHandle<()>)>,
 }
 
-static NODE_STARTUP_INTERVAL: u64 = 3;
+static NODE_STARTUP_INTERVAL: u64 = 10;
 
 impl Network {
     pub async fn new(no_of_nodes: usize) -> Self {
@@ -90,7 +90,7 @@ impl Network {
                 .unwrap();
             nodes.push((command_tx, handle));
         }
-        thread::sleep(std::time::Duration::from_secs(30));
+        thread::sleep(std::time::Duration::from_secs(80));
         Self { nodes }
     }
 }
