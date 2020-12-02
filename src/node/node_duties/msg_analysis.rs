@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::node_ops::{ElderDuty, NetworkDuty};
 use crate::{
     node::{
         node_duties::accumulation::Accumulation,
@@ -84,6 +85,10 @@ impl NetworkMsgAnalysis {
             NodeMessagingDuty::NoOp => (),
             op => return Ok(op.into()),
         };
+        match self.try_system_cmd(&msg).await? {
+            NodeOperation::NoOp => (),
+            op => return Ok(op.into()),
+        };
         match self.try_client_entry(&msg).await? {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
@@ -117,6 +122,35 @@ impl NetworkMsgAnalysis {
         };
         error!("Unknown message destination: {:?}", msg.id());
         Err(Error::Logic("Unknown message destination".to_string()))
+    }
+
+    async fn try_system_cmd(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
+        // Check if it a message from adult
+        if msg.origin.is_adult() && msg.most_recent_sender().is_adult() {
+            // Check if it is a StorageFull message to increase full_node count
+            if matches!(msg.message,
+            Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::StorageFull { .. }) , ..
+            }) {
+                let node_id = match &msg.message {
+                    Message::NodeCmd { cmd, .. } => match cmd {
+                        NodeCmd::System(system_cmd) => match system_cmd {
+                            NodeSystemCmd::StorageFull { node_id, .. } => node_id.clone(),
+                            _ => return Err(Error::Logic("".to_string())),
+                        },
+                        _ => return Err(Error::Logic("".to_string())),
+                    },
+                    _ => return Err(Error::Logic("".to_string())),
+                };
+                Ok(NodeOperation::Single(NetworkDuty::RunAsElder(
+                    ElderDuty::StorageFull { node_id },
+                )))
+            } else {
+                Ok(NodeOperation::NoOp)
+            }
+        } else {
+            Ok(NodeOperation::NoOp)
+        }
     }
 
     async fn try_messaging(&self, msg: &MsgEnvelope) -> Result<NodeMessagingDuty> {

@@ -123,6 +123,8 @@ pub enum NodeDuty {
     /// Receiving and processing events from the network.
     ProcessNetworkEvent(RoutingEvent),
     NoOp,
+    /// Storage reaching max capacity.
+    StorageFull,
 }
 
 impl Into<NodeOperation> for NodeDuty {
@@ -142,6 +144,7 @@ impl Debug for NodeDuty {
             Self::ProcessMessaging(duty) => duty.fmt(f),
             Self::ProcessNetworkEvent(event) => event.fmt(f),
             Self::NoOp => write!(f, "No op."),
+            Self::StorageFull => write!(f, "StorageFull"),
         }
     }
 }
@@ -239,6 +242,11 @@ pub enum ElderDuty {
     /// via key sections.
     RunAsDataSection(DataSectionDuty),
     NoOp,
+    /// Increase number of Full Nodes in the network
+    StorageFull {
+        /// Node ID of node that reached max capacity.
+        node_id: PublicKey,
+    },
 }
 
 impl Into<NodeOperation> for ElderDuty {

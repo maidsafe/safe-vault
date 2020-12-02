@@ -2666,8 +2666,8 @@ dependencies = [
  "serde-value",
  "serde_json",
  "sha3",
- "sn_data_types",
- "sn_transfers",
+ "sn_data_types 0.11.37 (git+https://github.com/oetyng/sn_data_types?branch=wallet-actor-model)",
+ "sn_transfers 0.2.4 (git+https://github.com/oetyng/sn_transfers?branch=wallet-actor-model)",
  "threshold_crypto",
  "tiny-keccak 1.5.0",
  "tokio",
@@ -2680,7 +2680,32 @@ dependencies = [
 [[package]]
 name = "sn_data_types"
 version = "0.11.37"
+<<<<<<< HEAD
 source = "git+https://github.com/oetyng/sn_data_types?branch=refactor-chunk-duplication#ac2ea50b868a88cb9659aaf52e879e07350fff31"
+=======
+source = "git+https://github.com/yoga07/sn_data_types?branch=storage-check#0e545cb67148f808019b9b84c8b5fa93b963666e"
+dependencies = [
+ "bincode",
+ "crdts",
+ "ed25519",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "serde",
+ "sha3",
+ "signature",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_data_types"
+version = "0.11.37"
+source = "git+https://github.com/oetyng/sn_data_types?branch=wallet-actor-model#d5ca4672d4751df9803132a3c1098a733f83ee83"
+>>>>>>> feat(storage): impl adult storage tracking at Elders
 dependencies = [
  "bincode",
  "crdts",
@@ -2744,10 +2769,10 @@ dependencies = [
  "sha2 0.8.2",
  "signature",
  "sn_client",
- "sn_data_types",
+ "sn_data_types 0.11.37 (git+https://github.com/yoga07/sn_data_types?branch=storage-check)",
  "sn_launch_tool",
  "sn_routing",
- "sn_transfers",
+ "sn_transfers 0.2.4 (git+https://github.com/yoga07/sn_transfers)",
  "structopt 0.3.21",
  "tempdir",
  "threshold_crypto",
@@ -2787,7 +2812,10 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.4"
+<<<<<<< HEAD
 source = "git+https://github.com/oetyng/sn_transfers?branch=refactor-chunk-duplication#63fd141371c4c1ff58f388ba23c684cbe5d25556"
+=======
+source = "git+https://github.com/yoga07/sn_transfers?branch=master#56671c84699088cd491700a35c2d794e1dd9be95"
 dependencies = [
  "bincode",
  "crdts",
@@ -2795,7 +2823,24 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "serde",
- "sn_data_types",
+ "sn_data_types 0.11.37 (git+https://github.com/yoga07/sn_data_types?branch=storage-check)",
+ "threshold_crypto",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_transfers"
+version = "0.2.4"
+source = "git+https://github.com/oetyng/sn_transfers?branch=wallet-actor-model#7dbe918190a3f3a8813bb4b32c4dea6d6f2d8ecd"
+>>>>>>> feat(storage): impl adult storage tracking at Elders
+dependencies = [
+ "bincode",
+ "crdts",
+ "itertools",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "sn_data_types 0.11.37 (git+https://github.com/oetyng/sn_data_types?branch=wallet-actor-model)",
  "threshold_crypto",
  "xor_name",
 ]

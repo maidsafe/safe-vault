@@ -110,6 +110,11 @@ impl Transfers {
         Ok(NodeOperation::NoOp)
     }
 
+    ///
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) {
+        self.rate_limit.increase_full_node_count(node_id)
+    }
+
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
     pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NodeOperation> {

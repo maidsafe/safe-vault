@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{capacity::Capacity, Network};
-use sn_data_types::Money;
+use sn_data_types::{Money, PublicKey};
 
 const MAX_CHUNK_SIZE: u64 = 1_000_000;
 const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
@@ -60,6 +60,11 @@ impl RateLimit {
         let token_source = steepness_reductor * section_supply_share.powf(0.5_f64);
         let rate_limit = (token_source * data_size_factor * supply_demand_factor).round() as u64;
         Money::from_nano(rate_limit)
+    }
+
+    ///
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) {
+        self.capacity.increase_full_node_count(node_id);
     }
 }
 

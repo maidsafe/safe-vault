@@ -23,6 +23,7 @@ use crate::{
 };
 use futures::lock::Mutex;
 use log::trace;
+use sn_data_types::PublicKey;
 use sn_routing::Prefix;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -55,6 +56,11 @@ impl KeySection {
             msg_analysis,
             routing,
         })
+    }
+
+    ///
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
+        self.transfers.increase_full_node_count(node_id)
     }
 
     /// Initiates as first node in a network.

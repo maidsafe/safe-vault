@@ -33,14 +33,15 @@ impl AdultDuties {
 
     pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<NodeOperation> {
         use AdultDuty::*;
-        use ChunkReplicationCmd::*;
-        use ChunkReplicationDuty::*;
-        use ChunkReplicationQuery::*;
-        use ChunkStoreDuty::*;
-        let result = match duty {
-            RunAsChunkStore(chunk_duty) => match chunk_duty {
-                ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
-                ChunkStoreDuty::NoOp => return Ok(NodeOperation::NoOp),
+        use ChunkDuty::*;
+        let result: Result<NodeOperation> = match duty {
+            RunAsChunks(chunk_duty) => match chunk_duty {
+                ReadChunk(msg) | WriteChunk(msg) => {
+                    let first: Result<NodeOperation> = self.chunks.receive_msg(msg).await.convert();
+                    let second = self.chunks.check_storage().await;
+                    Ok(vec![first, second].into())
+                }
+                ChunkDuty::NoOp => return Ok(NodeOperation::NoOp),
             },
             RunAsChunkReplication(replication_duty) => match replication_duty {
                 ProcessQuery {
@@ -79,7 +80,7 @@ impl AdultDuties {
             _ => return Ok(NodeOperation::NoOp),
         };
 
-        result.convert()
+        result
     }
 }
 

@@ -53,7 +53,7 @@ impl DutyConfig {
     /// When becoming Adult.
     pub fn setup_as_adult(&mut self) -> Result<NodeOperation> {
         self.status = AgeGroup::Adult;
-        // 1. Becomde Adult.
+        // 1. Become Adult.
         let first: NodeOperation = NodeDuty::BecomeAdult.into();
         // 2. Register wallet at Elders.
         let second = NodeDuty::RegisterWallet(self.reward_key).into();

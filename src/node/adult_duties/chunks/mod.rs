@@ -24,10 +24,13 @@ use std::{
 };
 use xor_name::XorName;
 
+pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.8;
+
 /// Operations on data chunks.
 pub(crate) struct Chunks {
     chunk_storage: ChunkStorage,
 }
+use crate::node::node_ops::{NodeDuty, NodeOperation};
 pub use chunk_storage::UsedSpace;
 
 impl Chunks {
@@ -63,16 +66,13 @@ impl Chunks {
         }
     }
 
-    // fn validate_section_signature(&self, request: &Request, signature: &Signature) -> Option<()> {
-    //     if self
-    //         .public_key()?
-    //         .verify(signature, &utils::serialise(request))
-    //     {
-    //         Some(())
-    //     } else {
-    //         None
-    //     }
-    // }
+    pub async fn check_storage(&self) -> Result<NodeOperation> {
+        if self.chunk_storage.remaining_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
+            Ok(NodeDuty::StorageFull.into())
+        } else {
+            Ok(NodeOperation::NoOp)
+        }
+    }
 
     ///
     pub async fn replicate_chunk(
