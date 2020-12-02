@@ -144,8 +144,8 @@ impl Transfers {
         debug!("Processing Transfer CMD in keysection {:?}", &cmd);
         match &cmd {
             InitiateReplica(events) => {
-                let mut res = self.initiate_replica(&events).await;
-                let mut attempts = 0;
+                let res = self.initiate_replica(&events).await;
+                // let mut attempts = 0;
 
                 // // We must be able to initiate the replica, otherwise this node cannot function.
                 // while res.is_err() && attempts < 11 {
