@@ -76,6 +76,13 @@ impl KeySection {
         self.transfers.catchup_with_replicas().await
     }
 
+    pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<NodeOperation> {
+        match self.routing.set_joins_allowed(joins_allowed).await {
+            Ok(()) => Ok(NodeOperation::NoOp),
+            Err(e) => Err(e),
+        }
+    }
+
     // Update our replica with the latest keys
     pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
         let secret_key_share = self.routing.secret_key_share().await?;

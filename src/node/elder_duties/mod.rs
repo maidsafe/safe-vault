@@ -85,6 +85,9 @@ impl ElderDuties {
                 self.increase_full_node_count(node_id).await;
                 Ok(NodeOperation::NoOp)
             }
+            SwitchNodeJoin(joins_allowed) => {
+                self.key_section.set_node_join_flag(joins_allowed).await
+            }
         }
     }
 

@@ -480,6 +480,10 @@ impl ReplicaManager {
         })
     }
 
+    pub async fn check_network_storage(&self) -> bool {
+        self.rate_limit.check_network_storage().await
+    }
+
     pub(crate) fn all_keys(&self) -> Option<Vec<PublicKey>> {
         self.store.all_stream_keys()
     }
@@ -762,7 +766,7 @@ impl ReplicaManager {
         Ok(())
     }
 
-    pub async fn get_store_cost(&self, bytes: u64) -> Option<Money> {
+    pub async fn get_store_cost(&self, bytes: u64) -> Money {
         self.rate_limit.from(bytes).await
     }
 }

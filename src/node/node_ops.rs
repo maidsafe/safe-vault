@@ -247,6 +247,7 @@ pub enum ElderDuty {
         /// Node ID of node that reached max capacity.
         node_id: PublicKey,
     },
+    SwitchNodeJoin(bool),
 }
 
 impl Into<NodeOperation> for ElderDuty {

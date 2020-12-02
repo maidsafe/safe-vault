@@ -33,47 +33,52 @@ impl AdultDuties {
 
     pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<NodeOperation> {
         use AdultDuty::*;
-        use ChunkDuty::*;
+        use ChunkReplicationCmd::*;
+        use ChunkReplicationDuty::*;
+        use ChunkReplicationQuery::*;
+        use ChunkStoreDuty::*;
         let result: Result<NodeOperation> = match duty {
-            RunAsChunks(chunk_duty) => match chunk_duty {
+            RunAsChunkStore(chunk_duty) => match chunk_duty {
                 ReadChunk(msg) | WriteChunk(msg) => {
                     let first: Result<NodeOperation> = self.chunks.receive_msg(msg).await.convert();
                     let second = self.chunks.check_storage().await;
                     Ok(vec![first, second].into())
                 }
-                ChunkDuty::NoOp => return Ok(NodeOperation::NoOp),
+                ChunkStoreDuty::NoOp => return Ok(NodeOperation::NoOp),
             },
             RunAsChunkReplication(replication_duty) => match replication_duty {
                 ProcessQuery {
                     query: GetChunk(address),
                     msg_id,
                     origin,
-                } => {
-                    self.chunks
-                        .get_chunk_for_replication(address, msg_id, origin)
-                        .await
-                }
+                } => self
+                    .chunks
+                    .get_chunk_for_replication(address, msg_id, origin)
+                    .await
+                    .convert(),
                 ProcessCmd {
                     cmd,
                     msg_id,
                     origin,
                 } => match cmd {
-                    StoreReplicatedBlob(blob) => self.chunks.store_replicated_chunk(blob).await,
+                    StoreReplicatedBlob(blob) => {
+                        self.chunks.store_replicated_chunk(blob).await.convert()
+                    }
                     ReplicateChunk {
                         section_authority,
                         address,
                         current_holders,
-                    } => {
-                        self.chunks
-                            .replicate_chunk(
-                                address,
-                                current_holders,
-                                section_authority,
-                                msg_id,
-                                origin,
-                            )
-                            .await
-                    }
+                    } => self
+                        .chunks
+                        .replicate_chunk(
+                            address,
+                            current_holders,
+                            section_authority,
+                            msg_id,
+                            origin,
+                        )
+                        .await
+                        .convert(),
                 },
                 ChunkReplicationDuty::NoOp => return Ok(NodeOperation::NoOp),
             },

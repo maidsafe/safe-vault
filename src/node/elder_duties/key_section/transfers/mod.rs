@@ -16,7 +16,7 @@ use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{
-        Blah, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery,
+        Blah, ElderDuty, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery,
     },
     utils, Error, ReplicaInfo, Result,
 };
@@ -130,11 +130,14 @@ impl Transfers {
                 cmd,
                 msg_id,
                 origin,
-            } => self.process_cmd(cmd, *msg_id, origin.clone()).await,
+            } => self
+                .process_cmd(cmd, *msg_id, origin.clone())
+                .await
+                .convert(),
             NoOp => return Ok(NodeOperation::NoOp),
         };
 
-        result.convert()
+        result
     }
 
     async fn process_query(
@@ -142,16 +145,17 @@ impl Transfers {
         query: &TransferQuery,
         msg_id: MessageId,
         origin: Address,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeOperation> {
         use TransferQuery::*;
         match query {
-            GetSectionActorHistory => self.section_actor_history(msg_id, origin).await,
-            GetReplicaEvents => self.all_events(msg_id, origin).await,
-            GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await,
-            GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await,
-            GetHistory { at, since_version } => {
-                self.history(at, *since_version, msg_id, origin).await
-            }
+            GetSectionActorHistory => self.section_actor_history(msg_id, origin).await.convert(),
+            GetReplicaEvents => self.all_events(msg_id, origin).await.convert(),
+            GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await.convert(),
+            GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await.convert(),
+            GetHistory { at, since_version } => self
+                .history(at, *since_version, msg_id, origin)
+                .await
+                .convert(),
             GetStoreCost { bytes, .. } => self.get_store_cost(*bytes, msg_id, origin).await,
         }
     }
@@ -251,13 +255,7 @@ impl Transfers {
                 info!("Payment: registration and propagation succeeded.");
                 // Paying too little will see the amount be forfeited.
                 // This prevents spam of the network.
-                let total_cost = if let Some(res) = self.rate_limit.from(num_bytes).await {
-                    res
-                } else {
-                    return Err(Error::NetworkData(NdError::Unexpected(
-                        "Could not calculate store cost.".to_string(),
-                    )));
-                };
+                let total_cost = self.rate_limit.from(num_bytes).await;
                 if total_cost > payment.amount() {
                     warn!(
                         "Payment: Too low payment: {}, expected: {}",
@@ -318,31 +316,33 @@ impl Transfers {
             .await
     }
 
-    /// Get latest StoreCost for the given number of bytes
+    /// Get latest StoreCost for the given number of bytes.
+    /// Also check for Section storage capacity and report accordingly.
     async fn get_store_cost(
         &self,
         bytes: u64,
         msg_id: MessageId,
         origin: Address,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeOperation> {
         info!("Computing StoreCost for {:?} bytes", bytes);
-        let result =
-            self.rate_limit.from(bytes).await.ok_or_else(|| {
-                NdError::Unexpected("Could not compute current StoreCost".to_string())
-            });
+        let result = self.rate_limit.from(bytes).await;
 
-        if result.is_ok() {
-            info!("Got StoreCost {:?}", result.clone()?);
-        }
+        info!("Got StoreCost {:?}", result);
 
-        self.wrapping
+        let first = self
+            .wrapping
             .send_to_client(Message::QueryResponse {
-                response: QueryResponse::GetStoreCost(result),
+                response: QueryResponse::GetStoreCost(Ok(result)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
             })
             .await
+            .convert();
+        let second: Result<NodeOperation> =
+            Ok(ElderDuty::SwitchNodeJoin(self.rate_limit.check_network_storage().await).into());
+
+        Ok(vec![first, second].into())
     }
 
     /// Get the PublicKeySet of our replicas
