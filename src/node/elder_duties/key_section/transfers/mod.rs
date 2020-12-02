@@ -201,7 +201,7 @@ impl Transfers {
 
         match self.replica.lock().await.initiate(events) {
             Ok(()) => Ok(None),
-            Err(e) => {
+            Err(_e) => {
                 error!("Error instantiating replica for transfers....");
                 Outcome::error(Error::Onboarding)
             }
