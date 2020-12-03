@@ -6,15 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::node_ops::{ElderDuty, NetworkDuty};
 use crate::{
     node::{
         node_duties::accumulation::Accumulation,
         node_ops::{
             AdultDuty, AdultDuty::NoOp as AdultNoOp, ChunkReplicationCmd, ChunkReplicationDuty,
-            ChunkReplicationQuery, ChunkStoreDuty, GatewayDuty, MetadataDuty, NodeMessagingDuty,
-            NodeOperation, RewardCmd, RewardDuty, RewardQuery, TransferCmd, TransferDuty,
-            TransferQuery,
+            ChunkReplicationQuery, ChunkStoreDuty, ElderDuty, GatewayDuty, MetadataDuty,
+            NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery, TransferCmd,
+            TransferDuty, TransferQuery,
         },
     },
     utils, Error, Network, Result,
@@ -125,29 +124,18 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_system_cmd(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
+        use NodeCmd::*;
+        use NodeSystemCmd::*;
         // Check if it a message from adult
-        if msg.origin.is_adult() && msg.most_recent_sender().is_adult() {
-            // Check if it is a StorageFull message to increase full_node count
-            if matches!(msg.message,
-            Message::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::StorageFull { .. }) , ..
-            }) {
-                let node_id = match &msg.message {
-                    Message::NodeCmd { cmd, .. } => match cmd {
-                        NodeCmd::System(system_cmd) => match system_cmd {
-                            NodeSystemCmd::StorageFull { node_id, .. } => node_id.clone(),
-                            _ => return Err(Error::Logic("".to_string())),
-                        },
-                        _ => return Err(Error::Logic("".to_string())),
-                    },
-                    _ => return Err(Error::Logic("".to_string())),
-                };
-                Ok(NodeOperation::Single(NetworkDuty::RunAsElder(
-                    ElderDuty::StorageFull { node_id },
-                )))
-            } else {
-                Ok(NodeOperation::NoOp)
-            }
+        if !msg.origin.is_adult() {
+            return Ok(NodeOperation::NoOp);
+        }
+        if let Message::NodeCmd {
+            cmd: System(StorageFull { node_id, .. }),
+            ..
+        } = &msg.message
+        {
+            Ok(ElderDuty::StorageFull { node_id: *node_id }.into())
         } else {
             Ok(NodeOperation::NoOp)
         }
