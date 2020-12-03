@@ -6,13 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::node_ops::{ElderDuty, NetworkDuty};
 use crate::{
     node::{
         node_duties::accumulation::Accumulation,
         node_ops::{
-            AdultDuty, ChunkDuty, GatewayDuty, MetadataDuty, NodeMessagingDuty, NodeOperation,
-            RewardDuty, TransferCmd, TransferDuty, TransferQuery,
+            AdultDuty, ChunkDuty, ElderDuty, GatewayDuty, MetadataDuty, NodeMessagingDuty,
+            NodeOperation, RewardDuty, TransferCmd, TransferDuty, TransferQuery,
         },
     },
     Error, Network, Outcome, Result, TernaryResult,
@@ -97,29 +96,18 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_system_cmd(&self, msg: &MsgEnvelope) -> Outcome<NodeOperation> {
+        use NodeCmd::*;
+        use NodeSystemCmd::*;
         // Check if it a message from adult
-        if msg.origin.is_adult() && msg.most_recent_sender().is_adult() {
-            // Check if it is a StorageFull message to increase full_node count
-            if matches!(msg.message,
-            Message::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::StorageFull { .. }) , ..
-            }) {
-                let node_id = match &msg.message {
-                    Message::NodeCmd { cmd, .. } => match cmd {
-                        NodeCmd::System(system_cmd) => match system_cmd {
-                            NodeSystemCmd::StorageFull { node_id, .. } => *node_id,
-                            _ => return Outcome::error(Error::Logic),
-                        },
-                        _ => return Outcome::error(Error::Logic),
-                    },
-                    _ => return Outcome::error(Error::Logic),
-                };
-                Outcome::oki(NodeOperation::Single(NetworkDuty::RunAsElder(
-                    ElderDuty::StorageFull { node_id },
-                )))
-            } else {
-                Outcome::oki_no_change()
-            }
+        if !msg.origin.is_adult() {
+            return Outcome::oki_no_change();
+        }
+        if let Message::NodeCmd {
+            cmd: System(StorageFull { node_id, .. }),
+            ..
+        } = &msg.message
+        {
+            Outcome::oki(ElderDuty::StorageFull { node_id: *node_id }.into())
         } else {
             Outcome::oki_no_change()
         }
