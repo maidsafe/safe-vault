@@ -115,12 +115,13 @@ impl NodeDuties {
     async fn notify_section_of_our_storage(&mut self) -> Result<NodeOperation> {
         let wrapping =
             NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
+        let node_id = self.node_info.public_key().await;
         wrapping
             .send_to_section(
                 Message::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
-                        section: self.node_info.public_key().await.into(),
-                        node_id: self.node_info.public_key().await,
+                        section: node_id.into(),
+                        node_id,
                     }),
                     id: MessageId::new(),
                 },
