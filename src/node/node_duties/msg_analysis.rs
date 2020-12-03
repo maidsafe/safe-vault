@@ -74,7 +74,7 @@ impl NetworkMsgAnalysis {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
             // (All other client msgs are handled when received from client).
-            duty.into()
+            duty
         } else if let Some(duty) = self.try_client_entry(&msg).await? {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
             // The auth cmd has been agreed by the Gateway section.
@@ -109,7 +109,7 @@ impl NetworkMsgAnalysis {
                 let node_id = match &msg.message {
                     Message::NodeCmd { cmd, .. } => match cmd {
                         NodeCmd::System(system_cmd) => match system_cmd {
-                            NodeSystemCmd::StorageFull { node_id, .. } => node_id.clone(),
+                            NodeSystemCmd::StorageFull { node_id, .. } => *node_id,
                             _ => return Outcome::error(Error::Logic),
                         },
                         _ => return Outcome::error(Error::Logic),

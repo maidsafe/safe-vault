@@ -152,7 +152,9 @@ impl<T: Chunk> ChunkStore<T> {
 
     /// Max space to remaining space ratio.
     pub async fn remaining_space_ratio(&self) -> f64 {
-        (self.total_used_space().await / self.used_space.max_capacity().await) as f64
+        let used = self.total_used_space().await;
+        let total = self.used_space.max_capacity().await;
+        (used / total) as f64
     }
 
     /// Returns a data chunk previously stored under `id`.
