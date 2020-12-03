@@ -60,7 +60,7 @@ impl Chunks {
     }
 
     pub async fn check_storage(&self) -> Outcome<NodeOperation> {
-        if self.chunk_storage.remaining_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
+        if self.chunk_storage.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
             Outcome::oki(NodeDuty::StorageFull.into())
         } else {
             Outcome::oki_no_change()
