@@ -241,10 +241,14 @@ impl Transfers {
             })
             .await
             .convert();
-        let second: Outcome<NodeOperation> =
-            Outcome::oki(ElderDuty::SwitchNodeJoin(replica.check_network_storage().await).into());
 
-        Outcome::oki(vec![first, second].into())
+        if replica.check_network_storage().await {
+            let second: Outcome<NodeOperation> =
+                Outcome::oki(ElderDuty::SwitchNodeJoin(true).into());
+            Outcome::oki(vec![first, second].into())
+        } else {
+            first
+        }
     }
 
     /// Get the PublicKeySet of our replicas

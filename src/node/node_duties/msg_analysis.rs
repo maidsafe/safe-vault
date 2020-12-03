@@ -71,9 +71,7 @@ impl NetworkMsgAnalysis {
             // Identified as an outbound msg, to be sent on the wire.
             duty.into()
         } else if let Some(duty) = self.try_system_cmd(&msg).await? {
-            // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
-            // The auth cmd has been agreed by the Gateway section.
-            // (All other client msgs are handled when received from client).
+            // Evaluate for system commands(StorageFull, ChunkDuplication etc.).
             duty
         } else if let Some(duty) = self.try_client_entry(&msg).await? {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).

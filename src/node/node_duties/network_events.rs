@@ -65,14 +65,20 @@ impl NetworkEvents {
                     Outcome::oki(ProcessNewMember(XorName(name.0)).into())
                 } else if let Some(prev_name) = previous_name {
                     trace!("New member has joined the section");
-                    Outcome::oki(
-                        ProcessRelocatedMember {
-                            old_node_id: XorName(prev_name.0),
-                            new_node_id: XorName(name.0),
-                            age,
-                        }
-                        .into(),
-                    )
+                    let first: NodeOperation = ProcessRelocatedMember {
+                        old_node_id: XorName(prev_name.0),
+                        new_node_id: XorName(name.0),
+                        age,
+                    }
+                    .into();
+
+                    // Switch joins_allowed off a new adult joining.
+                    if age > MIN_AGE {
+                        let second: NodeOperation = SwitchNodeJoin(false).into();
+                        Outcome::oki(vec![first, second].into())
+                    } else {
+                        Outcome::oki(first)
+                    }
                 } else {
                     trace!("Invalid member config");
                     Outcome::error(Error::Logic)
