@@ -1958,9 +1958,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.9.2"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "261db39c47d10ab89eab2b0da61acff330936b905afb371188b0ae00466b6f56"
+checksum = "7634824e7a73d77c46b8cfe5f80356b1247fe05039342f377d8a9f586875c7b5"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2583,7 +2583,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client#d867d8e8f20007e352f82bdd1c33a2bd6e7699b7"
+source = "git+https://github.com/maidsafe/sn_client#b3243d029d996e5f4bcc64d5cf671cde777e774f"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2656,7 +2656,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.25.5"
+version = "0.25.6"
 dependencies = [
  "async-log",
  "base64 0.10.1",
