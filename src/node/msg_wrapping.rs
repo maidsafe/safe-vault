@@ -106,15 +106,15 @@ impl AdultMsgWrapping {
     }
 
     pub async fn sign(&self, msg: &Message) -> Result<(EdPK, EdSign), Error> {
-        Ok((
-            self.inner.keys.node_id().await,
-            self.inner
-                .keys
-                .sign_as_node(msg)
-                .await
-                .into_ed()
-                .ok_or_else(|| Error::Logic("Could not sign message as Node".to_string()))?,
-        ))
+        let pk = self.inner.keys.node_id().await;
+        let sign = self
+            .inner
+            .keys
+            .sign_as_node(msg)
+            .await
+            .into_ed()
+            .ok_or_else(|| Error::Logic("Could not sign message as Node".to_string()))?;
+        Ok((pk, sign))
     }
 }
 

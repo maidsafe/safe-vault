@@ -379,16 +379,15 @@ impl NetworkMsgAnalysis {
                     let verify_section_authority =
                         section_authority.verify(&utils::serialise(&message));
 
+                    let given_section_pk =
+                        &section_authority.id().public_key().bls().ok_or_else(|| {
+                            Error::Logic("Section Key cannot be non-BLS".to_string())
+                        })?;
+
                     // Verify that the DuplicateChunk Msg was sent with SectionAuthority
                     if section_authority.is_section()
                         && verify_section_authority
-                        && proof_chain.has_key(
-                            &section_authority
-                                .id()
-                                .public_key()
-                                .bls()
-                                .ok_or(Error::Logic("Section Key cannot be non-BLS".to_string()))?,
-                        )
+                        && proof_chain.has_key(given_section_pk)
                     {
                         info!("Creating internal Cmd for ReplyForDuplication");
                         Some(ReplyForDuplication {
