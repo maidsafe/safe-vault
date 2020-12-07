@@ -29,7 +29,6 @@ use xor_name::XorName;
 
 // The number of separate copies of a blob chunk which should be maintained.
 const CHUNK_COPY_COUNT: usize = 4;
-const CHUNK_ADULT_COPY_COUNT: usize = 3;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 struct ChunkMetadata {
@@ -527,22 +526,25 @@ impl BlobRegister {
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
     async fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
-        let take = CHUNK_ADULT_COPY_COUNT;
         let mut closest_adults = self
             .routing
-            .our_adults_sorted_by_distance_to(&target, take)
+            .our_adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
             .await;
-        if closest_adults.len() < CHUNK_COPY_COUNT {
-            let take = CHUNK_COPY_COUNT - closest_adults.len();
-            let mut closest_elders = self
-                .routing
-                .our_elder_names_sorted_by_distance_to(&target, take)
-                .await;
-            closest_adults.append(&mut closest_elders);
-            closest_adults
-        } else {
-            closest_adults
-        }
+
+        // TODO: Investigate elder blob storage
+        // if closest_adults.len() < CHUNK_COPY_COUNT {
+        //     let take = CHUNK_COPY_COUNT - closest_adults.len();
+        //     let mut closest_elders = self
+        //         .routing
+        //         .our_elder_names_sorted_by_distance_to(&target, take)
+        //         .await;
+        //     closest_adults.append(&mut closest_elders);
+        //     closest_adults
+        // } else {
+        //     closest_adults
+        // }
+
+        closest_adults
     }
 
     // Returns `XorName`s of the new target holders for an Blob chunk.
