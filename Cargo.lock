@@ -2583,8 +2583,9 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_client"
-version = "0.42.1"
-source = "git+https://github.com/maidsafe/sn_client#b064eff303f43c3f1f98d22c1b43aee8dba64b5c"
+version = "0.44.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4afa653ea301e75d5a4d634800ab212963ce62d5f98e76a8a86e4ebae3e55896"
 dependencies = [
  "async-trait",
  "bincode",

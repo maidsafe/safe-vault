@@ -101,4 +101,4 @@ simulated-payouts = [
 chaos = [ ]
 
 [patch.crates-io]
-sn_data_types = { path = "../sn_data_types" }
+sn_data_types = { git = "https://github.com/yoga07/sn_data_types", branch = "adult-dup" }

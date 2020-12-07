@@ -127,6 +127,34 @@ impl ChunkStorage {
             .await
     }
 
+    pub fn get_for_duplication(&self, address: &BlobAddress) -> Result<Blob> {
+        self.chunks
+            .get(address)
+            .map_err(|error| error.to_string().into())
+    }
+
+    pub async fn store_for_duplication(&mut self, blob: Blob) -> Outcome<NodeMessagingDuty> {
+        if self.chunks.has(blob.address()) {
+            info!(
+                "{}: Immutable chunk already exists, not storing: {:?}",
+                self,
+                blob.address()
+            );
+            return Outcome::oki_no_change();
+        }
+
+        if let Err(e) = self
+            .chunks
+            .put(&blob)
+            .await
+            .map_err(|error| error.to_string().into())
+        {
+            Outcome::error(e)
+        } else {
+            Outcome::oki_no_change()
+        }
+    }
+
     // pub(crate) fn get_for_duplciation(
     //     &self,
     //     address: BlobAddress,

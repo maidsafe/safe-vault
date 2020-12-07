@@ -331,6 +331,7 @@ impl BlobRegister {
                 hash_bytes.extend_from_slice(&address.name().0);
                 hash_bytes.extend_from_slice(&new_holder.0);
                 let message_id = MessageId(XorName(sha3_256(&hash_bytes)));
+                info!("Sending duplicate chunk msg to NewHolder {:?}", new_holder);
                 Message::NodeCmd {
                     cmd: Data(DuplicateChunk {
                         new_holder,

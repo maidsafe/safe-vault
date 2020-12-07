@@ -12,8 +12,8 @@ use sn_data_types::Transfer;
 use crate::Outcome;
 use serde::export::Formatter;
 use sn_data_types::{
-    Address, BlobAddress, DebitAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
-    ReplicaEvent, Signature, SignedTransfer, TransferValidated,
+    Address, Blob, BlobAddress, DebitAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
+    ReplicaEvent, SignedTransfer, TransferValidated,
 };
 use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;
@@ -241,6 +241,17 @@ pub enum AdultDuty {
         address: BlobAddress,
         ///
         section_authority: MsgSender,
+    },
+    ReplyForDuplication {
+        ///
+        address: BlobAddress,
+        ///
+        new_holder: XorName,
+        ///
+        correlation_id: MessageId,
+    },
+    StoreDuplicatedBlob {
+        blob: Blob,
     },
 }
 

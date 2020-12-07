@@ -15,7 +15,7 @@ use crate::{Error, Outcome, TernaryResult};
 use chunk_storage::ChunkStorage;
 
 use log::trace;
-use sn_data_types::{Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
+use sn_data_types::{Blob, BlobAddress, Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
 
 use std::fmt::{self, Display, Formatter};
 
@@ -41,17 +41,17 @@ impl Chunks {
         );
         match &msg.message {
             Message::Query {
-                query: Query::Data(DataQuery::Blob(read)),
+                query: Query::Data(DataQuery::Blob(ref read)),
                 ..
-            } => reading::get_result(read, msg, &self.chunk_storage).await,
+            } => reading::get_result(read, msg.clone(), &self.chunk_storage).await,
             Message::Cmd {
                 cmd:
                     Cmd::Data {
-                        cmd: DataCmd::Blob(write),
+                        cmd: DataCmd::Blob(ref write),
                         ..
                     },
                 ..
-            } => writing::get_result(write, msg, &mut self.chunk_storage).await,
+            } => writing::get_result(write, msg.clone(), &mut self.chunk_storage).await,
             _ => Outcome::error(Error::Logic(format!(
                 "{:?}: Could not receive msg as Adult",
                 msg.id()
@@ -145,6 +145,14 @@ impl Chunks {
     //         None
     //     }
     // }
+
+    pub fn get_chunk_for_duplication(&self, address: &BlobAddress) -> Result<Blob, Error> {
+        self.chunk_storage.get_for_duplication(address)
+    }
+
+    pub async fn store_duplicated_chunk(&mut self, blob: Blob) -> Outcome<NodeMessagingDuty> {
+        self.chunk_storage.store_for_duplication(blob).await
+    }
 }
 
 impl Display for Chunks {

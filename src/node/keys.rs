@@ -11,6 +11,7 @@ use bls::PublicKeySet;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use serde::Serialize;
 use sn_data_types::{Signature, SignatureShare, TransientElderKey as ElderKey};
+use xor_name::XorName;
 
 #[derive(Clone)]
 pub struct NodeSigningKeys {
@@ -24,6 +25,10 @@ impl NodeSigningKeys {
 
     pub async fn node_id(&self) -> Ed25519PublicKey {
         self.routing.public_key().await
+    }
+
+    pub async fn name(&self) -> XorName {
+        self.routing.name().await
     }
 
     pub async fn elder_key(&self) -> Option<ElderKey> {

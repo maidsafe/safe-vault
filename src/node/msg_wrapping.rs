@@ -12,7 +12,7 @@ use ed25519_dalek::{PublicKey as EdPK, Signature as EdSign};
 use log::info;
 use sn_data_types::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NodeDuties, PublicKey, Signature, TransientSectionKey,
+    NodeDuties, Signature, TransientSectionKey,
 };
 use xor_name::XorName;
 
@@ -72,6 +72,10 @@ impl AdultMsgWrapping {
         Self { inner }
     }
 
+    pub async fn name(&self) -> XorName {
+        self.inner.keys.name().await
+    }
+
     pub async fn send_to_section(
         &self,
         message: Message,
@@ -101,8 +105,16 @@ impl AdultMsgWrapping {
         self.inner.error(error, msg_id, origin).await
     }
 
-    pub async fn sign(&self, msg: &Message) -> (EdPK, EdSign) {
-        (self.inner.keys.node_id(), self.inner.keys.sign_as_node(msg))
+    pub async fn sign(&self, msg: &Message) -> Result<(EdPK, EdSign), Error> {
+        Ok((
+            self.inner.keys.node_id().await,
+            self.inner
+                .keys
+                .sign_as_node(msg)
+                .await
+                .into_ed()
+                .ok_or_else(|| Error::Logic("Could not sign message as Node".to_string()))?,
+        ))
     }
 }
 
