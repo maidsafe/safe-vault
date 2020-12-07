@@ -81,7 +81,7 @@ tempdir = "~0.3.7"
 futures = "~0.3.5"
 
   [dev_dependencies.sn_client]
-  git = "https://github.com/maidsafe/sn_client"
+  version="0.44.3"
   features = [ "simulated-payouts" ]
 
   [dev_dependencies.tokio]
@@ -99,7 +99,3 @@ simulated-payouts = [
   "sn_transfers/simulated-payouts"
 ]
 chaos = [ ]
-
-[patch.crates-io.crdts]
-git = "https://github.com/joshuef/rust-crdt"
-branch = "Remove-LseqdefaultApply"
