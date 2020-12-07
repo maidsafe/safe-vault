@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.7](https://github.com/maidsafe/sn_node/compare/v0.25.6...v0.25.7) (2020-12-07)
+
+
+### Bug Fixes
+
+* **blob:** rebase atop latest master ([74a88dc](https://github.com/maidsafe/sn_node/commit/74a88dc513d8fb4a0c1f90f493e30fa9c89f9d61))
+* **blob:** verify unpub blob owner ([36318be](https://github.com/maidsafe/sn_node/commit/36318be0b6e53e63cd98a7cf2fc59401563aac2d))
+* **data:** verify owner before writing/deleting new data ([88addf9](https://github.com/maidsafe/sn_node/commit/88addf9e70888afaf937c8a06e17d548b500a06e))
+
 ### [0.25.6](https://github.com/maidsafe/sn_node/compare/v0.25.5...v0.25.6) (2020-12-03)
 
 ### [0.25.5](https://github.com/maidsafe/sn_node/compare/v0.25.4...v0.25.5) (2020-12-02)
