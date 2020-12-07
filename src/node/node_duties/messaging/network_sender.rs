@@ -89,7 +89,7 @@ impl NetworkSender {
             self.network
                 .send_message(
                     SrcLocation::Node(name),
-                    DstLocation::Node(XorName(target.0)),
+                    DstLocation::Node(target),
                     utils::serialise(&msg),
                 )
                 .await

@@ -9,10 +9,16 @@
 mod chunks;
 
 use self::chunks::{Chunks, UsedSpace};
+use crate::node::msg_wrapping::AdultMsgWrapping;
+use crate::node::node_ops::NodeMessagingDuty;
 use crate::{
     node::node_ops::{AdultDuty, ChunkDuty, NodeOperation},
     node::state_db::NodeInfo,
     Outcome, Result, TernaryResult,
+};
+use bytes::BufMut;
+use sn_data_types::{
+    AdultDuties::ChunkStorage, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -20,20 +26,51 @@ use std::fmt::{self, Display, Formatter};
 /// storage and retrieval of data chunks.
 pub struct AdultDuties {
     chunks: Chunks,
+    msg_wrapping: AdultMsgWrapping,
 }
 
 impl AdultDuties {
     pub async fn new(node_info: &NodeInfo, used_space: UsedSpace) -> Result<Self> {
         let chunks = Chunks::new(node_info, used_space).await?;
-        Ok(Self { chunks })
+        let msg_wrapping = AdultMsgWrapping::new(
+            node_info.keys(),
+            AdultDuties::new(node_info, used_space.clone()),
+        );
+        Ok(Self {
+            chunks,
+            msg_wrapping,
+        })
     }
 
-    pub async fn process_adult_duty(&mut self, duty: &AdultDuty) -> Outcome<NodeOperation> {
+    pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Outcome<NodeOperation> {
         use AdultDuty::*;
         use ChunkDuty::*;
-        let RunAsChunks(chunk_duty) = duty;
-        let result = match chunk_duty {
-            ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
+        let result = match duty {
+            RunAsChunks(chunk_duty) => match chunk_duty {
+                ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
+            },
+            RequestForChunk {
+                section_authority,
+                address,
+                targets,
+            } => {
+                let msg = Message::NodeCmd {
+                    cmd: NodeCmd::Data(NodeDataCmd::GetChunk {
+                        section_authority,
+                        address,
+                        target: x,
+                    }),
+                    id: MessageId::new(),
+                };
+                let (pk, sign) = self.msg_wrapping.sign(&msg).await;
+                let origin = MsgSender::adult(pk, ChunkStorage, sign)?;
+                let env = MsgEnvelope {
+                    message: msg,
+                    origin,
+                    proxies: vec![],
+                };
+                self.msg_wrapping.send_to_adults(&env, targets).await;
+            }
         };
 
         result.convert()

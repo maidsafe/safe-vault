@@ -184,7 +184,7 @@ impl<R: CryptoRng + Rng> Node<R> {
             RunAsAdult(duty) => {
                 info!("Running as Adult: {:?}", duty);
                 if let Some(duties) = self.duties.adult_duties() {
-                    duties.process_adult_duty(&duty).await
+                    duties.process_adult_duty(duty).await
                 } else {
                     error!("Currently not an Adult!");
                     Outcome::error(Error::Logic("Currently not an Adult".to_string()))

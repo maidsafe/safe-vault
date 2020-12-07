@@ -16,7 +16,7 @@ use sn_data_types::{BlobWrite, Error as NdError, MsgEnvelope};
 
 pub(super) async fn get_result(
     write: &BlobWrite,
-    msg: &MsgEnvelope,
+    msg: MsgEnvelope,
     storage: &mut ChunkStorage,
 ) -> Outcome<NodeMessagingDuty> {
     use BlobWrite::*;

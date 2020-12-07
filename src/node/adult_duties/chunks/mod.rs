@@ -32,7 +32,7 @@ impl Chunks {
         Ok(Self { chunk_storage })
     }
 
-    pub async fn receive_msg(&mut self, msg: &MsgEnvelope) -> Outcome<NodeMessagingDuty> {
+    pub async fn receive_msg(&mut self, msg: MsgEnvelope) -> Outcome<NodeMessagingDuty> {
         trace!(
             "{}: Received ({:?} from src {:?}",
             self,

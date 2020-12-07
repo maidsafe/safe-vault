@@ -526,7 +526,7 @@ impl BlobRegister {
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
     async fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
-        let mut closest_adults = self
+        let closest_adults = self
             .routing
             .our_adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
             .await;

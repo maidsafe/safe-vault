@@ -8,10 +8,11 @@
 
 use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty};
 use crate::{Error, Outcome, TernaryResult};
+use ed25519_dalek::{PublicKey as EdPK, Signature as EdSign};
 use log::info;
 use sn_data_types::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NodeDuties, Signature, TransientSectionKey,
+    NodeDuties, PublicKey, Signature, TransientSectionKey,
 };
 use xor_name::XorName;
 
@@ -83,6 +84,14 @@ impl AdultMsgWrapping {
         self.inner.send_to_node(message).await
     }
 
+    pub async fn send_to_adults(
+        &self,
+        message: &MsgEnvelope,
+        targets: BTreeSet<XorName>,
+    ) -> Outcome<NodeMessagingDuty> {
+        self.inner.send_to_adults(targets, message).await
+    }
+
     pub async fn error(
         &self,
         error: CmdError,
@@ -90,6 +99,10 @@ impl AdultMsgWrapping {
         origin: &Address,
     ) -> Outcome<NodeMessagingDuty> {
         self.inner.error(error, msg_id, origin).await
+    }
+
+    pub async fn sign(&self, msg: &Message) -> (EdPK, EdSign) {
+        (self.inner.keys.node_id(), self.inner.keys.sign_as_node(msg))
     }
 }
 

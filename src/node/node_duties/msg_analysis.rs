@@ -18,9 +18,10 @@ use crate::{
 };
 use log::{error, info};
 use sn_data_types::{
-    Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, NodeCmd, NodeDuties,
-    NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
-    NodeSystemCmd, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
+    Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MsgEnvelope, MsgSender, NodeCmd,
+    NodeDataCmd, NodeDuties, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery,
+    NodeRewardQueryResponse, NodeSystemCmd, NodeTransferCmd, NodeTransferQuery,
+    NodeTransferQueryResponse, Query,
 };
 use sn_routing::MIN_AGE;
 use xor_name::XorName;
@@ -80,7 +81,7 @@ impl NetworkMsgAnalysis {
         } else if let Some(duty) = self.try_metadata(&msg).await? {
             // Accumulated msg from `Payment`!
             duty.into()
-        } else if let Some(duty) = self.try_adult(&msg).await? {
+        } else if let Some(duty) = self.try_adult(msg).await? {
             // Accumulated msg from `Metadata`!
             duty.into()
         } else if let Some(duty) = self.try_rewards(&msg).await? {
@@ -191,35 +192,43 @@ impl NetworkMsgAnalysis {
         } else {
             return Ok(false);
         };
-        let from_single_metadata_elder = || {
-            let res = msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Metadata));
-            info!("from single metadata elder: {:?}", res);
-            res
-        };
-        let is_chunk_msg = || {
-            let res = matches!(msg.message,
-            Message::Cmd {
-                cmd:
-                    Cmd::Data {
-                        cmd: DataCmd::Blob(_),
-                        ..
-                    },
-                ..
-            }
-            | Message::Query { // TODO: Should not accumulate queries, just pass them through.
-                query: Query::Data(DataQuery::Blob(_)),
-                ..
-            });
-            info!("is chunk msg: {:?}", res);
-            res
-        };
+        let from_single_metadata_elder = msg.most_recent_sender().is_elder()
+            && matches!(duty, Duty::Elder(ElderDuties::Metadata));
 
-        let accumulate = is_chunk_msg()
-            && from_single_metadata_elder()
-            && self.is_dst_for(msg).await?
-            && self.is_adult().await;
+        info!(
+            "from single metadata elder: {:?}",
+            from_single_metadata_elder
+        );
 
+        if !from_single_metadata_elder {
+            return Ok(false);
+        }
+
+        let is_chunk_msg = matches!(msg.message,
+        Message::Cmd {
+            cmd:
+                Cmd::Data {
+                    cmd: DataCmd::Blob(_),
+                    ..
+                },
+            ..
+        }
+        | Message::Query { // TODO: Should not accumulate queries, just pass them through.
+            query: Query::Data(DataQuery::Blob(_)),
+            ..
+        });
+        info!("is chunk msg: {:?}", is_chunk_msg);
+
+        let duplication_msg = matches!(msg.message,
+        Message::NodeCmd { cmd: NodeCmd::Data(NodeDataCmd::DuplicateChunk { .. }), .. });
+        info!("is duplication msg: {:?}", duplication_msg);
+
+        if !(is_chunk_msg || duplication_msg) {
+            return Ok(false);
+        }
+
+        let accumulate = self.is_dst_for(msg).await? && self.is_adult().await;
+        info!("Accumulating as Adult");
         Ok(accumulate)
     }
 
@@ -286,7 +295,7 @@ impl NetworkMsgAnalysis {
 
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
-    async fn try_adult(&self, msg: &MsgEnvelope) -> Outcome<AdultDuty> {
+    async fn try_adult(&self, msg: MsgEnvelope) -> Outcome<AdultDuty> {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
@@ -318,18 +327,37 @@ impl NetworkMsgAnalysis {
         };
 
         let shall_process =
-            from_metadata_section() && self.is_dst_for(msg).await? && self.is_adult().await;
+            from_metadata_section() && self.is_dst_for(&msg).await? && self.is_adult().await;
 
         if !shall_process {
             return Ok(None);
         }
 
+        let dup = match &msg.message {
+            Message::NodeCmd {
+                cmd:
+                    NodeCmd::Data(NodeDataCmd::DuplicateChunk {
+                        fetch_from_holders,
+                        address,
+                        ..
+                    }),
+                ..
+            } => Some(RequestForChunk {
+                targets: fetch_from_holders.clone(),
+                address: *address,
+                section_authority: msg.most_recent_sender().clone(),
+            }),
+            _ => None,
+        };
+
         use AdultDuty::*;
         use ChunkDuty::*;
         let duty = if is_chunk_cmd() {
-            RunAsChunks(WriteChunk(msg.clone()))
+            RunAsChunks(WriteChunk(msg))
         } else if is_chunk_query() {
-            RunAsChunks(ReadChunk(msg.clone()))
+            RunAsChunks(ReadChunk(msg))
+        } else if let Some(request) = dup {
+            request
         } else {
             return Ok(None);
         };

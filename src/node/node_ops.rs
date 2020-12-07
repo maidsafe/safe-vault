@@ -12,8 +12,8 @@ use sn_data_types::Transfer;
 use crate::Outcome;
 use serde::export::Formatter;
 use sn_data_types::{
-    Address, DebitAgreementProof, MessageId, MsgEnvelope, PublicKey, ReplicaEvent, SignedTransfer,
-    TransferValidated,
+    Address, BlobAddress, DebitAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
+    ReplicaEvent, Signature, SignedTransfer, TransferValidated,
 };
 use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;
@@ -233,6 +233,15 @@ pub enum AdultDuty {
     /// The main duty of an Adult is
     /// storage and retrieval of data chunks.
     RunAsChunks(ChunkDuty),
+    /// Request for duplicate chunk
+    RequestForChunk {
+        ///
+        targets: BTreeSet<XorName>,
+        ///
+        address: BlobAddress,
+        ///
+        section_authority: MsgSender,
+    },
 }
 
 impl Into<NodeOperation> for AdultDuty {

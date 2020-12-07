@@ -16,7 +16,7 @@ use sn_data_types::{Address, BlobRead, Error as NdError, MsgEnvelope};
 
 pub(super) async fn get_result(
     read: &BlobRead,
-    msg: &MsgEnvelope,
+    msg: MsgEnvelope,
     storage: &ChunkStorage,
 ) -> Outcome<NodeMessagingDuty> {
     let BlobRead::Get(address) = read;

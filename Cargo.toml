@@ -99,3 +99,6 @@ simulated-payouts = [
   "sn_transfers/simulated-payouts"
 ]
 chaos = [ ]
+
+[patch.crates-io]
+sn_data_types = { path = "../sn_data_types" }
