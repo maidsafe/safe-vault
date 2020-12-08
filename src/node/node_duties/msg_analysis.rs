@@ -18,10 +18,10 @@ use crate::{
 };
 use log::{error, info};
 use sn_data_types::{
-    Address, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message, MessageId, MsgEnvelope, NodeCmd,
-    NodeDataCmd, NodeDuties, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery,
-    NodeRewardQueryResponse, NodeSystemCmd, NodeTransferCmd, NodeTransferQuery,
-    NodeTransferQueryResponse, Query,
+    Address, AdultDuties::ChunkStorage, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message,
+    MessageId, MsgEnvelope, NodeCmd, NodeDataCmd, NodeDuties, NodeEvent, NodeQuery,
+    NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeTransferCmd,
+    NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
 use sn_routing::MIN_AGE;
 use tiny_keccak::sha3_256;
@@ -307,6 +307,8 @@ impl NetworkMsgAnalysis {
                 && matches!(duty, Duty::Elder(ElderDuties::Metadata))
         };
 
+        let from_adult_for_chunk_duplication = matches!(duty, Duty::Adult(ChunkStorage));
+
         // TODO: Should not accumulate queries, just pass them through.
         let is_chunk_query = || {
             matches!(msg.message, Message::Query {
@@ -327,14 +329,16 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        let shall_process =
-            from_metadata_section() && self.is_dst_for(&msg).await? && self.is_adult().await;
+        let shall_process = (from_metadata_section() || from_adult_for_chunk_duplication)
+            && self.is_dst_for(&msg).await?
+            && self.is_adult().await;
 
         if !shall_process {
             return Ok(None);
         }
 
-        let dup = match &msg.message {
+        info!("Checking chunking duplication!");
+        let is_chunk_duplication = match &msg.message {
             Message::NodeCmd {
                 cmd: NodeCmd::Data(cmd),
                 ..
@@ -357,6 +361,7 @@ impl NetworkMsgAnalysis {
                     address,
                     fetch_from_holders,
                 } => {
+                    info!("Verifying GetChunk Message!");
                     let proof_chain = self.routing.our_history().await;
 
                     // Recreate original MessageId from Section
@@ -404,6 +409,7 @@ impl NetworkMsgAnalysis {
                     correlation_id,
                     ..
                 } => {
+                    info!("Verifying GiveChunk Message!");
                     // Recreate original MessageId from Section
                     let mut hash_bytes = Vec::new();
                     hash_bytes.extend_from_slice(&blob.address().name().0);
@@ -429,7 +435,7 @@ impl NetworkMsgAnalysis {
             RunAsChunks(WriteChunk(msg.clone()))
         } else if is_chunk_query() {
             RunAsChunks(ReadChunk(msg.clone()))
-        } else if let Some(request) = dup {
+        } else if let Some(request) = is_chunk_duplication {
             request
         } else {
             return Ok(None);
