@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_node"
 readme = "README.md"
 repository = "https://github.com/maidsafe/sn_node"
-version = "0.25.7"
+version = "0.25.8"
 
 [package.metadata.cargo-udeps.ignore]
 development = [ "sn_client", "maplit" ]
@@ -81,7 +81,7 @@ tempdir = "~0.3.7"
 futures = "~0.3.5"
 
   [dev_dependencies.sn_client]
-  version="0.44.3"
+  version = "0.44.3"
   features = [ "simulated-payouts" ]
 
   [dev_dependencies.tokio]

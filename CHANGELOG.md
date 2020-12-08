@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.8](https://github.com/maidsafe/sn_node/compare/v0.25.7...v0.25.8) (2020-12-08)
+
+
+### Features
+
+* update data types and client deps ([55249e1](https://github.com/maidsafe/sn_node/commit/55249e1db0c06334fa583e1370a40cd72d3da045))
+
 ### [0.25.7](https://github.com/maidsafe/sn_node/compare/v0.25.6...v0.25.7) (2020-12-07)
 
 
