@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.9](https://github.com/maidsafe/sn_node/compare/v0.25.8...v0.25.9) (2020-12-08)
+
+
+### Features
+
+* **adult:** enable chunk duplication at adults ([771c618](https://github.com/maidsafe/sn_node/commit/771c618d9e35fccb2cafb2362eb4929ee63d04f5))
+
+
+### Bug Fixes
+
+* **blob:** verify unpub blob owner ([0a4b5c7](https://github.com/maidsafe/sn_node/commit/0a4b5c748260b465015dd28c69901eca187cfaf1))
+* **duplication:** fix message parsing for chunk duplication at adults ([5ea395f](https://github.com/maidsafe/sn_node/commit/5ea395ff1b63e8f08be92e76f84f355117f37d45))
+
 ### [0.25.8](https://github.com/maidsafe/sn_node/compare/v0.25.7...v0.25.8) (2020-12-08)
 
 
