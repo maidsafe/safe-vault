@@ -50,7 +50,7 @@ impl AdultDuties {
                 address,
                 targets,
             } => {
-                info!("Creating new MsgEnvelope for getting duplicate Chunk at NewHolder");
+                info!("Creating new MsgEnvelope for getting duplicate chunk from current_holders");
                 let msg = Message::NodeCmd {
                     cmd: NodeCmd::Data(NodeDataCmd::GetChunk {
                         section_authority,
