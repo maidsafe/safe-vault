@@ -40,9 +40,6 @@ mod to_db_key;
 
 pub mod utils;
 
-#[cfg(all(test, feature = "simulated-payouts"))]
-mod tests;
-
 pub(crate) use to_db_key::ToDbKey;
 
 pub use crate::{
@@ -54,6 +51,7 @@ pub use crate::{
 };
 
 #[derive(Clone, Debug)]
+///
 pub struct ReplicaInfo {
     id: PublicKeyShare,
     key_index: usize,
