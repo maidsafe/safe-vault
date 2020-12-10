@@ -142,11 +142,7 @@ impl ChunkStorage {
             return Ok(NodeMessagingDuty::NoOp);
         }
 
-        let _ = self
-            .chunks
-            .put(&blob)
-            .await
-            .map_err(|error| Error::ChunkStore(error))?;
+        let _ = self.chunks.put(&blob).await.map_err(Error::ChunkStore)?;
 
         Ok(NodeMessagingDuty::NoOp)
     }
