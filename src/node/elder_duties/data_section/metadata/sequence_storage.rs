@@ -11,7 +11,7 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
-    Error, Result,
+    Result,
 };
 use log::info;
 use sn_data_types::{

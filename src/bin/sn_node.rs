@@ -104,11 +104,11 @@ async fn main() {
         Ok(our_conn_info) => {
             println!(
                 "Node connection info:\n{}",
-                serde_json::to_string(&our_conn_info).unwrap()
+                serde_json::to_string(&our_conn_info).unwrap_or("Failed to serialize connection info".into())
             );
             info!(
                 "Node connection info: {}",
-                serde_json::to_string(&our_conn_info).unwrap()
+                serde_json::to_string(&our_conn_info).unwrap_or("Failed to serialize connection info".into())
             );
 
             if config.is_first() {

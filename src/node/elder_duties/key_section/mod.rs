@@ -19,7 +19,7 @@ use crate::{
     capacity::RateLimit,
     node::node_ops::{KeySectionDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Error, Network, ReplicaInfo, Result,
+    Network, ReplicaInfo, Result,
 };
 use futures::lock::Mutex;
 use log::trace;

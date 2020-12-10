@@ -15,7 +15,7 @@ use crate::{
     chunk_store::UsedSpace,
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Error, Network, Result,
+    Network, Result,
 };
 use log::{debug, trace};
 use sn_routing::Prefix;
@@ -49,7 +49,7 @@ impl ElderDuties {
     pub async fn initiate(&mut self, first: bool) -> Result<NodeOperation> {
         // currently only key section needs to catch up
         if first {
-            self.key_section.init_first().await?;
+            let _ = self.key_section.init_first().await?;
         }
         self.key_section.catchup_with_section().await
     }

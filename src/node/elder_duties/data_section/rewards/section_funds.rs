@@ -14,7 +14,7 @@ use crate::{
 use crate::{Error, Result};
 use sn_data_types::{
     CreditAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, PublicKey,
-    ReplicaEvent, Result as NdResult, SignedTransfer, TransferValidated,
+    ReplicaEvent, SignedTransfer, TransferValidated,
 };
 use xor_name::XorName;
 

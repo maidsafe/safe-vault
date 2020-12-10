@@ -1,3 +1,5 @@
+#![allow(unused)] // FIXME
+
 // Copyright 2020 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
@@ -15,6 +17,7 @@ use xor_name::XorName;
 
 const TRANSFERS_DIR_NAME: &str = "transfers";
 const DB_EXTENSION: &str = ".db";
+
 
 /// Disk storage for transfers.
 pub struct TransferStore {

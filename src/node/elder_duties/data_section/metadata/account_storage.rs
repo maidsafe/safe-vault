@@ -11,7 +11,7 @@ use crate::{
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
-    Error, Result,
+    Result,
 };
 use sn_data_types::{
     Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,

@@ -9,7 +9,7 @@
 pub mod network_sender;
 
 use crate::node::node_ops::{NodeMessagingDuty, NodeOperation};
-use crate::{Error, Network, Result};
+use crate::{Network, Result};
 use log::info;
 use network_sender::NetworkSender;
 

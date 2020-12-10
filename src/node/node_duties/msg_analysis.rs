@@ -10,7 +10,7 @@ use crate::{
     node::{
         node_duties::accumulation::Accumulation,
         node_ops::{
-            AdultDuty, ChunkDuty, GatewayDuty, MetadataDuty, NodeMessagingDuty, NodeOperation,
+            AdultDuty::NoOp as AdultNoOp, AdultDuty, ChunkDuty, GatewayDuty, MetadataDuty, NodeMessagingDuty, NodeOperation,
             RewardDuty, TransferCmd, TransferDuty, TransferQuery,
         },
     },
@@ -92,7 +92,7 @@ impl NetworkMsgAnalysis {
         };
         match self.try_adult(&msg).await? {
             // Accumulated msg from `Metadata`!
-            AdultDuty::NoOp => (),
+            AdultNoOp => (),
             op => return Ok(op.into()),
         };
         match self.try_rewards(&msg).await? {
@@ -308,7 +308,7 @@ impl NetworkMsgAnalysis {
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
-            return Ok(AdultDuty::NoOp);
+            return Ok(AdultNoOp);
         };
         let from_metadata_section = || {
             msg.most_recent_sender().is_section()
@@ -342,7 +342,7 @@ impl NetworkMsgAnalysis {
             && self.is_adult().await;
 
         if !shall_process {
-            return Ok(AdultDuty::NoOp);
+            return Ok(AdultNoOp);
         }
 
         info!("Checking chunking duplication!");
@@ -446,7 +446,7 @@ impl NetworkMsgAnalysis {
         } else if let Some(request) = is_chunk_duplication {
             request
         } else {
-            return Ok(AdultDuty::NoOp);
+            return Ok(AdultNoOp);
         };
         Ok(duty)
     }

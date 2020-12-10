@@ -24,7 +24,7 @@ use xor_name::Prefix;
 use {
     crate::node::node_ops::NodeMessagingDuty,
     bls::{SecretKey, SecretKeySet, SecretKeyShare},
-    log::{debug, trace},
+    log::debug,
     rand::thread_rng,
     sn_data_types::{Signature, SignatureShare, SignedCredit, SignedDebit, Transfer},
 };
@@ -175,6 +175,7 @@ impl Replicas {
     }
 
     /// For now, with test money there is no from wallet.., money is created from thin air.
+    #[allow(unused)] // TODO: Can this be removed?
     pub async fn test_validate_transfer(&self, signed_transfer: SignedTransfer) -> Result<()> {
         let id = signed_transfer.sender();
         // Acquire lock of the wallet.

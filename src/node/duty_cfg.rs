@@ -9,7 +9,7 @@
 use crate::node::state_db::AgeGroup;
 use crate::{
     node::node_ops::{NodeDuty, NodeOperation, RewardDuty},
-    Error, Network, Result,
+    Network, Result,
 };
 use sn_data_types::PublicKey;
 

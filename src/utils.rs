@@ -101,6 +101,7 @@ pub(crate) fn serialise<T: Serialize>(data: &T) -> Result<Bytes> {
     Ok(Bytes::copy_from_slice(serialised_data.as_slice()))
 }
 
+#[allow(unused)]
 pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
     bincode::deserialize(bytes).map_err(Error::Bincode)
 }
