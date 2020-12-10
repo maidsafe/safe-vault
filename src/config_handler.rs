@@ -389,7 +389,7 @@ mod test {
             let value = test_values
                 .iter()
                 .find(|elt| &elt[0] == arg)
-                .unwrap_or_else(|| panic!("Missing arg: {:?}", &arg))[1];
+                .ok_or_else(|| Error::Logic(format!("Missing arg: {:?}", &arg)))?[1];
             let matches = if value == "None" {
                 Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str()])
             } else {

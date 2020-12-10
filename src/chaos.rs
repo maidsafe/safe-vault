@@ -13,7 +13,7 @@ macro_rules! with_chaos {
             let chaos_trigger: usize = env::var("SAFE_CHAOS_LEVEL")
                 .unwrap_or("20".to_string())
                 .parse()
-                .unwrap();
+                .unwrap_or(20);
             let die = Uniform::from(1..100);
             let throw = die.sample(&mut rng);
             debug!(

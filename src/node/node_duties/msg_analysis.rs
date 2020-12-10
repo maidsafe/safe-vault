@@ -10,8 +10,8 @@ use crate::{
     node::{
         node_duties::accumulation::Accumulation,
         node_ops::{
-            AdultDuty::NoOp as AdultNoOp, AdultDuty, ChunkDuty, GatewayDuty, MetadataDuty, NodeMessagingDuty, NodeOperation,
-            RewardDuty, TransferCmd, TransferDuty, TransferQuery,
+            AdultDuty, AdultDuty::NoOp as AdultNoOp, ChunkDuty, GatewayDuty, MetadataDuty,
+            NodeMessagingDuty, NodeOperation, RewardDuty, TransferCmd, TransferDuty, TransferQuery,
         },
     },
     utils, Error, Network, Result,
