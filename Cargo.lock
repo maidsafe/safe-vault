@@ -2603,9 +2603,8 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_client"
-version = "0.44.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4afa653ea301e75d5a4d634800ab212963ce62d5f98e76a8a86e4ebae3e55896"
+version = "0.44.5"
+source = "git+https://github.com/joshuef/sn_client?branch=Feat-WalletActor#f1a40754b03ca139769cd8e2f9e8424e8e2f76ab"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2700,6 +2699,7 @@ dependencies = [
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",
+ "self_encryption",
  "self_update",
  "serde",
  "serde_json",
@@ -2749,7 +2749,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.4"
-source = "git+https://github.com/oetyng/sn_transfers?branch=wallet-actor-model#bea55f523f45b2392a487bc2faea490a20554cec"
+source = "git+https://github.com/joshuef/sn_transfers?branch=Feat-WalletActor#b617dade8210de0bacc6329829c4947e377ef8c5"
 dependencies = [
  "bincode",
  "crdts",
@@ -3626,13 +3626,3 @@ dependencies = [
  "thiserror",
  "time",
 ]
-
-[[patch.unused]]
-name = "crdts"
-version = "4.2.0"
-source = "git+https://github.com/joshuef/rust-crdt?branch=Remove-LseqdefaultApply#5fa18c41c2e4473e6bd8952f5ca05a367467dc4b"
-
-[[patch.unused]]
-name = "sn_client"
-version = "0.42.1"
-source = "git+https://github.com/oetyng/sn_client?branch=wallet-actor-model#fd4cb6f168eafb537d559a4f70fccbcd9e582d35"

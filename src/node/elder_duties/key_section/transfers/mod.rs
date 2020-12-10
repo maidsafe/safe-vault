@@ -110,7 +110,7 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NodeOperation> {
+    pub async fn process_transfer_duty(&mut self, duty: &TransferDuty) -> Result<NodeOperation> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
         let result = match duty {
@@ -140,7 +140,10 @@ impl Transfers {
         match query {
             GetReplicaEvents => self.all_events(msg_id, origin).await,
             GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await,
-            GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await,
+            GetBalance(wallet_id) => {
+                self.balance(*wallet_id, msg_id, origin).await
+
+            } 
             GetHistory { at, since_version } => {
                 self.history(at, *since_version, msg_id, origin).await
             }
@@ -149,7 +152,7 @@ impl Transfers {
     }
 
     async fn process_cmd(
-        &self,
+        &mut self,
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: Address,
@@ -161,7 +164,11 @@ impl Transfers {
             ProcessPayment(msg) => self.process_payment(msg).await,
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
-            SimulatePayout(transfer) => self.replicas.credit_without_proof(transfer.clone()).await,
+            SimulatePayout(transfer) => {
+                let res =  self.replicas.credit_without_proof(transfer.clone()).await;
+                debug!("Simu payoput res: {:?}", res);
+                res
+            },
             ValidateTransfer(signed_transfer) => {
                 self.validate(signed_transfer.clone(), msg_id, origin).await
             }
@@ -361,12 +368,16 @@ impl Transfers {
         msg_id: MessageId,
         origin: Address,
     ) -> Result<NodeMessagingDuty> {
+        debug!("Getting balance for {:?}", wallet_id);
+
         // validate signature
         let result = self
             .replicas
             .balance(wallet_id)
             .await
             .map_err(|e| NdError::Unexpected(e.to_string()));
+
+        debug!("------->>>The result: {:?}", result);
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetBalance(result),

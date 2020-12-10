@@ -65,7 +65,14 @@ pub(crate) fn new_periodic_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     let db_path = db_dir.as_ref().join(db_name);
     if init_mode == Init::New {
         trace!("Creating database at {}", db_path.display());
-        fs::create_dir_all(db_dir)?;
+        match fs::create_dir_all(db_dir) {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                error!("Problem making DB....... {:?}", error);
+                Err(error)
+            }
+        }?;
+
         let mut db = PickleDb::new_bin(
             db_path,
             PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL),

@@ -24,7 +24,7 @@ use xor_name::Prefix;
 use {
     crate::node::node_ops::NodeMessagingDuty,
     bls::{SecretKey, SecretKeySet, SecretKeyShare},
-    log::trace,
+    log::{trace, debug},
     rand::thread_rng,
     sn_data_types::{Signature, SignatureShare, SignedCredit, SignedDebit, Transfer},
 };
@@ -301,8 +301,14 @@ impl Replicas {
 
     async fn load_key_lock(&self, id: PublicKey) -> Result<Arc<Mutex<TransferStore>>> {
         match self.locks.get(&id) {
-            Some(val) => Ok(val.clone()),
-            None => Err(Error::Logic("Key does not exist among locks.".to_string())),
+            Some(val) => {
+                debug!("Got lockkkkk");
+                Ok(val.clone())
+            },
+            None => {
+                debug!("Nooooooooooooooo lock");
+                Err(Error::Logic("Key does not exist among locks.".to_string()))
+            },
         }
     }
 
@@ -332,13 +338,29 @@ impl Replicas {
     }
 
     #[cfg(feature = "simulated-payouts")]
-    pub async fn credit_without_proof(&self, transfer: Transfer) -> Result<NodeMessagingDuty> {
-        trace!("Performing credit without proof");
+    pub async fn credit_without_proof(&mut self, transfer: Transfer) -> Result<NodeMessagingDuty> {
+        debug!("!!!!!!!!!!!!!!!!!!!!!Performing credit without proof {:?}", transfer);
         let debit = transfer.debit();
         let credit = transfer.credit()?;
+
         // Acquire lock of the wallet.
         let id = transfer.to;
-        let key_lock = self.load_key_lock(id).await?;
+
+        let key_lock = match self.load_key_lock(id).await {
+            Ok(lock) => lock,
+            Err(_) => {
+
+                debug!("making lock ourselves");
+                let store = TransferStore::new(id.into(), &self.root_dir, Init::New)?;
+                let lock = Arc::new(Mutex::new(store));
+                // no key lock, so we create one for this simulated payout...
+                let _ = self.locks.insert(id, lock.clone());
+                // .filter_map(|id| .ok())
+
+                lock
+
+            }
+        };
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
@@ -351,6 +373,9 @@ impl Replicas {
         let sec_key = SecretKey::random();
         let pub_key = sec_key.public_key();
         let dummy_shares = SecretKeyShare::default();
+
+        debug!("OR HERE?????!! our lock fails no??????????????????????/hereee?????????????/");
+
         let dummy_sig = dummy_shares.sign(dummy_msg);
         let sig = sec_key.sign(dummy_msg);
         let transfer_proof = TransferAgreementProof {
@@ -366,6 +391,8 @@ impl Replicas {
             credit_sig: Signature::from(sig),
             debiting_replicas_keys: replica_keys,
         };
+
+        debug!("??????????????????????/hereee?????????????/");
         store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
             credit_proof: transfer_proof.credit_proof(),
             crediting_replica_keys: PublicKey::from(pub_key),
