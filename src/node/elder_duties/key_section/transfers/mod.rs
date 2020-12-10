@@ -18,8 +18,7 @@ use crate::{
     },
     utils, Error, ReplicaInfo, Result,
 };
-use futures::lock::Mutex;
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace, warn};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
@@ -463,7 +462,6 @@ impl Transfers {
                 correlation_id: msg_id,
                 cmd_origin: origin,
             },
-            Err(_e) => unimplemented!("validate_section_payout"),
         };
         self.wrapping.send_to_node(message).await
     }

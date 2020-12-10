@@ -99,7 +99,7 @@ impl AdultDuties {
                 }
             }
             StoreDuplicatedBlob { blob } => self.chunks.store_duplicated_chunk(blob).await,
-            AdultDuty::NoOp => return Ok(NodeOperation::NoOp),
+            _ => return Ok(NodeOperation::NoOp),
         };
 
         result.convert()

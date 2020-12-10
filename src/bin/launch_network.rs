@@ -125,7 +125,7 @@ pub async fn run_network() -> Result<(), String> {
         "11",
     ];
 
-    let interval_as_int = &INTERVAL.parse::<u64>().unwrap();
+    let interval_as_int = &INTERVAL.parse::<u64>().map_err(|_| String::from("Error parsing Interval argument"))?;
 
     let mut verbosity_arg = String::from("-");
     if verbosity > 0 {

@@ -22,6 +22,7 @@ pub(crate) trait ToDbKey: Serialize {
     }
 }
 
+#[allow(unused)]
 pub fn from_db_key<T: DeserializeOwned>(key: &str) -> Option<T> {
     let decoded = base64::decode(key).ok()?;
     utils::deserialise(&decoded).ok()

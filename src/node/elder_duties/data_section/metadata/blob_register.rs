@@ -10,7 +10,7 @@ use crate::{
     capacity::ChunkHolderDbs,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeMessagingDuty, NodeOperation},
-    Error, Network, Result, ToDbKey,
+    Network, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};

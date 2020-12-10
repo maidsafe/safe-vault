@@ -11,7 +11,7 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::{Blah, NodeMessagingDuty, NodeOperation};
-use crate::{Error, Result};
+use crate::Result;
 use log::info;
 use sn_data_types::{
     AccountWrite, BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
