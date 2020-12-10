@@ -18,7 +18,7 @@ use crate::{
     chunk_store::UsedSpace,
     node::node_ops::{DataSectionDuty, NodeOperation, RewardDuty},
     node::state_db::NodeInfo,
-    utils, Network, Result
+    utils, Network, Result,
 };
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;

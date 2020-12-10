@@ -18,7 +18,6 @@ use xor_name::XorName;
 const TRANSFERS_DIR_NAME: &str = "transfers";
 const DB_EXTENSION: &str = ".db";
 
-
 /// Disk storage for transfers.
 pub struct TransferStore {
     id: XorName,

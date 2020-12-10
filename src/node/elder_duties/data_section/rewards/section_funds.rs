@@ -273,7 +273,10 @@ impl SectionFunds {
         // hmm.. it would actually be a bug
         // if we have a payout in flight...
         if self.has_payout_in_flight() {
-            panic!("You failed to implement the logic correctly. Go back to the drawing desk.")
+            return Err(Error::Logic(
+                "You failed to implement the logic correctly. Go back to the drawing desk."
+                    .to_string(),
+            ));
         }
 
         use sn_data_types::ReplicaEvent::*;

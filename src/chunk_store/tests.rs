@@ -137,7 +137,7 @@ async fn failed_put_when_not_enough_space() -> Result<()> {
 
     match chunk_store.put(&data).await {
         Err(Error::NotEnoughSpace) => (),
-        x => panic!("Unexpected: {:?}", x),
+        x => return Err(crate::Error::Logic(format!("Unexpected: {:?}", x))),
     }
 
     Ok(())
@@ -228,7 +228,7 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
     let id = Id(new_rng().gen());
     match chunk_store.get(&id) {
         Err(Error::NoSuchChunk) => (),
-        x => panic!("Unexpected {:?}", x),
+        x => return Err(crate::Error::Logic(format!("Unexpected {:?}", x))),
     }
 
     Ok(())

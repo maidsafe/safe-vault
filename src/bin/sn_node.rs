@@ -41,7 +41,10 @@ const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP
 async fn main() {
     let mut config = match Config::new() {
         Ok(cfg) => cfg,
-        Err(e) => panic!("Failed to create Config: {:?}", e),
+        Err(e) => {
+            println!("Failed to create Config: {:?}", e);
+            process::exit(1);
+        }
     };
 
     if let Some(c) = &config.completions() {
@@ -104,15 +107,20 @@ async fn main() {
         Ok(our_conn_info) => {
             println!(
                 "Node connection info:\n{}",
-                serde_json::to_string(&our_conn_info).unwrap_or("Failed to serialize connection info".into())
+                serde_json::to_string(&our_conn_info)
+                    .unwrap_or("Failed to serialize connection info".into())
             );
             info!(
                 "Node connection info: {}",
-                serde_json::to_string(&our_conn_info).unwrap_or("Failed to serialize connection info".into())
+                serde_json::to_string(&our_conn_info)
+                    .unwrap_or("Failed to serialize connection info".into())
             );
 
             if config.is_first() {
-                let _ = write_connection_info(&our_conn_info).unwrap();
+                let _ = write_connection_info(&our_conn_info).unwrap_or_else(|err| {
+                    log::error!("Unable to write config to disk: {}", err);
+                    Default::default()
+                });
             }
         }
         Err(e) => {

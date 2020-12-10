@@ -156,7 +156,10 @@ mod inner {
         /// writers
         pub async fn local(used_space: Arc<Mutex<UsedSpace>>, id: StoreId) -> u64 {
             let used_space_lock = used_space.lock().await;
-            used_space_lock.local_stores.get(&id).unwrap().local_value
+            used_space_lock
+                .local_stores
+                .get(&id)
+                .map_or(0, |res| res.local_value)
         }
 
         /// Adds a new record for tracking the actions
