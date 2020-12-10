@@ -37,8 +37,20 @@ const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP
                                 Note that not all routers are supported in this testnet. Visit https://safenetforum.org for more information.";
 
 /// Runs a Safe Network node.
-#[tokio::main]
-async fn main() {
+fn main() {
+    let sn_node_thread = std::thread::spawn(move || {
+        let mut rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(run_node());
+        Ok::<(), std::io::Error>(())
+    });
+
+    match sn_node_thread.join() {
+        Ok(_) => {}
+        Err(err) => println!("Failed to run node: {:?}", err)
+    }
+}
+
+async fn run_node() {
     let mut config = match Config::new() {
         Ok(cfg) => cfg,
         Err(e) => {
