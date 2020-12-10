@@ -2699,7 +2699,6 @@ dependencies = [
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",
- "self_encryption",
  "self_update",
  "serde",
  "serde_json",

@@ -566,6 +566,7 @@ pub enum TransferQuery {
 
 /// Cmds carried out on AT2 Replicas.
 #[derive(Debug)]
+#[allow(clippy::clippy::large_enum_variant)]
 pub enum TransferCmd {
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.

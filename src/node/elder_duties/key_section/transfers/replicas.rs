@@ -274,12 +274,10 @@ impl Replicas {
 
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, id).await?;
-        if wallet
-            .receive_propagated(credit_proof, || {
-                self.find_past_key(&credit_proof.replica_keys())
-            })
-            .is_ok()
-        {
+        let propagation_result = wallet.receive_propagated(credit_proof, || {
+            self.find_past_key(&credit_proof.replica_keys())
+        });
+        if propagation_result.is_ok() {
             // sign + update state
             if let Some(crediting_replica_sig) = self
                 .info
@@ -322,7 +320,7 @@ impl Replicas {
             self.info.peer_replicas.clone(),
             events,
         )
-        .map_err(|e| Error::NetworkData(e))?;
+        .map_err(Error::NetworkData)?;
         Ok(wallet)
     }
 

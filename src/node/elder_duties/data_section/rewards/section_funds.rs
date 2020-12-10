@@ -68,7 +68,7 @@ impl SectionFunds {
         let _ = self
             .actor
             .synch_events(events)
-            .map_err(|e| Error::NetworkData(e))?;
+            .map_err(Error::NetworkData)?;
         Ok(NodeMessagingDuty::NoOp)
     }
 
@@ -307,7 +307,7 @@ impl SectionFunds {
     }
 
     fn apply(&mut self, event: ActorEvent) -> Result<()> {
-        self.actor.apply(event).map_err(|e| Error::NetworkData(e))
+        self.actor.apply(event).map_err(Error::NetworkData)
     }
 
     fn is_transition_credit(&self, credit: &CreditAgreementProof) -> bool {
