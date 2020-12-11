@@ -241,7 +241,7 @@ impl Transfers {
             },
             Err(error) => Err(error), // not using TransferPropagation error, since that is for NodeCmds, so wouldn't be returned to client.
         };
-        let result = match result {
+        match result {
             Ok(_) => {
                 info!("Payment: registration and propagation succeeded.");
                 // Paying too little will see the amount be forfeited.
@@ -285,8 +285,7 @@ impl Transfers {
                     .await
             }
             Err(_e) => unimplemented!("process_payment"),
-        };
-        result
+        }
     }
 
     fn section_wallet_id(&self) -> PublicKey {

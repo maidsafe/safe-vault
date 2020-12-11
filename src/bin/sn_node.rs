@@ -46,7 +46,7 @@ fn main() {
 
     match sn_node_thread.join() {
         Ok(_) => {}
-        Err(err) => println!("Failed to run node: {:?}", err)
+        Err(err) => println!("Failed to run node: {:?}", err),
     }
 }
 
