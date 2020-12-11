@@ -39,15 +39,21 @@ const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP
 
 /// Runs a Safe Network node.
 fn main() {
-    let sn_node_thread = std::thread::spawn(move || {
-        let mut rt = tokio::runtime::Runtime::new()?;
-        rt.block_on(run_node());
-        Ok::<(), std::io::Error>(())
-    });
+    let sn_node_thread = std::thread::Builder::new()
+        .name("sn_node".to_string())
+        .stack_size(8 * 1024 * 1024)
+        .spawn(move || {
+            let mut rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(run_node());
+            Ok::<(), std::io::Error>(())
+        });
 
-    match sn_node_thread.join() {
-        Ok(_) => {}
-        Err(err) => println!("Failed to run node: {:?}", err)
+    match sn_node_thread {
+        Ok(thread) => match thread.join() {
+            Ok(_) => {}
+            Err(err) => println!("Failed to run node: {:?}", err),
+        },
+        Err(err) => println!("Failed to run node: {:?}", err),
     }
 }
 
