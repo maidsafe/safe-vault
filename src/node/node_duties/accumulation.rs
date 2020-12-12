@@ -14,7 +14,7 @@ use sn_data_types::{
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 type RequestInfo = (MsgEnvelope, MsgSender, Vec<SignatureShare>);
-//type DuplicationInfo = (BlobAddress, BTreeSet<XorName>, Vec<SignatureShare>);
+//type ReplicationInfo = (BlobAddress, BTreeSet<XorName>, Vec<SignatureShare>);
 
 /// Accumulation of messages signed by individual nodes
 /// into messages that are stamped as originating from a section.

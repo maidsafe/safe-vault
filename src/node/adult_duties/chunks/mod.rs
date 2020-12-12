@@ -86,7 +86,7 @@ impl Chunks {
     //         match response {
     //             GetBlob(result) => {
     //                 if matches!(requester, PublicId::Node(_)) {
-    //                     debug!("got the duplication copy");
+    //                     debug!("got the replication copy");
     //                     if let Ok(data) = result {
     //                         trace!(
     //                             "Got GetBlob copy response for address: ({:?})",
@@ -145,12 +145,12 @@ impl Chunks {
     //     }
     // }
 
-    pub fn get_chunk_for_duplication(&self, address: &BlobAddress) -> Result<Blob, Error> {
-        self.chunk_storage.get_for_duplication(address)
+    pub fn get_chunk_for_replication(&self, address: &BlobAddress) -> Result<Blob, Error> {
+        self.chunk_storage.get_for_replication(address)
     }
 
-    pub async fn store_duplicated_chunk(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
-        self.chunk_storage.store_for_duplication(blob).await
+    pub async fn store_replicated_chunk(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
+        self.chunk_storage.store_for_replication(blob).await
     }
 }
 

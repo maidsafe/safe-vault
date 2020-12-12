@@ -45,7 +45,7 @@ impl ChunkStorage {
     }
 
     #[allow(unused)]
-    pub(crate) async fn take_duplicate(
+    pub(crate) async fn take_replica(
         &mut self,
         data: &Blob,
         msg_id: MessageId,
@@ -54,7 +54,7 @@ impl ChunkStorage {
     ) -> Result<NodeMessagingDuty> {
         let message = match self.try_store(data, origin).await {
             Ok(()) => Message::NodeEvent {
-                event: NodeEvent::DuplicationComplete {
+                event: NodeEvent::ReplicationCompleted {
                     chunk: *data.address(),
                     proof: accumulated_signature.clone(),
                 },
@@ -63,7 +63,7 @@ impl ChunkStorage {
             },
             Err(error) => Message::NodeCmdError {
                 id: MessageId::new(),
-                error: NodeCmdError::Data(NodeDataError::ChunkDuplication {
+                error: NodeCmdError::Data(NodeDataError::ChunkReplication {
                     address: *data.address(),
                     error,
                 }),
@@ -126,13 +126,13 @@ impl ChunkStorage {
             .await
     }
 
-    pub fn get_for_duplication(&self, address: &BlobAddress) -> Result<Blob> {
+    pub fn get_for_replication(&self, address: &BlobAddress) -> Result<Blob> {
         self.chunks
             .get(address)
             .map_err(|error| error.to_string().into())
     }
 
-    pub async fn store_for_duplication(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
+    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
         if self.chunks.has(blob.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",

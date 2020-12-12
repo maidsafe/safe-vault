@@ -122,7 +122,7 @@ impl DataSection {
 
     /// When a relocated node joins, a DataSection
     /// has a few different things to do, such as
-    /// pay out rewards and trigger chunk duplication.
+    /// pay out rewards and trigger chunk replication.
     pub async fn relocated_node_joined(
         &mut self,
         old_node_id: XorName,
@@ -142,7 +142,7 @@ impl DataSection {
                 origin: Address::Node(self.network.name().await),
             })
             .await;
-        let second = self.metadata.trigger_chunk_duplication(new_node_id).await;
+        let second = self.metadata.trigger_chunk_replication(new_node_id).await;
         Ok(vec![first, second].into())
     }
 
@@ -159,7 +159,7 @@ impl DataSection {
                 origin: Address::Node(self.network.name().await),
             })
             .await;
-        let second = self.metadata.trigger_chunk_duplication(node_id).await;
+        let second = self.metadata.trigger_chunk_replication(node_id).await;
         Ok(vec![first, second].into())
     }
 }

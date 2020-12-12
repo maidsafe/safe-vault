@@ -90,10 +90,10 @@ impl Metadata {
     // This should be called whenever a node leaves the section. It fetches the list of data that was
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
-    pub async fn trigger_chunk_duplication(&mut self, node: XorName) -> Result<NodeOperation> {
+    pub async fn trigger_chunk_replication(&mut self, node: XorName) -> Result<NodeOperation> {
         self.elder_stores
             .blob_register_mut()
-            .duplicate_chunks(node)
+            .replicate_chunks(node)
             .await
     }
 
@@ -162,7 +162,7 @@ impl Metadata {
     //     }
     // }
 
-    // fn initiate_duplication(
+    // fn initiate_replication(
     //     &mut self,
     //     address: BlobAddress,
     //     holders: BTreeSet<XorName>,
@@ -186,7 +186,7 @@ impl Metadata {
     //     })
     // }
 
-    // fn finalise_duplication(
+    // fn finalise_replication(
     //     &mut self,
     //     sender: SrcLocation,
     //     response: Response,
@@ -210,7 +210,7 @@ impl Metadata {
     //                 result,
     //                 message_id,
     //             ),
-    //             // Duplication doesn't care about other type of responses
+    //             // Replication doesn't care about other type of responses
     //             ref _other => {
     //                 error!(
     //                     "{}: Should not receive {:?} as a data handler.",
@@ -220,7 +220,7 @@ impl Metadata {
     //             }
     //         }
     //     } else {
-    //         error!("Ignoring duplication response. Invalid Signature.");
+    //         error!("Ignoring replication response. Invalid Signature.");
     //         None
     //     }
     // }

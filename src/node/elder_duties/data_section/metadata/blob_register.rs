@@ -298,8 +298,8 @@ impl BlobRegister {
         Ok(())
     }
 
-    pub(super) async fn duplicate_chunks(&mut self, holder: XorName) -> Result<NodeOperation> {
-        trace!("Duplicating chunks of holder {:?}", holder);
+    pub(super) async fn replicate_chunks(&mut self, holder: XorName) -> Result<NodeOperation> {
+        trace!("Replicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder) {
             Ok(chunks) => chunks,
@@ -307,12 +307,12 @@ impl BlobRegister {
         };
         let mut cmds = Vec::new();
         for (address, holders) in chunks_stored {
-            cmds.extend(self.get_duplication_msgs(address, holders).await);
+            cmds.extend(self.get_replication_msgs(address, holders).await);
         }
         Ok(cmds.into())
     }
 
-    async fn get_duplication_msgs(
+    async fn get_replication_msgs(
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
@@ -326,9 +326,9 @@ impl BlobRegister {
             .into_iter()
             .map(|new_holder| {
                 let message_id = MessageId::combine(vec![*address.name(), new_holder]);
-                info!("Sending duplicate chunk msg to NewHolder {:?}", new_holder);
+                info!("Sending replicate-chunk cmd to NewHolder {:?}", new_holder);
                 Message::NodeCmd {
-                    cmd: Data(DuplicateChunk {
+                    cmd: Data(ReplicateChunk {
                         new_holder,
                         address,
                         fetch_from_holders: current_holders.clone(),
@@ -430,7 +430,7 @@ impl BlobRegister {
                 self, error
             );
         }
-        info!("Duplication process completed for: {:?}", message_id);
+        info!("Replication process completed for: {:?}", message_id);
         Ok(NodeMessagingDuty::NoOp)
     }
 

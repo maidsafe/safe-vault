@@ -11,7 +11,7 @@ mod chunks;
 use self::chunks::{Chunks, UsedSpace};
 use crate::node::msg_wrapping::AdultMsgWrapping;
 use crate::{
-    node::node_ops::{AdultDuty, Blah, ChunkDuty, NodeOperation},
+    node::node_ops::{AdultDuty, Blah, ChunkStoreDuty, NodeOperation},
     node::state_db::NodeInfo,
     Result,
 };
@@ -40,20 +40,20 @@ impl AdultDuties {
 
     pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<NodeOperation> {
         use AdultDuty::*;
-        use ChunkDuty::*;
+        use ChunkStoreDuty::*;
         let result = match duty {
-            RunAsChunks(chunk_duty) => match chunk_duty {
+            RunAsChunkStore(chunk_duty) => match chunk_duty {
                 ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
-                ChunkDuty::NoOp => return Ok(NodeOperation::NoOp),
+                ChunkStoreDuty::NoOp => return Ok(NodeOperation::NoOp),
             },
             RequestForChunk {
                 section_authority,
                 address,
                 targets,
             } => {
-                info!("Creating new MsgEnvelope for getting duplicate chunk from current_holders");
+                info!("Creating new MsgEnvelope for acquiring chunk from current_holders");
                 let msg = Message::NodeCmd {
-                    cmd: NodeCmd::Data(NodeDataCmd::GetChunk {
+                    cmd: NodeCmd::Data(NodeDataCmd::AcquireChunk {
                         section_authority,
                         address,
                         new_holder: self.msg_wrapping.name().await,
@@ -71,34 +71,34 @@ impl AdultDuties {
                 info!("Sending to existing Holders");
                 self.msg_wrapping.send_to_adults(&env, targets).await
             }
-            ReplyForDuplication {
+            ReplyForReplication {
                 address,
                 new_holder,
                 correlation_id,
                 ..
             } => {
-                let res = self.chunks.get_chunk_for_duplication(&address);
+                let res = self.chunks.get_chunk_for_replication(&address);
                 match res {
                     Ok(blob) => {
                         let msg = Message::NodeCmd {
-                            cmd: NodeCmd::Data(NodeDataCmd::GiveChunk {
+                            cmd: NodeCmd::Data(NodeDataCmd::ProvideChunk {
                                 blob,
                                 new_holder,
                                 correlation_id,
                             }),
                             id: MessageId::new(),
                         };
-                        info!("Send blob for duplication to the NewHolder");
+                        info!("Send blob for replication to the new holder.");
                         self.msg_wrapping.send_to_node(msg).await
                     }
                     Err(e) => {
                         // TODO: Penalise adult for this behaviour
-                        error!("Chunk doesn't exist at current holder for Duplication. But it should. Check Logic");
+                        error!("Chunk to be acquired for replication doesn't exist at current holder. But it should. Check Logic");
                         Err(e)
                     }
                 }
             }
-            StoreDuplicatedBlob { blob } => self.chunks.store_duplicated_chunk(blob).await,
+            StoreReplicatedBlob { blob } => self.chunks.store_replicated_chunk(blob).await,
             _ => return Ok(NodeOperation::NoOp),
         };
 

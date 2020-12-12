@@ -260,8 +260,8 @@ impl Into<NodeOperation> for ElderDuty {
 pub enum AdultDuty {
     /// The main duty of an Adult is
     /// storage and retrieval of data chunks.
-    RunAsChunks(ChunkDuty),
-    /// Request for duplicate chunk
+    RunAsChunkStore(ChunkStoreDuty),
+    /// Request for chunk
     RequestForChunk {
         ///
         targets: BTreeSet<XorName>,
@@ -270,7 +270,7 @@ pub enum AdultDuty {
         ///
         section_authority: MsgSender,
     },
-    ReplyForDuplication {
+    ReplyForReplication {
         ///
         address: BlobAddress,
         ///
@@ -278,7 +278,7 @@ pub enum AdultDuty {
         ///
         correlation_id: MessageId,
     },
-    StoreDuplicatedBlob {
+    StoreReplicatedBlob {
         blob: Blob,
     },
     NoOp,
@@ -411,7 +411,7 @@ impl Into<NodeOperation> for MetadataDuty {
 
 /// Chunk storage and retrieval is done at Adults.
 #[derive(Debug)]
-pub enum ChunkDuty {
+pub enum ChunkStoreDuty {
     /// Reads.
     ReadChunk(MsgEnvelope),
     /// Writes.

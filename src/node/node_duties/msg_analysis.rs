@@ -10,7 +10,7 @@ use crate::{
     node::{
         node_duties::accumulation::Accumulation,
         node_ops::{
-            AdultDuty, AdultDuty::NoOp as AdultNoOp, ChunkDuty, GatewayDuty, MetadataDuty,
+            AdultDuty, AdultDuty::NoOp as AdultNoOp, ChunkStoreDuty, GatewayDuty, MetadataDuty,
             NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery, TransferCmd,
             TransferDuty, TransferQuery,
         },
@@ -316,11 +316,11 @@ impl NetworkMsgAnalysis {
         });
         info!("is chunk msg: {:?}", is_chunk_msg);
 
-        let duplication_msg = matches!(msg.message,
-        Message::NodeCmd { cmd: NodeCmd::Data(NodeDataCmd::DuplicateChunk { .. }), .. });
-        info!("is duplication msg: {:?}", duplication_msg);
+        let is_replication_msg = matches!(msg.message,
+        Message::NodeCmd { cmd: NodeCmd::Data(NodeDataCmd::ReplicateChunk { .. }), .. });
+        info!("is replication msg: {:?}", is_replication_msg);
 
-        if !(is_chunk_msg || duplication_msg) {
+        if !(is_chunk_msg || is_replication_msg) {
             return Ok(false);
         }
 
@@ -402,7 +402,7 @@ impl NetworkMsgAnalysis {
                 && matches!(duty, Duty::Elder(ElderDuties::Metadata))
         };
 
-        let from_adult_for_chunk_duplication = matches!(duty, Duty::Adult(ChunkStorage));
+        let from_adult_for_chunk_replication = matches!(duty, Duty::Adult(ChunkStorage));
 
         // TODO: Should not accumulate queries, just pass them through.
         let is_chunk_query = || {
@@ -424,7 +424,7 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        let shall_process = (from_metadata_section() || from_adult_for_chunk_duplication)
+        let shall_process = (from_metadata_section() || from_adult_for_chunk_replication)
             && self.is_dst_for(&msg).await?
             && self.is_adult().await;
 
@@ -432,31 +432,31 @@ impl NetworkMsgAnalysis {
             return Ok(AdultNoOp);
         }
 
-        info!("Checking chunking duplication!");
-        let is_chunk_duplication = match &msg.message {
+        info!("Checking chunk replication!");
+        let is_chunk_replication = match &msg.message {
             Message::NodeCmd {
                 cmd: NodeCmd::Data(cmd),
                 ..
             } => match cmd {
-                NodeDataCmd::DuplicateChunk {
+                NodeDataCmd::ReplicateChunk {
                     fetch_from_holders,
                     address,
                     ..
                 } => {
-                    info!("Creating request for duplicating chunk");
+                    info!("Creating request for replicating chunk");
                     Some(RequestForChunk {
                         targets: fetch_from_holders.clone(),
                         address: *address,
                         section_authority: msg.most_recent_sender().clone(),
                     })
                 }
-                NodeDataCmd::GetChunk {
+                NodeDataCmd::AcquireChunk {
                     section_authority,
                     new_holder,
                     address,
                     fetch_from_holders,
                 } => {
-                    info!("Verifying GetChunk Message!");
+                    info!("Verifying AcquireChunk Message!");
                     let proof_chain = self.routing.our_history().await;
 
                     // Recreate original MessageId from Section
@@ -464,7 +464,7 @@ impl NetworkMsgAnalysis {
 
                     // Recreate Message that was sent by the message.
                     let message = Message::NodeCmd {
-                        cmd: NodeCmd::Data(NodeDataCmd::DuplicateChunk {
+                        cmd: NodeCmd::Data(NodeDataCmd::ReplicateChunk {
                             new_holder: *new_holder,
                             address: *address,
                             fetch_from_holders: fetch_from_holders.clone(),
@@ -481,13 +481,13 @@ impl NetworkMsgAnalysis {
                             Error::Logic("Section Key cannot be non-BLS".to_string())
                         })?;
 
-                    // Verify that the DuplicateChunk Msg was sent with SectionAuthority
+                    // Verify that the ReplicateChunk Msg was sent with SectionAuthority
                     if section_authority.is_section()
                         && verify_section_authority
                         && proof_chain.has_key(given_section_pk)
                     {
-                        info!("Creating internal Cmd for ReplyForDuplication");
-                        Some(ReplyForDuplication {
+                        info!("Creating internal Cmd for ReplyForReplication");
+                        Some(ReplyForReplication {
                             address: *address,
                             new_holder: *new_holder,
                             correlation_id: msg_id,
@@ -496,17 +496,17 @@ impl NetworkMsgAnalysis {
                         None
                     }
                 }
-                NodeDataCmd::GiveChunk {
+                NodeDataCmd::ProvideChunk {
                     blob,
                     correlation_id,
                     ..
                 } => {
-                    info!("Verifying GiveChunk Message!");
+                    info!("Verifying ProvideChunk Message!");
                     // Recreate original MessageId from Section
                     let msg_id =
                         MessageId::combine(vec![*blob.address().name(), self.routing.name().await]);
                     if msg_id == *correlation_id {
-                        Some(StoreDuplicatedBlob {
+                        Some(StoreReplicatedBlob {
                             // TODO: Remove the clone
                             blob: blob.clone(),
                         })
@@ -520,12 +520,12 @@ impl NetworkMsgAnalysis {
         };
 
         use AdultDuty::*;
-        use ChunkDuty::*;
+        use ChunkStoreDuty::*;
         let duty = if is_chunk_cmd() {
-            RunAsChunks(WriteChunk(msg.clone()))
+            RunAsChunkStore(WriteChunk(msg.clone()))
         } else if is_chunk_query() {
-            RunAsChunks(ReadChunk(msg.clone()))
-        } else if let Some(request) = is_chunk_duplication {
+            RunAsChunkStore(ReadChunk(msg.clone()))
+        } else if let Some(request) = is_chunk_replication {
             request
         } else {
             return Ok(AdultNoOp);
