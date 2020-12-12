@@ -8,7 +8,6 @@
 
 use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty};
 use crate::{Error, Result};
-use ed25519_dalek::{PublicKey as EdPK, Signature as EdSign};
 use log::info;
 use sn_data_types::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
@@ -90,7 +89,7 @@ impl AdultMsgWrapping {
 
     pub async fn send_to_adults(
         &self,
-        message: &MsgEnvelope,
+        message: Message,
         targets: BTreeSet<XorName>,
     ) -> Result<NodeMessagingDuty> {
         self.inner.send_to_adults(targets, message).await
@@ -103,18 +102,6 @@ impl AdultMsgWrapping {
         origin: &Address,
     ) -> Result<NodeMessagingDuty> {
         self.inner.error(error, msg_id, origin).await
-    }
-
-    pub async fn sign(&self, msg: &Message) -> Result<(EdPK, EdSign), Error> {
-        let pk = self.inner.keys.node_id().await;
-        let sign = self
-            .inner
-            .keys
-            .sign_as_node(msg)
-            .await?
-            .into_ed()
-            .ok_or_else(|| Error::Logic("Could not sign message as Node".to_string()))?;
-        Ok((pk, sign))
     }
 }
 
@@ -157,9 +144,9 @@ impl ElderMsgWrapping {
     pub async fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
-        msg: &MsgEnvelope,
+        message: Message,
     ) -> Result<NodeMessagingDuty> {
-        self.inner.send_to_adults(targets, msg).await
+        self.inner.send_to_adults(targets, message).await
     }
 
     pub async fn error(
@@ -232,14 +219,26 @@ impl MsgWrapping {
     pub async fn send_to_adults(
         &self,
         targets: BTreeSet<XorName>,
-        msg: &MsgEnvelope,
+        message: Message,
     ) -> Result<NodeMessagingDuty> {
-        if let Some(msg) = self.set_proxy(&msg, false).await {
-            Ok(NodeMessagingDuty::SendToAdults { targets, msg })
+        if let Some(origin) = self.sign(&message, false).await {
+            let msg = MsgEnvelope {
+                message,
+                origin,
+                proxies: Default::default(),
+            };
+            if let Some(msg) = self.set_proxy(&msg, false).await {
+                Ok(NodeMessagingDuty::SendToAdults { targets, msg })
+            } else {
+                Err(Error::Logic(format!(
+                    "{:?}: Could not send msg to adults",
+                    msg.id()
+                )))
+            }
         } else {
             Err(Error::Logic(format!(
                 "{:?}: Could not send msg to adults",
-                msg.id()
+                message.id()
             )))
         }
     }

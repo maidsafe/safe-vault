@@ -9,15 +9,13 @@
 mod chunks;
 
 use self::chunks::{Chunks, UsedSpace};
-use crate::node::msg_wrapping::AdultMsgWrapping;
 use crate::{
-    node::node_ops::{AdultDuty, Blah, ChunkStoreDuty, NodeOperation},
+    node::node_ops::{
+        AdultDuty, Blah, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
+        ChunkStoreDuty, NodeOperation,
+    },
     node::state_db::NodeInfo,
     Result,
-};
-use log::{error, info};
-use sn_data_types::{
-    AdultDuties::ChunkStorage, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -25,80 +23,59 @@ use std::fmt::{self, Display, Formatter};
 /// storage and retrieval of data chunks.
 pub struct AdultDuties {
     chunks: Chunks,
-    msg_wrapping: AdultMsgWrapping,
 }
 
 impl AdultDuties {
     pub async fn new(node_info: &NodeInfo, used_space: UsedSpace) -> Result<Self> {
         let chunks = Chunks::new(node_info, used_space).await?;
-        let msg_wrapping = AdultMsgWrapping::new(node_info.keys(), ChunkStorage);
-        Ok(Self {
-            chunks,
-            msg_wrapping,
-        })
+        Ok(Self { chunks })
     }
 
     pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<NodeOperation> {
         use AdultDuty::*;
+        use ChunkReplicationCmd::*;
+        use ChunkReplicationDuty::*;
+        use ChunkReplicationQuery::*;
         use ChunkStoreDuty::*;
         let result = match duty {
             RunAsChunkStore(chunk_duty) => match chunk_duty {
                 ReadChunk(msg) | WriteChunk(msg) => self.chunks.receive_msg(msg).await,
                 ChunkStoreDuty::NoOp => return Ok(NodeOperation::NoOp),
             },
-            RequestForChunk {
-                section_authority,
-                address,
-                targets,
-            } => {
-                info!("Creating new MsgEnvelope for acquiring chunk from current_holders");
-                let msg = Message::NodeCmd {
-                    cmd: NodeCmd::Data(NodeDataCmd::AcquireChunk {
+            RunAsChunkReplication(replication_duty) => match replication_duty {
+                ProcessQuery {
+                    query: GetChunk(address),
+                    msg_id,
+                    origin,
+                } => {
+                    self.chunks
+                        .get_chunk_for_replication(address, msg_id, origin)
+                        .await
+                }
+                ProcessCmd {
+                    cmd,
+                    msg_id,
+                    origin,
+                } => match cmd {
+                    StoreReplicatedBlob(blob) => self.chunks.store_replicated_chunk(blob).await,
+                    ReplicateChunk {
                         section_authority,
                         address,
-                        new_holder: self.msg_wrapping.name().await,
-                        fetch_from_holders: targets.clone(),
-                    }),
-                    id: MessageId::new(),
-                };
-                let (pk, sign) = self.msg_wrapping.sign(&msg).await?;
-                let origin = MsgSender::adult(pk, ChunkStorage, sign)?;
-                let env = MsgEnvelope {
-                    message: msg,
-                    origin,
-                    proxies: vec![],
-                };
-                info!("Sending to existing Holders");
-                self.msg_wrapping.send_to_adults(&env, targets).await
-            }
-            ReplyForReplication {
-                address,
-                new_holder,
-                correlation_id,
-                ..
-            } => {
-                let res = self.chunks.get_chunk_for_replication(&address);
-                match res {
-                    Ok(blob) => {
-                        let msg = Message::NodeCmd {
-                            cmd: NodeCmd::Data(NodeDataCmd::ProvideChunk {
-                                blob,
-                                new_holder,
-                                correlation_id,
-                            }),
-                            id: MessageId::new(),
-                        };
-                        info!("Send blob for replication to the new holder.");
-                        self.msg_wrapping.send_to_node(msg).await
+                        current_holders,
+                    } => {
+                        self.chunks
+                            .replicate_chunk(
+                                address,
+                                current_holders,
+                                section_authority,
+                                msg_id,
+                                origin,
+                            )
+                            .await
                     }
-                    Err(e) => {
-                        // TODO: Penalise adult for this behaviour
-                        error!("Chunk to be acquired for replication doesn't exist at current holder. But it should. Check Logic");
-                        Err(e)
-                    }
-                }
-            }
-            StoreReplicatedBlob { blob } => self.chunks.store_replicated_chunk(blob).await,
+                },
+                ChunkReplicationDuty::NoOp => return Ok(NodeOperation::NoOp),
+            },
             _ => return Ok(NodeOperation::NoOp),
         };
 

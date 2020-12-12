@@ -13,10 +13,16 @@ mod writing;
 use crate::{node::node_ops::NodeMessagingDuty, node::state_db::NodeInfo, Error, Result};
 use chunk_storage::ChunkStorage;
 
-use log::trace;
-use sn_data_types::{Blob, BlobAddress, Cmd, DataCmd, DataQuery, Message, MsgEnvelope, Query};
-
-use std::fmt::{self, Display, Formatter};
+use log::{info, trace};
+use sn_data_types::{
+    Address, Blob, BlobAddress, Cmd, DataCmd, DataQuery, Message, MessageId, MsgEnvelope,
+    MsgSender, Query,
+};
+use std::{
+    collections::BTreeSet,
+    fmt::{self, Display, Formatter},
+};
+use xor_name::XorName;
 
 /// Operations on data chunks.
 pub(crate) struct Chunks {
@@ -27,7 +33,6 @@ pub use chunk_storage::UsedSpace;
 impl Chunks {
     pub async fn new(node_info: &NodeInfo, used_space: UsedSpace) -> Result<Self> {
         let chunk_storage = ChunkStorage::new(node_info, used_space).await?;
-
         Ok(Self { chunk_storage })
     }
 
@@ -58,82 +63,6 @@ impl Chunks {
         }
     }
 
-    // fn handle_response(
-    //     &mut self,
-    //     src: SrcLocation,
-    //     response: Response,
-    //     requester: PublicId,
-    //     message_id: MessageId,
-    //     proof: Option<(Request, Signature)>,
-    // ) -> Result<NodeMessagingDuty> {
-    //     use Response::*;
-    //     trace!(
-    //         "{}: Received ({:?} {:?}) from {}",
-    //         self,
-    //         response,
-    //         message_id,
-    //         utils::get_source_name(src),
-    //     );
-    //     if let Some((request, signature)) = proof {
-    //         if !matches!(requester, PublicId::Node(_))
-    //             && self
-    //                 .validate_section_signature(&request, &signature)
-    //                 .is_none()
-    //         {
-    //             error!("Invalid section signature");
-    //             return None;
-    //         }
-    //         match response {
-    //             GetBlob(result) => {
-    //                 if matches!(requester, PublicId::Node(_)) {
-    //                     debug!("got the replication copy");
-    //                     if let Ok(data) = result {
-    //                         trace!(
-    //                             "Got GetBlob copy response for address: ({:?})",
-    //                             data.address(),
-    //                         );
-    //                         self.chunk_storage.store(
-    //                             src,
-    //                             &data,
-    //                             &requester,
-    //                             message_id,
-    //                             Some(&signature),
-    //                             request,
-    //                         )
-    //                     } else {
-    //                         None
-    //                     }
-    //                 } else {
-    //                     None
-    //                 }
-    //             }
-    //             //
-    //             // ===== Invalid =====
-    //             //
-    //             ref _other => {
-    //                 error!(
-    //                     "{}: Should not receive {:?} as a data handler.",
-    //                     self, response
-    //                 );
-    //                 None
-    //             }
-    //         }
-    //     } else {
-    //         error!("Missing section signature");
-    //         None
-    //     }
-    // }
-
-    // fn public_key(&self) -> Option<PublicKey> {
-    //     Some(
-    //         self.routing_node
-    //             .borrow()
-    //             .public_key_set()
-    //             .ok()?
-    //             .public_key(),
-    //     )
-    // }
-
     // fn validate_section_signature(&self, request: &Request, signature: &Signature) -> Option<()> {
     //     if self
     //         .public_key()?
@@ -145,10 +74,35 @@ impl Chunks {
     //     }
     // }
 
-    pub fn get_chunk_for_replication(&self, address: &BlobAddress) -> Result<Blob, Error> {
-        self.chunk_storage.get_for_replication(address)
+    ///
+    pub async fn replicate_chunk(
+        &self,
+        address: BlobAddress,
+        current_holders: BTreeSet<XorName>,
+        section_authority: MsgSender,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Result<NodeMessagingDuty> {
+        info!("Creating new MsgEnvelope for acquiring chunk from current_holders");
+        self.chunk_storage
+            .replicate_chunk(address, current_holders, section_authority, msg_id, origin)
+            .await
     }
 
+    ///
+    pub async fn get_chunk_for_replication(
+        &self,
+        address: BlobAddress,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Result<NodeMessagingDuty> {
+        info!("Send blob for replication to the new holder.");
+        self.chunk_storage
+            .get_for_replication(address, msg_id, origin)
+            .await
+    }
+
+    ///
     pub async fn store_replicated_chunk(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
         self.chunk_storage.store_for_replication(blob).await
     }

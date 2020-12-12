@@ -261,26 +261,7 @@ pub enum AdultDuty {
     /// The main duty of an Adult is
     /// storage and retrieval of data chunks.
     RunAsChunkStore(ChunkStoreDuty),
-    /// Request for chunk
-    RequestForChunk {
-        ///
-        targets: BTreeSet<XorName>,
-        ///
-        address: BlobAddress,
-        ///
-        section_authority: MsgSender,
-    },
-    ReplyForReplication {
-        ///
-        address: BlobAddress,
-        ///
-        new_holder: XorName,
-        ///
-        correlation_id: MessageId,
-    },
-    StoreReplicatedBlob {
-        blob: Blob,
-    },
+    RunAsChunkReplication(ChunkReplicationDuty),
     NoOp,
 }
 
@@ -418,6 +399,83 @@ pub enum ChunkStoreDuty {
     WriteChunk(MsgEnvelope),
     NoOp,
 }
+
+/// Chunk storage and retrieval is done at Adults.
+#[derive(Debug)]
+pub enum ChunkReplicationDuty {
+    ///
+    ProcessCmd {
+        cmd: ChunkReplicationCmd,
+        ///
+        msg_id: MessageId,
+        ///
+        origin: Address,
+    },
+    ///
+    ProcessQuery {
+        query: ChunkReplicationQuery,
+        ///
+        msg_id: MessageId,
+        ///
+        origin: Address,
+    },
+    NoOp,
+}
+
+/// Queries for chunk to replicate
+#[derive(Debug)]
+pub enum ChunkReplicationQuery {
+    ///
+    GetChunk(BlobAddress),
+}
+
+/// Cmds carried out on AT2 Replicas.
+#[derive(Debug)]
+#[allow(clippy::clippy::large_enum_variant)]
+pub enum ChunkReplicationCmd {
+    /// Request for chunk
+    ReplicateChunk {
+        ///
+        current_holders: BTreeSet<XorName>,
+        ///
+        address: BlobAddress,
+        ///
+        section_authority: MsgSender,
+    },
+    StoreReplicatedBlob(Blob),
+}
+
+// impl From<sn_data_types::TransferCmd> for ChunkReplicationCmd {
+//     fn from(cmd: sn_data_types::TransferCmd) -> Self {
+//         match cmd {
+//             #[cfg(feature = "simulated-payouts")]
+//             sn_data_types::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
+//             sn_data_types::TransferCmd::ValidateTransfer(signed_transfer) => {
+//                 Self::ValidateTransfer(signed_transfer)
+//             }
+//             sn_data_types::TransferCmd::RegisterTransfer(transfer_agreement) => {
+//                 Self::RegisterTransfer(transfer_agreement)
+//             }
+//         }
+//     }
+// }
+
+// impl From<sn_data_types::TransferQuery> for ChunkReplicationQuery {
+//     fn from(cmd: sn_data_types::TransferQuery) -> Self {
+//         match cmd {
+//             sn_data_types::TransferQuery::GetReplicaKeys(transfer) => {
+//                 Self::GetReplicaKeys(transfer)
+//             }
+//             sn_data_types::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
+//             sn_data_types::TransferQuery::GetHistory { at, since_version } => {
+//                 Self::GetHistory { at, since_version }
+//             }
+//             sn_data_types::TransferQuery::GetStoreCost { requester, bytes } => {
+//                 Self::GetStoreCost { requester, bytes }
+//             }
+//         }
+//     }
+// }
 
 // --------------- Rewards ---------------
 

@@ -15,7 +15,7 @@ use crate::Result;
 use log::info;
 use sn_data_types::{
     AccountWrite, BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
-    SequenceWrite, TransferAgreementProof,
+    SequenceWrite,
 };
 
 pub(super) async fn get_result(
@@ -29,10 +29,7 @@ pub(super) async fn get_result(
     info!("Writing Data");
     let result = match msg.message {
         Message::Cmd {
-            cmd: Cmd::Data {
-                cmd: data_cmd,
-                payment,
-            },
+            cmd: Cmd::Data { cmd: data_cmd, .. },
             ..
         } => match data_cmd {
             Blob(write) => {
@@ -42,7 +39,6 @@ pub(super) async fn get_result(
                     stores.blob_register_mut(),
                     msg_id,
                     msg_origin,
-                    payment,
                     proxies,
                 )
                 .await
@@ -70,12 +66,9 @@ async fn blob(
     register: &mut BlobRegister,
     msg_id: MessageId,
     origin: MsgSender,
-    payment: TransferAgreementProof,
     proxies: Vec<MsgSender>,
 ) -> Result<NodeMessagingDuty> {
-    register
-        .write(write, msg_id, origin, payment, proxies)
-        .await
+    register.write(write, msg_id, origin, proxies).await
 }
 
 async fn map(

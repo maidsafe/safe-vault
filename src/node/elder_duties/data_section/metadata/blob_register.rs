@@ -15,9 +15,9 @@ use crate::{
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    Blob, BlobAddress, BlobRead, BlobWrite, Cmd, CmdError, DataQuery, Error as NdError, Message,
-    MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, PublicKey, Query, QueryResponse,
-    Result as NdResult, TransferAgreementProof,
+    Blob, BlobAddress, BlobRead, BlobWrite, CmdError, DataQuery, Error as NdError, Message,
+    MessageId, MsgSender, NodeCmd, NodeDataCmd, PublicKey, Query, QueryResponse,
+    Result as NdResult,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -64,13 +64,12 @@ impl BlobRegister {
         write: BlobWrite,
         msg_id: MessageId,
         origin: MsgSender,
-        payment: TransferAgreementProof,
         proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
         use BlobWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, origin, payment, proxies).await,
-            DeletePrivate(address) => self.delete(address, msg_id, origin, payment, proxies).await,
+            New(data) => self.store(data, msg_id, origin, proxies).await,
+            DeletePrivate(address) => self.delete(address, msg_id, origin, proxies).await,
         }
     }
 
@@ -79,8 +78,7 @@ impl BlobRegister {
         data: Blob,
         msg_id: MessageId,
         origin: MsgSender,
-        payment: TransferAgreementProof,
-        proxies: Vec<MsgSender>,
+        _proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
@@ -139,18 +137,15 @@ impl BlobRegister {
         if !results.is_empty() {
             info!("Results is not empty!");
         }
-        let msg = MsgEnvelope {
-            message: Message::Cmd {
-                cmd: Cmd::Data {
-                    cmd: sn_data_types::DataCmd::Blob(BlobWrite::New(data)),
-                    payment,
-                },
-                id: msg_id,
-            },
-            origin,
-            proxies,
+        let message = Message::NodeCmd {
+            cmd: NodeCmd::Data(sn_data_types::NodeDataCmd::Blob(BlobWrite::New(data))),
+            id: msg_id,
         };
-        self.wrapping.send_to_adults(target_holders, &msg).await
+        //     ,
+        //     origin,
+        //     proxies,
+        // };
+        self.wrapping.send_to_adults(target_holders, message).await
     }
 
     async fn delete(
@@ -158,8 +153,7 @@ impl BlobRegister {
         address: BlobAddress,
         msg_id: MessageId,
         origin: MsgSender,
-        payment: TransferAgreementProof,
-        proxies: Vec<MsgSender>,
+        _proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
         let cmd_error = |error: NdError| {
             self.wrapping.send_to_section(
@@ -178,6 +172,7 @@ impl BlobRegister {
             Err(error) => return cmd_error(error).await,
         };
 
+        // todo: use signature verification instead
         if let Some(data_owner) = metadata.owner {
             if data_owner != origin.id().public_key() {
                 return cmd_error(NdError::AccessDenied).await;
@@ -190,18 +185,13 @@ impl BlobRegister {
             .collect();
         if !results.is_empty() {}
 
-        let msg = MsgEnvelope {
-            message: Message::Cmd {
-                cmd: Cmd::Data {
-                    cmd: sn_data_types::DataCmd::Blob(BlobWrite::DeletePrivate(address)),
-                    payment,
-                },
-                id: msg_id,
-            },
-            origin,
-            proxies,
+        let message = Message::NodeCmd {
+            cmd: NodeCmd::Data(NodeDataCmd::Blob(BlobWrite::DeletePrivate(address))),
+            id: msg_id,
         };
-        self.wrapping.send_to_adults(metadata.holders, &msg).await
+        self.wrapping
+            .send_to_adults(metadata.holders, message)
+            .await
     }
 
     fn set_chunk_holder(
@@ -331,7 +321,7 @@ impl BlobRegister {
                     cmd: Data(ReplicateChunk {
                         new_holder,
                         address,
-                        fetch_from_holders: current_holders.clone(),
+                        current_holders: current_holders.clone(),
                     }),
                     id: message_id,
                 }
@@ -364,7 +354,7 @@ impl BlobRegister {
         address: BlobAddress,
         msg_id: MessageId,
         origin: MsgSender,
-        proxies: Vec<MsgSender>,
+        _proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
         let query_error = |error: NdError| {
             self.wrapping.send_to_section(
@@ -388,15 +378,16 @@ impl BlobRegister {
                 return query_error(NdError::AccessDenied).await;
             }
         };
-        let msg = MsgEnvelope {
-            message: Message::Query {
-                query: Query::Data(DataQuery::Blob(BlobRead::Get(address))),
-                id: msg_id,
-            },
-            origin,
-            proxies,
+        let message = Message::Query {
+            query: Query::Data(DataQuery::Blob(BlobRead::Get(address))),
+            id: msg_id,
         };
-        self.wrapping.send_to_adults(metadata.holders, &msg).await
+        //     origin,
+        //     proxies,
+        // };
+        self.wrapping
+            .send_to_adults(metadata.holders, message)
+            .await
     }
 
     #[allow(unused)]

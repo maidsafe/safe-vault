@@ -130,8 +130,7 @@ impl DataSection {
         age: u8,
     ) -> Result<NodeOperation> {
         // Adds the relocated account.
-        let first = self
-            .rewards
+        self.rewards
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddRelocatingNode {
                     old_node_id,
@@ -141,9 +140,7 @@ impl DataSection {
                 msg_id: MessageId::new(),
                 origin: Address::Node(self.network.name().await),
             })
-            .await;
-        let second = self.metadata.trigger_chunk_replication(new_node_id).await;
-        Ok(vec![first, second].into())
+            .await
     }
 
     /// Name of the node

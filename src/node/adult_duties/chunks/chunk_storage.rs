@@ -11,10 +11,15 @@ use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty};
 use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Error, Result};
 use log::{error, info};
 use sn_data_types::{
-    AdultDuties, Blob, BlobAddress, CmdError, Error as NdError, Message, MessageId, MsgSender,
-    NodeCmdError, NodeDataError, NodeEvent, QueryResponse, Result as NdResult, Signature,
+    Address, AdultDuties, Blob, BlobAddress, CmdError, Error as NdError, Message, MessageId,
+    MsgSender, NodeCmdError, NodeDataError, NodeDataQuery, NodeDataQueryResponse, NodeEvent,
+    NodeQuery, NodeQueryResponse, QueryResponse, Result as NdResult, Signature,
 };
-use std::fmt::{self, Display, Formatter};
+use std::{
+    collections::BTreeSet,
+    fmt::{self, Display, Formatter},
+};
+use xor_name::XorName;
 
 /// Storage of data chunks.
 pub(crate) struct ChunkStorage {
@@ -126,12 +131,50 @@ impl ChunkStorage {
             .await
     }
 
-    pub fn get_for_replication(&self, address: &BlobAddress) -> Result<Blob> {
-        self.chunks
-            .get(address)
-            .map_err(|error| error.to_string().into())
+    pub async fn replicate_chunk(
+        &self,
+        address: BlobAddress,
+        current_holders: BTreeSet<XorName>,
+        section_authority: MsgSender,
+        _msg_id: MessageId,
+        _origin: Address,
+    ) -> Result<NodeMessagingDuty> {
+        let message = Message::NodeQuery {
+            query: NodeQuery::Data(NodeDataQuery::GetChunk {
+                section_authority,
+                address,
+                new_holder: self.wrapping.name().await,
+                current_holders: current_holders.clone(),
+            }),
+            id: MessageId::new(),
+        };
+        info!("Sending NodeDataQuery::GetChunk to existing holders");
+        self.wrapping.send_to_adults(message, current_holders).await
     }
 
+    ///
+    pub async fn get_for_replication(
+        &self,
+        address: BlobAddress,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Result<NodeMessagingDuty> {
+        let result = self
+            .chunks
+            .get(&address)
+            .map_err(|error| error.to_string().into());
+
+        self.wrapping
+            .send_to_node(Message::NodeQueryResponse {
+                response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
+                id: MessageId::new(),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
+    }
+
+    ///
     pub async fn store_for_replication(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
         if self.chunks.has(blob.address()) {
             info!(

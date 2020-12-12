@@ -10,19 +10,20 @@ use crate::{
     node::{
         node_duties::accumulation::Accumulation,
         node_ops::{
-            AdultDuty, AdultDuty::NoOp as AdultNoOp, ChunkStoreDuty, GatewayDuty, MetadataDuty,
-            NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery, TransferCmd,
-            TransferDuty, TransferQuery,
+            AdultDuty, AdultDuty::NoOp as AdultNoOp, ChunkReplicationCmd, ChunkReplicationDuty,
+            ChunkReplicationQuery, ChunkStoreDuty, GatewayDuty, MetadataDuty, NodeMessagingDuty,
+            NodeOperation, RewardCmd, RewardDuty, RewardQuery, TransferCmd, TransferDuty,
+            TransferQuery,
         },
     },
     utils, Error, Network, Result,
 };
 use log::{error, info};
 use sn_data_types::{
-    Address, AdultDuties::ChunkStorage, Cmd, DataCmd, DataQuery, Duty, ElderDuties, Message,
-    MessageId, MsgEnvelope, NodeCmd, NodeDataCmd, NodeDuties, NodeEvent, NodeQuery,
-    NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeTransferCmd,
-    NodeTransferQuery, NodeTransferQueryResponse, Query,
+    Address, AdultDuties, AdultDuties::ChunkStorage, Cmd, DataCmd, DataQuery, Duty, ElderDuties,
+    Message, MessageId, MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse,
+    NodeDuties, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
+    NodeSystemCmd, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
 use sn_routing::MIN_AGE;
 use xor_name::XorName;
@@ -104,6 +105,11 @@ impl NetworkMsgAnalysis {
             AdultNoOp => (),
             op => return Ok(op.into()),
         };
+        match self.try_chunk_replication(&msg).await? {
+            // asdf aSdF AsDf `..`!
+            AdultNoOp => (),
+            op => return Ok(op.into()),
+        }
         match self.try_rewards(&msg).await? {
             // Identified as a Rewards msg
             RewardDuty::NoOp => (),
@@ -432,101 +438,111 @@ impl NetworkMsgAnalysis {
             return Ok(AdultNoOp);
         }
 
-        info!("Checking chunk replication!");
-        let is_chunk_replication = match &msg.message {
-            Message::NodeCmd {
-                cmd: NodeCmd::Data(cmd),
-                ..
-            } => match cmd {
-                NodeDataCmd::ReplicateChunk {
-                    fetch_from_holders,
-                    address,
-                    ..
-                } => {
-                    info!("Creating request for replicating chunk");
-                    Some(RequestForChunk {
-                        targets: fetch_from_holders.clone(),
-                        address: *address,
-                        section_authority: msg.most_recent_sender().clone(),
-                    })
-                }
-                NodeDataCmd::AcquireChunk {
-                    section_authority,
-                    new_holder,
-                    address,
-                    fetch_from_holders,
-                } => {
-                    info!("Verifying AcquireChunk Message!");
-                    let proof_chain = self.routing.our_history().await;
-
-                    // Recreate original MessageId from Section
-                    let msg_id = MessageId::combine(vec![*address.name(), *new_holder]);
-
-                    // Recreate Message that was sent by the message.
-                    let message = Message::NodeCmd {
-                        cmd: NodeCmd::Data(NodeDataCmd::ReplicateChunk {
-                            new_holder: *new_holder,
-                            address: *address,
-                            fetch_from_holders: fetch_from_holders.clone(),
-                        }),
-                        id: msg_id,
-                    };
-
-                    // Verify that the message was
-                    let verify_section_authority =
-                        section_authority.verify(&utils::serialise(&message)?);
-
-                    let given_section_pk =
-                        &section_authority.id().public_key().bls().ok_or_else(|| {
-                            Error::Logic("Section Key cannot be non-BLS".to_string())
-                        })?;
-
-                    // Verify that the ReplicateChunk Msg was sent with SectionAuthority
-                    if section_authority.is_section()
-                        && verify_section_authority
-                        && proof_chain.has_key(given_section_pk)
-                    {
-                        info!("Creating internal Cmd for ReplyForReplication");
-                        Some(ReplyForReplication {
-                            address: *address,
-                            new_holder: *new_holder,
-                            correlation_id: msg_id,
-                        })
-                    } else {
-                        None
-                    }
-                }
-                NodeDataCmd::ProvideChunk {
-                    blob,
-                    correlation_id,
-                    ..
-                } => {
-                    info!("Verifying ProvideChunk Message!");
-                    // Recreate original MessageId from Section
-                    let msg_id =
-                        MessageId::combine(vec![*blob.address().name(), self.routing.name().await]);
-                    if msg_id == *correlation_id {
-                        Some(StoreReplicatedBlob {
-                            // TODO: Remove the clone
-                            blob: blob.clone(),
-                        })
-                    } else {
-                        info!("Given blob is incorrect.");
-                        None
-                    }
-                }
-            },
-            _ => None,
-        };
-
         use AdultDuty::*;
         use ChunkStoreDuty::*;
         let duty = if is_chunk_cmd() {
             RunAsChunkStore(WriteChunk(msg.clone()))
         } else if is_chunk_query() {
             RunAsChunkStore(ReadChunk(msg.clone()))
-        } else if let Some(request) = is_chunk_replication {
-            request
+        } else {
+            return Ok(AdultNoOp);
+        };
+        Ok(duty)
+    }
+
+    async fn try_chunk_replication(&self, msg: &MsgEnvelope) -> Result<AdultDuty> {
+        use AdultDuties::*;
+        use ChunkReplicationDuty::*;
+        use Duty::*;
+        if msg.most_recent_sender().is_adult() {
+            match msg.most_recent_sender().duty() {
+                Some(Adult(ChunkReplication { .. })) => {}
+                _ => return Ok(AdultNoOp),
+            }
+        } else {
+            return Ok(AdultNoOp);
+        };
+
+        use ChunkReplicationCmd::*;
+        use ChunkReplicationQuery::*;
+        let chunk_replication = match &msg.message {
+            Message::NodeQueryResponse {
+                response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
+                correlation_id,
+                ..
+            } => {
+                let blob = result.to_owned()?;
+                info!("Verifying GetChunk NodeQueryResponse!");
+                // Recreate original MessageId from Section
+                let msg_id = MessageId::combine(vec![*blob.address().name(), *&self.routing.name().await]);
+                if msg_id == *correlation_id {
+                    Some(ProcessCmd {
+                        cmd: StoreReplicatedBlob(blob),
+                        msg_id,
+                        origin: msg.origin.address(), // todo: use self as origin?
+                    })
+                } else {
+                    info!("Given blob is incorrect.");
+                    None
+                }
+            }
+            Message::NodeQuery {
+                query:
+                    NodeQuery::Data(NodeDataQuery::GetChunk {
+                        section_authority,
+                        new_holder,
+                        address,
+                        current_holders,
+                    }),
+                ..
+            } => {
+                info!("Verifying GetChunk query!");
+                let proof_chain = self.routing.our_history().await;
+
+                // Recreate original MessageId from Section
+                let msg_id = MessageId::combine(vec![*address.name(), *new_holder]);
+
+                // Recreate cmd that was sent by the message.
+                let message = Message::NodeCmd {
+                    cmd: NodeCmd::Data(NodeDataCmd::ReplicateChunk {
+                        new_holder: *new_holder,
+                        address: *address,
+                        current_holders: current_holders.clone(),
+                    }),
+                    id: msg_id,
+                };
+
+                // Verify that the message was
+                let verify_section_authority =
+                    section_authority.verify(&utils::serialise(&message)?);
+
+                let given_section_pk = &section_authority
+                    .id()
+                    .public_key()
+                    .bls()
+                    .ok_or_else(|| Error::Logic("Section Key cannot be non-BLS".to_string()))?;
+
+                // Verify that the original ReplicateChunk cmd was sent with SectionAuthority
+                if section_authority.is_section()
+                    && verify_section_authority
+                    && proof_chain.has_key(given_section_pk)
+                {
+                    info!("Internal ChunkReplicationQuery ProcessQuery");
+                    Some(ProcessQuery {
+                        query: GetChunk(*address),
+                        msg_id,
+                        origin: msg.origin.address(),
+                    })
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        use AdultDuty::*;
+        let duty = if let Some(request) = chunk_replication {
+            RunAsChunkReplication(request)
         } else {
             return Ok(AdultNoOp);
         };
