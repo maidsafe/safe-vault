@@ -183,44 +183,24 @@ impl NetworkMsgAnalysis {
         } else {
             return Ok(false);
         };
-        let from_single_rewards_elder = || {
-            msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
-        };
         let from_single_transfer_elder = || {
             msg.most_recent_sender().is_elder()
                 && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-        use NodeQuery::Transfers as TransfersQuery;
         use NodeQueryResponse::Transfers as TransfersReponse;
-        use NodeTransferQuery::GetReplicaEvents as GetReplicaEventsQuery;
-        use NodeTransferQuery::GetSectionActorHistory;
         use NodeTransferQueryResponse::GetReplicaEvents as GetReplicaEventsResponse;
         let from_transfers_to_transfers = || {
-            let res1 = matches!(msg.message, Message::NodeQuery {
-                query: TransfersQuery(GetReplicaEventsQuery(_)),
-                ..
-            });
-            let res2 = matches!(msg.message, Message::NodeQueryResponse {
+            matches!(msg.message, Message::NodeQueryResponse {
                 response:
                     TransfersReponse(GetReplicaEventsResponse(_)),
-                ..
-            });
-            res1 || res2
-        };
-
-        let from_rewards_to_transfers = || {
-            matches!(msg.message, Message::NodeQuery {
-                query: TransfersQuery(GetSectionActorHistory(_)),
                 ..
             })
         };
 
-        let from_rewards = || from_rewards_to_transfers() && from_single_rewards_elder();
         let from_transfers = || from_transfers_to_transfers() && from_single_transfer_elder();
 
-        let accumulate_for_transfers = (from_rewards() || from_transfers())
-            && self.is_dst_for(msg).await?
-            && self.is_elder().await;
+        let accumulate_for_transfers =
+            from_transfers() && self.is_dst_for(msg).await? && self.is_elder().await;
 
         Ok(accumulate_for_transfers)
     }
@@ -233,7 +213,6 @@ impl NetworkMsgAnalysis {
         };
 
         use NodeQueryResponse::Rewards;
-        use NodeRewardQuery::GetWalletId as GetWalletIdQuery;
         use NodeRewardQueryResponse::GetWalletId as GetWalletIdResponse;
         let from_single_rewards_elder = || {
             let res = msg.most_recent_sender().is_elder()
@@ -242,19 +221,10 @@ impl NetworkMsgAnalysis {
             res
         };
         let from_rewards_to_rewards = || {
-            let res1 = matches!(msg.message, Message::NodeQuery {
-                query: NodeQuery::Rewards(GetWalletIdQuery { .. }),
-                ..
-            });
-            info!("is accumulating reward query (GetWalletId): {:?}", res1);
-
-            let res2 = matches!(msg.message, Message::NodeQueryResponse {
+            matches!(msg.message, Message::NodeQueryResponse {
                 response: Rewards(GetWalletIdResponse { .. }),
                 ..
-            });
-            info!("is accumulating reward response (GetWalletId): {:?}", res2);
-
-            res1 || res2
+            })
         };
 
         use NodeQueryResponse::*;
