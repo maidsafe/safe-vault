@@ -29,9 +29,8 @@ pickledb = "~0.4.0"
 quick-error = "1.2.2"
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
-# sn_routing = "0.39.5"
+sn_routing = "~0.39.5"
 # sn_routing = { path = "../sn_routing" }
-sn_routing = { git = "https://github.com/oetyng/sn_routing", branch = "initiate-section-actor" }
 serde_json = "1.0.53"
 structopt = "~0.3.17"
 tiny-keccak = "1.5.0"
@@ -42,8 +41,8 @@ sha2 = "0.8.1"
 # sn_data_types = { path = "../sn_data_types" }
 # sn_transfers = "~0.2.4"
 # sn_transfers = { path = "../sn_transfers" }
-sn_data_types = { git = "https://github.com/oetyng/sn_data_types", branch = "initiate-section-actor" }
-sn_transfers = { git = "https://github.com/oetyng/sn_transfers", branch = "initiate-section-actor" }
+sn_data_types = { git = "https://github.com/oetyng/sn_data_types", branch = "refactor-chunk-duplication" }
+sn_transfers = { git = "https://github.com/oetyng/sn_transfers", branch = "refactor-chunk-duplication" }
 self_encryption = "~0.19.4"
 ed25519 = "1.0.1"
 signature = "1.1.0"
@@ -92,7 +91,7 @@ futures = "~0.3.5"
   version = "0.44.3"
   features = [ "simulated-payouts" ]
   git = "https://github.com/oetyng/sn_client"
-  branch = "initiate-section-actor"
+  branch = "refactor-chunk-duplication"
   # path="../sn_client"
 
   [dev_dependencies.tokio]

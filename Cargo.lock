@@ -2642,7 +2642,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.44.5"
-source = "git+https://github.com/oetyng/sn_client?branch=initiate-section-actor#bad7be141a9552ffe33f4824403af03b6b931081"
+source = "git+https://github.com/oetyng/sn_client?branch=refactor-chunk-duplication#a2133f4d2184740b0822f412716c4a010d58eb39"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2680,7 +2680,7 @@ dependencies = [
 [[package]]
 name = "sn_data_types"
 version = "0.11.37"
-source = "git+https://github.com/oetyng/sn_data_types?branch=initiate-section-actor#6f5cf29b57ddcb6baad61b014dff503e3aaf43f0"
+source = "git+https://github.com/oetyng/sn_data_types?branch=refactor-chunk-duplication#ac2ea50b868a88cb9659aaf52e879e07350fff31"
 dependencies = [
  "bincode",
  "crdts",
@@ -2758,8 +2758,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.39.5"
-source = "git+https://github.com/oetyng/sn_routing?branch=initiate-section-actor#b3a3eec69efaee5f3bea26aefb12c9f147a89fae"
+version = "0.39.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5611c4f3193b60fa121d5e5c74c43815005bb8f0b9368572771cee42e495b236"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2786,7 +2787,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.4"
-source = "git+https://github.com/oetyng/sn_transfers?branch=initiate-section-actor#5fd6715ac74037750c128752f3624a5c5f0f4945"
+source = "git+https://github.com/oetyng/sn_transfers?branch=refactor-chunk-duplication#63fd141371c4c1ff58f388ba23c684cbe5d25556"
 dependencies = [
  "bincode",
  "crdts",

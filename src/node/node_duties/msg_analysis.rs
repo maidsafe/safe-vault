@@ -474,7 +474,8 @@ impl NetworkMsgAnalysis {
                 let blob = result.to_owned()?;
                 info!("Verifying GetChunk NodeQueryResponse!");
                 // Recreate original MessageId from Section
-                let msg_id = MessageId::combine(vec![*blob.address().name(), *&self.routing.name().await]);
+                let msg_id =
+                    MessageId::combine(vec![*blob.address().name(), *&self.routing.name().await]);
                 if msg_id == *correlation_id {
                     Some(ProcessCmd {
                         cmd: StoreReplicatedBlob(blob),
