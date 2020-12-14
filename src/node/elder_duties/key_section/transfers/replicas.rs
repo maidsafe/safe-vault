@@ -76,7 +76,7 @@ impl Replicas {
         let store = TransferStore::new(id.into(), &self.root_dir, Init::Load);
 
         if let Err(error) = store {
-            if "PickleDb error: No such file or directory".to_string() == error.to_string() {
+            if "PickleDb error: No such file or directory" == error.to_string() {
                 // we have no history yet, so lets report that.
                 return Ok(vec![]);
             }

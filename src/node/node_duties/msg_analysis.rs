@@ -475,7 +475,7 @@ impl NetworkMsgAnalysis {
                 info!("Verifying GetChunk NodeQueryResponse!");
                 // Recreate original MessageId from Section
                 let msg_id =
-                    MessageId::combine(vec![*blob.address().name(), *&self.routing.name().await]);
+                    MessageId::combine(vec![*blob.address().name(), self.routing.name().await]);
                 if msg_id == *correlation_id {
                     Some(ProcessCmd {
                         cmd: StoreReplicatedBlob(blob),
@@ -613,6 +613,7 @@ impl NetworkMsgAnalysis {
         // SectionPayoutValidated and GetWalletId
         // do not need accumulation since they are accumulated in the domain logic.
 
+        use NodeRewardQuery::GetWalletId;
         match &msg.message {
             Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(validation),
@@ -620,6 +621,21 @@ impl NetworkMsgAnalysis {
                 ..
             } => Ok(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::ReceivePayoutValidation(validation.clone()),
+                msg_id: *id,
+                origin: msg.origin.address(),
+            }),
+            Message::NodeQuery {
+                query:
+                    NodeQuery::Rewards(GetWalletId {
+                        old_node_id,
+                        new_node_id,
+                    }),
+                id,
+            } => Ok(RewardDuty::ProcessQuery {
+                query: RewardQuery::GetWalletId {
+                    old_node_id: *old_node_id,
+                    new_node_id: *new_node_id,
+                },
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
@@ -643,26 +659,10 @@ impl NetworkMsgAnalysis {
 
         if shall_process_accumulated {
             use NodeQueryResponse::Rewards;
-            use NodeRewardQuery::GetWalletId as GetWalletIdQuery;
-            use NodeRewardQueryResponse::GetWalletId as GetWalletIdResponse;
+            use NodeRewardQueryResponse::GetWalletId;
             return match &msg.message {
-                Message::NodeQuery {
-                    query:
-                        NodeQuery::Rewards(GetWalletIdQuery {
-                            old_node_id,
-                            new_node_id,
-                        }),
-                    id,
-                } => Ok(RewardDuty::ProcessQuery {
-                    query: RewardQuery::GetWalletId {
-                        old_node_id: *old_node_id,
-                        new_node_id: *new_node_id,
-                    },
-                    msg_id: *id,
-                    origin: msg.origin.address(),
-                }),
                 Message::NodeQueryResponse {
-                    response: Rewards(GetWalletIdResponse(Ok((wallet_id, new_node_id)))),
+                    response: Rewards(GetWalletId(Ok((wallet_id, new_node_id)))),
                     id,
                     ..
                 } => Ok(RewardDuty::ProcessCmd {
@@ -727,27 +727,69 @@ impl NetworkMsgAnalysis {
         } else {
             return Ok(TransferDuty::NoOp);
         };
-        let from_rewards_section = || {
+
+        let from_transfers_section = || {
             msg.most_recent_sender().is_section()
-                && matches!(duty, Duty::Elder(ElderDuties::Rewards))
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
         let shall_process_accumulated =
-            from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+            from_transfers_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+        if !shall_process_accumulated {
+            return Ok(TransferDuty::NoOp);
+        }
 
-        if shall_process_accumulated {
-            use NodeTransferQuery::GetSectionActorHistory;
+        use NodeQueryResponse::Transfers;
+        use NodeTransferQueryResponse::GetReplicaEvents;
+        match &msg.message {
+            Message::NodeQueryResponse {
+                response: Transfers(GetReplicaEvents(events)),
+                id,
+                ..
+            } => Ok(TransferDuty::ProcessCmd {
+                cmd: TransferCmd::InitiateReplica(events.clone()?),
+                msg_id: *id,
+                origin: msg.origin.address(),
+            }),
+            _ => Ok(TransferDuty::NoOp),
+        }
+    }
+
+    // Check non accumulated transfer msgss.
+    async fn try_nonacc_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
+        // From Transfer module we get `PropagateTransfer`.
+        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
+            duty
+        } else {
+            return Ok(TransferDuty::NoOp);
+        };
+        let from_transfer_elder = || {
+            msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+        };
+        let shall_process =
+            from_transfer_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
+
+        if shall_process {
+            use NodeTransferQuery::GetReplicaEvents;
             return match &msg.message {
+                Message::NodeCmd {
+                    cmd: NodeCmd::Transfers(PropagateTransfer(proof)),
+                    id,
+                } => Ok(TransferDuty::ProcessCmd {
+                    cmd: TransferCmd::PropagateTransfer(proof.credit_proof()),
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                }),
                 Message::NodeQuery {
-                    query: NodeQuery::Transfers(GetSectionActorHistory(public_key)),
+                    query: NodeQuery::Transfers(GetReplicaEvents(public_key)),
                     id,
                 } => {
                     // This comparison is a good example of the need to use `lazy messaging`,
                     // as to handle that the expected public key is not the same as the current.
                     if let Some(section_pk) = self.routing.section_public_key().await {
                         if public_key == &section_pk {
-                            info!("TransferQuery::GetSectionActorHistory received!");
                             Ok(TransferDuty::ProcessQuery {
-                                query: TransferQuery::GetSectionActorHistory,
+                                query: TransferQuery::GetReplicaEvents,
                                 msg_id: *id,
                                 origin: msg.origin.address(),
                             })
@@ -764,87 +806,6 @@ impl NetworkMsgAnalysis {
             };
         }
 
-        let from_transfers_section = || {
-            msg.most_recent_sender().is_section()
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
-        };
-        let shall_process_accumulated =
-            from_transfers_section() && self.is_dst_for(msg).await? && self.is_elder().await;
-        if !shall_process_accumulated {
-            return Ok(TransferDuty::NoOp);
-        }
-
-        use NodeQueryResponse::Transfers;
-        use NodeTransferQuery::GetReplicaEvents as GetReplicaEventsQuery;
-        use NodeTransferQueryResponse::GetReplicaEvents;
-        match &msg.message {
-            Message::NodeQuery {
-                query: NodeQuery::Transfers(GetReplicaEventsQuery(public_key)),
-                id,
-            } => {
-                // This comparison is a good example of the need to use `lazy messaging`,
-                // as to handle that the expected public key is not the same as the current.
-                if let Some(section_pk) = self.routing.section_public_key().await {
-                    if public_key == &section_pk {
-                        Ok(TransferDuty::ProcessQuery {
-                            query: TransferQuery::GetReplicaEvents,
-                            msg_id: *id,
-                            origin: msg.origin.address(),
-                        })
-                    } else {
-                        error!("Unexpected public key!");
-                        Err(Error::Logic("Unexpected PK".to_string()))
-                    }
-                } else {
-                    error!("No section public key found!");
-                    Err(Error::Logic("No section PK found".to_string()))
-                }
-            }
-            Message::NodeQueryResponse {
-                response: Transfers(GetReplicaEvents(events)),
-                id,
-                ..
-            } => Ok(TransferDuty::ProcessCmd {
-                cmd: TransferCmd::InitiateReplica(events.clone()?),
-                msg_id: *id,
-                origin: msg.origin.address(),
-            }),
-            _ => Ok(TransferDuty::NoOp),
-        }
-    }
-
-    // Check non accumulated transfer msgss.
-    async fn try_nonacc_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
-        use NodeTransferCmd::*;
-
-        // From Transfer module we get `PropagateTransfer`.
-
-        let duty = if let Some(duty) = msg.most_recent_sender().duty() {
-            duty
-        } else {
-            return Ok(TransferDuty::NoOp);
-        };
-        let from_transfer_elder = || {
-            msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
-        };
-        let shall_process =
-            from_transfer_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
-
-        if shall_process {
-            return match &msg.message {
-                Message::NodeCmd {
-                    cmd: NodeCmd::Transfers(PropagateTransfer(proof)),
-                    id,
-                } => Ok(TransferDuty::ProcessCmd {
-                    cmd: TransferCmd::PropagateTransfer(proof.credit_proof()),
-                    msg_id: *id,
-                    origin: msg.origin.address(),
-                }),
-                _ => Ok(TransferDuty::NoOp),
-            };
-        }
-
         // From Rewards module, we get
         // `ValidateSectionPayout` and `RegisterSectionPayout`.
 
@@ -857,6 +818,8 @@ impl NetworkMsgAnalysis {
             return Ok(TransferDuty::NoOp);
         }
 
+        use NodeTransferCmd::*;
+        use NodeTransferQuery::GetSectionActorHistory;
         match &msg.message {
             Message::NodeCmd {
                 cmd: NodeCmd::Transfers(ValidateSectionPayout(signed_transfer)),
@@ -874,6 +837,29 @@ impl NetworkMsgAnalysis {
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
+            Message::NodeQuery {
+                query: NodeQuery::Transfers(GetSectionActorHistory(public_key)),
+                id,
+            } => {
+                // This comparison is a good example of the need to use `lazy messaging`,
+                // as to handle that the expected public key is not the same as the current.
+                if let Some(section_pk) = self.routing.section_public_key().await {
+                    if public_key == &section_pk {
+                        info!("TransferQuery::GetSectionActorHistory received!");
+                        Ok(TransferDuty::ProcessQuery {
+                            query: TransferQuery::GetSectionActorHistory,
+                            msg_id: *id,
+                            origin: msg.origin.address(),
+                        })
+                    } else {
+                        error!("Unexpected public key!");
+                        Err(Error::Logic("Unexpected PK".to_string()))
+                    }
+                } else {
+                    error!("No section public key found!");
+                    Err(Error::Logic("No section PK found".to_string()))
+                }
+            }
             _ => Ok(TransferDuty::NoOp),
         }
     }
