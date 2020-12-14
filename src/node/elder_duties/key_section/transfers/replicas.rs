@@ -246,6 +246,7 @@ impl Replicas {
         let propagation_result = wallet.receive_propagated(credit_proof, || {
             self.find_past_key(&credit_proof.replica_keys())
         });
+
         if propagation_result.is_ok() {
             // sign + update state
             if let Some(crediting_replica_sig) = self
@@ -260,7 +261,10 @@ impl Replicas {
                     crediting_replica_keys: PublicKey::Bls(self.info.peer_replicas.public_key()),
                     crediting_replica_sig,
                 };
-                store.try_insert(ReplicaEvent::TransferPropagated(event.clone()))?;
+                // only add it locally i we don't know about it... (this prevents SimulatedPayouts being reapplied due to varied sigs.)
+                if propagation_result?.is_some() {
+                    store.try_insert(ReplicaEvent::TransferPropagated(event.clone()))?;
+                }
                 return Ok(event);
             }
         }
