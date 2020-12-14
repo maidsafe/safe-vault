@@ -417,11 +417,9 @@ impl Transfers {
     ) -> Result<NodeMessagingDuty> {
         trace!("Handling GetHistory");
         // validate signature
-        let result = self
-            .replicas
-            .history(*wallet_id)
-            .await
-            .map_err(|e| NdError::Unexpected(e.to_string()));
+        let result = self.replicas.history(*wallet_id).await.map_err(|_e| {
+            NdError::Unexpected(format!("Could not get history for key {:?}", wallet_id))
+        });
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetHistory(result),

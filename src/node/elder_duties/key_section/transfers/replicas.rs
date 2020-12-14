@@ -73,7 +73,19 @@ impl Replicas {
     /// History of events
     pub async fn history(&self, id: PublicKey) -> Result<Vec<ReplicaEvent>> {
         debug!("Replica history get");
-        let store = TransferStore::new(id.into(), &self.root_dir, Init::Load)?;
+        let store = TransferStore::new(id.into(), &self.root_dir, Init::Load);
+
+        if let Err(error) = store {
+            if "PickleDb error: No such file or directory".to_string() == error.to_string() {
+                // we have no history yet, so lets report that.
+                return Ok(vec![]);
+            }
+
+            return Err(error);
+        };
+
+        let store = store?;
+
         Ok(store.get_all())
     }
 
