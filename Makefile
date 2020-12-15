@@ -51,19 +51,11 @@ endif
 	rm -rf target
 	rm -rf artifacts
 	mkdir artifacts
-	docker run --name "sn-node-build-${UUID}" \
-		-v "${PWD}":/usr/src/sn_node:Z \
-		-e CC=musl-gcc \
-		-e OPENSSL_INCLUDE_DIR=/usr/local/musl/include \
-		-e OPENSSL_LIB_DIR=/usr/local/musl/lib \
-		-e RUSTFLAGS='-C linker=musl-gcc' \
-		-u ${USER_ID}:${GROUP_ID} \
-		maidsafe/sn-node-build:build \
-		cargo build --release --target x86_64-unknown-linux-musl --verbose
-	docker cp "sn-node-build-${UUID}":/target .
-	docker rm "sn-node-build-${UUID}"
+	sudo apt update -y && sudo apt install -y musl-tools
+	rustup target add x86_64-unknown-linux-musl
+	cargo build --release --target x86_64-unknown-linux-musl --verbose
 	find target/x86_64-unknown-linux-musl/release \
-		-maxdepth 1 -type f -exec cp '{}' artifacts \;
+		-maxdepth 1 -type f -exec cp '{}' artifacts \;		
 
 package-commit_hash-artifacts-for-deploy:
 	rm -f *.tar
