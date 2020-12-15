@@ -46,12 +46,18 @@ impl NetworkMsgAnalysis {
     }
 
     pub async fn is_dst_for(&self, msg: &MsgEnvelope) -> Result<bool> {
+        let dst = msg.destination()?;
+        let are_we_dst = dst.xorname() == self.routing.name().await;
         let are_we_origin = self.are_we_origin(&msg).await;
-        let is_dst = !are_we_origin
-            && self
-                .self_is_handler_for(&msg.destination()?.xorname())
-                .await;
-        Ok(is_dst || (are_we_origin && self.is_genesis_request().await))
+        let is_genesis_node_msg_to_self = are_we_origin && self.is_genesis_request().await;
+        let are_we_handler_for_dst = self.self_is_handler_for(&dst.xorname()).await;
+        let is_genesis_section_msg_to_section =
+            matches!(dst, Address::Section(_)) && self.routing.our_prefix().await.is_empty();
+        let is_dst = are_we_dst
+            || are_we_handler_for_dst
+            || is_genesis_node_msg_to_self
+            || is_genesis_section_msg_to_section;
+        Ok(is_dst)
     }
 
     async fn is_genesis_request(&self) -> bool {
@@ -782,6 +788,12 @@ impl NetworkMsgAnalysis {
         let from_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
+
+        info!(
+            "VALIDATE SECTION PAYOUT: is dst for? {}",
+            self.is_dst_for(msg).await?
+        );
+
         let shall_process =
             from_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
         if !shall_process {
