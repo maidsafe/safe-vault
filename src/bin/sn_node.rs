@@ -58,13 +58,7 @@ fn main() {
 }
 
 async fn run_node() {
-    let mut config = match Config::new() {
-        Ok(cfg) => cfg,
-        Err(e) => {
-            println!("Failed to create Config: {:?}", e);
-            process::exit(1);
-        }
-    };
+    let mut config = Config::new() ;
 
     if let Some(c) = &config.completions() {
         match c.parse::<clap::Shell>() {
