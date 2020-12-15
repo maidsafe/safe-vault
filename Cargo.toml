@@ -110,3 +110,6 @@ simulated-payouts = [
   "sn_client/simulated-payouts",
 ]
 chaos = [ ]
+
+[patch.crates-io]
+sn_routing = { git = "https://github.com/madadam/sn_routing", branch = "new-node-age-fix" }

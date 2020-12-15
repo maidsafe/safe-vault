@@ -20,9 +20,9 @@ use crate::{
 };
 use log::{error, info};
 use sn_data_types::{
-    Address, AdultDuties, AdultDuties::ChunkStorage, Cmd, DataCmd, DataQuery, Duty, ElderDuties,
-    Message, MessageId, MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse,
-    NodeDuties, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
+    Address, AdultDuties, AdultDuties::ChunkStorage, Cmd, DataQuery, Duty, ElderDuties, Message,
+    MessageId, MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse, NodeDuties,
+    NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
     NodeSystemCmd, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
 use sn_routing::MIN_AGE;
@@ -321,7 +321,8 @@ impl NetworkMsgAnalysis {
         }
 
         let accumulate = self.is_dst_for(msg).await? && self.is_adult().await;
-        info!("Accumulating as Adult");
+        info!("Accumulating as Adult: {:?}", self.is_adult().await);
+        info!("Accumulating as Adult: {:?}", accumulate);
         Ok(accumulate)
     }
 
@@ -410,12 +411,8 @@ impl NetworkMsgAnalysis {
 
         let is_chunk_cmd = || {
             matches!(msg.message,
-            Message::Cmd {
-                cmd:
-                    Cmd::Data {
-                        cmd: DataCmd::Blob(_),
-                        ..
-                    },
+            Message::NodeCmd {
+                cmd:NodeCmd::Data(NodeDataCmd::Blob(_)),
                 ..
             })
         };

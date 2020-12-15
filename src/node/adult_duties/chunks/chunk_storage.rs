@@ -149,7 +149,9 @@ impl ChunkStorage {
             id: MessageId::new(),
         };
         info!("Sending NodeDataQuery::GetChunk to existing holders");
-        self.wrapping.send_to_adults(message, current_holders).await
+        self.wrapping
+            .send_to_adults(message, current_holders, AdultDuties::ChunkReplication)
+            .await
     }
 
     ///

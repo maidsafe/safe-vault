@@ -15,8 +15,8 @@ use chunk_storage::ChunkStorage;
 
 use log::{info, trace};
 use sn_data_types::{
-    Address, Blob, BlobAddress, Cmd, DataCmd, DataQuery, Message, MessageId, MsgEnvelope,
-    MsgSender, Query,
+    Address, Blob, BlobAddress, DataQuery, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd,
+    NodeDataCmd, Query,
 };
 use std::{
     collections::BTreeSet,
@@ -51,12 +51,8 @@ impl Chunks {
                 query: Query::Data(DataQuery::Blob(ref read)),
                 ..
             } => reading::get_result(read, msg.clone(), &self.chunk_storage).await,
-            Message::Cmd {
-                cmd:
-                    Cmd::Data {
-                        cmd: DataCmd::Blob(ref write),
-                        ..
-                    },
+            Message::NodeCmd {
+                cmd: NodeCmd::Data(NodeDataCmd::Blob(write)),
                 ..
             } => writing::get_result(write, msg.clone(), &mut self.chunk_storage).await,
             _ => Err(Error::Logic(format!(
