@@ -58,7 +58,7 @@ fn main() {
 }
 
 async fn run_node() {
-    let mut config = Config::new() ;
+    let mut config = Config::new();
 
     if let Some(c) = &config.completions() {
         match c.parse::<clap::Shell>() {
