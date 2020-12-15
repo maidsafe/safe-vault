@@ -2701,7 +2701,7 @@ dependencies = [
 [[package]]
 name = "sn_data_types"
 version = "0.11.37"
-source = "git+https://github.com/yoga07/sn_data_types?branch=storage-check#75ce32dafeea7c0e99fc8e3377c1402466dd067a"
+source = "git+https://github.com/yoga07/sn_data_types?branch=storage-check#0fd195aadcf59b7932831b04b565f8dc120e270f"
 dependencies = [
  "bincode",
  "crdts",

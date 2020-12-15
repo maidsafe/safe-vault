@@ -163,7 +163,7 @@ impl NetworkMsgAnalysis {
 
     async fn should_accumulate(&self, msg: &MsgEnvelope) -> Result<bool> {
         // Incoming msg from `Payment`!
-        let accumulate = self.should_accumulate_for_metadata_write(msg).await? // Metadata Elders accumulate the msgs from Payment Elders.
+        let accumulate = self.should_accumulate_for_metadata_write(msg).await? // Metadata(DataSection) Elders accumulate the msgs from Payment Elders.
             // Incoming msg from `Metadata`!
             || self.should_accumulate_for_adult(msg).await? // Adults accumulate the msgs from Metadata Elders.
             || self.should_accumulate_for_transfers(msg).await? // Transfer Elders accumulate GetSectionActorHistory from Rewards Elders
@@ -182,7 +182,8 @@ impl NetworkMsgAnalysis {
         };
 
         let from_single_payment_elder = || {
-            msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Payment))
+            msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
         let is_data_cmd = || {
             matches!(msg.message, Message::Cmd {
@@ -300,12 +301,9 @@ impl NetworkMsgAnalysis {
         }
 
         let is_chunk_msg = matches!(msg.message,
-        Message::Cmd {
+        Message::NodeCmd {
             cmd:
-                Cmd::Data {
-                    cmd: DataCmd::Blob(_),
-                    ..
-                },
+                NodeCmd::Data(NodeDataCmd::Blob(_)),
             ..
         }
         | Message::Query { // TODO: Should not accumulate queries, just pass them through.
@@ -362,7 +360,7 @@ impl NetworkMsgAnalysis {
         };
         let from_payment_section = || {
             msg.most_recent_sender().is_section()
-                && matches!(duty, Duty::Elder(ElderDuties::Payment))
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
 
         let is_data_query = || {

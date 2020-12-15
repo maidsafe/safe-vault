@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{capacity::Capacity, Network};
+use log::info;
 use sn_data_types::{Money, PublicKey};
 
 const MAX_CHUNK_SIZE: u64 = 1_000_000;
@@ -70,6 +71,7 @@ impl RateLimit {
 
     ///
     pub async fn check_network_storage(&self) -> bool {
+        info!("Checking network storage");
         let all_nodes = self.network.our_adults().await.len() as u8;
         let full_nodes = self.capacity.full_nodes();
         (full_nodes / all_nodes) as f64 > MAX_NETWORK_STORAGE_RATIO
