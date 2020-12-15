@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.11](https://github.com/maidsafe/sn_node/compare/v0.25.10...v0.25.11) (2020-12-15)
+
+
+### Bug Fixes
+
+* config init ([2348a8d](https://github.com/maidsafe/sn_node/commit/2348a8dd64b8a07be0db2a3e66b0c728e1a6e082))
+* **sn_node:** set sn_node thread stack size ([435b50b](https://github.com/maidsafe/sn_node/commit/435b50bfd64526484d0f9d0e56d3263fa0266991))
+
 ### [0.25.10](https://github.com/maidsafe/sn_node/compare/v0.25.9...v0.25.10) (2020-12-15)
 
 ### [0.25.9](https://github.com/maidsafe/sn_node/compare/v0.25.8...v0.25.9) (2020-12-08)
