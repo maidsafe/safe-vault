@@ -356,16 +356,18 @@ impl BlobRegister {
         origin: MsgSender,
         _proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
-        let query_error = |error: NdError| {
-            self.wrapping.send_to_section(
-                Message::QueryResponse {
-                    response: QueryResponse::GetBlob(Err(error)),
-                    id: MessageId::in_response_to(&msg_id),
-                    query_origin: origin.address(),
-                    correlation_id: msg_id,
-                },
-                true,
-            )
+        let query_error = |error: NdError| async {
+            let err_msg = Message::QueryResponse {
+                response: QueryResponse::GetBlob(Err(error)),
+                id: MessageId::in_response_to(&msg_id),
+                query_origin: origin.address(),
+                correlation_id: msg_id,
+            };
+            if _proxies.is_empty() && origin.is_client() {
+                self.wrapping.send_to_client(err_msg).await
+            } else {
+                self.wrapping.send_to_section(err_msg, false).await
+            }
         };
 
         let metadata = match self.get_metadata_for(address) {
