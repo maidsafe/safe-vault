@@ -153,7 +153,7 @@ impl Transfers {
                 .process_cmd(cmd, *msg_id, origin.clone())
                 .await
                 .convert(),
-            NoOp => return Ok(NodeOperation::NoOp),
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 

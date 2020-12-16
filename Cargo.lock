@@ -2642,6 +2642,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.44.5"
+source = "git+https://github.com/oetyng/sn_client?branch=section-wallet#635d75d18a90dfdc45db615fcaf341bdb8d9a40e"
 dependencies = [
  "async-trait",
  "bincode",
@@ -2665,8 +2666,8 @@ dependencies = [
  "serde-value",
  "serde_json",
  "sha3",
- "sn_data_types 0.11.37",
- "sn_transfers 0.2.4",
+ "sn_data_types",
+ "sn_transfers",
  "threshold_crypto",
  "tiny-keccak 1.5.0",
  "tokio",
@@ -2680,26 +2681,6 @@ dependencies = [
 name = "sn_data_types"
 version = "0.11.37"
 source = "git+https://github.com/oetyng/sn_data_types?branch=section-wallet#b8473c27b4239fdc10cbf73030a60129c29836bb"
-dependencies = [
- "bincode",
- "crdts",
- "ed25519",
- "ed25519-dalek",
- "hex_fmt",
- "multibase",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "serde",
- "sha3",
- "signature",
- "threshold_crypto",
- "tiny-keccak 1.5.0",
- "xor_name",
-]
-
-[[package]]
-name = "sn_data_types"
-version = "0.11.37"
 dependencies = [
  "bincode",
  "crdts",
@@ -2763,10 +2744,10 @@ dependencies = [
  "sha2 0.8.2",
  "signature",
  "sn_client",
- "sn_data_types 0.11.37 (git+https://github.com/oetyng/sn_data_types?branch=section-wallet)",
+ "sn_data_types",
  "sn_launch_tool",
  "sn_routing",
- "sn_transfers 0.2.4 (git+https://github.com/oetyng/sn_transfers?branch=section-wallet)",
+ "sn_transfers",
  "structopt 0.3.21",
  "tempdir",
  "threshold_crypto",
@@ -2814,22 +2795,7 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "serde",
- "sn_data_types 0.11.37 (git+https://github.com/oetyng/sn_data_types?branch=section-wallet)",
- "threshold_crypto",
- "xor_name",
-]
-
-[[package]]
-name = "sn_transfers"
-version = "0.2.4"
-dependencies = [
- "bincode",
- "crdts",
- "itertools",
- "log",
- "rand 0.7.3",
- "serde",
- "sn_data_types 0.11.37 (git+https://github.com/oetyng/sn_data_types?branch=section-wallet)",
+ "sn_data_types",
  "threshold_crypto",
  "xor_name",
 ]

@@ -86,11 +86,11 @@ tempdir = "~0.3.7"
 futures = "~0.3.5"
 
   [dev_dependencies.sn_client]
-  # version = "0.44.3"
-  # features = [ "simulated-payouts" ]
-  # git = "https://github.com/oetyng/sn_client"
-  # branch = "refactor-chunk-duplication"
-  path="../sn_client"
+  version = "0.44.3"
+  features = [ "simulated-payouts" ]
+  git = "https://github.com/oetyng/sn_client"
+  branch = "section-wallet"
+  # path="../sn_client"
 
   [dev_dependencies.tokio]
   version = "~0.2.21"

@@ -77,7 +77,7 @@ impl KeySection {
     }
 
     pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<NodeOperation> {
-        match self.routing.set_joins_allowed(joins_allowed).await {
+        match self.network.set_joins_allowed(joins_allowed).await {
             Ok(()) => Ok(NodeOperation::NoOp),
             Err(e) => Err(e),
         }
