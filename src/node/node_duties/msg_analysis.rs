@@ -20,10 +20,10 @@ use crate::{
 };
 use log::{error, info};
 use sn_data_types::{
-    Address, AdultDuties, AdultDuties::ChunkStorage, Cmd, DataQuery, Duty, ElderDuties, Message,
-    MessageId, MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse, NodeDuties,
-    NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse,
-    NodeSystemCmd, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
+    Address, AdultDuties::ChunkStorage, Cmd, DataQuery, Duty, ElderDuties, Message, MessageId,
+    MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse, NodeDuties, NodeEvent,
+    NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd,
+    NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
 use sn_routing::MIN_AGE;
 use xor_name::XorName;
@@ -86,7 +86,7 @@ impl NetworkMsgAnalysis {
         };
         match self.try_system_cmd(&msg).await? {
             NodeOperation::NoOp => (),
-            op => return Ok(op.into()),
+            op => return Ok(op),
         };
         match self.try_client_entry(&msg).await? {
             // Client auth cmd finalisation (Temporarily handled here, will be at app layer (Authenticator)).
@@ -438,21 +438,32 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_chunk_replication(&self, msg: &MsgEnvelope) -> Result<AdultDuty> {
-        use AdultDuties::*;
+        info!("Trying chunk replication");
         use ChunkReplicationDuty::*;
-        use Duty::*;
-        if msg.most_recent_sender().is_adult() {
-            match msg.most_recent_sender().duty() {
-                Some(Adult(ChunkReplication { .. })) => {}
-                _ => return Ok(AdultNoOp),
-            }
-        } else {
-            return Ok(AdultNoOp);
-        };
 
         use ChunkReplicationCmd::*;
         use ChunkReplicationQuery::*;
         let chunk_replication = match &msg.message {
+            Message::NodeCmd {
+                cmd:
+                    NodeCmd::Data(NodeDataCmd::ReplicateChunk {
+                        address,
+                        current_holders,
+                        ..
+                    }),
+                ..
+            } => {
+                info!("Origin of Replicate Chunk: {:?}", msg.origin.clone());
+                Some(ProcessCmd {
+                    cmd: ReplicateChunk {
+                        current_holders: current_holders.clone(),
+                        address: *address,
+                        section_authority: msg.most_recent_sender().clone(),
+                    },
+                    msg_id: Default::default(),
+                    origin: msg.most_recent_sender().clone(),
+                })
+            }
             Message::NodeQueryResponse {
                 response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
                 correlation_id,
@@ -467,7 +478,7 @@ impl NetworkMsgAnalysis {
                     Some(ProcessCmd {
                         cmd: StoreReplicatedBlob(blob),
                         msg_id,
-                        origin: msg.origin.address(), // todo: use self as origin?
+                        origin: msg.origin.clone(),
                     })
                 } else {
                     info!("Given blob is incorrect.");
@@ -490,7 +501,7 @@ impl NetworkMsgAnalysis {
                 // Recreate original MessageId from Section
                 let msg_id = MessageId::combine(vec![*address.name(), *new_holder]);
 
-                // Recreate cmd that was sent by the message.
+                // Recreate cmd that was sent by the section.
                 let message = Message::NodeCmd {
                     cmd: NodeCmd::Data(NodeDataCmd::ReplicateChunk {
                         new_holder: *new_holder,
@@ -500,7 +511,7 @@ impl NetworkMsgAnalysis {
                     id: msg_id,
                 };
 
-                // Verify that the message was
+                // Verify that the message was sent from the section
                 let verify_section_authority =
                     section_authority.verify(&utils::serialise(&message)?);
 

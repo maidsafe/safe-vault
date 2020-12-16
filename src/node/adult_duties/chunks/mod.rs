@@ -77,7 +77,7 @@ impl Chunks {
         current_holders: BTreeSet<XorName>,
         section_authority: MsgSender,
         msg_id: MessageId,
-        origin: Address,
+        origin: MsgSender,
     ) -> Result<NodeMessagingDuty> {
         info!("Creating new MsgEnvelope for acquiring chunk from current_holders");
         self.chunk_storage

@@ -109,6 +109,7 @@ impl Accumulation {
             public_key_set.threshold() + 1
         );
         if public_key_set.threshold() >= signatures.len() {
+            info!("Did not meetthreshold yet");
             return Ok(None);
         }
         let (msg, _sender, signatures) = match self.messages.remove(&msg_id) {
@@ -141,6 +142,7 @@ impl Accumulation {
             .combine_signatures(signatures.iter().map(|sig| (sig.index, &sig.share)))
             .map_err(|e| Error::Logic(format!("Could not combine signatures: {:?}", e)))?;
         if public_key_set.public_key().verify(&signature, &signed_data) {
+            info!("Aggregation and verification successful!");
             let _ = self.completed.insert(msg_id);
 
             // upgrade sender to Section, since it accumulated

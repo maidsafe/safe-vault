@@ -26,7 +26,7 @@ use structopt::StructOpt;
 const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
-const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
+const DEFAULT_MAX_CAPACITY: u64 = 1024;
 const ARGS: [&str; 17] = [
     "wallet-id",
     "max-capacity",

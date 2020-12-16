@@ -418,7 +418,7 @@ pub enum ChunkReplicationDuty {
         ///
         msg_id: MessageId,
         ///
-        origin: Address,
+        origin: MsgSender,
     },
     ///
     ProcessQuery {

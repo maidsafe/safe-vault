@@ -76,7 +76,7 @@ impl Node {
             res
         };
 
-        let (reward_key, mut age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
+        let (reward_key, _age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
         let (network_api, network_events) = Network::new(config).await?;
         let keys = NodeSigningKeys::new(network_api.clone());
 
@@ -97,7 +97,7 @@ impl Node {
         info!("Our Age: {:?}", age);
 
         info!("Fetching age group");
-        age_group = if !network_api.is_elder().await && age > MIN_AGE {
+        let age_group = if !network_api.is_elder().await && age > MIN_AGE {
             info!("We are Adult");
             Adult
         } else {

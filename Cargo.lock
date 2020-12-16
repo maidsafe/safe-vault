@@ -2779,8 +2779,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.39.7"
-source = "git+https://github.com/madadam/sn_routing?branch=new-node-age-fix#4db63514d4b4f8fe226bc76d97ca33f0e646165a"
+version = "0.39.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4442f28a9b9a7d7fe60aed14aee048d7453447c4fdb030fa9f4f1cda828edd6"
 dependencies = [
  "bincode",
  "bls_dkg",

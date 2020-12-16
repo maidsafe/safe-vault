@@ -29,25 +29,19 @@ pickledb = "~0.4.0"
 quick-error = "1.2.2"
 rand = "~0.7.3"
 rand_chacha = "~0.2.2"
-sn_routing = "~0.39.5"
-# sn_routing = { path = "../sn_routing" }
+sn_routing = "~0.39.8"
 serde_json = "1.0.53"
 structopt = "~0.3.17"
 tiny-keccak = "1.5.0"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-# sn_data_types = "~0.11.36"
-# sn_data_types = { path = "../sn_data_types" }
-# sn_transfers = "~0.2.4"
-# sn_transfers = { path = "../sn_transfers" }
 sn_data_types = { git = "https://github.com/yoga07/sn_data_types", branch = "storage-check" }
 sn_transfers = { git = "https://github.com/yoga07/sn_transfers", branch = "master" }
 self_encryption = "~0.19.4"
 ed25519 = "1.0.1"
 signature = "1.1.0"
 xor_name = "1.1.0"
-# sn_launch_tool = { path = "../sn_launch_tool" }
 sn_launch_tool = "~0.0.5"
 dashmap = "3.11.10"
 
@@ -110,6 +104,3 @@ simulated-payouts = [
   "sn_client/simulated-payouts",
 ]
 chaos = [ ]
-
-[patch.crates-io]
-sn_routing = { git = "https://github.com/madadam/sn_routing", branch = "new-node-age-fix" }

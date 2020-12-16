@@ -137,7 +137,7 @@ impl ChunkStorage {
         current_holders: BTreeSet<XorName>,
         section_authority: MsgSender,
         _msg_id: MessageId,
-        _origin: Address,
+        _origin: MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let message = Message::NodeQuery {
             query: NodeQuery::Data(NodeDataQuery::GetChunk {
