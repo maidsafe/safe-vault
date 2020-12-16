@@ -22,7 +22,7 @@ use crate::node::{
     state_db::NodeInfo,
 };
 use crate::{chunk_store::UsedSpace, Error, Network, Outcome, TernaryResult};
-use log::{info, trace, warn};
+use log::{info, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use rand::{CryptoRng, Rng};
