@@ -7,10 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::NetworkMsgAnalysis;
-use crate::node::{
-    duty_cfg::DutyConfig,
-    node_ops::{ElderDuty, NodeOperation},
-};
+use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
 use crate::{Error, Network, Result};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
@@ -22,13 +19,12 @@ use xor_name::XorName;
 /// Maps events from the transport layer
 /// into domain messages for the various modules.
 pub struct NetworkEvents {
-    duty_cfg: DutyConfig,
     analysis: NetworkMsgAnalysis,
 }
 
 impl NetworkEvents {
-    pub fn new(duty_cfg: DutyConfig, analysis: NetworkMsgAnalysis) -> Self {
-        Self { duty_cfg, analysis }
+    pub fn new(analysis: NetworkMsgAnalysis) -> Self {
+        Self { analysis }
     }
 
     pub async fn process_network_event(
@@ -37,12 +33,11 @@ impl NetworkEvents {
         network: &Network,
     ) -> Result<NodeOperation> {
         use ElderDuty::*;
-
         trace!("Processing Routing Event: {:?}", event);
         match event {
             RoutingEvent::PromotedToElder => {
                 info!("Node promoted to Elder");
-                self.duty_cfg.setup_as_elder().await
+                Ok(NodeDuty::AssumeElderDuties.into())
             }
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
@@ -99,7 +94,7 @@ impl NetworkEvents {
                 if age > MIN_AGE {
                     info!("Node promoted to Adult");
                     info!("Our Age: {:?}", age);
-                    self.duty_cfg.setup_as_adult()
+                    Ok(NodeDuty::AssumeAdultDuties.into())
                 } else {
                     info!("Our AGE: {:?}", age);
                     Ok(NodeOperation::NoOp)
@@ -110,7 +105,7 @@ impl NetworkEvents {
                 if age > MIN_AGE {
                     info!("Node promoted to Adult");
                     info!("Our Age: {:?}", age);
-                    self.duty_cfg.setup_as_adult()
+                    Ok(NodeDuty::AssumeAdultDuties.into())
                 } else {
                     info!("We are not Adult, do nothing");
                     info!("Our Age: {:?}", age);

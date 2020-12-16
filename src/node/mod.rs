@@ -9,7 +9,6 @@
 pub mod state_db;
 
 mod adult_duties;
-mod duty_cfg;
 mod elder_duties;
 mod keys;
 mod msg_wrapping;
@@ -99,12 +98,12 @@ impl Node {
             Infant => Ok(NodeOperation::NoOp),
             Adult => {
                 duties
-                    .process_node_duty(node_ops::NodeDuty::BecomeAdult)
+                    .process_node_duty(node_ops::NodeDuty::AssumeAdultDuties)
                     .await
             }
             Elder => {
                 duties
-                    .process_node_duty(node_ops::NodeDuty::BecomeElder)
+                    .process_node_duty(node_ops::NodeDuty::AssumeElderDuties)
                     .await
             }
         };

@@ -108,6 +108,11 @@ impl Accumulation {
             signatures.len(),
             public_key_set.threshold() + 1
         );
+        // tricky thing here.. (I mean, is this _always_ correct?)
+        // but a workaround for now..
+        if sender.address() == msg.destination()? {
+            return Ok(Some(msg.clone()));
+        }
         if public_key_set.threshold() >= signatures.len() {
             return Ok(None);
         }

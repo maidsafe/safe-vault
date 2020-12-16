@@ -16,7 +16,8 @@ use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{
-        Blah, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty, TransferQuery,
+        IntoNodeOp, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, TransferCmd,
+        TransferDuty, TransferQuery,
     },
     utils, Error, ReplicaInfo, Result,
 };
@@ -27,7 +28,7 @@ use sn_data_types::{
     Address, Cmd, CmdError, CreditAgreementProof, ElderDuties, Error as NdError, Event, Message,
     MessageId, MsgEnvelope, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse,
     NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, PublicKey,
-    QueryResponse, ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferError,
+    QueryResponse, ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferError, WalletInfo,
 };
 use std::fmt::{self, Display, Formatter};
 use xor_name::Prefix;
@@ -76,9 +77,27 @@ impl Transfers {
         }
     }
 
-    pub async fn init_first(&self) -> Result<NodeOperation> {
-        let result = self.initiate_replica(&[]).await;
-        result.convert()
+    pub async fn genesis(&self) -> Result<NodeOperation> {
+        let _ = self.replicas.initiate(&[]).await?;
+        // if we are genesis, we would get the genesis event via this call
+        let events = self.replicas.history(self.section_wallet_id()).await?;
+
+        match self.replicas.balance(self.section_wallet_id()).await {
+            Ok(balance) => info!("Genesis balance: {}", balance),
+            Err(e) => warn!("what what?!?! {}", e),
+        };
+
+        // make sure we init section wallet
+        let section_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
+        Ok(RewardDuty::ProcessCmd {
+            cmd: RewardCmd::InitiateSectionWallet(WalletInfo {
+                replicas: self.replicas.replicas_pk_set(),
+                history: events.to_vec(),
+            }),
+            msg_id: MessageId::new(),
+            origin: Address::Section(section_key.into()),
+        }
+        .into())
     }
 
     /// Issues a query to existing Replicas
@@ -128,7 +147,6 @@ impl Transfers {
             } => self.process_cmd(cmd, *msg_id, origin.clone()).await,
             NoOp => return Ok(NodeOperation::NoOp),
         };
-
         result.convert()
     }
 
@@ -140,7 +158,14 @@ impl Transfers {
     ) -> Result<NodeMessagingDuty> {
         use TransferQuery::*;
         match query {
-            GetSectionActorHistory => self.section_actor_history(msg_id, origin).await,
+            CatchUpWithSectionWallet(wallet_id) => {
+                self.catchup_with_section_wallet(*wallet_id, msg_id, origin)
+                    .await
+            }
+            GetNewSectionWallet(wallet_id) => {
+                self.get_new_section_wallet(*wallet_id, msg_id, origin)
+                    .await
+            }
             GetReplicaEvents => self.all_events(msg_id, origin).await,
             GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await,
             GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await,
@@ -383,24 +408,55 @@ impl Transfers {
             .await
     }
 
-    async fn section_actor_history(
+    async fn catchup_with_section_wallet(
         &self,
+        wallet_id: PublicKey,
         msg_id: MessageId,
         origin: Address,
     ) -> Result<NodeMessagingDuty> {
-        info!("Handling GetSectionActorHistory query");
+        info!("Handling CatchUpWithSectionWallet query");
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
-        let wallet_id = self.section_wallet_id();
         // todo: validate signature
-        let result = self
-            .replicas
-            .history(wallet_id)
-            .await
-            .map_err(|e| NdError::Unexpected(e.to_string()));
+        let result = match self.replicas.history(wallet_id).await {
+            Ok(history) => Ok(WalletInfo {
+                replicas: self.replicas.replicas_pk_set(),
+                history,
+            }),
+            Err(e) => Err(NdError::Unexpected(e.to_string())),
+        };
+
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
-                response: Transfers(GetSectionActorHistory(result)),
+                response: Transfers(CatchUpWithSectionWallet(result)),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                query_origin: origin,
+            })
+            .await
+    }
+
+    async fn get_new_section_wallet(
+        &self,
+        wallet_id: PublicKey,
+        msg_id: MessageId,
+        origin: Address,
+    ) -> Result<NodeMessagingDuty> {
+        info!("Handling GetNewSectionWallet query");
+        use NodeQueryResponse::*;
+        use NodeTransferQueryResponse::*;
+        // todo: validate signature
+        let result = match self.replicas.history(wallet_id).await {
+            Ok(history) => Ok(WalletInfo {
+                replicas: self.replicas.replicas_pk_set(),
+                history,
+            }),
+            Err(e) => Err(NdError::Unexpected(e.to_string())),
+        };
+
+        self.wrapping
+            .send_to_node(Message::NodeQueryResponse {
+                response: Transfers(GetNewSectionWallet(result)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,

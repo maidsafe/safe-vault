@@ -15,13 +15,15 @@ pub use self::{reward_calc::RewardCalc, validator::Validator};
 use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{Blah, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery},
+    node::node_ops::{
+        IntoNodeOp, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery,
+    },
 };
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
 use sn_data_types::{
-    Address, ElderDuties, Error as NdError, Message, MessageId, Money, NodeQuery,
+    Address, ElderDuties, Error as NdError, Keypair, Message, MessageId, Money, NodeQuery,
     NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery, PublicKey,
 };
 use sn_transfers::TransferActor;
@@ -92,11 +94,13 @@ impl Rewards {
     pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
         info!("Rewards: Catching up with our Replicas (section actor history)!");
         // prepare actor init
-        let pub_key = self.section_funds.replicas();
+        let pub_key = self.section_funds.replicas(); // this can't be right?
         self.wrapping
             .send_to_section(
                 Message::NodeQuery {
-                    query: NodeQuery::Transfers(NodeTransferQuery::GetSectionActorHistory(pub_key)),
+                    query: NodeQuery::Transfers(NodeTransferQuery::CatchUpWithSectionWallet(
+                        pub_key,
+                    )),
                     id: MessageId::new(),
                 },
                 true,
@@ -107,9 +111,22 @@ impl Rewards {
 
     /// After Elder change, we transition to a new
     /// transfer actor, as there is now a new keypair for it.
-    pub async fn transition(&mut self, to: TransferActor<Validator>) -> Result<NodeOperation> {
-        Ok(self.section_funds.transition(to).await?.into())
+    pub async fn init_transition(
+        &mut self,
+        new_section_key: PublicKey,
+        new_keypair_share: Keypair,
+    ) -> Result<NodeOperation> {
+        self.section_funds
+            .init_transition(new_section_key, new_keypair_share)
+            .await
+            .convert()
     }
+
+    // /// After Elder change, we transition to a new
+    // /// transfer actor, as there is now a new keypair for it.
+    // pub async fn transition(&mut self, to: TransferActor<Validator>) -> Result<NodeOperation> {
+    //     Ok(self.section_funds.transition(to).await?.into())
+    // }
 
     pub async fn process_reward_duty(&mut self, duty: RewardDuty) -> Result<NodeOperation> {
         use RewardDuty::*;
@@ -136,7 +153,17 @@ impl Rewards {
     ) -> Result<NodeOperation> {
         use RewardCmd::*;
         let result = match cmd {
-            InitiateSectionActor(events) => self.section_funds.synch(events).await?.into(),
+            InitiateSectionWallet(info) => {
+                if self.section_funds.has_initiated_transition() {
+                    self.section_funds.complete_transition(info).await?.into()
+                } else if self.section_funds.replicas()
+                    != PublicKey::Bls(info.replicas.public_key())
+                {
+                    return Err(Error::Logic("crap..".to_string()));
+                } else {
+                    self.section_funds.synch(info.history).await?.into()
+                }
+            }
             AddNewNode(node_id) => self.add_new_node(node_id)?.into(),
             SetNodeWallet { node_id, wallet_id } => {
                 self.set_node_wallet(node_id, wallet_id)?.into()
@@ -167,7 +194,7 @@ impl Rewards {
     ) -> Result<NodeOperation> {
         use RewardQuery::*;
         let result = match query {
-            GetWalletId {
+            GetNodeWalletId {
                 old_node_id,
                 new_node_id,
             } => self
@@ -274,7 +301,7 @@ impl Rewards {
         self.wrapping
             .send_to_section(
                 Message::NodeQuery {
-                    query: Rewards(GetWalletId {
+                    query: Rewards(GetNodeWalletId {
                         old_node_id,
                         new_node_id,
                     }),
@@ -377,7 +404,7 @@ impl Rewards {
                 return self
                     .wrapping
                     .send_to_node(Message::NodeQueryResponse {
-                        response: Rewards(GetWalletId(Err(NdError::NetworkOther(
+                        response: Rewards(GetNodeWalletId(Err(NdError::NetworkOther(
                             "Node is not being relocated.".to_string(),
                         )))),
                         id: MessageId::in_response_to(&msg_id),
@@ -399,7 +426,7 @@ impl Rewards {
         use NodeRewardQueryResponse::*;
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
-                response: Rewards(GetWalletId(Ok((wallet, new_node_id)))),
+                response: Rewards(GetNodeWalletId(Ok((wallet, new_node_id)))),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin.clone(),

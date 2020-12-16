@@ -13,15 +13,17 @@ use crate::{
 };
 use crate::{Error, Result};
 use sn_data_types::{
-    CreditAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, PublicKey,
-    ReplicaEvent, SignedTransfer, TransferValidated,
+    CreditAgreementProof, Keypair, Message, MessageId, Money, NodeCmd, NodeQuery, NodeTransferCmd,
+    NodeTransferQuery, PublicKey, ReplicaEvent, SignedTransfer, TransferValidated, WalletInfo,
 };
+use std::sync::Arc;
 use xor_name::XorName;
 
 use log::{error, info};
 use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
 use ActorEvent::*;
+
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
 pub(super) struct SectionFunds {
@@ -44,6 +46,7 @@ struct State {
     queued_payouts: VecDeque<Payout>,
     payout_in_flight: Option<Payout>,
     finished: BTreeSet<XorName>, // this set grows within acceptable bounds, since transitions do not happen that often, and at every section split, the set is cleared..
+    pending_actor: Option<(PublicKey, Keypair)>,
     /// While awaiting payout completion
     next_actor: Option<TransferActor<Validator>>, // we could do a queue here, and when starting transition skip all but the last one, but that is also prone to edge case problems..
 }
@@ -57,6 +60,7 @@ impl SectionFunds {
                 queued_payouts: Default::default(),
                 payout_in_flight: None,
                 finished: Default::default(),
+                pending_actor: None,
                 next_actor: None,
             },
         }
@@ -72,7 +76,7 @@ impl SectionFunds {
         info!("Synching replica events to section transfer actor...");
         if let Some(event) = self
             .actor
-            .synch_events(events)
+            .from_history(events)
             .map_err(Error::NetworkData)?
         {
             self.actor.apply(TransfersSynched(event.clone()))?;
@@ -82,74 +86,122 @@ impl SectionFunds {
         Ok(NodeMessagingDuty::NoOp)
     }
 
-    /// At Elder churn, we must transition to a new account.
-    pub async fn transition(&mut self, to: TransferActor<Validator>) -> Result<NodeMessagingDuty> {
-        info!("Transitioning section transfer actor...");
-        if self.is_transitioning() {
+    /// Wallet transition, step 1.
+    /// At Elder churn, we must transition to a new wallet.
+    /// We start by querying network for the Replicas of this new wallet.
+    pub async fn init_transition(
+        &mut self,
+        new_wallet: PublicKey,
+        new_keypair_share: Keypair,
+    ) -> Result<NodeMessagingDuty> {
+        info!("Initiating transition to new section wallet...");
+        if self.has_initiated_transition() {
+            info!("has_initiated_transition");
+            return Err(Error::Logic("Already initiated transition".to_string()));
+        } else if self.is_transitioning() {
             info!("is_transitioning");
-            // hm, could be tricky edge cases here, but
-            // we'll start by assuming there will only be
-            // one transition at a time.
-            // (We could enqueue actors, and when starting transition skip
-            // all but the last one, but that is also prone to edge case problems..)
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
 
-        let new_id = to.id();
-        self.state.next_actor = Some(to);
         // When we have a payout in flight, we defer the transition.
         if self.has_payout_in_flight() {
             info!("has_payout_in_flight");
             return Err(Error::Logic("Has payout in flight".to_string()));
         }
 
-        // Get all the money of current actor.
-        let amount = self.actor.balance();
-        if amount == Money::zero() {
-            info!("No money to transfer in this section.");
-            // if zero, then there is nothing to transfer..
-            // so just go ahead and become the new actor.
-            return match self.state.next_actor.take() {
-                Some(actor) => {
-                    self.actor = actor;
-                    Ok(NodeMessagingDuty::NoOp)
-                }
-                None => {
-                    error!("Tried to take next actor while non existed!");
-                    Err(Error::Logic(
-                        "Tried to take next actor while non existed".to_string(),
-                    ))
-                }
-            };
-        }
+        self.state.pending_actor = Some((new_wallet, new_keypair_share));
 
-        // Transfer the money from
-        // previous actor to new actor.
-        use NodeCmd::*;
-        use NodeTransferCmd::*;
-        match self.actor.transfer(
-            amount,
-            new_id,
-            format!("Section Actor transition to id: {}", new_id),
-        )? {
-            None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
-            Some(event) => {
-                let _ = self.apply(TransferInitiated(event.clone()))?;
-                info!("Section actor transition transfer is being requested of the replicas..");
-                // We ask of our Replicas to validate this transfer.
-                self.wrapping
-                    .send_to_section(
-                        Message::NodeCmd {
-                            cmd: Transfers(ValidateSectionPayout(SignedTransfer {
-                                debit: event.signed_debit,
-                                credit: event.signed_credit,
-                            })),
-                            id: MessageId::new(),
-                        },
-                        true,
-                    )
-                    .await
+        self.wrapping
+            .send_to_section(
+                Message::NodeQuery {
+                    query: NodeQuery::Transfers(NodeTransferQuery::GetNewSectionWallet(new_wallet)),
+                    id: MessageId::new(),
+                },
+                true,
+            )
+            .await
+    }
+
+    /// Wallet transition, step 2.
+    /// When receiving the wallet info, containing the Replicas of
+    /// the new wallet, we can complete the transition by starting
+    /// a transfer to the new wallet.
+    pub async fn complete_transition(
+        &mut self,
+        new_wallet: WalletInfo,
+    ) -> Result<NodeMessagingDuty> {
+        info!("Transitioning section transfer actor...");
+        if self.is_transitioning() {
+            info!("is_transitioning");
+            return Err(Error::Logic("Undergoing transition already".to_string()));
+        }
+        if let Some((_, new_keypair_share)) = self.state.pending_actor.take() {
+            let actor =
+                TransferActor::from_info(Arc::new(new_keypair_share), new_wallet, Validator {})?;
+            let wallet_id = actor.id();
+            self.state.next_actor = Some(actor);
+            // When we have a payout in flight, we defer the transition.
+            if self.has_payout_in_flight() {
+                info!("has_payout_in_flight");
+                return Err(Error::Logic("Has payout in flight".to_string()));
             }
+
+            // Get all the money of current actor.
+            let amount = self.actor.balance();
+            if amount == Money::zero() {
+                info!("No money to transfer in this section.");
+                // if zero, then there is nothing to transfer..
+                // so just go ahead and become the new actor.
+                return match self.state.next_actor.take() {
+                    Some(actor) => {
+                        self.actor = actor;
+                        Ok(NodeMessagingDuty::NoOp)
+                    }
+                    None => {
+                        error!("Tried to take next actor while non existed!");
+                        Err(Error::Logic(
+                            "Tried to take next actor while non existed".to_string(),
+                        ))
+                    }
+                };
+            }
+
+            // ---- TODO TODO
+            // ------ NB: THIS PART NEEDS THE MULTI SIG ACTOR ----
+            // ---- TODO TODO
+
+            // Transfer the money from
+            // previous actor to new actor.
+            use NodeCmd::*;
+            use NodeTransferCmd::*;
+            match self.actor.transfer(
+                amount,
+                wallet_id,
+                format!("Section Actor transition to new wallet: {}", wallet_id),
+            )? {
+                None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
+                Some(event) => {
+                    let _ = self.apply(TransferInitiated(event.clone()))?;
+                    info!("Section actor transition transfer is being requested of the replicas..");
+                    // We ask of our Replicas to validate this transfer.
+                    self.wrapping
+                        .send_to_section(
+                            Message::NodeCmd {
+                                cmd: Transfers(ValidateSectionPayout(SignedTransfer {
+                                    debit: event.signed_debit,
+                                    credit: event.signed_credit,
+                                })),
+                                id: MessageId::new(),
+                            },
+                            true,
+                        )
+                        .await
+                }
+            }
+        } else {
+            Err(Error::Logic(
+                "eeeeh.. had not initiated transition !?!?!".to_string(),
+            ))
         }
     }
 
@@ -195,6 +247,7 @@ impl SectionFunds {
         }
     }
 
+    /// (potentially leading to Wallet transition, step 3.)
     /// As all Replicas have accumulated the distributed
     /// actor cmds and applied them, they'll send out the
     /// result, which each actor instance accumulates locally.
@@ -275,7 +328,8 @@ impl SectionFunds {
         Ok(NodeOperation::NoOp)
     }
 
-    // If we are transitioning to a new actor, we replace the old with the new.
+    /// Wallet transition, step 3.
+    /// If we are transitioning to a new actor, we replace the old with the new.
     fn try_transition(&mut self, credit_proof: CreditAgreementProof) -> Result<()> {
         if !self.is_transition_credit(&credit_proof) {
             return Ok(());
@@ -301,10 +355,10 @@ impl SectionFunds {
         // (which we don't really have reason for here)
 
         // Credit the transfer to the new actor.
-        match self.actor.synch_events(vec![TransferPropagated(
+        match self.actor.from_history(vec![TransferPropagated(
             sn_data_types::TransferPropagated {
                 credit_proof,
-                crediting_replica_keys: self.actor.id(),
+                crediting_replica_keys: self.actor.replicas(),
                 crediting_replica_sig: dummy_sig(),
             },
         )]) {
@@ -312,6 +366,9 @@ impl SectionFunds {
             Ok(None) => (),
             Err(error) => return Err(Error::NetworkData(error)),
         };
+
+        // Wallet transition is completed!
+        info!("Wallet transition is completed!");
 
         Ok(())
     }
@@ -325,6 +382,10 @@ impl SectionFunds {
             return credit.recipient() == next_actor.id();
         }
         false
+    }
+
+    pub fn has_initiated_transition(&self) -> bool {
+        self.state.pending_actor.is_some()
     }
 
     fn is_transitioning(&self) -> bool {

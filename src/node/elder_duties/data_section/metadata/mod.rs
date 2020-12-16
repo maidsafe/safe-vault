@@ -18,7 +18,7 @@ use crate::{
     capacity::ChunkHolderDbs,
     chunk_store::UsedSpace,
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{Blah, MetadataDuty, NodeOperation},
+    node::node_ops::{IntoNodeOp, MetadataDuty, NodeOperation},
     node::state_db::NodeInfo,
     Error, Network, Result,
 };
