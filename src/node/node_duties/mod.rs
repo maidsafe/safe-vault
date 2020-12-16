@@ -132,7 +132,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
     }
 
     async fn become_adult(&mut self) -> Outcome<NodeOperation> {
-        trace!("Becoming Adult");
+        info!("Becoming Adult");
         use DutyLevel::*;
         let used_space = UsedSpace::new(self.node_info.max_storage_capacity);
         if let Ok(duties) = AdultDuties::new(&self.node_info, used_space).await {
@@ -146,7 +146,7 @@ impl<R: CryptoRng + Rng> NodeDuties<R> {
     }
 
     async fn become_elder(&mut self) -> Outcome<NodeOperation> {
-        trace!("Becoming Elder");
+        info!("Becoming Elder");
 
         use DutyLevel::*;
         let used_space = UsedSpace::new(self.node_info.max_storage_capacity);

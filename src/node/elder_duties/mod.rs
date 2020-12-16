@@ -18,7 +18,7 @@ use crate::{
     Network, Result,
 };
 use crate::{Outcome, TernaryResult};
-use log::{debug, trace};
+use log::{debug, info, trace};
 use rand::{CryptoRng, Rng};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
@@ -110,6 +110,8 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
 
     ///
     async fn elders_changed(&mut self, prefix: Prefix) -> Outcome<NodeOperation> {
+        info!("Elders changed");
+
         let mut ops = Vec::new();
         if let Ok(Some(op)) = self.key_section.elders_changed().await {
             ops.push(op)
@@ -121,7 +123,8 @@ impl<R: CryptoRng + Rng> ElderDuties<R> {
         };
         debug!("Data section completed elder change update.");
         if prefix != self.prefix {
-            debug!("Prefix changed, i.e. split occurred!");
+            info!("Split occured");
+            info!("New prefix is: {:?}", prefix);
             if let Ok(Some(op)) = self.key_section.section_split(prefix).await {
                 ops.push(op)
             };
