@@ -28,7 +28,7 @@ use crate::{
 use bls::SecretKey;
 use log::{error, info};
 use sn_data_types::PublicKey;
-use sn_routing::{Event, EventStream};
+use sn_routing::{Event, EventStream, MIN_AGE};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -75,7 +75,7 @@ impl Node {
             res
         };
 
-        let (reward_key, age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
+        let (reward_key, _age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
         let (network_api, network_events) = Network::new(config).await?;
         let keys = NodeSigningKeys::new(network_api.clone());
 
@@ -91,11 +91,25 @@ impl Node {
             reward_key,
         };
 
-        let mut duties = NodeDuties::new(node_info, network_api.clone()).await;
-
         use AgeGroup::*;
+        let age = network_api.age().await;
+        info!("Our Age: {:?}", age);
+
+        info!("Fetching age group");
+        let age_group = if !network_api.is_elder().await && age > MIN_AGE {
+            info!("We are Adult");
+            Adult
+        } else {
+            info!("We are Infant");
+            Infant
+        };
+
+        let mut duties = NodeDuties::new(node_info, network_api.clone()).await;
         let _ = match age_group {
-            Infant => Ok(NodeOperation::NoOp),
+            Infant => {
+                info!("Do nothing as Infant");
+                Ok(NodeOperation::NoOp)
+            }
             Adult => {
                 duties
                     .process_node_duty(node_ops::NodeDuty::AssumeAdultDuties)

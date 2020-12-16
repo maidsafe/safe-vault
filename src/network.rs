@@ -117,6 +117,15 @@ impl Network {
         // Ok(())
     }
 
+    pub async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
+        self.routing
+            .lock()
+            .await
+            .set_joins_allowed(joins_allowed)
+            .await
+            .map_err(Error::Routing)
+    }
+
     pub async fn send_message_to_client(
         &mut self,
         peer_addr: SocketAddr,

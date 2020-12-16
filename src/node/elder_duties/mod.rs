@@ -18,7 +18,7 @@ use crate::{
     Network, Result,
 };
 use log::{debug, trace};
-use sn_data_types::WalletInfo;
+use sn_data_types::{PublicKey, WalletInfo};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
@@ -89,12 +89,23 @@ impl ElderDuties {
             }
             RunAsDataSection(duty) => self.data_section.process_data_section_duty(duty).await,
             NoOp => Ok(NodeOperation::NoOp),
+            StorageFull { node_id } => {
+                self.increase_full_node_count(node_id).await;
+                Ok(NodeOperation::NoOp)
+            }
+            SwitchNodeJoin(joins_allowed) => {
+                self.key_section.set_node_join_flag(joins_allowed).await
+            }
         }
     }
 
     ///
     async fn new_node_joined(&mut self, name: XorName) -> Result<NodeOperation> {
         self.data_section.new_node_joined(name).await
+    }
+
+    async fn increase_full_node_count(&mut self, node_id: PublicKey) {
+        self.key_section.increase_full_node_count(node_id).await;
     }
 
     ///

@@ -12,6 +12,7 @@ target/*
 target/release/*
 !target/release/README.md
 /.idea
+/.vscode
 /.project
 *.sublime-*
 *.bootstrap.cache

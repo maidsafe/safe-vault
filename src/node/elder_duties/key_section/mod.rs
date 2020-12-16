@@ -23,6 +23,7 @@ use crate::{
 };
 use futures::lock::Mutex;
 use log::trace;
+use sn_data_types::PublicKey;
 use sn_routing::Prefix;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -57,6 +58,11 @@ impl KeySection {
         })
     }
 
+    ///
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
+        self.transfers.increase_full_node_count(node_id)
+    }
+
     /// Initiates as first node in a network.
     pub async fn init_genesis_node(&mut self) -> Result<NodeOperation> {
         self.transfers.genesis().await
@@ -68,6 +74,13 @@ impl KeySection {
     pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
         // currently only at2 replicas need to catch up
         self.transfers.catchup_with_replicas().await
+    }
+
+    pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<NodeOperation> {
+        match self.routing.set_joins_allowed(joins_allowed).await {
+            Ok(()) => Ok(NodeOperation::NoOp),
+            Err(e) => Err(e),
+        }
     }
 
     // Update our replica with the latest keys

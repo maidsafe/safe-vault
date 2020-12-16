@@ -2665,14 +2665,35 @@ dependencies = [
  "serde-value",
  "serde_json",
  "sha3",
- "sn_data_types",
- "sn_transfers",
+ "sn_data_types 0.11.37",
+ "sn_transfers 0.2.4",
  "threshold_crypto",
  "tiny-keccak 1.5.0",
  "tokio",
  "unwrap",
  "url",
  "ws",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_data_types"
+version = "0.11.37"
+source = "git+https://github.com/oetyng/sn_data_types?branch=section-wallet#b8473c27b4239fdc10cbf73030a60129c29836bb"
+dependencies = [
+ "bincode",
+ "crdts",
+ "ed25519",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "serde",
+ "sha3",
+ "signature",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
  "xor_name",
 ]
 
@@ -2742,10 +2763,10 @@ dependencies = [
  "sha2 0.8.2",
  "signature",
  "sn_client",
- "sn_data_types",
+ "sn_data_types 0.11.37 (git+https://github.com/oetyng/sn_data_types?branch=section-wallet)",
  "sn_launch_tool",
  "sn_routing",
- "sn_transfers",
+ "sn_transfers 0.2.4 (git+https://github.com/oetyng/sn_transfers?branch=section-wallet)",
  "structopt 0.3.21",
  "tempdir",
  "threshold_crypto",
@@ -2756,9 +2777,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.39.7"
+version = "0.39.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e7d872ef666a287e859e4947a8d75a0cc1ae8da1ab5044f3bb33df8a721a0a9"
+checksum = "f4442f28a9b9a7d7fe60aed14aee048d7453447c4fdb030fa9f4f1cda828edd6"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2785,6 +2806,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.4"
+source = "git+https://github.com/oetyng/sn_transfers?branch=section-wallet#ed0e81a03e94951b4362757ba61569b0380018db"
 dependencies = [
  "bincode",
  "crdts",
@@ -2792,7 +2814,22 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "serde",
- "sn_data_types",
+ "sn_data_types 0.11.37 (git+https://github.com/oetyng/sn_data_types?branch=section-wallet)",
+ "threshold_crypto",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_transfers"
+version = "0.2.4"
+dependencies = [
+ "bincode",
+ "crdts",
+ "itertools",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "sn_data_types 0.11.37 (git+https://github.com/oetyng/sn_data_types?branch=section-wallet)",
  "threshold_crypto",
  "xor_name",
 ]

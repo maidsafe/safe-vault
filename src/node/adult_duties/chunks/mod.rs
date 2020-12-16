@@ -15,8 +15,8 @@ use chunk_storage::ChunkStorage;
 
 use log::{info, trace};
 use sn_data_types::{
-    Address, Blob, BlobAddress, Cmd, DataCmd, DataQuery, Message, MessageId, MsgEnvelope,
-    MsgSender, Query,
+    Address, Blob, BlobAddress, DataQuery, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd,
+    NodeDataCmd, Query,
 };
 use std::{
     collections::BTreeSet,
@@ -24,10 +24,13 @@ use std::{
 };
 use xor_name::XorName;
 
+pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.8;
+
 /// Operations on data chunks.
 pub(crate) struct Chunks {
     chunk_storage: ChunkStorage,
 }
+use crate::node::node_ops::{NodeDuty, NodeOperation};
 pub use chunk_storage::UsedSpace;
 
 impl Chunks {
@@ -48,12 +51,8 @@ impl Chunks {
                 query: Query::Data(DataQuery::Blob(ref read)),
                 ..
             } => reading::get_result(read, msg.clone(), &self.chunk_storage).await,
-            Message::Cmd {
-                cmd:
-                    Cmd::Data {
-                        cmd: DataCmd::Blob(ref write),
-                        ..
-                    },
+            Message::NodeCmd {
+                cmd: NodeCmd::Data(NodeDataCmd::Blob(write)),
                 ..
             } => writing::get_result(write, msg.clone(), &mut self.chunk_storage).await,
             _ => Err(Error::Logic(format!(
@@ -63,16 +62,13 @@ impl Chunks {
         }
     }
 
-    // fn validate_section_signature(&self, request: &Request, signature: &Signature) -> Option<()> {
-    //     if self
-    //         .public_key()?
-    //         .verify(signature, &utils::serialise(request))
-    //     {
-    //         Some(())
-    //     } else {
-    //         None
-    //     }
-    // }
+    pub async fn check_storage(&self) -> Result<NodeOperation> {
+        if self.chunk_storage.remaining_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
+            Ok(NodeDuty::StorageFull.into())
+        } else {
+            Ok(NodeOperation::NoOp)
+        }
+    }
 
     ///
     pub async fn replicate_chunk(
@@ -81,7 +77,7 @@ impl Chunks {
         current_holders: BTreeSet<XorName>,
         section_authority: MsgSender,
         msg_id: MessageId,
-        origin: Address,
+        origin: MsgSender,
     ) -> Result<NodeMessagingDuty> {
         info!("Creating new MsgEnvelope for acquiring chunk from current_holders");
         self.chunk_storage

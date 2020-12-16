@@ -150,6 +150,13 @@ impl<T: Chunk> ChunkStore<T> {
         self.do_delete(&self.file_path(id)?).await
     }
 
+    /// Remaining space to max space ratio.
+    pub async fn remaining_space_ratio(&self) -> f64 {
+        let used = self.total_used_space().await;
+        let total = self.used_space.max_capacity().await;
+        (used / total) as f64
+    }
+
     /// Returns a data chunk previously stored under `id`.
     ///
     /// If the data file can't be accessed, it returns `Error::NoSuchChunk`.
@@ -166,7 +173,6 @@ impl<T: Chunk> ChunkStore<T> {
         }
     }
 
-    #[cfg(test)]
     pub async fn total_used_space(&self) -> u64 {
         self.used_space.total().await
     }

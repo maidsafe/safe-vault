@@ -111,6 +111,7 @@ impl NetworkSender {
             Address::Node(xorname) => DstLocation::Node(xorname),
             Address::Client(xorname) | Address::Section(xorname) => DstLocation::Section(xorname),
         };
+        info!("Dst Location: {:?}", dst);
         let src = if as_node {
             SrcLocation::Node(self.network.name().await)
         } else {

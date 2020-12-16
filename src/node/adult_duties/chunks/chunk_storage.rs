@@ -137,7 +137,7 @@ impl ChunkStorage {
         current_holders: BTreeSet<XorName>,
         section_authority: MsgSender,
         _msg_id: MessageId,
-        _origin: Address,
+        _origin: MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let message = Message::NodeQuery {
             query: NodeQuery::Data(NodeDataQuery::GetChunk {
@@ -149,7 +149,9 @@ impl ChunkStorage {
             id: MessageId::new(),
         };
         info!("Sending NodeDataQuery::GetChunk to existing holders");
-        self.wrapping.send_to_adults(message, current_holders).await
+        self.wrapping
+            .send_to_adults(message, current_holders, AdultDuties::ChunkReplication)
+            .await
     }
 
     ///
@@ -188,6 +190,10 @@ impl ChunkStorage {
         let _ = self.chunks.put(&blob).await.map_err(Error::ChunkStore)?;
 
         Ok(NodeMessagingDuty::NoOp)
+    }
+
+    pub async fn remaining_space_ratio(&self) -> f64 {
+        self.chunks.remaining_space_ratio().await
     }
 
     // pub(crate) fn get_for_duplciation(

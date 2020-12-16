@@ -16,8 +16,8 @@ use crate::{
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{
-        IntoNodeOp, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, TransferCmd,
-        TransferDuty, TransferQuery,
+        ElderDuty, IntoNodeOp, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty,
+        TransferCmd, TransferDuty, TransferQuery,
     },
     utils, Error, ReplicaInfo, Result,
 };
@@ -129,12 +129,17 @@ impl Transfers {
         Ok(NodeOperation::NoOp)
     }
 
+    ///
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) {
+        self.rate_limit.increase_full_node_count(node_id)
+    }
+
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
     pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NodeOperation> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
-        let result = match duty {
+        match duty {
             ProcessQuery {
                 query,
                 msg_id,
@@ -144,10 +149,12 @@ impl Transfers {
                 cmd,
                 msg_id,
                 origin,
-            } => self.process_cmd(cmd, *msg_id, origin.clone()).await,
+            } => self
+                .process_cmd(cmd, *msg_id, origin.clone())
+                .await
+                .convert(),
             NoOp => return Ok(NodeOperation::NoOp),
-        };
-        result.convert()
+        }
     }
 
     async fn process_query(
@@ -155,9 +162,9 @@ impl Transfers {
         query: &TransferQuery,
         msg_id: MessageId,
         origin: Address,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeOperation> {
         use TransferQuery::*;
-        match query {
+        let result = match query {
             CatchUpWithSectionWallet(wallet_id) => {
                 self.catchup_with_section_wallet(*wallet_id, msg_id, origin)
                     .await
@@ -172,8 +179,16 @@ impl Transfers {
             GetHistory { at, since_version } => {
                 self.history(at, *since_version, msg_id, origin).await
             }
-            GetStoreCost { bytes, .. } => self.get_store_cost(*bytes, msg_id, origin).await,
-        }
+            GetStoreCost { bytes, .. } => {
+                let first = self.get_store_cost(*bytes, msg_id, origin).await.convert();
+                let second = Ok(ElderDuty::SwitchNodeJoin(
+                    self.rate_limit.check_network_storage().await,
+                )
+                .into());
+                return Ok(vec![first, second].into());
+            }
+        };
+        result.convert()
     }
 
     async fn process_cmd(
@@ -271,13 +286,7 @@ impl Transfers {
                 info!("Payment: registration and propagation succeeded.");
                 // Paying too little will see the amount be forfeited.
                 // This prevents spam of the network.
-                let total_cost = if let Some(res) = self.rate_limit.from(num_bytes).await {
-                    res
-                } else {
-                    return Err(Error::NetworkData(NdError::Unexpected(
-                        "Could not calculate store cost.".to_string(),
-                    )));
-                };
+                let total_cost = self.rate_limit.from(num_bytes).await;
                 if total_cost > payment.amount() {
                     warn!(
                         "Payment: Too low payment: {}, expected: {}",
@@ -338,7 +347,8 @@ impl Transfers {
             .await
     }
 
-    /// Get latest StoreCost for the given number of bytes
+    /// Get latest StoreCost for the given number of bytes.
+    /// Also check for Section storage capacity and report accordingly.
     async fn get_store_cost(
         &self,
         bytes: u64,
@@ -346,18 +356,13 @@ impl Transfers {
         origin: Address,
     ) -> Result<NodeMessagingDuty> {
         info!("Computing StoreCost for {:?} bytes", bytes);
-        let result =
-            self.rate_limit.from(bytes).await.ok_or_else(|| {
-                NdError::Unexpected("Could not compute current StoreCost".to_string())
-            });
+        let result = self.rate_limit.from(bytes).await;
 
-        if result.is_ok() {
-            info!("Got StoreCost {:?}", result.clone()?);
-        }
+        info!("Got StoreCost {:?}", result);
 
         self.wrapping
             .send_to_client(Message::QueryResponse {
-                response: QueryResponse::GetStoreCost(result),
+                response: QueryResponse::GetStoreCost(Ok(result)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
