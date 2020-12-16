@@ -108,7 +108,7 @@ impl Node {
         let mut duties = NodeDuties::new(node_info, network_api.clone()).await;
         let _ = match age_group {
             Infant => {
-                info!("Do nothing as Infant");
+                info!("Becoming Infant, do nothing.");
                 Ok(NodeOperation::NoOp)
             }
             Adult => {
