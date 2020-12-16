@@ -127,7 +127,7 @@ impl NetworkMsgAnalysis {
         use NodeCmd::*;
         use NodeSystemCmd::*;
         // Check if it a message from adult
-        if !msg.origin.is_adult() {
+        if !msg.origin.is_any_node() {
             return Ok(NodeOperation::NoOp);
         }
         if let Message::NodeCmd {

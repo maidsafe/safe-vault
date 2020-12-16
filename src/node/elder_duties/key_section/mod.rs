@@ -22,7 +22,7 @@ use crate::{
     Network, ReplicaInfo, Result,
 };
 use futures::lock::Mutex;
-use log::trace;
+use log::{info, trace};
 use sn_data_types::PublicKey;
 use sn_routing::Prefix;
 use std::path::PathBuf;
@@ -59,7 +59,7 @@ impl KeySection {
     }
 
     ///
-    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
         self.transfers.increase_full_node_count(node_id)
     }
 
@@ -78,7 +78,10 @@ impl KeySection {
 
     pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<NodeOperation> {
         match self.routing.set_joins_allowed(joins_allowed).await {
-            Ok(()) => Ok(NodeOperation::NoOp),
+            Ok(()) => {
+                info!("Successfully set joins_allowed to true");
+                Ok(NodeOperation::NoOp)
+            }
             Err(e) => Err(e),
         }
     }

@@ -63,6 +63,7 @@ impl Chunks {
     }
 
     pub async fn check_storage(&self) -> Result<NodeOperation> {
+        info!("Checking remaining storage");
         if self.chunk_storage.remaining_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
             Ok(NodeDuty::StorageFull.into())
         } else {

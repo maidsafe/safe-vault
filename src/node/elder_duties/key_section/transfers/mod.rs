@@ -111,7 +111,7 @@ impl Transfers {
     }
 
     ///
-    pub fn increase_full_node_count(&mut self, node_id: PublicKey) {
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
         self.rate_limit.increase_full_node_count(node_id)
     }
 

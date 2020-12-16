@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{capacity::Capacity, Network};
+use crate::{capacity::Capacity, Network, Result};
 use log::info;
 use sn_data_types::{Money, PublicKey};
 
 const MAX_CHUNK_SIZE: u64 = 1_000_000;
 const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
-const MAX_NETWORK_STORAGE_RATIO: f64 = 0.8;
+const MAX_NETWORK_STORAGE_RATIO: f64 = 0.5;
 
 /// Calculation of rate limit for writes.
 pub struct RateLimit {
@@ -65,16 +65,20 @@ impl RateLimit {
     }
 
     ///
-    pub fn increase_full_node_count(&mut self, node_id: PublicKey) {
-        self.capacity.increase_full_node_count(node_id);
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+        self.capacity.increase_full_node_count(node_id)
     }
 
     ///
     pub async fn check_network_storage(&self) -> bool {
         info!("Checking network storage");
-        let all_nodes = self.network.our_adults().await.len() as u8;
-        let full_nodes = self.capacity.full_nodes();
-        (full_nodes / all_nodes) as f64 > MAX_NETWORK_STORAGE_RATIO
+        let all_nodes = self.network.our_adults().await.len() as f64;
+        let full_nodes = self.capacity.full_nodes() as f64;
+        let usage_ratio = full_nodes / all_nodes;
+        info!("Total number of adult nodes: {:?}", all_nodes);
+        info!("Number of Full adult nodes: {:?}", full_nodes);
+        info!("Section storage usage ratio: {:?}", usage_ratio);
+        usage_ratio > MAX_NETWORK_STORAGE_RATIO
     }
 }
 

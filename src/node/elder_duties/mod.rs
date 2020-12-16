@@ -81,10 +81,7 @@ impl ElderDuties {
             }
             RunAsDataSection(duty) => self.data_section.process_data_section_duty(duty).await,
             NoOp => Ok(NodeOperation::NoOp),
-            StorageFull { node_id } => {
-                self.increase_full_node_count(node_id).await;
-                Ok(NodeOperation::NoOp)
-            }
+            StorageFull { node_id } => self.increase_full_node_count(node_id).await,
             SwitchNodeJoin(joins_allowed) => {
                 self.key_section.set_node_join_flag(joins_allowed).await
             }
@@ -96,8 +93,11 @@ impl ElderDuties {
         self.data_section.new_node_joined(name).await
     }
 
-    async fn increase_full_node_count(&mut self, node_id: PublicKey) {
-        self.key_section.increase_full_node_count(node_id).await;
+    async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<NodeOperation> {
+        self.key_section
+            .increase_full_node_count(node_id)
+            .await
+            .map(|()| NodeOperation::NoOp)
     }
 
     ///
