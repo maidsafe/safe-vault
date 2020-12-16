@@ -18,11 +18,11 @@ use crate::{
     chunk_store::UsedSpace,
     node::node_ops::{DataSectionDuty, NodeOperation, RewardCmd, RewardDuty},
     node::state_db::NodeInfo,
-    utils, Network, Result,
+    utils, Error, Network, Result,
 };
 use log::info;
+use sn_data_types::WalletInfo;
 use sn_messaging::{Address, MessageId};
-
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use std::sync::Arc;
@@ -48,6 +48,7 @@ impl DataSection {
         info: &NodeInfo,
         dbs: ChunkHolderDbs,
         used_space: UsedSpace,
+        wallet_info: WalletInfo,
         network: Network,
     ) -> Result<Self> {
         // Metadata
@@ -55,8 +56,7 @@ impl DataSection {
 
         // Rewards
         let keypair = utils::key_pair(network.clone()).await?;
-        let public_key_set = network.public_key_set().await?;
-        let actor = TransferActor::new(Arc::new(keypair), public_key_set, Validator {});
+        let actor = TransferActor::from_info(Arc::new(keypair), wallet_info, Validator {})?;
         let reward_calc = RewardCalc::new(network.clone());
         let rewards = Rewards::new(info.keys.clone(), actor, reward_calc);
 
@@ -89,11 +89,19 @@ impl DataSection {
     /// Transition the section funds account to the new key.
     #[allow(unused)]
     pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
-        info!("updating section public key set in data section!");
-        let pub_key_set = self.network.public_key_set().await?;
-        let keypair = utils::key_pair(self.network.clone()).await?;
-        let actor = TransferActor::new(Arc::new(keypair), pub_key_set, Validator {});
-        self.rewards.transition(actor).await
+        // if we were demoted, we should not call this at all,
+        // make sure demoted is handled properly first, so that
+        // EldersChanged doesn't lead to calling this method..
+        if let Some(new_section_key) = self.network.section_public_key().await {
+            let new_keypair_share = utils::key_pair(self.network.clone()).await?;
+            self.rewards
+                .init_transition(new_section_key, new_keypair_share)
+                .await
+        } else {
+            Err(Error::Logic(
+                "Seems we are not an Elder, this code should not be reachable then..".to_string(),
+            ))
+        }
     }
 
     /// At section split, all Elders get their reward payout.

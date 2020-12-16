@@ -11,8 +11,8 @@ mod chunks;
 use self::chunks::{Chunks, UsedSpace};
 use crate::{
     node::node_ops::{
-        AdultDuty, Blah, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
-        ChunkStoreDuty, NodeOperation,
+        AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
+        ChunkStoreDuty, IntoNodeOp, NodeOperation,
     },
     node::state_db::NodeInfo,
     Result,

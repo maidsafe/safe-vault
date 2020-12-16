@@ -76,7 +76,12 @@ impl Replicas {
         let store = TransferStore::new(id.into(), &self.root_dir, Init::Load);
 
         if let Err(error) = store {
-            if error.to_string().contains("No such file or directory") {
+            // hmm.. can we handle this in a better way?
+            let err_string = error.to_string();
+            let no_such_file_or_dir = err_string.contains("No such file or directory");
+            let system_cannot_find_file =
+                err_string.contains("The system cannot find the file specified");
+            if no_such_file_or_dir || system_cannot_find_file {
                 // we have no history yet, so lets report that.
                 return Ok(vec![]);
             }

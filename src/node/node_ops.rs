@@ -12,7 +12,7 @@ use sn_data_types::Transfer;
 use crate::Result;
 use sn_data_types::{
     Blob, BlobAddress, CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer,
-    TransferAgreementProof, TransferValidated,
+    TransferAgreementProof, TransferValidated, WalletInfo,
 };
 use sn_messaging::{Address, MessageId, MsgEnvelope, MsgSender};
 use std::fmt::Formatter;
@@ -22,11 +22,11 @@ use std::collections::BTreeSet;
 use std::fmt::Debug;
 use xor_name::XorName;
 
-pub trait Blah {
+pub trait IntoNodeOp {
     fn convert(self) -> Result<NodeOperation>;
 }
 
-impl Blah for Result<NodeMessagingDuty> {
+impl IntoNodeOp for Result<NodeMessagingDuty> {
     fn convert(self) -> Result<NodeOperation> {
         match self? {
             NodeMessagingDuty::NoOp => Ok(NodeOperation::NoOp),
@@ -117,9 +117,11 @@ pub enum NodeDuty {
     ///
     RegisterWallet(PublicKey),
     /// On being promoted, an Infant node becomes an Adult.
-    BecomeAdult,
+    AssumeAdultDuties,
     /// On being promoted, an Adult node becomes an Elder.
-    BecomeElder,
+    AssumeElderDuties,
+    ///
+    InitSectionWallet(WalletInfo),
     /// Sending messages on to the network.
     ProcessMessaging(NodeMessagingDuty),
     /// Receiving and processing events from the network.
@@ -141,8 +143,9 @@ impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RegisterWallet(_) => write!(f, "RegisterWallet"),
-            Self::BecomeAdult => write!(f, "BecomeAdult"),
-            Self::BecomeElder => write!(f, "BecomeElder"),
+            Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),
+            Self::AssumeElderDuties => write!(f, "AssumeElderDuties"),
+            Self::InitSectionWallet { .. } => write!(f, "InitSectionWallet"),
             Self::ProcessMessaging(duty) => duty.fmt(f),
             Self::ProcessNetworkEvent(event) => event.fmt(f),
             Self::NoOp => write!(f, "No op."),
@@ -440,11 +443,13 @@ pub enum ChunkReplicationQuery {
     GetChunk(BlobAddress),
 }
 
-/// Cmds carried out on AT2 Replicas.
+/// Cmds carried out on Adults.
 #[derive(Debug)]
 #[allow(clippy::clippy::large_enum_variant)]
 pub enum ChunkReplicationCmd {
-    /// Request for chunk
+    /// An imperament to retrieve
+    /// a chunk from current holders, in order
+    /// to replicate it locally.
     ReplicateChunk {
         ///
         current_holders: BTreeSet<XorName>,
@@ -522,7 +527,7 @@ pub enum RewardDuty {
 pub enum RewardCmd {
     /// Initiates a new SectionActor with the
     /// state of existing Replicas in the group.
-    InitiateSectionActor(Vec<ReplicaEvent>),
+    InitiateSectionWallet(WalletInfo),
     /// With the node id.
     AddNewNode(XorName),
     /// Set the account for a node.
@@ -568,7 +573,7 @@ pub enum RewardCmd {
 pub enum RewardQuery {
     /// When a node is relocated from us, the other
     /// section will query for the node wallet id.
-    GetWalletId {
+    GetNodeWalletId {
         /// The id of the node at the previous section.
         old_node_id: XorName,
         /// The id of the node at its new section (i.e. this one).
@@ -635,7 +640,9 @@ impl Into<NodeOperation> for TransferDuty {
 #[derive(Debug)]
 pub enum TransferQuery {
     /// Get section actor transfers.
-    GetSectionActorHistory,
+    CatchUpWithSectionWallet(PublicKey),
+    /// Get section actor transfers.
+    GetNewSectionWallet(PublicKey),
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(PublicKey),
     /// Get key balance.

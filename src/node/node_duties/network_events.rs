@@ -7,10 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::NetworkMsgAnalysis;
-use crate::node::{
-    duty_cfg::DutyConfig,
-    node_ops::{ElderDuty, NodeOperation},
-};
+use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
 use crate::{Error, Network, Result};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
@@ -23,13 +20,12 @@ use xor_name::XorName;
 /// Maps events from the transport layer
 /// into domain messages for the various modules.
 pub struct NetworkEvents {
-    duty_cfg: DutyConfig,
     analysis: NetworkMsgAnalysis,
 }
 
 impl NetworkEvents {
-    pub fn new(duty_cfg: DutyConfig, analysis: NetworkMsgAnalysis) -> Self {
-        Self { duty_cfg, analysis }
+    pub fn new(analysis: NetworkMsgAnalysis) -> Self {
+        Self { analysis }
     }
 
     // Dump elders and adults count
@@ -58,7 +54,6 @@ impl NetworkEvents {
         network: &Network,
     ) -> Result<NodeOperation> {
         use ElderDuty::*;
-
         trace!("Processing Routing Event: {:?}", event);
         match event {
             RoutingEvent::MemberLeft { name, age } => {
@@ -110,32 +105,21 @@ impl NetworkEvents {
                 prefix,
                 self_status_change,
             } => {
-                let mut ops = Vec::new();
-                match self_status_change {
-                    NodeElderChange::Promoted => ops.push(self.duty_cfg.setup_as_elder().await?),
-                    NodeElderChange::Demoted => {
-                        let age = network.age().await;
-                        if age > MIN_AGE {
-                            info!("Node promoted to Adult");
-                            info!("Our Age: {:?}", age);
-                            ops.push(self.duty_cfg.setup_as_adult()?);
-                        } else {
-                            info!("We are not Adult, do nothing");
-                            info!("Our Age: {:?}", age);
-                        }
-                    }
-                    NodeElderChange::None => {
-                        trace!("Node status has not changed");
-                    }
-                }
-                ops.push(
-                    ProcessElderChange {
+                let initial_op = match self_status_change {
+                    NodeElderChange::Promoted => NodeDuty::AssumeElderDuties.into(),
+                    NodeElderChange::Demoted => NodeDuty::AssumeAdultDuties.into(),
+                    NodeElderChange::None => NodeOperation::NoOp,
+                };
+                let ops = vec![
+                    initial_op,
+                    NodeDuty::InitiateElderChange {
                         prefix,
                         key: PublicKey::Bls(key),
                         elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
                     }
                     .into(),
-                );
+                ];
+
                 Ok(ops.into())
             }
             RoutingEvent::Relocated { .. } => {
@@ -144,7 +128,7 @@ impl NetworkEvents {
                 if age > MIN_AGE {
                     info!("Node promoted to Adult");
                     info!("Our Age: {:?}", age);
-                    self.duty_cfg.setup_as_adult()
+                    Ok(NodeDuty::AssumeAdultDuties.into())
                 } else {
                     info!("Our AGE: {:?}", age);
                     Ok(NodeOperation::NoOp)

@@ -18,7 +18,7 @@ use crate::{
     Network, Result,
 };
 use log::{debug, info, trace};
-use sn_data_types::PublicKey;
+use sn_data_types::{PublicKey, WalletInfo};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
@@ -31,12 +31,17 @@ pub struct ElderDuties {
 }
 
 impl ElderDuties {
-    pub async fn new(info: &NodeInfo, used_space: UsedSpace, network: Network) -> Result<Self> {
+    pub async fn new(
+        info: &NodeInfo,
+        wallet_info: WalletInfo,
+        used_space: UsedSpace,
+        network: Network,
+    ) -> Result<Self> {
         let prefix = network.our_prefix().await;
         let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
         let rate_limit = RateLimit::new(network.clone(), Capacity::new(dbs.clone()));
         let key_section = KeySection::new(info, rate_limit, network.clone()).await?;
-        let data_section = DataSection::new(info, dbs, used_space, network).await?;
+        let data_section = DataSection::new(info, dbs, used_space, wallet_info, network).await?;
         Ok(Self {
             prefix,
             key_section,
@@ -50,10 +55,13 @@ impl ElderDuties {
     pub async fn initiate(&mut self, first: bool) -> Result<NodeOperation> {
         let mut ops = vec![];
         if first {
-            ops.push(self.key_section.init_first().await?);
+            // if we are genesis
+            // does local init, with no roundrip via network messaging
+            ops.push(self.key_section.init_genesis_node().await?);
+        } else {
+            ops.push(self.key_section.catchup_with_section().await?);
+            ops.push(self.data_section.catchup_with_section().await?);
         }
-        ops.push(self.key_section.catchup_with_section().await?);
-        //ops.push(self.data_section.catchup_with_section().await?);
 
         Ok(ops.into())
     }
