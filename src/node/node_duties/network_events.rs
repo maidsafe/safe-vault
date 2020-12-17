@@ -58,10 +58,7 @@ impl NetworkEvents {
                 age,
                 startup_relocation,
             } => {
-                if startup_relocation {
-                    trace!("New node has joined the network");
-                    Ok(ProcessNewMember(XorName(name.0)).into())
-                } else if let Some(prev_name) = previous_name {
+                if let Some(prev_name) = previous_name {
                     trace!("New member has joined the section");
                     let first: NodeOperation = ProcessRelocatedMember {
                         old_node_id: XorName(prev_name.0),
@@ -78,8 +75,11 @@ impl NetworkEvents {
                         Ok(first)
                     }
                 } else {
-                    trace!("Invalid member config");
-                    Err(Error::Logic("Invalid member config".to_string()))
+                    trace!(
+                        "New node has joined the network. startup_relocation: ({})",
+                        startup_relocation
+                    );
+                    Ok(ProcessNewMember(XorName(name.0)).into())
                 }
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
