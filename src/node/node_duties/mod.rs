@@ -186,7 +186,7 @@ impl NodeDuties {
 
         trace!("Beginning transition to Elder duties.");
         let wrapping =
-            NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
+            NodeMsgWrapping::new(self.node_info.keys(), sn_messaging::NodeDuties::NodeConfig);
         if let Some(wallet_id) = self.network_api.section_public_key().await {
             use NodeTransferQuery::GetNewSectionWallet;
             return wrapping

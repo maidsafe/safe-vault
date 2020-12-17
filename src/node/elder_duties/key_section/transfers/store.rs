@@ -9,20 +9,28 @@
 use crate::{utils, utils::Init, Error, Result, ToDbKey};
 use log::{debug, trace};
 use pickledb::PickleDb;
-use sn_data_types::ReplicaEvent;
-use std::path::{Path, PathBuf};
+use serde::{de::DeserializeOwned, Serialize};
+use std::{
+    fmt::Debug,
+    marker::PhantomData,
+    path::{Path, PathBuf},
+};
 use xor_name::XorName;
 
 const TRANSFERS_DIR_NAME: &str = "transfers";
 const DB_EXTENSION: &str = ".db";
 
 /// Disk storage for transfers.
-pub struct TransferStore {
+pub struct TransferStore<TEvent: Debug + Serialize + DeserializeOwned> {
     id: XorName,
     db: PickleDb,
+    _phantom: PhantomData<TEvent>,
 }
 
-impl TransferStore {
+impl<'a, TEvent: Debug + Serialize + DeserializeOwned> TransferStore<TEvent>
+where
+    TEvent: 'a,
+{
     pub fn new(id: XorName, root_dir: &PathBuf, init_mode: Init) -> Result<Self> {
         let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME));
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
@@ -30,6 +38,7 @@ impl TransferStore {
             id,
             db: utils::new_auto_dump_db(db_dir.as_path(), db_name, init_mode)?,
             //db: utils::new_periodic_dump_db(db_dir.as_path(), db_name, init_mode)?,
+            _phantom: PhantomData::default(),
         })
     }
 
@@ -39,17 +48,17 @@ impl TransferStore {
     }
 
     ///
-    pub fn get_all(&self) -> Vec<ReplicaEvent> {
+    pub fn get_all(&self) -> Vec<TEvent> {
         trace!(
             "Getting all events from transfer store w/id: {:?}",
             self.id()
         );
         let keys = self.db.get_all();
 
-        let mut events: Vec<(usize, ReplicaEvent)> = keys
+        let mut events: Vec<(usize, TEvent)> = keys
             .iter()
             .filter_map(|key| {
-                let value = self.db.get::<ReplicaEvent>(key);
+                let value = self.db.get::<TEvent>(key);
                 let key = key.parse::<usize>();
                 match value {
                     Some(v) => match key {
@@ -63,43 +72,50 @@ impl TransferStore {
 
         events.sort_by(|(key_a, _), (key_b, _)| key_a.partial_cmp(key_b).unwrap());
 
-        let events: Vec<ReplicaEvent> = events.into_iter().map(|(_, val)| val).collect();
+        let events: Vec<TEvent> = events.into_iter().map(|(_, val)| val).collect();
 
         trace!("all events {:?} ", events);
         events
     }
 
     ///
-    pub fn try_insert(&mut self, event: ReplicaEvent) -> Result<()> {
+    pub fn try_insert(&mut self, event: TEvent) -> Result<()> {
         debug!("Trying to insert replica event: {:?}", event);
         let key = &self.db.total_keys().to_string();
-        match event {
-            ReplicaEvent::KnownGroupAdded(_e) => unimplemented!("to be deprecated"),
-            ReplicaEvent::TransferPropagated(e) => {
-                if self.db.exists(key) {
-                    return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
-                }
-                self.db
-                    .set(key, &ReplicaEvent::TransferPropagated(e))
-                    .map_err(Error::PickleDb)
-            }
-            ReplicaEvent::TransferValidated(e) => {
-                if self.db.exists(key) {
-                    return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
-                }
-                self.db
-                    .set(key, &ReplicaEvent::TransferValidated(e))
-                    .map_err(Error::PickleDb)
-            }
-            ReplicaEvent::TransferRegistered(e) => {
-                if self.db.exists(key) {
-                    return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
-                }
-                self.db
-                    .set(key, &ReplicaEvent::TransferRegistered(e))
-                    .map_err(Error::PickleDb)
-            }
+        if self.db.exists(key) {
+            return Err(Error::Logic(format!(
+                "Key exists: {}. Event: {:?}",
+                key, event
+            )));
         }
+        self.db.set(key, &event).map_err(Error::PickleDb)
+        // match event {
+        //     ReplicaEvent::KnownGroupAdded(_e) => unimplemented!("to be deprecated"),
+        //     ReplicaEvent::TransferPropagated(e) => {
+        //         if self.db.exists(key) {
+        //             return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
+        //         }
+        //         self.db
+        //             .set(key, &ReplicaEvent::TransferPropagated(e))
+        //             .map_err(Error::PickleDb)
+        //     }
+        //     ReplicaEvent::TransferValidated(e) => {
+        //         if self.db.exists(key) {
+        //             return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
+        //         }
+        //         self.db
+        //             .set(key, &ReplicaEvent::TransferValidated(e))
+        //             .map_err(Error::PickleDb)
+        //     }
+        //     ReplicaEvent::TransferRegistered(e) => {
+        //         if self.db.exists(key) {
+        //             return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
+        //         }
+        //         self.db
+        //             .set(key, &ReplicaEvent::TransferRegistered(e))
+        //             .map_err(Error::PickleDb)
+        //     }
+        // }
     }
 }
 
@@ -108,7 +124,7 @@ mod test {
     use super::*;
     use crate::Result;
     use bls::SecretKey;
-    use sn_data_types::{PublicKey, TransferPropagated};
+    use sn_data_types::{PublicKey, ReplicaEvent, TransferPropagated};
     use sn_transfers::get_genesis;
     use tempdir::TempDir;
 

@@ -447,7 +447,6 @@ impl Transfers {
                 query_origin: origin,
             })
             .await
-            .map_err(convert_to_error_message);
     }
 
     async fn get_new_section_wallet(
@@ -465,7 +464,7 @@ impl Transfers {
                 replicas: self.replicas.replicas_pk_set(),
                 history,
             }),
-            Err(e) => Err(NdError::Unexpected(e.to_string())),
+            Err(e) => Err(convert_to_error_message(e)),
         };
 
         self.wrapping

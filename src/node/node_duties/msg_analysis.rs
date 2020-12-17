@@ -222,16 +222,11 @@ impl NetworkMsgAnalysis {
             res
         };
         let from_transfers_to_node_cfg = || {
-            let res = matches!(msg.message, Message::NodeQueryResponse {
+            matches!(msg.message, Message::NodeQueryResponse {
                 response:
                     Transfers(CatchUpWithSectionWallet(_)),
                 ..
-            });
-            info!(
-                "is accumulating transfer response (CatchUpWithSectionWallet): {:?}",
-                res
-            );
-            res
+            })
         };
 
         let from_transfers = || from_transfers_to_node_cfg() && from_single_transfer_elder();
@@ -306,24 +301,40 @@ impl NetworkMsgAnalysis {
         };
 
         use NodeQueryResponse::Rewards;
-        use NodeRewardQueryResponse::GetNodeWalletId as GetNodeWalletIdResponse;
+        use NodeRewardQueryResponse::GetNodeWalletId;
         let from_single_rewards_elder = || {
-            let res = msg.most_recent_sender().is_elder()
-                && matches!(duty, Duty::Elder(ElderDuties::Rewards));
-            info!("from single rewards elder: {:?}", res);
-            res
+            msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
         let from_rewards_to_rewards = || {
             matches!(msg.message, Message::NodeQueryResponse {
-                response: Rewards(GetNodeWalletIdResponse { .. }),
+                response: Rewards(GetNodeWalletId { .. }),
+                ..
+            })
+        };
+
+        use NodeQueryResponse::*;
+        use NodeTransferQueryResponse::*;
+        let from_single_transfer_elder = || {
+            msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+        };
+        let from_transfer_to_rewards = || {
+            matches!(msg.message, Message::NodeQueryResponse {
+                response: Transfers(GetNewSectionWallet(_)),
+                ..
+            }) || matches!(msg.message, Message::NodeQueryResponse {
+                response:
+                    Transfers(CatchUpWithSectionWallet(_)),
                 ..
             })
         };
 
         let from_rewards = || from_rewards_to_rewards() && from_single_rewards_elder();
+        let from_transfers = || from_transfer_to_rewards() && from_single_transfer_elder();
 
-        let accumulate_for_rewards =
-            from_rewards() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let accumulate_for_rewards = (from_rewards() || from_transfers())
+            && self.is_dst_for(msg).await?
+            && self.is_elder().await;
 
         Ok(accumulate_for_rewards)
     }
@@ -707,21 +718,54 @@ impl NetworkMsgAnalysis {
         let shall_process_accumulated =
             from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
 
+        use NodeQueryResponse::Rewards;
+        use NodeRewardQueryResponse::GetNodeWalletId;
+        if shall_process_accumulated {
+            return match &msg.message {
+                Message::NodeQueryResponse {
+                    response: Rewards(GetNodeWalletId(Ok((wallet_id, new_node_id)))),
+                    id,
+                    ..
+                } => Ok(RewardDuty::ProcessCmd {
+                    cmd: RewardCmd::ActivateNodeRewards {
+                        id: *wallet_id,
+                        node_id: *new_node_id,
+                    },
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                }),
+                _ => Ok(RewardDuty::NoOp),
+            };
+        }
+
+        let from_transfer_section = || {
+            sender.is_section()
+                || (sender.address() == dst) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+        };
+        let shall_process_accumulated =
+            from_transfer_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+
         if !shall_process_accumulated {
             return Ok(RewardDuty::NoOp);
         }
-        use NodeQueryResponse::Rewards;
-        use NodeRewardQueryResponse::GetNodeWalletId;
+        use NodeQueryResponse::Transfers;
+        use NodeTransferQueryResponse::*;
         match &msg.message {
             Message::NodeQueryResponse {
-                response: Rewards(GetNodeWalletId(Ok((wallet_id, new_node_id)))),
+                response: Transfers(GetNewSectionWallet(result)),
                 id,
                 ..
             } => Ok(RewardDuty::ProcessCmd {
-                cmd: RewardCmd::ActivateNodeRewards {
-                    id: *wallet_id,
-                    node_id: *new_node_id,
-                },
+                cmd: RewardCmd::InitiateSectionWallet(result.clone()?),
+                msg_id: *id,
+                origin: msg.origin.address(),
+            }),
+            Message::NodeQueryResponse {
+                response: Transfers(CatchUpWithSectionWallet(result)),
+                id,
+                ..
+            } => Ok(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::InitiateSectionWallet(result.clone()?),
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
@@ -761,7 +805,7 @@ impl NetworkMsgAnalysis {
         }
 
         use NodeQueryResponse::Transfers;
-        use NodeTransferQueryResponse::GetReplicaEvents;
+        use NodeTransferQueryResponse::*;
         match &msg.message {
             Message::NodeQueryResponse {
                 response: Transfers(GetReplicaEvents(events)),
@@ -877,6 +921,7 @@ impl NetworkMsgAnalysis {
             };
         }
 
+        // CatchUpWithSectionWallet is sent both by NodeCfg and Rewards.
         let from_node_cfg = || {
             msg.most_recent_sender().is_any_node()
                 && matches!(duty, Duty::Node(NodeDuties::NodeConfig))

@@ -20,7 +20,7 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Error, Network, Result,
 };
-use log::info;
+//use log::info;
 use sn_data_types::WalletInfo;
 use sn_messaging::{Address, MessageId};
 use sn_routing::Prefix;

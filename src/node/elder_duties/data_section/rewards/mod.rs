@@ -407,7 +407,7 @@ impl Rewards {
                 return self
                     .wrapping
                     .send_to_node(Message::NodeQueryResponse {
-                        response: Rewards(GetWalletId(Err(ErrorMessage::NodeWasNotRelocated))),
+                        response: Rewards(GetNodeWalletId(Err(ErrorMessage::NodeWasNotRelocated))),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
                         query_origin: origin.clone(),
