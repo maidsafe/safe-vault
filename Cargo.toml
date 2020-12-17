@@ -84,9 +84,8 @@ futures = "~0.3.5"
   [dev_dependencies.sn_client]
   version = "0.44.3"
   features = [ "simulated-payouts" ]
-  git = "https://github.com/oetyng/sn_client"
-  branch = "refactor-chunk-duplication"
-  # path="../sn_client"
+  git = "https://github.com/yoga07/sn_client"
+  branch = "testnet"
 
   [dev_dependencies.tokio]
   version = "~0.2.21"
