@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.15](https://github.com/maidsafe/sn_node/compare/v0.25.14...v0.25.15) (2020-12-17)
+
+
+### Bug Fixes
+
+* disregard startup_relocation ([5117e30](https://github.com/maidsafe/sn_node/commit/5117e30b0b1b3d7dc2efdb0ce676559176a66728))
+
 ### [0.25.14](https://github.com/maidsafe/sn_node/compare/v0.25.13...v0.25.14) (2020-12-17)
 
 
