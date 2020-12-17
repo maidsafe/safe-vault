@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.13](https://github.com/maidsafe/sn_node/compare/v0.25.12...v0.25.13) (2020-12-17)
+
+
+### Features
+
+* **section_funds:** initiate section actor WIP ([e093675](https://github.com/maidsafe/sn_node/commit/e09367560975f0197e919454e97186338cfa0457))
+* **storage:** impl adult storage tracking at Elders ([11215bd](https://github.com/maidsafe/sn_node/commit/11215bd241bd653b9cc739202c63d164be943e2b))
+* **storage:** monitor section storage and flip joins_allowed accordingly ([24ff1ce](https://github.com/maidsafe/sn_node/commit/24ff1ce94346cd04213b5c1bd510a0e408d3ee50))
+
+
+### Bug Fixes
+
+* **all:** remove unused dependency and fix clippy issues ([4ed5a73](https://github.com/maidsafe/sn_node/commit/4ed5a73e3e43a2be96f0d12b58ec86d2094385fb))
+* **blob:** fix blob msg accumulation ([4becc9d](https://github.com/maidsafe/sn_node/commit/4becc9defc54dbadabe8c297d61811e9a795bf9f))
+* **blob:** fix verification of blob replication messages ([201f9e8](https://github.com/maidsafe/sn_node/commit/201f9e8046c0eefed14d974987bd8a2acd2a1d71))
+* **blob:** short circuit blob query messaging ([4b39dc8](https://github.com/maidsafe/sn_node/commit/4b39dc87aafcb8172366303f29e6b5db66fd9161))
+* **messagning:** fix msg wrapping at adults and elders ([0aa3b70](https://github.com/maidsafe/sn_node/commit/0aa3b708c9ae10f320bf2e86cebb5b14fca9b655))
+* **msg_analysis:** accumulate node queries + resp ([9fc4363](https://github.com/maidsafe/sn_node/commit/9fc436365ceaa1f9d9c09e388d0d2fcca314d0ee))
+* **msg_analysis:** remove incorrect accumulation ([e270455](https://github.com/maidsafe/sn_node/commit/e270455083894d3a5ab1cf3ff6453ebd03a47dcf))
+* **sn_node:** set sn_node thread stack size ([9a42cd9](https://github.com/maidsafe/sn_node/commit/9a42cd9e829551a643e93a0616e03a2913b23db4))
+* **storage:** fix storage calculation and improve logging ([77fb9f6](https://github.com/maidsafe/sn_node/commit/77fb9f667a10b3b092897a2cee142ceb96675fe4))
+* **storage:** increase default maximum capacity ([8dfc35c](https://github.com/maidsafe/sn_node/commit/8dfc35c0c385b489b9482f46103b6c89347f2fd0))
+* compile + clippy errors ([d6a51a4](https://github.com/maidsafe/sn_node/commit/d6a51a44a157f256837e21db2fb2d21f87124194))
+* do not accumulate node query ([7b3c0f0](https://github.com/maidsafe/sn_node/commit/7b3c0f0529a26aac5d3801d35ca381da9b6f1a15))
+* don't apply transfers to store if already seen. ([9f895ad](https://github.com/maidsafe/sn_node/commit/9f895ad22b9996844cde9e7552033812f45aec37))
+* Ensure to store TransferStore in lock ([5172011](https://github.com/maidsafe/sn_node/commit/51720117ac7723dd1354141f87218c439c1a8828))
+* hex encode serialised key ([8bbc235](https://github.com/maidsafe/sn_node/commit/8bbc2352c46abd80ea4e047ab878ffa9fcd6806b))
+* re-add disabled match branch ([4fe82ec](https://github.com/maidsafe/sn_node/commit/4fe82ec8f6edf01292e81e4c8feb5c97fc00f2d9))
+* return empty vec when key's transfer db doesn't exist ([05fb09e](https://github.com/maidsafe/sn_node/commit/05fb09e85f89ad9cb5462b022d7f0e4d56b2a6f6))
+* **tests:** make tests compile and run ([c8b6037](https://github.com/maidsafe/sn_node/commit/c8b60370e3b03b152f85bd6847e3093be1633057))
+* **transfers:** fix genesis, sigs and store keys ([194a9a3](https://github.com/maidsafe/sn_node/commit/194a9a317b0ed0880ba74f136a3e3898db7a949c))
+* reimplement overwritten hex encode fix ([aa50061](https://github.com/maidsafe/sn_node/commit/aa50061efe35d2069a9ac4612513dd7d23a56a96))
+* **wallet:** lock over the db on write ([a6f5127](https://github.com/maidsafe/sn_node/commit/a6f5127f0130c56fdac4ce0429ff3ebedbae5995))
+
 ### [0.25.12](https://github.com/maidsafe/sn_node/compare/v0.25.11...v0.25.12) (2020-12-16)
 
 
