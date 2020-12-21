@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.17](https://github.com/maidsafe/sn_node/compare/v0.25.16...v0.25.17) (2020-12-21)
+
+
+### Bug Fixes
+
+* return Balance(0) when no db found ([99f7308](https://github.com/maidsafe/sn_node/commit/99f73087777498bbae3b2522e5f2c0cf993589d3))
+
 ### [0.25.16](https://github.com/maidsafe/sn_node/compare/v0.25.15...v0.25.16) (2020-12-21)
 
 ### [0.25.15](https://github.com/maidsafe/sn_node/compare/v0.25.14...v0.25.15) (2020-12-17)
