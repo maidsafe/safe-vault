@@ -2715,7 +2715,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.25.16"
+version = "0.25.17"
 dependencies = [
  "async-log",
  "base64 0.10.1",
@@ -2739,7 +2739,6 @@ dependencies = [
  "quick-error",
  "rand 0.7.3",
  "rand_chacha",
- "self_encryption",
  "self_update",
  "serde",
  "serde_json",
