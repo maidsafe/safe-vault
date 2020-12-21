@@ -76,7 +76,7 @@ impl Replicas {
         let store = TransferStore::new(id.into(), &self.root_dir, Init::Load);
 
         if let Err(error) = store {
-            if "PickleDb error: No such file or directory" == error.to_string() {
+            if error.to_string().contains("No such file or directory") {
                 // we have no history yet, so lets report that.
                 return Ok(vec![]);
             }
@@ -92,7 +92,12 @@ impl Replicas {
     ///
     pub async fn balance(&self, id: PublicKey) -> Result<Money> {
         debug!("Replica: Getting balance of: {:?}", id);
-        let store = TransferStore::new(id.into(), &self.root_dir, Init::Load)?;
+        let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
+            Ok(store) => store,
+            // store load failed, so we return 0 balance
+            Err(error) => return Ok(Money::from_nano(0)),
+        };
+
         let wallet = self.load_wallet(&store, id).await?;
         Ok(wallet.balance())
     }
