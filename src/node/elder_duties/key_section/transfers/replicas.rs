@@ -95,7 +95,7 @@ impl Replicas {
         let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
             Ok(store) => store,
             // store load failed, so we return 0 balance
-            Err(error) => return Ok(Money::from_nano(0)),
+            Err(_) => return Ok(Money::from_nano(0)),
         };
 
         let wallet = self.load_wallet(&store, id).await?;
