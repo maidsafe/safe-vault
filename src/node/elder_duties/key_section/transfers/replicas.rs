@@ -67,39 +67,36 @@ impl Replicas {
             .map(|store| store.get_all())
             .flatten()
             .collect();
+
         Ok(events)
     }
 
     /// History of events
     pub async fn history(&self, id: PublicKey) -> Result<Vec<ReplicaEvent>> {
         debug!("Replica history get");
-        let store = TransferStore::new(id.into(), &self.root_dir, Init::Load);
-
-        if let Err(error) = store {
-            if error.to_string().contains("No such file or directory") {
+        match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
+            Err(Error::PickleDb(error))
+                if error.to_string().contains("No such file or directory") =>
+            {
                 // we have no history yet, so lets report that.
-                return Ok(vec![]);
+                Ok(vec![])
             }
-
-            return Err(error);
-        };
-
-        let store = store?;
-
-        Ok(store.get_all())
+            Err(error) => Err(error),
+            Ok(store) => Ok(store.get_all()),
+        }
     }
 
     ///
     pub async fn balance(&self, id: PublicKey) -> Result<Money> {
         debug!("Replica: Getting balance of: {:?}", id);
-        let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
-            Ok(store) => store,
+        match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
+            Ok(store) => {
+                let wallet = self.load_wallet(&store, id).await?;
+                Ok(wallet.balance())
+            }
             // store load failed, so we return 0 balance
-            Err(_) => return Ok(Money::from_nano(0)),
-        };
-
-        let wallet = self.load_wallet(&store, id).await?;
-        Ok(wallet.balance())
+            Err(_) => Ok(Money::from_nano(0)),
+        }
     }
 
     /// Get the replica's PK set

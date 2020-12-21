@@ -46,20 +46,20 @@ pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
         let db = PickleDb::new_bin(db_path, PickleDbDumpPolicy::AutoDump);
         return Ok(db);
     }
+
     debug!(
         "Loading auto dump database at {}, init mode was {:?}",
         db_path.display(),
         init_mode
     );
-    let result = PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
-    if let Err(ref error) = &result {
+    PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump).or_else(|error| {
         error!(
             "Failed to load auto dump db at {}: {}",
             db_path.display(),
             error
         );
-    }
-    Ok(result?)
+        Err(error.into())
+    })
 }
 
 #[allow(unused)]

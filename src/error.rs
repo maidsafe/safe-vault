@@ -45,6 +45,7 @@ quick_error! {
         }
         /// PickleDB error.
         PickleDb(error: pickledb::error::Error) {
+            cause(error)
             display("PickleDb error: {}", error)
             from()
         }

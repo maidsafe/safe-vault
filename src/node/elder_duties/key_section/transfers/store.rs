@@ -26,11 +26,9 @@ impl TransferStore {
     pub fn new(id: XorName, root_dir: &PathBuf, init_mode: Init) -> Result<Self> {
         let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME));
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
-        Ok(Self {
-            id,
-            db: utils::new_auto_dump_db(db_dir.as_path(), db_name, init_mode)?,
-            //db: utils::new_periodic_dump_db(db_dir.as_path(), db_name, init_mode)?,
-        })
+        let db = utils::new_auto_dump_db(db_dir.as_path(), db_name, init_mode)?;
+
+        Ok(Self { id, db })
     }
 
     ///
