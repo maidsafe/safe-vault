@@ -56,10 +56,21 @@ impl NetworkEvents {
                 name,
                 previous_name,
                 age,
-                startup_relocation,
+                ..
             } => {
+                info!("New member has joined the section");
+                info!("---------------------------------------------");
+                info!(
+                    "| No. of Elders in our Section: {:?} |",
+                    self.analysis.no_of_elders().await
+                );
+                info!(
+                    "| No. of Adults in our Section: {:?} |",
+                    self.analysis.no_of_adults().await
+                );
+                info!("---------------------------------------------");
                 if let Some(prev_name) = previous_name {
-                    trace!("New member has joined the section");
+                    trace!("The new member is a Relocated Node");
                     let first: NodeOperation = ProcessRelocatedMember {
                         old_node_id: XorName(prev_name.0),
                         new_node_id: XorName(name.0),
@@ -68,17 +79,10 @@ impl NetworkEvents {
                     .into();
 
                     // Switch joins_allowed off a new adult joining.
-                    if age > MIN_AGE {
-                        let second: NodeOperation = SwitchNodeJoin(false).into();
-                        Ok(vec![first, second].into())
-                    } else {
-                        Ok(first)
-                    }
+                    let second: NodeOperation = SwitchNodeJoin(false).into();
+                    Ok(vec![first, second].into())
                 } else {
-                    trace!(
-                        "New node has joined the network. startup_relocation: ({})",
-                        startup_relocation
-                    );
+                    trace!("New node has just joined the network and is a fresh node.",);
                     Ok(ProcessNewMember(XorName(name.0)).into())
                 }
             }

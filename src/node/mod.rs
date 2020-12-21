@@ -96,7 +96,7 @@ impl Node {
         let age = network_api.age().await;
         info!("Our Age: {:?}", age);
 
-        info!("Fetching age group");
+        info!("Fetching Age bracket");
         let age_group = if !network_api.is_elder().await && age > MIN_AGE {
             info!("We are Adult");
             Adult
@@ -107,10 +107,7 @@ impl Node {
 
         let mut duties = NodeDuties::new(node_info, network_api.clone()).await;
         let _ = match age_group {
-            Infant => {
-                info!("Becoming Infant, do nothing.");
-                Ok(NodeOperation::NoOp)
-            }
+            Infant => Ok(NodeOperation::NoOp),
             Adult => {
                 info!("Becoming Adult");
                 let _ = duties
@@ -121,6 +118,7 @@ impl Node {
                     .await
             }
             Elder => {
+                info!("Becoming Elder");
                 duties
                     .process_node_duty(node_ops::NodeDuty::BecomeElder)
                     .await

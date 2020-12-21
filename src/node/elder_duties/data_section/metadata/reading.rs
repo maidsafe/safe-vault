@@ -13,7 +13,8 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::NodeMessagingDuty;
-use crate::Result;
+use crate::{Error, Result};
+use log::info;
 use sn_data_types::{
     AccountRead, BlobRead, DataQuery, MapRead, Message, MessageId, MsgEnvelope, MsgSender, Query,
     SequenceRead,
@@ -27,7 +28,7 @@ pub(super) async fn get_result(
     let msg_id = msg.id();
     let origin = msg.origin;
     let proxies = msg.proxies;
-    match msg.message {
+    let res = match msg.message {
         Message::Query {
             query: Query::Data(data_query),
             ..
@@ -37,8 +38,14 @@ pub(super) async fn get_result(
             Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin).await,
             Account(read) => account(read, stores.account_storage(), msg_id, origin).await,
         },
-        _ => unreachable!("Logic error"),
+        _ => Err(Error::Logic(
+            "Unreachable pattern when reading data.".to_string(),
+        )),
+    };
+    if res.is_ok() {
+        info!("Read data queried by message: '{:?}' successfully!", msg_id);
     }
+    res
 }
 
 async fn blob(

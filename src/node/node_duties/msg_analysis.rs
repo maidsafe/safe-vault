@@ -866,11 +866,19 @@ impl NetworkMsgAnalysis {
         self.routing.matches_our_prefix(*address).await
     }
 
-    async fn is_elder(&self) -> bool {
+    pub async fn is_elder(&self) -> bool {
         self.routing.is_elder().await
     }
 
     pub async fn is_adult(&self) -> bool {
         !self.routing.is_elder().await && self.routing.age().await > MIN_AGE
+    }
+
+    pub async fn no_of_elders(&self) -> usize {
+        self.routing.our_elder_addresses().await.len()
+    }
+
+    pub async fn no_of_adults(&self) -> usize {
+        self.routing.our_adults().await.len()
     }
 }

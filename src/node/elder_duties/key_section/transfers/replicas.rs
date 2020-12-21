@@ -162,10 +162,8 @@ impl Replicas {
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, id).await?;
 
-        debug!("******************&&&&&swallet loadded");
+        debug!("Wallet loaded");
         let result = wallet.validate(&signed_transfer.debit, &signed_transfer.credit);
-
-        debug!("validation sezzzz: {:?}", result);
 
         let _ = result?;
         debug!("wallet valid");

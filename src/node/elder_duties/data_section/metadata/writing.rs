@@ -11,7 +11,7 @@ use super::{
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::{Blah, NodeMessagingDuty, NodeOperation};
-use crate::Result;
+use crate::{Error, Result};
 use log::info;
 use sn_data_types::{
     AccountWrite, BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
@@ -56,8 +56,13 @@ pub(super) async fn get_result(
                 account(write, stores.account_storage_mut(), msg_id, msg_origin).await
             }
         },
-        _ => unreachable!("Logic error"),
+        _ => Err(Error::Logic(
+            "Unreachable pattern when writing data.".to_string(),
+        )),
     };
+    if result.is_ok() {
+        info!("Wrote data from message: '{:?}' successfully!", msg_id);
+    }
     result.convert()
 }
 
