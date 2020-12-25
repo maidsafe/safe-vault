@@ -26,3 +26,4 @@ installer/docker/sn_node
 installer/docker/sn_node.*.config
 installer/docker/.env
 nodes
+node_data/*

@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
-const AGE_GROUP_FILENAME: &str = "age_group";
 const REWARD_PUBLIC_KEY_FILENAME: &str = "reward_public_key";
 const REWARD_SECRET_KEY_FILENAME: &str = "reward_secret_key";
 
@@ -29,22 +28,6 @@ pub async fn store_new_reward_keypair(
     Ok(())
 }
 
-/// Writes the info to disk.
-pub async fn store_age_group(root_dir: &Path, age_group: &AgeGroup) -> Result<()> {
-    let path = root_dir.join(AGE_GROUP_FILENAME);
-    fs::write(path, utils::serialise(age_group)?).await?;
-    Ok(())
-}
-
-/// Returns Some(AgeGroup) or None if file doesn't exist.
-pub async fn get_age_group(root_dir: &Path) -> Result<Option<AgeGroup>> {
-    let path = root_dir.join(AGE_GROUP_FILENAME);
-    if !path.is_file() {
-        return Ok(None);
-    }
-    let contents = fs::read(path).await?;
-    Ok(Some(bincode::deserialize(&contents)?))
-}
 
 /// A node is within one
 /// out of three age groups.
@@ -106,8 +89,8 @@ fn sk_to_hex(secret: &SecretKey) -> String {
     vec_to_hex(sk_serialised)
 }
 
-fn vec_to_hex(hash: Vec<u8>) -> String {
-    hash.iter().map(|b| format!("{:02x}", b)).collect()
+fn vec_to_hex(vec: Vec<u8>) -> String {
+    vec.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 fn parse_hex(hex_str: &str) -> Vec<u8> {

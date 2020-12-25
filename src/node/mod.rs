@@ -21,7 +21,7 @@ use crate::{
         keys::NodeSigningKeys,
         node_duties::NodeDuties,
         node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
-        state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup, NodeInfo},
+        state_db::{store_new_reward_keypair, AgeGroup, NodeInfo},
     },
     utils::Init,
     Config, Error, Network, Result,
@@ -64,19 +64,8 @@ impl Node {
             };
             res
         };
-        let age_group_task = async move {
-            let res: Result<AgeGroup>;
-            if let Some(age_group) = get_age_group(&root_dir).await? {
-                res = Ok(age_group)
-            } else {
-                let age_group = Infant;
-                store_age_group(root_dir, &age_group).await?;
-                res = Ok(age_group)
-            };
-            res
-        };
 
-        let (reward_key, _age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
+        let reward_key = reward_key_task.await?;
         let (network_api, network_events) = Network::new(config).await?;
         let keys = NodeSigningKeys::new(network_api.clone());
 
