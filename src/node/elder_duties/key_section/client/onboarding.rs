@@ -67,9 +67,7 @@ impl Onboarding {
             HandshakeRequest::Bootstrap(client_key) => {
                 self.try_bootstrap(peer_addr, &client_key, stream).await
             }
-            HandshakeRequest::Join(client_key) => {
-                self.try_join(peer_addr, client_key).await
-            }
+            HandshakeRequest::Join(client_key) => self.try_join(peer_addr, client_key).await,
         }
     }
 
@@ -89,10 +87,7 @@ impl Onboarding {
         stream: &mut SendStream,
     ) -> Result<()> {
         if !self.shall_bootstrap(&peer_addr) {
-            info!(
-                "Redundant bootstrap..: {} on {}",
-                client_key, peer_addr
-            );
+            info!("Redundant bootstrap..: {} on {}", client_key, peer_addr);
             return Ok(());
         }
         info!(
@@ -130,11 +125,7 @@ impl Onboarding {
     }
 
     /// Handles a received join request from a client.
-    async fn try_join (
-        &self,
-        peer_addr: SocketAddr,
-        client_key: PublicKey,
-    ) -> Result<()> {
+    async fn try_join(&self, peer_addr: SocketAddr, client_key: PublicKey) -> Result<()> {
         info!(
             "{}: Trying to join..: {} on {}",
             self, client_key, peer_addr
@@ -157,7 +148,6 @@ impl Onboarding {
         Ok(())
     }
 }
-
 
 impl Display for Onboarding {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {

@@ -99,7 +99,6 @@ pub(crate) fn new_periodic_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     Ok(result?)
 }
 
-
 pub(crate) fn serialise<T: Serialize>(data: &T) -> Result<Bytes> {
     let serialised_data = bincode::serialize(data).map_err(Error::Bincode)?;
     Ok(Bytes::copy_from_slice(serialised_data.as_slice()))
