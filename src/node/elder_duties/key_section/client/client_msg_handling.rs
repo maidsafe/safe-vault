@@ -53,7 +53,7 @@ impl ClientMsgHandling {
         let mut the_stream = stream;
 
         with_chaos!({
-            log::debug!("Chaos: Dropping handshake");
+            debug!("Chaos: Dropping handshake");
             return Ok(());
         });
 
@@ -100,7 +100,7 @@ impl ClientMsgHandling {
         trace!("Tracking incoming client message");
 
         with_chaos!({
-            log::debug!("Chaos: Dropping incoming message");
+            debug!("Chaos: Dropping incoming message");
             return Ok(());
         });
 

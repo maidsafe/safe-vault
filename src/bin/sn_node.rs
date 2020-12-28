@@ -27,7 +27,7 @@
     unused_results
 )]
 
-use log::{self, error, info};
+use log::{self, debug, error, info};
 use self_update::{cargo_crate_version, Status};
 use sn_node::{self, utils, write_connection_info, Config, Node};
 use std::{io::Write, process};
@@ -172,8 +172,8 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
         .fetch()?;
 
     if !releases.is_empty() {
-        log::debug!("Target for update is {}", target);
-        log::debug!("Found releases: {:#?}\n", releases);
+        debug!("Target for update is {}", target);
+        debug!("Found releases: {:#?}\n", releases);
         let bin_name = if target.contains("pc-windows") {
             "sn_node.exe"
         } else {
