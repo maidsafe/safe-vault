@@ -61,9 +61,7 @@ pub fn try_deserialize_msg(bytes: &Bytes) -> Result<MsgEnvelope> {
 
 pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Result<HandshakeRequest> {
     let hs = match bincode::deserialize(&bytes) {
-        Ok(hs @ HandshakeRequest::Bootstrap(_))
-        | Ok(hs @ HandshakeRequest::Join(_))
-        | Ok(hs @ HandshakeRequest::ChallengeResult(_)) => hs,
+        Ok(hs @ HandshakeRequest::Bootstrap(_)) | Ok(hs @ HandshakeRequest::Join(_)) => hs,
         Err(err) => {
             info!(
                 "Failed to deserialize client input from {} as a handshake: {}",

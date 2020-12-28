@@ -10,8 +10,7 @@ use crate::{utils, Network};
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, trace};
-use rand::{CryptoRng, Rng};
-use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
+use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey};
 use sn_routing::SendStream;
 use std::{
     fmt::{self, Display, Formatter},
@@ -27,7 +26,6 @@ use std::{
 /// taking place between a connecting client and
 /// the Elders of this section.
 pub struct Onboarding {
-    node_id: PublicKey,
     routing: Network,
     clients: DashMap<SocketAddr, PublicKey>,
     /// Map of new client connections to the challenge value we sent them.
@@ -35,9 +33,8 @@ pub struct Onboarding {
 }
 
 impl Onboarding {
-    pub fn new(node_id: PublicKey, routing: Network) -> Self {
+    pub fn new(routing: Network) -> Self {
         Self {
-            node_id,
             routing,
             clients: Default::default(),
             client_candidates: Default::default(),
@@ -60,22 +57,18 @@ impl Onboarding {
     //     }
     // }
 
-    pub async fn onboard_client<G: CryptoRng + Rng>(
+    pub async fn onboard_client(
         &self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
         stream: &mut SendStream,
-        rng: &mut G,
     ) -> Result<()> {
         match handshake {
             HandshakeRequest::Bootstrap(client_key) => {
                 self.try_bootstrap(peer_addr, &client_key, stream).await
             }
             HandshakeRequest::Join(client_key) => {
-                self.try_join(peer_addr, client_key, stream, rng).await
-            }
-            HandshakeRequest::ChallengeResult(signature) => {
-                self.receive_challenge_response(peer_addr, &signature)
+                self.try_join(peer_addr, client_key).await
             }
         }
     }
@@ -97,8 +90,8 @@ impl Onboarding {
     ) -> Result<()> {
         if !self.shall_bootstrap(&peer_addr) {
             info!(
-                "{}: Redundant bootstrap..: {} on {}",
-                self, client_key, peer_addr
+                "Redundant bootstrap..: {} on {}",
+                client_key, peer_addr
             );
             return Ok(());
         }
@@ -137,156 +130,34 @@ impl Onboarding {
     }
 
     /// Handles a received join request from a client.
-    async fn try_join<G: CryptoRng + Rng>(
+    async fn try_join (
         &self,
         peer_addr: SocketAddr,
         client_key: PublicKey,
-        stream: &mut SendStream,
-        rng: &mut G,
     ) -> Result<()> {
-        if self.clients.contains_key(&peer_addr) {
-            info!(
-                "{}: Client is already accepted..: {} on {}",
-                self, client_key, peer_addr
-            );
-            return Ok(());
-        }
         info!(
             "{}: Trying to join..: {} on {}",
             self, client_key, peer_addr
         );
         if self.routing.matches_our_prefix(client_key.into()).await {
-            let challenge = if let Some(challenge_ref) = self.client_candidates.get(&peer_addr) {
-                let (challenge, _) = challenge_ref.to_owned();
-                challenge
-            } else {
-                let challenge = utils::random_vec(rng, 8);
-                let _ = self
-                    .client_candidates
-                    .insert(peer_addr, (challenge.clone(), client_key));
-                challenge
+            match self.clients.insert(peer_addr, client_key) {
+                None => info!(
+                    "{}: Client is already accepted..: {} on {}",
+                    self, client_key, peer_addr
+                ),
+                Some(_) => info!("{}: Client Joined..: {} on {}", self, client_key, peer_addr),
             };
-
-            let bytes = utils::serialise(&HandshakeResponse::Challenge(self.node_id, challenge))?;
-
-            // Q: Hmmmm, what to do about this response.... do we need a duty response here?
-            let res = futures::executor::block_on(stream.send_user_msg(bytes));
-
-            match res {
-                Ok(()) => Ok(()),
-                Err(error) => {
-                    error!("Error sending on stream {:?}", error);
-                    Err(Error::Onboarding)
-                }
-            }
         } else {
             debug!(
                 "Client {} ({}) wants to join us but we are not its client handler",
                 client_key, peer_addr
-            );
-            Err(Error::Onboarding)
-        }
+            ); // FIXME - send error back to client
+            return Err(Error::Onboarding);
+        };
+        Ok(())
     }
-
-    /// Handles a received challenge response.
-    ///
-    /// Checks that the response contains a valid signature of the challenge we previously sent.
-    /// If a client requests the section info, we also send it.
-    fn receive_challenge_response(
-        &self,
-        peer_addr: SocketAddr,
-        signature: &Signature,
-    ) -> Result<()> {
-        trace!("Receive challenge response");
-        if self.clients.contains_key(&peer_addr) {
-            info!("{}: Client is already accepted (on {})", self, peer_addr);
-            return Ok(());
-        }
-        if let Some((_, (challenge, public_key))) = self.client_candidates.remove(&peer_addr) {
-            match public_key.verify(&signature, challenge) {
-                Ok(()) => {
-                    info!("{}: Accepted {} on {}.", self, public_key, peer_addr,);
-                    let _ = self.clients.insert(peer_addr, public_key);
-                    Ok(())
-                }
-                Err(err) => {
-                    info!(
-                        "{}: Challenge failed for {} on {}: {}",
-                        self, public_key, peer_addr, err
-                    );
-
-                    Err(Error::Onboarding)
-                }
-            }
-        } else {
-            info!(
-                "{}: {} supplied challenge response without us providing it.",
-                self, peer_addr
-            );
-
-            Err(Error::Onboarding)
-
-            // Some(NodeMessagingDuty::DisconnectClient(peer_addr))
-        }
-    }
-
-    // pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {
-    //     for client_key in self.lookup_client_and_its_apps(client) {
-    //         self.send_notification_to_client(&client_key, &TransferNotification(receipt.clone()));
-    //     }
-    // }
-
-    // pub(crate) fn send_notification_to_client(
-    //     &mut self,
-    //     client_key: &PublicId,
-    //     notification: &TransferNotification,
-    // ) {
-    //     let peer_addrs = self.lookup_client_peer_addrs(&client_key);
-
-    //     if peer_addrs.is_empty() {
-    //         warn!(
-    //             "{}: can't notify {} as none of the instances of the client is connected.",
-    //             self, client_key
-    //         );
-    //         return;
-    //     };
-
-    //     for peer_addr in peer_addrs {
-    //         self.send(
-    //             peer_addr,
-    //             &Message::TransferNotification {
-    //                 payload: notification.clone(),
-    //             },
-    //         )
-    //     }
-    // }
-
-    // fn lookup_client_peer_addrs(&self, id: &PublicId) -> Vec<SocketAddr> {
-    //     self.clients
-    //         .iter()
-    //         .filter_map(|(peer_addr, client)| {
-    //             if &client.public_key == id {
-    //                 Some(*peer_addr)
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .collect()
-    // }
-
-    // fn lookup_client_and_its_apps(&self, name: &XorName) -> Vec<PublicId> {
-    //     self.clients
-    //         .values()
-    //         .filter_map(|client| {
-    //             if client.public_key.name() == name {
-    //                 Some(client.public_key.clone())
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .collect::<Vec<_>>()
-    // }
 }
+
 
 impl Display for Onboarding {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {

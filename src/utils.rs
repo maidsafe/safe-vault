@@ -15,7 +15,6 @@ use flexi_logger::{DeferredNow, Logger};
 use log::{debug, error};
 use log::{Log, Metadata, Record};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
-use rand::{distributions::Standard, CryptoRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
 use sn_data_types::{BlsKeypairShare, Keypair};
 use std::{fs, path::Path};
@@ -100,9 +99,6 @@ pub(crate) fn new_periodic_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     Ok(result?)
 }
 
-pub(crate) fn random_vec<R: CryptoRng + Rng>(rng: &mut R, size: usize) -> Vec<u8> {
-    rng.sample_iter(&Standard).take(size).collect()
-}
 
 pub(crate) fn serialise<T: Serialize>(data: &T) -> Result<Bytes> {
     let serialised_data = bincode::serialize(data).map_err(Error::Bincode)?;

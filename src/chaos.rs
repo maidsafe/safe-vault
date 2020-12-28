@@ -16,7 +16,7 @@ macro_rules! with_chaos {
                 .unwrap_or(20);
             let die = Uniform::from(1..100);
             let throw = die.sample(&mut rng);
-            debug!(
+            log::debug!(
                 "Threshold for \"chaos\" to occur is < {}, we rolled: {}",
                 chaos_trigger, throw
             );

@@ -28,7 +28,6 @@ pub async fn store_new_reward_keypair(
     Ok(())
 }
 
-
 /// A node is within one
 /// out of three age groups.
 #[derive(Serialize, Deserialize, Clone)]

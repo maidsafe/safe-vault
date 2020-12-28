@@ -13,7 +13,6 @@ use crate::with_chaos;
 use crate::{Error, Result};
 use dashmap::{mapref::entry::Entry, DashMap};
 use log::{error, info, trace, warn};
-use rand::{CryptoRng, Rng};
 use sn_data_types::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
 use sn_routing::SendStream;
 use std::{
@@ -44,24 +43,23 @@ impl ClientMsgHandling {
         self.onboarding.get_public_key(peer_addr)
     }
 
-    pub async fn process_handshake<G: CryptoRng + Rng>(
+    pub async fn process_handshake(
         &self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
         stream: SendStream,
-        rng: &mut G,
     ) -> Result<()> {
         trace!("Processing client handshake");
         let mut the_stream = stream;
 
         with_chaos!({
-            debug!("Chaos: Dropping handshake");
+            log::debug!("Chaos: Dropping handshake");
             return Ok(());
         });
 
         let result = self
             .onboarding
-            .onboard_client(handshake, peer_addr, &mut the_stream, rng)
+            .onboard_client(handshake, peer_addr, &mut the_stream)
             .await;
 
         // client has been onboarded or already exists
@@ -102,7 +100,7 @@ impl ClientMsgHandling {
         trace!("Tracking incoming client message");
 
         with_chaos!({
-            debug!("Chaos: Dropping incoming message");
+            log::debug!("Chaos: Dropping incoming message");
             return Ok(());
         });
 

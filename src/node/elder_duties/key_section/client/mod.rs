@@ -17,12 +17,9 @@ use self::{
 };
 use crate::{
     node::node_ops::{GatewayDuty, KeySectionDuty, NodeMessagingDuty, NodeOperation},
-    node::state_db::NodeInfo,
     Error, Network, Result,
 };
 use log::{error, info, trace, warn};
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
 use sn_data_types::{Address, Error as NdError, MsgEnvelope};
 use sn_routing::Event as RoutingEvent;
 use std::fmt::{self, Display, Formatter};
@@ -35,8 +32,8 @@ pub struct ClientGateway {
 }
 
 impl ClientGateway {
-    pub async fn new(info: &NodeInfo, routing: Network) -> Result<Self> {
-        let onboarding = Onboarding::new(info.public_key().await, routing.clone());
+    pub async fn new(routing: Network) -> Result<Self> {
+        let onboarding = Onboarding::new(routing.clone());
         let client_msg_handling = ClientMsgHandling::new(onboarding);
 
         let gateway = Self {
@@ -99,11 +96,9 @@ impl ClientGateway {
                 } else {
                     match try_deserialize_handshake(&content, src) {
                         Ok(hs) => {
-                            let mut rng = rand::thread_rng();
-                            let mut rng = ChaChaRng::from_seed(rng.gen());
                             let _ = self
                                 .client_msg_handling
-                                .process_handshake(hs, src, send, &mut rng)
+                                .process_handshake(hs, src, send)
                                 .await;
                             Ok(NodeOperation::NoOp)
                         }

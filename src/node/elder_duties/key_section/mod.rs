@@ -45,7 +45,7 @@ pub struct KeySection {
 
 impl KeySection {
     pub async fn new(info: &NodeInfo, rate_limit: RateLimit, routing: Network) -> Result<Self> {
-        let gateway = ClientGateway::new(info, routing.clone()).await?;
+        let gateway = ClientGateway::new(routing.clone()).await?;
         let replicas = Self::new_replica_manager(info.root_dir.clone(), routing.clone()).await?;
         let transfers = Transfers::new(info.keys.clone(), replicas, rate_limit);
         let msg_analysis = ClientMsgAnalysis::new(routing.clone());
