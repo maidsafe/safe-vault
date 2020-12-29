@@ -10,7 +10,7 @@ use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::NodeMessagingDuty;
 use crate::{Error, Result};
 use log::error;
-use sn_data_types::{Address, BlobRead, Error as NdError, MsgEnvelope};
+use sn_data_types::{Address, BlobRead, Error as DtError, MsgEnvelope};
 
 /// Read operations on data chunks.
 
@@ -29,7 +29,7 @@ pub(super) async fn get_result(
                 "Accumulated signature is invalid! Verification: {:?}",
                 verification
             );
-            Err(Error::NetworkData(NdError::InvalidSignature))
+            Err(Error::NetworkData(DtError::InvalidSignature))
         }
     // } else if matches!(self.requester, PublicId::Node(_)) {
     //     if self.verify(&address) {

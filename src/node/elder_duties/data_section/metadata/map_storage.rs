@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::{error::Error as ChunkStoreError, MapChunkStore, UsedSpace},
+    chunk_store::{MapChunkStore, UsedSpace},
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
-    Result,
+    Error, Result,
 };
 use log::info;
 use sn_data_types::{
-    CmdError, Error as NdError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
+    CmdError, Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
     MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey, QueryResponse,
     Result as NdResult,
 };
@@ -104,7 +104,7 @@ impl MapStorage {
         self.chunks
             .get(&address)
             .map_err(|e| match e {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+                Error::NoSuchChunk => DtError::NoSuchData,
                 error => error.to_string().into(),
             })
             .and_then(move |map| {
@@ -125,7 +125,7 @@ impl MapStorage {
         F: FnOnce(Map) -> NdResult<Map>,
     {
         let result = match self.chunks.get(address).map_err(|e| match e {
-            ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+            Error::NoSuchChunk => DtError::NoSuchData,
             error => error.to_string().into(),
         }) {
             Ok(data) => match mutation_fn(data) {
@@ -150,7 +150,7 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let result = if self.chunks.has(data.address()) {
-            Err(NdError::DataExists)
+            Err(DtError::DataExists)
         } else {
             self.chunks
                 .put(&data)
@@ -167,7 +167,7 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let result = match self.chunks.get(&address).map_err(|e| match e {
-            ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+            Error::NoSuchChunk => DtError::NoSuchData,
             error => error.to_string().into(),
         }) {
             Ok(map) => match map.check_is_owner(origin.id().public_key()) {
@@ -320,12 +320,12 @@ impl MapStorage {
                 .get(key)
                 .cloned()
                 .map(MapValue::from)
-                .ok_or(NdError::NoSuchEntry),
+                .ok_or(DtError::NoSuchEntry),
             Map::Unseq(map) => map
                 .get(key)
                 .cloned()
                 .map(MapValue::from)
-                .ok_or(NdError::NoSuchEntry),
+                .ok_or(DtError::NoSuchEntry),
         });
         self.wrapping
             .send_to_section(

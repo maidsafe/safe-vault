@@ -17,7 +17,7 @@ use crate::{Outcome, TernaryResult};
 use futures::lock::Mutex;
 use log::{info, trace, warn};
 use sn_data_types::{
-    Cmd, CmdError, ElderDuties, Error as NdError, Message, MsgEnvelope, PublicKey, Result,
+    Cmd, CmdError, ElderDuties, Error as DtError, Message, MsgEnvelope, PublicKey, Result,
     TransferError,
 };
 use std::fmt::{self, Display, Formatter};
@@ -76,7 +76,7 @@ impl Payments {
             return self
                 .wrapping
                 .error(
-                    CmdError::Transfer(TransferRegistration(NdError::NoSuchRecipient)),
+                    CmdError::Transfer(TransferRegistration(DtError::NoSuchRecipient)),
                     msg.id(),
                     &msg.origin.address(),
                 )
@@ -107,7 +107,7 @@ impl Payments {
                     return self
                         .wrapping
                         .error(
-                            CmdError::Transfer(TransferRegistration(NdError::InsufficientBalance)),
+                            CmdError::Transfer(TransferRegistration(DtError::InsufficientBalance)),
                             msg.id(),
                             &msg.origin.address(),
                         )
@@ -136,7 +136,7 @@ impl Payments {
     async fn section_wallet_id(&self) -> Result<PublicKey> {
         match self.replica.lock().await.replicas_pk_set() {
             Some(keys) => Ok(PublicKey::Bls(keys.public_key())),
-            None => Err(NdError::NoSuchKey),
+            None => Err(DtError::NoSuchKey),
         }
     }
 }

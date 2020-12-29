@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::{error::Error as ChunkStoreError, SequenceChunkStore, UsedSpace},
+    chunk_store::{SequenceChunkStore, UsedSpace},
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
-    Result,
+    Error, Result,
 };
 use log::info;
 use sn_data_types::{
-    CmdError, Error as NdError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
+    CmdError, Error as DtError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
     Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp, SequenceEntry, SequenceIndex,
     SequencePolicyWriteOp, SequencePrivatePolicy, SequencePublicPolicy, SequenceRead, SequenceUser,
     SequenceWrite,
@@ -92,7 +92,7 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let result = if self.chunks.has(data.address()) {
-            Err(NdError::DataExists)
+            Err(DtError::DataExists)
         } else {
             self.chunks
                 .put(&data)
@@ -127,10 +127,10 @@ impl SequenceStorage {
         address: SequenceAddress,
         action: SequenceAction,
         origin: &MsgSender,
-    ) -> Result<Sequence, NdError> {
-        //let requester_key = utils::own_key(requester).ok_or(NdError::AccessDenied)?;
+    ) -> Result<Sequence, DtError> {
+        //let requester_key = utils::own_key(requester).ok_or(DtError::AccessDenied)?;
         let data = self.chunks.get(&address).map_err(|error| match error {
-            ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+            Error::NoSuchChunk => DtError::NoSuchData,
             _ => error.to_string().into(),
         })?;
 
@@ -148,13 +148,13 @@ impl SequenceStorage {
             .chunks
             .get(&address)
             .map_err(|error| match error {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchData,
+                Error::NoSuchChunk => DtError::NoSuchData,
                 error => error.to_string().into(),
             })
             .and_then(|sequence| {
                 // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
                 if sequence.address().is_pub() {
-                    return Err(NdError::InvalidOperation);
+                    return Err(DtError::InvalidOperation);
                 }
 
                 if origin.is_client() {
@@ -162,12 +162,12 @@ impl SequenceStorage {
                     let policy = sequence.private_policy(Some(pk))?;
 
                     if policy.owner != pk {
-                        Err(NdError::InvalidOwners)
+                        Err(DtError::InvalidOwners)
                     } else {
                         Ok(())
                     }
                 } else {
-                    Err(NdError::InvalidOwners)
+                    Err(DtError::InvalidOwners)
                 }
             }) {
             Ok(()) => self
@@ -193,7 +193,7 @@ impl SequenceStorage {
             .and_then(|sequence| {
                 sequence
                     .in_range(range.0, range.1, Some(origin.id().public_key()))?
-                    .ok_or(NdError::NoSuchEntry)
+                    .ok_or(DtError::NoSuchEntry)
             });
         self.wrapping
             .send_to_section(
@@ -222,7 +222,7 @@ impl SequenceStorage {
                         sequence.len(Some(origin.id().public_key()))? - 1,
                         entry.to_vec(),
                     )),
-                    None => Err(NdError::NoSuchEntry),
+                    None => Err(DtError::NoSuchEntry),
                 },
             );
         self.wrapping
@@ -304,7 +304,7 @@ impl SequenceStorage {
                     let policy = sequence.public_policy()?;
                     policy.clone()
                 } else {
-                    return Err(NdError::from(
+                    return Err(DtError::from(
                         "Cannot get public policy of private sequence.",
                     ));
                 };
@@ -336,7 +336,7 @@ impl SequenceStorage {
                     let policy = sequence.private_policy(Some(origin.id().public_key()))?;
                     policy.clone()
                 } else {
-                    return Err(NdError::from(
+                    return Err(DtError::from(
                         "Cannot get private policy of public sequence.",
                     ));
                 };

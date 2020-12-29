@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::{error::Error as ChunkStoreError, AccountChunkStore, UsedSpace},
+    chunk_store::{AccountChunkStore, UsedSpace},
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
-    Result,
+    Error, Result,
 };
 use sn_data_types::{
-    Account, AccountRead, AccountWrite, CmdError, Error as NdError, Message, MessageId, MsgSender,
+    Account, AccountRead, AccountWrite, CmdError, Error as DtError, Message, MessageId, MsgSender,
     PublicKey, QueryResponse, Result as NdResult,
 };
 use std::fmt::{self, Display, Formatter};
@@ -94,9 +94,9 @@ impl AccountStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let result = if self.chunks.has(account.address()) {
-            Err(NdError::LoginPacketExists)
+            Err(DtError::LoginPacketExists)
         } else if account.owner() != &origin.id().public_key() {
-            Err(NdError::InvalidOwners)
+            Err(DtError::InvalidOwners)
         } else {
             // also check the signature
             self.chunks
@@ -116,9 +116,9 @@ impl AccountStorage {
         let result = match self.account(&origin.id().public_key(), updated_account.address()) {
             Ok(existing_account) => {
                 if !updated_account.size_is_valid() {
-                    Err(NdError::ExceededSize)
+                    Err(DtError::ExceededSize)
                 } else if updated_account.owner() != existing_account.owner() {
-                    Err(NdError::InvalidOwners)
+                    Err(DtError::InvalidOwners)
                 } else {
                     // also check the signature
                     self.chunks
@@ -136,14 +136,14 @@ impl AccountStorage {
         self.chunks
             .get(address)
             .map_err(|e| match e {
-                ChunkStoreError::NoSuchChunk => NdError::NoSuchLoginPacket,
+                Error::NoSuchChunk => DtError::NoSuchLoginPacket,
                 error => error.to_string().into(),
             })
             .and_then(|account| {
                 if account.owner() == requester_pub_key {
                     Ok(account)
                 } else {
-                    Err(NdError::AccessDenied)
+                    Err(DtError::AccessDenied)
                 }
             })
     }

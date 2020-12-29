@@ -15,7 +15,7 @@ use crate::{
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{
-    Blob, BlobAddress, BlobRead, BlobWrite, CmdError, DataQuery, Error as NdError, Message,
+    Blob, BlobAddress, BlobRead, BlobWrite, CmdError, DataQuery, Error as DtError, Message,
     MessageId, MsgSender, NodeCmd, NodeDataCmd, PublicKey, Query, QueryResponse,
     Result as NdResult,
 };
@@ -92,7 +92,7 @@ impl BlobRegister {
                         .wrapping
                         .send_to_section(
                             Message::CmdError {
-                                error: CmdError::Data(NdError::DataExists),
+                                error: CmdError::Data(DtError::DataExists),
                                 id: MessageId::new(),
                                 cmd_origin: origin.address(),
                                 correlation_id: msg_id,
@@ -157,7 +157,7 @@ impl BlobRegister {
         origin: MsgSender,
         proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
-        let cmd_error = |error: NdError| {
+        let cmd_error = |error: DtError| {
             self.wrapping.send_to_section(
                 Message::CmdError {
                     error: CmdError::Data(error),
@@ -177,7 +177,7 @@ impl BlobRegister {
         // todo: use signature verification instead
         if let Some(data_owner) = metadata.owner {
             if data_owner != origin.id().public_key() {
-                return cmd_error(NdError::AccessDenied).await;
+                return cmd_error(DtError::AccessDenied).await;
             }
         };
 
@@ -358,7 +358,7 @@ impl BlobRegister {
         origin: MsgSender,
         proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
-        let query_error = |error: NdError| async {
+        let query_error = |error: DtError| async {
             let err_msg = Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(error)),
                 id: MessageId::in_response_to(&msg_id),
@@ -380,7 +380,7 @@ impl BlobRegister {
 
         if let Some(data_owner) = metadata.owner {
             if data_owner != origin.id().public_key() {
-                return query_error(NdError::AccessDenied).await;
+                return query_error(DtError::AccessDenied).await;
             }
         };
         let message = Message::Query {
@@ -440,7 +440,7 @@ impl BlobRegister {
             for chunk_address in holder.chunks {
                 let db_key = chunk_address
                     .to_db_key()
-                    .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+                    .map_err(|e| DtError::NetworkOther(e.to_string()))?;
                 let chunk_metadata = self.get_metadata_for(chunk_address);
 
                 if let Ok(mut metadata) = chunk_metadata {
@@ -467,7 +467,7 @@ impl BlobRegister {
         if let Err(error) = self.dbs.holders.borrow_mut().rem(
             &node
                 .to_db_key()
-                .map_err(|e| NdError::NetworkOther(e.to_string()))?,
+                .map_err(|e| DtError::NetworkOther(e.to_string()))?,
         ) {
             warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
         };
@@ -479,19 +479,19 @@ impl BlobRegister {
         match self.dbs.holders.borrow().get::<HolderMetadata>(
             &holder
                 .to_db_key()
-                .map_err(|e| NdError::NetworkOther(e.to_string()))?,
+                .map_err(|e| DtError::NetworkOther(e.to_string()))?,
         ) {
             Some(metadata) => {
                 if metadata.chunks.is_empty() {
                     warn!("{}: is not responsible for any chunk", holder);
-                    Err(NdError::NoSuchData)
+                    Err(DtError::NoSuchData)
                 } else {
                     Ok(metadata)
                 }
             }
             None => {
                 info!("{}: is not responsible for any chunk", holder);
-                Err(NdError::NoSuchData)
+                Err(DtError::NoSuchData)
             }
         }
     }
@@ -500,19 +500,19 @@ impl BlobRegister {
         match self.dbs.metadata.borrow().get::<ChunkMetadata>(
             &address
                 .to_db_key()
-                .map_err(|e| NdError::NetworkOther(e.to_string()))?,
+                .map_err(|e| DtError::NetworkOther(e.to_string()))?,
         ) {
             Some(metadata) => {
                 if metadata.holders.is_empty() {
                     warn!("{}: Metadata holders is empty for: {:?}", self, address);
-                    Err(NdError::NoSuchData)
+                    Err(DtError::NoSuchData)
                 } else {
                     Ok(metadata)
                 }
             }
             None => {
                 warn!("{}: Failed to get metadata from DB: {:?}", self, address);
-                Err(NdError::NoSuchData)
+                Err(DtError::NoSuchData)
             }
         }
     }

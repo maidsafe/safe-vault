@@ -43,7 +43,6 @@ pub mod utils;
 pub(crate) use to_db_key::ToDbKey;
 
 pub use crate::{
-    chunk_store::error::Error as ChunkStoreError,
     config_handler::{write_connection_info, Config},
     error::{Error, Result},
     network::Network,

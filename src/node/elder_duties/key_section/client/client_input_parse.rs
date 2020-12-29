@@ -9,7 +9,7 @@
 use crate::{Error, Result};
 use bytes::Bytes;
 use log::info;
-use sn_data_types::{Error as NdError, HandshakeRequest, Message, MsgEnvelope};
+use sn_data_types::{Error as DtError, HandshakeRequest, Message, MsgEnvelope};
 use std::net::SocketAddr;
 
 /*
@@ -69,7 +69,7 @@ pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Result
                 "Failed to deserialize client input from {} as a handshake: {}",
                 peer_addr, err
             );
-            return Err(Error::NetworkData(NdError::FailedToParse(format!(
+            return Err(Error::NetworkData(DtError::FailedToParse(format!(
                 "Failed to deserialize client input from {} as a handshake: {}",
                 peer_addr, err
             ))));

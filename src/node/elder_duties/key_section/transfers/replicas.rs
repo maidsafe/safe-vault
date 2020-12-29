@@ -14,7 +14,7 @@ use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::info;
 use sn_data_types::{
-    CreditAgreementProof, Error as NdError, Money, PublicKey, ReplicaEvent, SignedTransfer,
+    CreditAgreementProof, Error as DtError, Money, PublicKey, ReplicaEvent, SignedTransfer,
     TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
 };
 use sn_transfers::WalletReplica;
@@ -212,7 +212,7 @@ impl Replicas {
         })? {
             None => {
                 info!("transfer already registered!");
-                Err(Error::NetworkData(NdError::NetworkOther(
+                Err(Error::NetworkData(DtError::NetworkOther(
                     "transfer already registered!".to_string(),
                 )))
             }
@@ -306,7 +306,7 @@ impl Replicas {
         Ok(wallet)
     }
 
-    fn find_past_key(&self, keyset: &PublicKeySet) -> Result<PublicKey, NdError> {
+    fn find_past_key(&self, keyset: &PublicKeySet) -> Result<PublicKey, DtError> {
         let section_keys = self.info.section_proof_chain.clone();
         let key = section_keys
             .keys()
@@ -314,7 +314,7 @@ impl Replicas {
         if let Some(key_in_chain) = key {
             Ok(PublicKey::Bls(*key_in_chain))
         } else {
-            Err(NdError::NetworkOther("PublicKey provided by the transfer was never a part of the Section retrospectively".to_string()))
+            Err(DtError::NetworkOther("PublicKey provided by the transfer was never a part of the Section retrospectively".to_string()))
         }
     }
 
@@ -355,7 +355,7 @@ impl Replicas {
 
     /// This is the one and only infusion of money to the system. Ever.
     /// It is carried out by the first node in the network.
-    async fn store_genesis<F: FnOnce() -> Result<PublicKey, NdError>>(
+    async fn store_genesis<F: FnOnce() -> Result<PublicKey, DtError>>(
         &self,
         credit_proof: &CreditAgreementProof,
         past_key: F,
@@ -365,7 +365,7 @@ impl Replicas {
         let self_lock = self.self_lock.lock().await;
         // We expect nothing to exist before this transfer.
         if self.load_key_lock(id).await.is_ok() {
-            return Err(Error::NetworkData(NdError::BalanceExists));
+            return Err(Error::NetworkData(DtError::BalanceExists));
         }
         // No key lock (hence no store), so we create one
         let store = TransferStore::new(id.into(), &self.root_dir, Init::New)?;

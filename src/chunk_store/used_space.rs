@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::error::{Error, Result};
 use crate::utils::Init;
+use crate::{Error, Result};
 // use crate::node::Init;
 use std::{path::Path, sync::Arc};
 use tokio::sync::Mutex;
@@ -217,7 +217,7 @@ mod inner {
             let new_local = used_space_lock
                 .local_stores
                 .get(&id)
-                .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
+                .ok_or(Error::NoStoreId)?
                 .local_value
                 .checked_add(consumed)
                 .ok_or(Error::NotEnoughSpace)?;
@@ -226,7 +226,7 @@ mod inner {
                 let record = &mut used_space_lock
                     .local_stores
                     .get_mut(&id)
-                    .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
+                    .ok_or(Error::NoStoreId)?
                     .local_record;
                 Self::write_local_to_file(record, new_local).await?;
             }
@@ -234,7 +234,7 @@ mod inner {
             used_space_lock
                 .local_stores
                 .get_mut(&id)
-                .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
+                .ok_or(Error::NoStoreId)?
                 .local_value = new_local;
 
             Ok(())
@@ -251,7 +251,7 @@ mod inner {
             let new_local = used_space_lock
                 .local_stores
                 .get_mut(&id)
-                .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
+                .ok_or(Error::NoStoreId)?
                 .local_value
                 .saturating_sub(released);
             let new_total = used_space_lock.total_value.saturating_sub(released);
@@ -259,7 +259,7 @@ mod inner {
                 let record = &mut used_space_lock
                     .local_stores
                     .get_mut(&id)
-                    .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
+                    .ok_or(Error::NoStoreId)?
                     .local_record;
                 Self::write_local_to_file(record, new_local).await?;
             }
@@ -267,7 +267,7 @@ mod inner {
             used_space_lock
                 .local_stores
                 .get_mut(&id)
-                .ok_or_else(|| Error::Other("Could not fetch StoreID".to_string()))?
+                .ok_or(Error::NoStoreId)?
                 .local_value = new_local;
             Ok(())
         }
@@ -299,18 +299,16 @@ mod tests {
 
     /// creates a temp dir for the root of all stores
     fn create_temp_root() -> Result<TempDir> {
-        TempDir::new(&"temp_store_root").map_err(|e| Error::Other(e.to_string()))
+        TempDir::new(&"temp_store_root").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
     }
 
     /// create a temp dir for a store at a given temp store root
     fn create_temp_store(temp_root: &TempDir) -> Result<TempDir> {
         let path_str = temp_root.path().join(&"temp_store");
-        TempDir::new(
-            path_str
-                .to_str()
-                .ok_or_else(|| Error::Other("Could not convert to str".to_string()))?,
-        )
-        .map_err(|e| Error::Other(e.to_string()))
+        let path_str = path_str.to_str().ok_or_else(|| {
+            Error::TempDirCreationFailed("Could not parse path to string".to_string())
+        })?;
+        TempDir::new(path_str).map_err(|e| Error::TempDirCreationFailed(e.to_string()))
     }
 
     #[tokio::test]

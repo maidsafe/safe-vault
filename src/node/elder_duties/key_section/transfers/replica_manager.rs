@@ -13,7 +13,7 @@
 // use log::{info, warn};
 
 // use sn_data_types::{
-//     DebitAgreementProof, Error as NdError, Money, PublicKey as NdPublicKey, PublicKey,
+//     DebitAgreementProof, Error as DtError, Money, PublicKey as NdPublicKey, PublicKey,
 //     ReplicaEvent, Result as NdResult, SignedTransfer, TransferPropagated, TransferRegistered,
 //     TransferValidated,
 // };
@@ -108,7 +108,7 @@
 //         // Drops the streams from db.
 //         self.store
 //             .drop(accounts)
-//             .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+//             .map_err(|e| DtError::NetworkOther(e.to_string()))?;
 
 //         // Replays the kept streams
 //         // on a new instance of a Replica.
@@ -143,7 +143,7 @@
 //         if !self.info.initiating {
 //             warn!("Is not initiating");
 //             // can only synch while initiating
-//             return Err(NdError::InvalidOperation);
+//             return Err(DtError::InvalidOperation);
 //         }
 //         if events.is_empty() {
 //             info!("Events are empty. Initiating Genesis replica.");
@@ -163,7 +163,7 @@
 //                 Ok(None) => info!("Already handled genesis."), // no change
 //                 Err(e) => {
 //                     warn!("replica.genesis gave error: {}", e);
-//                     return Err(NdError::InvalidOperation);
+//                     return Err(DtError::InvalidOperation);
 //                 }
 //             };
 //         } else {
@@ -171,7 +171,7 @@
 //             let existing_events = self
 //                 .store
 //                 .try_load()
-//                 .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+//                 .map_err(|e| DtError::NetworkOther(e.to_string()))?;
 //             let events: Vec<_> = events
 //                 .iter()
 //                 .cloned()
@@ -184,14 +184,14 @@
 //             // (otherwise we can simply call sort on the vec.)
 //             self.store
 //                 .init(events)
-//                 .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+//                 .map_err(|e| DtError::NetworkOther(e.to_string()))?;
 //             self.replica = Replica::from_history(
 //                 self.info.secret_key.clone(),
 //                 self.info.key_index,
 //                 self.info.peer_replicas.clone(),
 //                 self.store
 //                     .try_load()
-//                     .map_err(|e| NdError::NetworkOther(e.to_string()))?,
+//                     .map_err(|e| DtError::NetworkOther(e.to_string()))?,
 //             )?;
 //             info!(
 //                 "Node initiated {:?}",
@@ -230,7 +230,7 @@
 //                 info!("Successfully updated Replica details on churn");
 //                 Ok(())
 //             }
-//             Err(_e) => Err(NdError::InvalidOperation), // todo: storage error
+//             Err(_e) => Err(DtError::InvalidOperation), // todo: storage error
 //         }
 //     }
 
@@ -258,13 +258,13 @@
 //         self.check_init_status()?;
 
 //         let serialized = bincode::serialize(&proof.signed_transfer)
-//             .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+//             .map_err(|e| DtError::NetworkOther(e.to_string()))?;
 //         let sig = proof
 //             .debiting_replicas_sig
 //             .clone()
 //             .into_bls()
 //             .ok_or_else(|| {
-//                 NdError::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
+//                 DtError::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
 //             })?;
 //         let section_keys = self.info.section_proof_chain.clone();
 
@@ -297,14 +297,14 @@
 //         self.check_init_status()?;
 
 //         let serialized = bincode::serialize(&proof.signed_transfer)
-//             .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+//             .map_err(|e| DtError::NetworkOther(e.to_string()))?;
 //         let section_keys = self.info.section_proof_chain.clone();
 //         let sig = proof
 //             .debiting_replicas_sig
 //             .clone()
 //             .into_bls()
 //             .ok_or_else(|| {
-//                 NdError::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
+//                 DtError::NetworkOther("Error retrieving threshold::Signature from DAP ".to_string())
 //             })?;
 
 //         let result = self.replica.receive_propagated(proof, move || {
@@ -336,7 +336,7 @@
 //     fn persist(&mut self, event: ReplicaEvent) -> NdResult<()> {
 //         self.store
 //             .try_append(event.clone())
-//             .map_err(|e| NdError::NetworkOther(e.to_string()))?;
+//             .map_err(|e| DtError::NetworkOther(e.to_string()))?;
 //         self.replica.apply(event)
 //     }
 
@@ -351,7 +351,7 @@
 //     fn check_init_status(&mut self) -> NdResult<()> {
 //         if self.info.initiating {
 //             warn!("Calling non-initiated replica");
-//             return Err(NdError::InvalidOperation);
+//             return Err(DtError::InvalidOperation);
 //         }
 //         Ok(())
 //     }

@@ -9,7 +9,6 @@
 //! A simple, persistent, disk-based key-value store.
 
 mod chunk;
-pub(super) mod error;
 mod immutable;
 mod login_packet;
 mod mutable;
@@ -18,9 +17,9 @@ mod sequence;
 mod tests;
 mod used_space;
 
+use crate::error::{Error, Result};
 use crate::{utils, utils::Init};
 use chunk::{Chunk, ChunkId};
-use error::{Error, Result};
 use log::{info, trace};
 use sn_data_types::{Account, Blob, Map, Sequence};
 use std::{
@@ -107,7 +106,7 @@ impl<T: Chunk> ChunkStore<T> {
     /// If a chunk with the same id already exists, it will be overwritten.
     pub async fn put(&mut self, chunk: &T) -> Result<()> {
         info!("Writing chunk");
-        let serialised_chunk = utils::serialise(chunk).map_err(|e| Error::Other(e.to_string()))?;
+        let serialised_chunk = utils::serialise(chunk)?;
         let consumed_space = serialised_chunk.len() as u64;
 
         info!("consumed space: {:?}", consumed_space);
@@ -215,9 +214,7 @@ impl<T: Chunk> ChunkStore<T> {
     }
 
     fn file_path(&self, id: &T::Id) -> Result<PathBuf> {
-        Ok(self.dir.join(&hex::encode(
-            utils::serialise(id).map_err(|e| Error::Other(e.to_string()))?,
-        )))
+        Ok(self.dir.join(&hex::encode(utils::serialise(id)?)))
     }
 }
 

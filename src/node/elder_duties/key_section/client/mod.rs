@@ -23,7 +23,7 @@ use crate::{
 use log::{error, info, trace, warn};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-use sn_data_types::{Address, Error as NdError, MsgEnvelope};
+use sn_data_types::{Address, Error as DtError, MsgEnvelope};
 use sn_routing::Event as RoutingEvent;
 use std::fmt::{self, Display, Formatter};
 
@@ -86,7 +86,7 @@ impl ClientGateway {
                     info!("Deserialized client msg from {}", public_key);
                     trace!("Deserialized client msg is {:?}", msg.message);
                     if !validate_client_sig(&msg) {
-                        return Err(Error::NetworkData(NdError::InvalidSignature));
+                        return Err(Error::NetworkData(DtError::InvalidSignature));
                     }
                     match self
                         .client_msg_handling

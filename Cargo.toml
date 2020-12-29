@@ -43,6 +43,8 @@ signature = "1.1.0"
 xor_name = "1.1.0"
 sn_launch_tool = "~0.0.5"
 dashmap = "3.11.10"
+anyhow="1.0.36" 
+thiserror="1.0.23"
 
   [dependencies.bytes]
   version = "~0.5.4"

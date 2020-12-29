@@ -8,10 +8,9 @@
 
 use super::{
     chunk::{Chunk, ChunkId},
-    error::Error,
     ChunkStore, Result as ChunkStoreResult, Subdir, UsedSpace,
 };
-use crate::{utils::Init, Result, ToDbKey};
+use crate::{utils::Init, Error, Result, ToDbKey};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, u64};
@@ -49,7 +48,7 @@ fn new_rng() -> ThreadRng {
 }
 
 fn temp_dir() -> ChunkStoreResult<TempDir> {
-    TempDir::new("test").map_err(|e| Error::Other(e.to_string()))
+    TempDir::new("test").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
 }
 
 struct Chunks {

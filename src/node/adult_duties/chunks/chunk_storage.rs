@@ -8,10 +8,10 @@
 
 pub use crate::chunk_store::UsedSpace;
 use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty};
-use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Error, Result};
+use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
 use log::{error, info};
 use sn_data_types::{
-    Address, AdultDuties, Blob, BlobAddress, CmdError, Error as NdError, Message, MessageId,
+    Address, AdultDuties, Blob, BlobAddress, CmdError, Error as DtError, Message, MessageId,
     MsgSender, NodeCmdError, NodeDataError, NodeDataQuery, NodeDataQueryResponse, NodeEvent,
     NodeQuery, NodeQueryResponse, QueryResponse, Result as NdResult, Signature,
 };
@@ -84,13 +84,13 @@ impl ChunkStorage {
         let id = origin.id().public_key();
 
         if data.is_unpub() {
-            let data_owner = *data.owner().ok_or(NdError::InvalidOwners)?;
+            let data_owner = *data.owner().ok_or(DtError::InvalidOwners)?;
             info!("Blob is unpub");
             info!("DATA OWNER: {:?}", data_owner);
             info!("ID OWNER: {:?}", id);
             if data_owner != id {
                 info!("INVALID OWNER! Returning error");
-                return Err(NdError::InvalidOwners);
+                return Err(DtError::InvalidOwners);
             }
         }
 
@@ -100,7 +100,7 @@ impl ChunkStorage {
                 self,
                 data.address()
             );
-            return Err(NdError::DataExists);
+            return Err(DtError::DataExists);
         }
         self.chunks
             .put(&data)
@@ -187,7 +187,7 @@ impl ChunkStorage {
             return Ok(NodeMessagingDuty::NoOp);
         }
 
-        let _ = self.chunks.put(&blob).await.map_err(Error::ChunkStore)?;
+        let _ = self.chunks.put(&blob).await?;
 
         Ok(NodeMessagingDuty::NoOp)
     }
@@ -238,7 +238,7 @@ impl ChunkStorage {
                         .await
                         .map_err(|error| error.to_string().into())
                 } else {
-                    Err(NdError::InvalidOwners)
+                    Err(DtError::InvalidOwners)
                 }
             }
             Ok(_) => {
@@ -246,9 +246,9 @@ impl ChunkStorage {
                     "{}: Invalid DeletePrivate(Blob::Public) encountered: {:?}",
                     self, msg_id
                 );
-                Err(NdError::InvalidOperation)
+                Err(DtError::InvalidOperation)
             }
-            _ => Err(NdError::NoSuchKey),
+            _ => Err(DtError::NoSuchKey),
             //err @ Err(_) => err.map_err(|error| error.to_string().into()),
         };
 

@@ -21,7 +21,7 @@ use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
 use sn_data_types::{
-    Address, ElderDuties, Error as NdError, Message, MessageId, Money, NodeQuery,
+    Address, ElderDuties, Error as DtError, Message, MessageId, Money, NodeQuery,
     NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery, PublicKey,
 };
 use sn_transfers::TransferActor;
@@ -238,7 +238,7 @@ impl Rewards {
         let state = match self.node_rewards.get_mut(&node_id) {
             None => {
                 error!("Cannot set node wallet unless active or new.");
-                return Err(Error::NetworkData(NdError::NoSuchKey));
+                return Err(Error::NetworkData(DtError::NoSuchKey));
             }
             Some(state) => {
                 match *state {
@@ -247,7 +247,7 @@ impl Rewards {
                     NodeRewards::Active { age, .. } => NodeRewards::Active { age, wallet },
                     _ => {
                         warn!("Cannot set node wallet unless active or new.");
-                        return Err(Error::NetworkData(NdError::InvalidOperation));
+                        return Err(Error::NetworkData(DtError::InvalidOperation));
                     }
                 }
             }
@@ -304,7 +304,7 @@ impl Rewards {
         let age = match self.node_rewards.get_mut(&node_id) {
             None => {
                 warn!("Invalid operation: Node not found {}.", node_id);
-                return Err(Error::NetworkData(NdError::NoSuchBalance));
+                return Err(Error::NetworkData(DtError::NoSuchBalance));
             }
             Some(state) => {
                 match *state {
@@ -312,7 +312,7 @@ impl Rewards {
                     NodeRewards::AwaitingActivation(age) => age,
                     _ => {
                         warn!("Invalid operation: Node is not awaiting reward activation.");
-                        return Err(Error::NetworkData(NdError::InvalidOperation));
+                        return Err(Error::NetworkData(DtError::InvalidOperation));
                     }
                 }
             }
@@ -378,7 +378,7 @@ impl Rewards {
                 return self
                     .wrapping
                     .send_to_node(Message::NodeQueryResponse {
-                        response: Rewards(GetWalletId(Err(NdError::NetworkOther(
+                        response: Rewards(GetWalletId(Err(DtError::NetworkOther(
                             "Node is not being relocated.".to_string(),
                         )))),
                         id: MessageId::in_response_to(&msg_id),

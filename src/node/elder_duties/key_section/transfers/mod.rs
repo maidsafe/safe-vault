@@ -24,7 +24,7 @@ use log::{debug, info, trace, warn};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
-    Address, Cmd, CmdError, CreditAgreementProof, ElderDuties, Error as NdError, Event, Message,
+    Address, Cmd, CmdError, CreditAgreementProof, ElderDuties, Error as DtError, Event, Message,
     MessageId, MsgEnvelope, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse,
     NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, PublicKey,
     QueryResponse, ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferError,
@@ -230,7 +230,7 @@ impl Transfers {
             return self
                 .wrapping
                 .error(
-                    CmdError::Transfer(TransferRegistration(NdError::NoSuchRecipient)),
+                    CmdError::Transfer(TransferRegistration(DtError::NoSuchRecipient)),
                     msg.id(),
                     &msg.origin.address(),
                 )
@@ -264,7 +264,7 @@ impl Transfers {
                     return self
                         .wrapping
                         .error(
-                            CmdError::Transfer(TransferRegistration(NdError::InsufficientBalance)),
+                            CmdError::Transfer(TransferRegistration(DtError::InsufficientBalance)),
                             msg.id(),
                             &msg.origin.address(),
                         )
@@ -279,7 +279,7 @@ impl Transfers {
                 warn!("Payment: registration or propagation failed: {}", e);
                 self.wrapping
                     .error(
-                        CmdError::Transfer(TransferRegistration(NdError::NetworkOther(
+                        CmdError::Transfer(TransferRegistration(DtError::NetworkOther(
                             e.to_string(),
                         ))),
                         msg.id(),
@@ -301,7 +301,7 @@ impl Transfers {
             .replicas
             .all_events()
             .await
-            .map_err(|e| NdError::Unexpected(e.to_string()));
+            .map_err(|e| DtError::Unexpected(e.to_string()));
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         self.wrapping
@@ -374,7 +374,7 @@ impl Transfers {
             .replicas
             .balance(wallet_id)
             .await
-            .map_err(|e| NdError::Unexpected(e.to_string()));
+            .map_err(|e| DtError::Unexpected(e.to_string()));
 
         self.wrapping
             .send_to_client(Message::QueryResponse {
@@ -400,7 +400,7 @@ impl Transfers {
             .replicas
             .history(wallet_id)
             .await
-            .map_err(|e| NdError::Unexpected(e.to_string()));
+            .map_err(|e| DtError::Unexpected(e.to_string()));
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
                 response: Transfers(GetSectionActorHistory(result)),
@@ -421,7 +421,7 @@ impl Transfers {
         trace!("Handling GetHistory");
         // validate signature
         let result = self.replicas.history(*wallet_id).await.map_err(|_e| {
-            NdError::Unexpected(format!("Could not get history for key {:?}", wallet_id))
+            DtError::Unexpected(format!("Could not get history for key {:?}", wallet_id))
         });
         self.wrapping
             .send_to_client(Message::QueryResponse {
@@ -454,7 +454,7 @@ impl Transfers {
             },
             Err(e) => Message::CmdError {
                 id: MessageId::new(),
-                error: CmdError::Transfer(TransferError::TransferValidation(NdError::Unexpected(
+                error: CmdError::Transfer(TransferError::TransferValidation(DtError::Unexpected(
                     e.to_string(),
                 ))),
                 correlation_id: msg_id,
@@ -482,7 +482,7 @@ impl Transfers {
             Err(e) => Message::NodeCmdError {
                 id: MessageId::new(),
                 error: NodeCmdError::Transfers(NodeTransferError::TransferPropagation(
-                    NdError::Unexpected(e.to_string()),
+                    DtError::Unexpected(e.to_string()),
                 )), // TODO: SHOULD BE TRANSFERVALIDATION
                 correlation_id: msg_id,
                 cmd_origin: origin,
@@ -517,7 +517,7 @@ impl Transfers {
                 self.wrapping
                     .error(
                         CmdError::Transfer(TransferError::TransferRegistration(
-                            NdError::Unexpected(e.to_string()),
+                            DtError::Unexpected(e.to_string()),
                         )),
                         msg_id,
                         &origin,
@@ -553,7 +553,7 @@ impl Transfers {
                 self.wrapping
                     .error(
                         CmdError::Transfer(TransferError::TransferRegistration(
-                            NdError::Unexpected(e.to_string()),
+                            DtError::Unexpected(e.to_string()),
                         )),
                         msg_id,
                         &origin,
