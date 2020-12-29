@@ -2673,7 +2673,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "sn_data_types",
- "sn_transfers",
+ "sn_transfers 0.2.8",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 1.5.0",
@@ -2757,7 +2757,7 @@ dependencies = [
  "sn_data_types",
  "sn_launch_tool",
  "sn_routing",
- "sn_transfers",
+ "sn_transfers 0.2.7",
  "structopt 0.3.21",
  "tempdir",
  "thiserror",
@@ -2798,6 +2798,24 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.7"
+dependencies = [
+ "bincode",
+ "crdts",
+ "itertools",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "sn_data_types",
+ "thiserror",
+ "threshold_crypto",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_transfers"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3307d4f8609505d7a7ad7d84fa67aad596af607b22655828d1af8db932903ac2"
 dependencies = [
  "bincode",
  "crdts",
