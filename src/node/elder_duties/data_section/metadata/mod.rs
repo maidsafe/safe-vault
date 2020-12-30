@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod account_storage;
 mod blob_register;
 mod elder_stores;
 mod map_storage;
@@ -22,7 +21,6 @@ use crate::{
     node::state_db::NodeInfo,
     Error, Network, Result,
 };
-use account_storage::AccountStorage;
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
@@ -51,14 +49,11 @@ impl Metadata {
         routing: Network,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
-        let account_storage =
-            AccountStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
         let blob_register = BlobRegister::new(dbs, wrapping.clone(), routing)?;
         let map_storage = MapStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
         let sequence_storage =
             SequenceStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
         let elder_stores = ElderStores::new(
-            account_storage,
             blob_register,
             map_storage,
             sequence_storage,

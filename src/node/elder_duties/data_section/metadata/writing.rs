@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
+    blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::{Blah, NodeMessagingDuty, NodeOperation};
 use crate::{Error, Result};
 use log::info;
 use sn_data_types::{
-    AccountWrite, BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
+    BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
     SequenceWrite,
 };
 
@@ -51,10 +51,8 @@ pub(super) async fn get_result(
                 info!("Writing Sequence");
                 sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await
             }
-            Account(write) => {
-                info!("Writing Account");
-                account(write, stores.account_storage_mut(), msg_id, msg_origin).await
-            }
+          
+            
         },
         _ => Err(Error::Logic(
             "Unreachable pattern when writing data.".to_string(),
@@ -88,15 +86,6 @@ async fn map(
 async fn sequence(
     write: SequenceWrite,
     storage: &mut SequenceStorage,
-    msg_id: MessageId,
-    origin: MsgSender,
-) -> Result<NodeMessagingDuty> {
-    storage.write(write, msg_id, &origin).await
-}
-
-async fn account(
-    write: AccountWrite,
-    storage: &mut AccountStorage,
     msg_id: MessageId,
     origin: MsgSender,
 ) -> Result<NodeMessagingDuty> {

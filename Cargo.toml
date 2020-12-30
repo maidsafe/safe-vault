@@ -38,7 +38,6 @@ ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
 sn_data_types = "~0.12.0"
 sn_transfers = "~0.2.8"
-
 self_encryption = "~0.19.4"
 ed25519 = "1.0.1"
 signature = "1.1.0"

@@ -9,14 +9,14 @@
 //! Read operations on data.
 
 use super::{
-    account_storage::AccountStorage, blob_register::BlobRegister, elder_stores::ElderStores,
+    blob_register::BlobRegister, elder_stores::ElderStores,
     map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::NodeMessagingDuty;
 use crate::{Error, Result};
 use log::info;
 use sn_data_types::{
-    AccountRead, BlobRead, DataQuery, MapRead, Message, MessageId, MsgEnvelope, MsgSender, Query,
+    BlobRead, DataQuery, MapRead, Message, MessageId, MsgEnvelope, MsgSender, Query,
     SequenceRead,
 };
 
@@ -36,7 +36,6 @@ pub(super) async fn get_result(
             Blob(read) => blob(read, stores.blob_register(), msg_id, origin, proxies).await,
             Map(read) => map(read, stores.map_storage(), msg_id, origin).await,
             Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin).await,
-            Account(read) => account(read, stores.account_storage(), msg_id, origin).await,
         },
         _ => Err(Error::Logic(
             "Unreachable pattern when reading data.".to_string(),
@@ -76,11 +75,3 @@ async fn sequence(
     storage.read(read, msg_id, &origin).await // sequence data currently stay at elders, so the msg is not needed
 }
 
-async fn account(
-    read: &AccountRead,
-    storage: &AccountStorage,
-    msg_id: MessageId,
-    origin: MsgSender,
-) -> Result<NodeMessagingDuty> {
-    storage.read(read, msg_id, &origin).await // account data currently stay at elders, so the msg is not needed
-}
