@@ -13,7 +13,7 @@ use crate::{
     node::state_db::NodeInfo,
     Error, Result,
 };
-use log::info;
+use log::{error,info};
 use sn_data_types::{
     CmdError, Error as DtError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
     Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp, SequenceEntry, SequenceIndex,
@@ -97,7 +97,7 @@ impl SequenceStorage {
             self.chunks
                 .put(&data)
                 .await
-                .map_err(|error| error.to_string().into())
+                .map_err(|error| DtError::NetworkOther(error.to_string()))
         };
         self.ok_or_error(result, msg_id, &origin).await
     }
@@ -129,10 +129,16 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Result<Sequence, DtError> {
         //let requester_key = utils::own_key(requester).ok_or(DtError::AccessDenied)?;
-        let data = self.chunks.get(&address).map_err(|error| match error {
-            Error::NoSuchChunk => DtError::NoSuchData,
-            err => err
-        })?;
+        let data = self.chunks.get(&address)
+            .map_err(|error|  
+                {
+                    error!("Error getting chun: {:?}", error);
+                    DtError::NoSuchData }
+                )?;
+                // match error {
+            // Error::NoSuchChunk => DtError::NoSuchData,
+            // err => err DtError::
+        // })?;
 
         data.check_permission(action, Some(origin.id().public_key()), None)?;
         Ok(data)
@@ -149,7 +155,7 @@ impl SequenceStorage {
             .get(&address)
             .map_err(|error| match error {
                 Error::NoSuchChunk => DtError::NoSuchData,
-                error => error.to_string().into(),
+                error => DtError::NetworkOther(error.to_string().into()),
             })
             .and_then(|sequence| {
                 // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
@@ -174,7 +180,7 @@ impl SequenceStorage {
                 .chunks
                 .delete(&address)
                 .await
-                .map_err(|error| error.to_string().into()),
+                .map_err(|error| DtError::NetworkOther(error.to_string().into())),
             Err(error) => Err(error),
         };
 
@@ -304,9 +310,7 @@ impl SequenceStorage {
                     let policy = sequence.public_policy()?;
                     policy.clone()
                 } else {
-                    return Err(DtError::from(
-                        "Cannot get public policy of private sequence.",
-                    ));
+                    return Err(DtError::CrdtUnexpectedState);
                 };
                 Ok(res)
             });
@@ -336,9 +340,7 @@ impl SequenceStorage {
                     let policy = sequence.private_policy(Some(origin.id().public_key()))?;
                     policy.clone()
                 } else {
-                    return Err(DtError::from(
-                        "Cannot get private policy of public sequence.",
-                    ));
+                    return Err(DtError::CrdtUnexpectedState);
                 };
                 Ok(res)
             });
@@ -460,7 +462,7 @@ impl SequenceStorage {
         self.chunks
             .put(&sequence)
             .await
-            .map_err(|error| error.to_string().into())
+            .map_err(|error| DtError::NetworkOther(error.to_string().into()),)
     }
 
     async fn ok_or_error<T>(

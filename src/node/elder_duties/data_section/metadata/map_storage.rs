@@ -105,7 +105,7 @@ impl MapStorage {
             .get(&address)
             .map_err(|e| match e {
                 Error::NoSuchChunk => DtError::NoSuchData,
-                error => error,
+                error =>  DtError::NetworkOther(error.to_string())
             })
             .and_then(move |map| {
                 map.check_permissions(action, origin.id().public_key())
@@ -126,15 +126,16 @@ impl MapStorage {
     {
         let result = match self.chunks.get(address).map_err(|e| match e {
             Error::NoSuchChunk => DtError::NoSuchData,
-            error => error.to_string().into(),
+            error =>  DtError::NetworkOther(error.to_string().into())
+            ,
         }) {
             Ok(data) => match mutation_fn(data) {
                 Ok(map) => self
                     .chunks
                     .put(&map)
                     .await
-                    .map_err(|error| error.to_string().into()),
-                Err(error) => Err(error),
+                    .map_err(|error| DtError::NetworkOther(error.to_string().into())),
+                    Err(error) => Err(error),
             },
             Err(error) => Err(error),
         };
@@ -155,7 +156,7 @@ impl MapStorage {
             self.chunks
                 .put(&data)
                 .await
-                .map_err(|error| error.to_string().into())
+                .map_err(|error| DtError::NetworkOther(error.to_string()))
         };
         self.ok_or_error(result, msg_id, origin).await
     }
@@ -168,7 +169,7 @@ impl MapStorage {
     ) -> Result<NodeMessagingDuty> {
         let result = match self.chunks.get(&address).map_err(|e| match e {
             Error::NoSuchChunk => DtError::NoSuchData,
-            error => error.to_string().into(),
+            error => DtError::NetworkOther(error.to_string().into()),
         }) {
             Ok(map) => match map.check_is_owner(origin.id().public_key()) {
                 Ok(()) => {
@@ -176,11 +177,11 @@ impl MapStorage {
                     self.chunks
                         .delete(&address)
                         .await
-                        .map_err(|error| error.to_string().into())
-                }
+                        .map_err(|error| DtError::NetworkOther(error.to_string().into()),)
+                    }
                 Err(e) => {
                     info!("Error: Delete Map called by non-owner");
-                    Err(e.to_string().into())
+                    Err(DtError::AccessDenied(origin.id().public_key()))
                 }
             },
             Err(error) => Err(error),

@@ -176,8 +176,9 @@ impl BlobRegister {
 
         // todo: use signature verification instead
         if let Some(data_owner) = metadata.owner {
-            if data_owner != origin.id().public_key() {
-                return cmd_error(DtError::AccessDenied).await;
+            let pk  =origin.id().public_key();
+            if data_owner != pk {
+                return cmd_error(DtError::AccessDenied(pk)).await;
             }
         };
 
@@ -380,7 +381,7 @@ impl BlobRegister {
 
         if let Some(data_owner) = metadata.owner {
             if data_owner != origin.id().public_key() {
-                return query_error(DtError::AccessDenied).await;
+                return query_error(DtError::AccessDenied(origin.id().public_key())).await;
             }
         };
         let message = Message::Query {
