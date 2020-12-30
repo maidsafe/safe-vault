@@ -105,7 +105,7 @@ impl MapStorage {
             .get(&address)
             .map_err(|e| match e {
                 Error::NoSuchChunk => DtError::NoSuchData,
-                error => error.to_string().into(),
+                error => error,
             })
             .and_then(move |map| {
                 map.check_permissions(action, origin.id().public_key())

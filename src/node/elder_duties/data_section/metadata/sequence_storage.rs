@@ -131,7 +131,7 @@ impl SequenceStorage {
         //let requester_key = utils::own_key(requester).ok_or(DtError::AccessDenied)?;
         let data = self.chunks.get(&address).map_err(|error| match error {
             Error::NoSuchChunk => DtError::NoSuchData,
-            _ => error.to_string().into(),
+            err => err
         })?;
 
         data.check_permission(action, Some(origin.id().public_key()), None)?;

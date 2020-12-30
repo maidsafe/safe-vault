@@ -74,7 +74,7 @@ impl SectionFunds {
         if let Some(event) = self
             .actor
             .synch_events(events)
-            .map_err(Error::NetworkData)?
+            .map_err(Error::Transfer)?
         {
             self.actor.apply(TransfersSynched(event.clone()))?;
             info!("Synched: {:?}", event);
@@ -311,14 +311,14 @@ impl SectionFunds {
         )]) {
             Ok(Some(event)) => self.apply(TransfersSynched(event))?,
             Ok(None) => (),
-            Err(error) => return Err(Error::NetworkData(error)),
+            Err(error) => return Err(Error::Transfer(error)),
         };
 
         Ok(())
     }
 
     fn apply(&mut self, event: ActorEvent) -> Result<()> {
-        self.actor.apply(event).map_err(Error::NetworkData)
+        self.actor.apply(event).map_err(Error::Transfer)
     }
 
     fn is_transition_credit(&self, credit: &CreditAgreementProof) -> bool {

@@ -48,6 +48,10 @@ pub enum Error {
     #[error("Network data error:: {0}")]
     NetworkData(#[from] sn_data_types::Error),
 
+    /// sn_transfers error.
+    #[error("Transfer data error:: {0}")]
+    Transfer(#[from] sn_transfers::Error),
+
     /// NetworkData Entry error.
     #[error("Network data entry error: {0:?}")]
     NetworkDataEntry(sn_data_types::EntryError),
