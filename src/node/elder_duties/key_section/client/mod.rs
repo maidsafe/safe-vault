@@ -23,7 +23,8 @@ use crate::{
 use log::{error, info, trace, warn};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
-use sn_data_types::{Address, Error as DtError, MsgEnvelope};
+use sn_data_types::Error as DtError;
+use sn_messaging::{Address, MsgEnvelope};
 use sn_routing::Event as RoutingEvent;
 use std::fmt::{self, Display, Formatter};
 

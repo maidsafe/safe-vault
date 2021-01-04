@@ -7,8 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use bls::SecretKeySet;
-use sn_data_types::{Credit, Error, Money, PublicKey, Result, SignedCredit};
+use sn_data_types::{Credit, Money, PublicKey, SignedCredit};
 use std::collections::BTreeMap;
+
+use crate::{Error, Result};
 
 /// Produces a genesis balance for a new network.
 pub fn get_genesis(balance: u64, id: PublicKey) -> Result<SignedCredit> {
@@ -32,8 +34,7 @@ pub fn get_genesis(balance: u64, id: PublicKey) -> Result<SignedCredit> {
         msg: "genesis".to_string(),
     };
 
-    let serialised_credit =
-        bincode::serialize(&credit).map_err(|e| Error::NetworkOther(e.to_string()))?;
+    let serialised_credit = bincode::serialize(&credit)?;
     let sender_sig_share = secret_key.sign(serialised_credit);
     let mut sender_sig_shares = BTreeMap::new();
     let _ = sender_sig_shares.insert(0, sender_sig_share);
@@ -41,7 +42,7 @@ pub fn get_genesis(balance: u64, id: PublicKey) -> Result<SignedCredit> {
     let sender_signature = sn_data_types::Signature::Bls(
         peer_replicas
             .combine_signatures(&sender_sig_shares)
-            .map_err(|e| Error::NetworkOther(e.to_string()))?,
+            .map_err(|_| Error::CouldNotCombineSignatures)?,
     );
 
     Ok(SignedCredit {

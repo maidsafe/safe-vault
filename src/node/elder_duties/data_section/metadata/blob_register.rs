@@ -8,17 +8,19 @@
 
 use crate::{
     capacity::ChunkHolderDbs,
+    error::convert_to_error_message,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeMessagingDuty, NodeOperation},
-    Network, Result, ToDbKey,
+    Error, Network, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{
-    Blob, BlobAddress, BlobRead, BlobWrite, CmdError, DataQuery, Error as DtError, Message,
-    MessageId, MsgSender, NodeCmd, NodeDataCmd, PublicKey, Query, QueryResponse,
-    Result as NdResult,
+use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey, Result as NdResult};
+use sn_messaging::{
+    BlobRead, BlobWrite, CmdError, DataQuery, Error as ErrorMessage, Message, MessageId, MsgSender,
+    NodeCmd, NodeDataCmd, Query, QueryResponse,
 };
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
@@ -92,7 +94,7 @@ impl BlobRegister {
                         .wrapping
                         .send_to_section(
                             Message::CmdError {
-                                error: CmdError::Data(DtError::DataExists),
+                                error: CmdError::Data(ErrorMessage::DataExists),
                                 id: MessageId::new(),
                                 cmd_origin: origin.address(),
                                 correlation_id: msg_id,
@@ -138,7 +140,7 @@ impl BlobRegister {
             info!("Results is not empty!");
         }
         let message = Message::NodeCmd {
-            cmd: NodeCmd::Data(sn_data_types::NodeDataCmd::Blob(BlobWrite::New(data))),
+            cmd: NodeCmd::Data(NodeDataCmd::Blob(BlobWrite::New(data))),
             id: msg_id,
         };
         //     ,
@@ -157,10 +159,11 @@ impl BlobRegister {
         origin: MsgSender,
         proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
-        let cmd_error = |error: DtError| {
+        let cmd_error = |error: Error| {
+            let message_error = convert_to_error_message(error);
             self.wrapping.send_to_section(
                 Message::CmdError {
-                    error: CmdError::Data(error),
+                    error: CmdError::Data(message_error),
                     id: MessageId::new(),
                     cmd_origin: origin.address(),
                     correlation_id: msg_id,
@@ -176,9 +179,9 @@ impl BlobRegister {
 
         // todo: use signature verification instead
         if let Some(data_owner) = metadata.owner {
-            let pk  =origin.id().public_key();
+            let pk = origin.id().public_key();
             if data_owner != pk {
-                return cmd_error(DtError::AccessDenied(pk)).await;
+                return cmd_error(Error::NetworkData(DtError::AccessDenied(pk))).await;
             }
         };
 
@@ -359,9 +362,10 @@ impl BlobRegister {
         origin: MsgSender,
         proxies: Vec<MsgSender>,
     ) -> Result<NodeMessagingDuty> {
-        let query_error = |error: DtError| async {
+        let query_error = |error: Error| async {
+            let message_error = convert_to_error_message(error);
             let err_msg = Message::QueryResponse {
-                response: QueryResponse::GetBlob(Err(error)),
+                response: QueryResponse::GetBlob(Err(message_error)),
                 id: MessageId::in_response_to(&msg_id),
                 query_origin: origin.address(),
                 correlation_id: msg_id,
@@ -381,7 +385,10 @@ impl BlobRegister {
 
         if let Some(data_owner) = metadata.owner {
             if data_owner != origin.id().public_key() {
-                return query_error(DtError::AccessDenied(origin.id().public_key())).await;
+                return query_error(Error::NetworkData(DtError::AccessDenied(
+                    origin.id().public_key(),
+                )))
+                .await;
             }
         };
         let message = Message::Query {
@@ -430,18 +437,14 @@ impl BlobRegister {
 
     // Updates the metadata of the chunks help by a node that left.
     // Returns the list of chunks that were held along with the remaining holders.
-    fn remove_holder(
-        &mut self,
-        node: XorName,
-    ) -> NdResult<BTreeMap<BlobAddress, BTreeSet<XorName>>> {
+    fn remove_holder(&mut self, node: XorName) -> Result<BTreeMap<BlobAddress, BTreeSet<XorName>>> {
         let mut blob_addresses: BTreeMap<BlobAddress, BTreeSet<XorName>> = BTreeMap::new();
         let chunk_holder = self.get_holder(node);
 
         if let Ok(holder) = chunk_holder {
             for chunk_address in holder.chunks {
-                let db_key = chunk_address
-                    .to_db_key()
-                    .map_err(|e| DtError::NetworkOther(e.to_string()))?;
+                let db_key = chunk_address.to_db_key()?;
+                // .map_err(|e| DtError::NetworkOther(e.to_string()))?;
                 let chunk_metadata = self.get_metadata_for(chunk_address);
 
                 if let Ok(mut metadata) = chunk_metadata {
@@ -466,9 +469,7 @@ impl BlobRegister {
 
         // Since the node has left the section, remove it from the holders DB
         if let Err(error) = self.dbs.holders.borrow_mut().rem(
-            &node
-                .to_db_key()
-                .map_err(|e| DtError::NetworkOther(e.to_string()))?,
+            &node.to_db_key()?, // .map_err(|e| DtError::NetworkOther(e.to_string()))?,
         ) {
             warn!("{}: Failed to delete metadata from DB: {:?}", self, error);
         };
@@ -476,44 +477,40 @@ impl BlobRegister {
         Ok(blob_addresses)
     }
 
-    fn get_holder(&self, holder: XorName) -> NdResult<HolderMetadata> {
+    fn get_holder(&self, holder: XorName) -> Result<HolderMetadata> {
         match self.dbs.holders.borrow().get::<HolderMetadata>(
-            &holder
-                .to_db_key()
-                .map_err(|e| DtError::NetworkOther(e.to_string()))?,
+            &holder.to_db_key()?, // .map_err(|e| DtError::NetworkOther(e.to_string()))?,
         ) {
             Some(metadata) => {
                 if metadata.chunks.is_empty() {
                     warn!("{}: is not responsible for any chunk", holder);
-                    Err(DtError::NoSuchData)
+                    Err(Error::NoSuchChunk)
                 } else {
                     Ok(metadata)
                 }
             }
             None => {
                 info!("{}: is not responsible for any chunk", holder);
-                Err(DtError::NoSuchData)
+                Err(Error::NoSuchChunk)
             }
         }
     }
 
-    fn get_metadata_for(&self, address: BlobAddress) -> NdResult<ChunkMetadata> {
+    fn get_metadata_for(&self, address: BlobAddress) -> Result<ChunkMetadata> {
         match self.dbs.metadata.borrow().get::<ChunkMetadata>(
-            &address
-                .to_db_key()
-                .map_err(|e| DtError::NetworkOther(e.to_string()))?,
+            &address.to_db_key()?, // .map_err(|e| DtError::NetworkOther(e.to_string()))?,
         ) {
             Some(metadata) => {
                 if metadata.holders.is_empty() {
                     warn!("{}: Metadata holders is empty for: {:?}", self, address);
-                    Err(DtError::NoSuchData)
+                    Err(Error::NoSuchChunk)
                 } else {
                     Ok(metadata)
                 }
             }
             None => {
                 warn!("{}: Failed to get metadata from DB: {:?}", self, address);
-                Err(DtError::NoSuchData)
+                Err(Error::NoSuchChunk)
             }
         }
     }

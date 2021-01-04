@@ -21,7 +21,8 @@ use crate::{
     utils, Network, Result,
 };
 use log::info;
-use sn_data_types::{Address, MessageId};
+use sn_messaging::{Address, MessageId};
+
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
 use std::sync::Arc;

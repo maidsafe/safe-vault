@@ -14,10 +14,10 @@ use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::info;
 use sn_data_types::{
-    CreditAgreementProof, Error as DtError, Money, PublicKey, ReplicaEvent, SignedTransfer,
+    CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignedTransfer,
     TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
 };
-use sn_transfers::WalletReplica;
+use sn_transfers::{Error as TransfersError, WalletReplica};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -212,9 +212,7 @@ impl Replicas {
         })? {
             None => {
                 info!("transfer already registered!");
-                Err(Error::NetworkData(DtError::NetworkOther(
-                    "transfer already registered!".to_string(),
-                )))
+                Err(Error::TransferAlreadyRegistered)
             }
             Some(event) => {
                 store.try_insert(ReplicaEvent::TransferRegistered(event.clone()))?;
@@ -301,12 +299,11 @@ impl Replicas {
             self.info.key_index,
             self.info.peer_replicas.clone(),
             events,
-        )
-        .map_err(Error::NetworkData)?;
+        )?;
         Ok(wallet)
     }
 
-    fn find_past_key(&self, keyset: &PublicKeySet) -> Result<PublicKey, DtError> {
+    fn find_past_key(&self, keyset: &PublicKeySet) -> Result<PublicKey, TransfersError> {
         let section_keys = self.info.section_proof_chain.clone();
         let key = section_keys
             .keys()
@@ -314,7 +311,7 @@ impl Replicas {
         if let Some(key_in_chain) = key {
             Ok(PublicKey::Bls(*key_in_chain))
         } else {
-            Err(DtError::NetworkOther("PublicKey provided by the transfer was never a part of the Section retrospectively".to_string()))
+            Err(TransfersError::SectionKeyNeverExisted)
         }
     }
 
@@ -355,7 +352,7 @@ impl Replicas {
 
     /// This is the one and only infusion of money to the system. Ever.
     /// It is carried out by the first node in the network.
-    async fn store_genesis<F: FnOnce() -> Result<PublicKey, DtError>>(
+    async fn store_genesis<F: FnOnce() -> Result<PublicKey, TransfersError>>(
         &self,
         credit_proof: &CreditAgreementProof,
         past_key: F,
@@ -365,7 +362,7 @@ impl Replicas {
         let self_lock = self.self_lock.lock().await;
         // We expect nothing to exist before this transfer.
         if self.load_key_lock(id).await.is_ok() {
-            return Err(Error::NetworkData(DtError::BalanceExists));
+            return Err(Error::BalanceExists);
         }
         // No key lock (hence no store), so we create one
         let store = TransferStore::new(id.into(), &self.root_dir, Init::New)?;
@@ -379,6 +376,7 @@ impl Replicas {
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, id).await?;
         let _ = wallet.genesis(credit_proof, past_key)?;
+        // .map_err(|e| Error::Transfer(e))?;
         // sign + update state
         if let Some(crediting_replica_sig) = self
             .info

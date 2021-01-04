@@ -9,7 +9,8 @@
 use crate::{Error, Result};
 use bytes::Bytes;
 use log::info;
-use sn_data_types::{Error as DtError, HandshakeRequest, Message, MsgEnvelope};
+use sn_data_types::{Error as DtError, HandshakeRequest};
+use sn_messaging::{Message, MsgEnvelope};
 use std::net::SocketAddr;
 
 /*

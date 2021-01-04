@@ -10,7 +10,8 @@ use crate::{utils, Network, Result};
 use bls::PublicKeySet;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use serde::Serialize;
-use sn_data_types::{Signature, SignatureShare, TransientElderKey as ElderKey};
+use sn_data_types::{Signature, SignatureShare};
+use sn_messaging::TransientElderKey;
 use xor_name::XorName;
 
 #[derive(Clone)]
@@ -31,12 +32,12 @@ impl NodeSigningKeys {
         self.routing.name().await
     }
 
-    pub async fn elder_key(&self) -> Option<ElderKey> {
+    pub async fn elder_key(&self) -> Option<TransientElderKey> {
         let bls_share_index = self.routing.our_index().await.ok()?;
         let bls_public_key_set = self.public_key_set().await?;
         let bls_key = bls_public_key_set.public_key_share(bls_share_index);
 
-        Some(ElderKey {
+        Some(TransientElderKey {
             node_id: self.node_id().await,
             bls_key,
             bls_share_index,

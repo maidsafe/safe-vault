@@ -16,8 +16,10 @@ use crate::{
 use crate::{Outcome, TernaryResult};
 use futures::lock::Mutex;
 use log::{info, trace, warn};
+use sn_messaging::{ Message, MessageId, MsgEnvelope, MsgSender };
+
 use sn_data_types::{
-    Cmd, CmdError, ElderDuties, Error as DtError, Message, MsgEnvelope, PublicKey, Result,
+    Cmd, CmdError, ElderDuties, Error as DtError, PublicKey, Result,
     TransferError,
 };
 use std::fmt::{self, Display, Formatter};

@@ -13,9 +13,10 @@ use crate::{
 };
 use crate::{Error, Result};
 use sn_data_types::{
-    CreditAgreementProof, Message, MessageId, Money, NodeCmd, NodeTransferCmd, PublicKey,
-    ReplicaEvent, SignedTransfer, TransferValidated,
+    CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignedTransfer, TransferValidated,
 };
+use sn_messaging::{Message, MessageId, NodeCmd, NodeTransferCmd};
+
 use xor_name::XorName;
 
 use log::{error, info};
@@ -71,11 +72,7 @@ impl SectionFunds {
     /// Replica events get synched to section actor instances.
     pub async fn synch(&mut self, events: Vec<ReplicaEvent>) -> Result<NodeMessagingDuty> {
         info!("Synching replica events to section transfer actor...");
-        if let Some(event) = self
-            .actor
-            .synch_events(events)
-            .map_err(Error::Transfer)?
-        {
+        if let Some(event) = self.actor.synch_events(events).map_err(Error::Transfer)? {
             self.actor.apply(TransfersSynched(event.clone()))?;
             info!("Synched: {:?}", event);
         }

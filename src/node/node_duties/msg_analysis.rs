@@ -19,12 +19,13 @@ use crate::{
     utils, Error, Network, Result,
 };
 use log::{error, info};
-use sn_data_types::{
+use sn_messaging::{
     Address, AdultDuties::ChunkStorage, Cmd, DataQuery, Duty, ElderDuties, Message, MessageId,
     MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse, NodeDuties, NodeEvent,
     NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd,
     NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
 };
+
 use sn_routing::MIN_AGE;
 use xor_name::XorName;
 

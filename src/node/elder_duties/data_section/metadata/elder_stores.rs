@@ -7,8 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob_register::BlobRegister, map_storage::MapStorage,
-    sequence_storage::SequenceStorage,
+    blob_register::BlobRegister, map_storage::MapStorage, sequence_storage::SequenceStorage,
 };
 
 /// The various data type stores,
@@ -31,7 +30,6 @@ impl ElderStores {
             sequence_storage,
         }
     }
-
 
     pub fn blob_register(&self) -> &BlobRegister {
         &self.blob_register

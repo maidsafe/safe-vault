@@ -14,10 +14,11 @@ use crate::{node::node_ops::NodeMessagingDuty, node::state_db::NodeInfo, Error, 
 use chunk_storage::ChunkStorage;
 
 use log::{info, trace};
-use sn_data_types::{
-    Address, Blob, BlobAddress, DataQuery, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd,
-    NodeDataCmd, Query,
+use sn_data_types::{Blob, BlobAddress};
+use sn_messaging::{
+    Address, DataQuery, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, Query,
 };
+
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},

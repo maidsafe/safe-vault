@@ -2648,8 +2648,6 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_client"
 version = "0.44.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63ce03346630d13b2b75315ba20c5bf64160d8c9fd81825efb481c3e625eecea"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2689,8 +2687,6 @@ dependencies = [
 [[package]]
 name = "sn_data_types"
 version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99b6b74c2b866e491855f5f345cd16b9f123b1fe248c7dac47279110ad61f161"
 dependencies = [
  "bincode",
  "crdts",
@@ -2720,6 +2716,28 @@ dependencies = [
  "log",
  "regex",
  "structopt 0.3.21",
+]
+
+[[package]]
+name = "sn_messaging"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "crdts",
+ "ed25519",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "serde",
+ "sha3",
+ "signature",
+ "sn_data_types",
+ "thiserror",
+ "threshold_crypto",
+ "tiny-keccak 1.5.0",
+ "xor_name",
 ]
 
 [[package]]
@@ -2758,6 +2776,7 @@ dependencies = [
  "sn_client",
  "sn_data_types",
  "sn_launch_tool",
+ "sn_messaging",
  "sn_routing",
  "sn_transfers",
  "structopt 0.3.21",
@@ -2800,8 +2819,6 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3307d4f8609505d7a7ad7d84fa67aad596af607b22655828d1af8db932903ac2"
 dependencies = [
  "bincode",
  "crdts",

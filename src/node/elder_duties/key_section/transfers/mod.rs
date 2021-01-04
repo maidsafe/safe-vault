@@ -13,6 +13,7 @@ pub mod store;
 use self::replicas::Replicas;
 use crate::{
     capacity::RateLimit,
+    error::{convert_dt_error_to_error_message, convert_to_error_message},
     node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{
@@ -23,11 +24,19 @@ use crate::{
 use log::{debug, info, trace, warn};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
+
 use sn_data_types::{
-    Address, Cmd, CmdError, CreditAgreementProof, ElderDuties, Error as DtError, Event, Message,
-    MessageId, MsgEnvelope, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse,
-    NodeTransferCmd, NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, PublicKey,
-    QueryResponse, ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferError,
+    CreditAgreementProof,
+    // Error as DtError,
+    PublicKey,
+    ReplicaEvent,
+    SignedTransfer,
+    TransferAgreementProof,
+};
+use sn_messaging::{
+    Address, Cmd, CmdError, ElderDuties, Error as ErrorMessage, Event, Message, MessageId,
+    MsgEnvelope, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd,
+    NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, QueryResponse, TransferError,
 };
 use std::fmt::{self, Display, Formatter};
 use xor_name::Prefix;
@@ -230,7 +239,7 @@ impl Transfers {
             return self
                 .wrapping
                 .error(
-                    CmdError::Transfer(TransferRegistration(DtError::NoSuchRecipient)),
+                    CmdError::Transfer(TransferRegistration(ErrorMessage::NoSuchRecipient)),
                     msg.id(),
                     &msg.origin.address(),
                 )
@@ -264,7 +273,9 @@ impl Transfers {
                     return self
                         .wrapping
                         .error(
-                            CmdError::Transfer(TransferRegistration(DtError::InsufficientBalance)),
+                            CmdError::Transfer(TransferRegistration(
+                                ErrorMessage::InsufficientBalance,
+                            )),
                             msg.id(),
                             &msg.origin.address(),
                         )
@@ -279,9 +290,7 @@ impl Transfers {
                 warn!("Payment: registration or propagation failed: {}", e);
                 self.wrapping
                     .error(
-                        CmdError::Transfer(TransferRegistration(DtError::NetworkOther(
-                            e.to_string(),
-                        ))),
+                        CmdError::Transfer(TransferRegistration(ErrorMessage::PaymentFailed)),
                         msg.id(),
                         &msg.origin.address(),
                     )
@@ -301,7 +310,7 @@ impl Transfers {
             .replicas
             .all_events()
             .await
-            .map_err(|e| DtError::NetworkOther(e.to_string()));
+            .map_err(convert_to_error_message);
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         self.wrapping
@@ -374,7 +383,7 @@ impl Transfers {
             .replicas
             .balance(wallet_id)
             .await
-            .map_err(|e| DtError::NetworkOther(e.to_string()));
+            .map_err(convert_to_error_message);
 
         self.wrapping
             .send_to_client(Message::QueryResponse {
@@ -400,7 +409,7 @@ impl Transfers {
             .replicas
             .history(wallet_id)
             .await
-            .map_err(|e| DtError::NetworkOther(e.to_string()));
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
                 response: Transfers(GetSectionActorHistory(result)),
@@ -420,9 +429,11 @@ impl Transfers {
     ) -> Result<NodeMessagingDuty> {
         trace!("Handling GetHistory");
         // validate signature
-        let result = self.replicas.history(*wallet_id).await.map_err(|_e| {
-            DtError::NetworkOther(format!("Could not get history for key {:?}", wallet_id))
-        });
+        let result = self
+            .replicas
+            .history(*wallet_id)
+            .await
+            .map_err(|_e| ErrorMessage::NoHistoryForPublicKey(*wallet_id));
         self.wrapping
             .send_to_client(Message::QueryResponse {
                 response: QueryResponse::GetHistory(result),
@@ -452,14 +463,15 @@ impl Transfers {
                 id: MessageId::new(),
                 correlation_id: msg_id,
             },
-            Err(e) => Message::CmdError {
-                id: MessageId::new(),
-                error: CmdError::Transfer(TransferError::TransferValidation(DtError::NetworkOther(
-                    e.to_string(),
-                ))),
-                correlation_id: msg_id,
-                cmd_origin: origin,
-            },
+            Err(e) => {
+                let message_error = convert_to_error_message(e);
+                Message::CmdError {
+                    id: MessageId::new(),
+                    error: CmdError::Transfer(TransferError::TransferValidation(message_error)),
+                    correlation_id: msg_id,
+                    cmd_origin: origin,
+                }
+            }
         };
         self.wrapping.send_to_client(message).await
     }
@@ -479,14 +491,18 @@ impl Transfers {
                 id: MessageId::new(),
                 correlation_id: msg_id,
             },
-            Err(e) => Message::NodeCmdError {
-                id: MessageId::new(),
-                error: NodeCmdError::Transfers(NodeTransferError::TransferPropagation(
-                    DtError::NetworkOther(e.to_string()),
-                )), // TODO: SHOULD BE TRANSFERVALIDATION
-                correlation_id: msg_id,
-                cmd_origin: origin,
-            },
+            Err(e) => {
+                let message_error = convert_to_error_message(e);
+
+                Message::NodeCmdError {
+                    id: MessageId::new(),
+                    error: NodeCmdError::Transfers(NodeTransferError::TransferPropagation(
+                        message_error,
+                    )), // TODO: SHOULD BE TRANSFERVALIDATION
+                    correlation_id: msg_id,
+                    cmd_origin: origin,
+                }
+            }
         };
         self.wrapping.send_to_node(message).await
     }
@@ -514,11 +530,11 @@ impl Transfers {
                     .await
             }
             Err(e) => {
+                let message_error = convert_to_error_message(e);
+
                 self.wrapping
                     .error(
-                        CmdError::Transfer(TransferError::TransferRegistration(
-                            DtError::NetworkOther(e.to_string()),
-                        )),
+                        CmdError::Transfer(TransferError::TransferRegistration(message_error)),
                         msg_id,
                         &origin,
                     )
@@ -550,11 +566,10 @@ impl Transfers {
                     .await
             }
             Err(e) => {
+                let message_error = convert_to_error_message(e);
                 self.wrapping
                     .error(
-                        CmdError::Transfer(TransferError::TransferRegistration(
-                            DtError::NetworkOther(e.to_string()),
-                        )),
+                        CmdError::Transfer(TransferError::TransferRegistration(message_error)),
                         msg_id,
                         &origin,
                     )
@@ -577,12 +592,16 @@ impl Transfers {
         // We will just validate the proofs and then apply the event.
         let message = match self.replicas.receive_propagated(credit_proof).await {
             Ok(_) => return Ok(NodeMessagingDuty::NoOp),
-            Err(Error::NetworkData(error)) => Message::NodeCmdError {
-                error: NodeCmdError::Transfers(TransferPropagation(error)),
-                id: MessageId::new(),
-                correlation_id: msg_id,
-                cmd_origin: origin,
-            },
+            Err(Error::NetworkData(error)) => {
+                let message_error = convert_dt_error_to_error_message(error);
+                Message::NodeCmdError {
+                    error: NodeCmdError::Transfers(TransferPropagation(message_error)),
+                    id: MessageId::new(),
+                    correlation_id: msg_id,
+                    cmd_origin: origin,
+                }
+            }
+
             Err(_e) => unimplemented!("receive_propagated"),
         };
         self.wrapping.send_to_node(message).await

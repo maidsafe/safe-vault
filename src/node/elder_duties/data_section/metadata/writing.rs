@@ -7,15 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob_register::BlobRegister, elder_stores::ElderStores,
-    map_storage::MapStorage, sequence_storage::SequenceStorage,
+    blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
+    sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::{Blah, NodeMessagingDuty, NodeOperation};
 use crate::{Error, Result};
 use log::info;
-use sn_data_types::{
-    BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender,
-    SequenceWrite,
+use sn_messaging::{
+    BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender, SequenceWrite,
 };
 
 pub(super) async fn get_result(
@@ -51,8 +50,6 @@ pub(super) async fn get_result(
                 info!("Writing Sequence");
                 sequence(write, stores.sequence_storage_mut(), msg_id, msg_origin).await
             }
-          
-            
         },
         _ => Err(Error::Logic(
             "Unreachable pattern when writing data.".to_string(),

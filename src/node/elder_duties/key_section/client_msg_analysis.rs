@@ -12,7 +12,7 @@ use crate::node::node_ops::{
 use crate::Network;
 use crate::{Error, Result};
 use log::{info, warn};
-use sn_data_types::{Cmd, CmdError, Message, MessageId, MsgEnvelope, Query};
+use sn_messaging::{Cmd, CmdError, Error as MessageError, Message, MessageId, MsgEnvelope, Query};
 
 // NB: Just as with the msg_analysis.rs,
 // this approach is not entirely good, so will need to be improved.
@@ -39,10 +39,11 @@ impl ClientMsgAnalysis {
         {
             // If owner is `Some`, then the Cmd is going to be newly created Data.
             if let Some(owner) = cmd.owner() {
-                if owner != msg.origin.id().public_key() {
+                let public_key = msg.origin.id().public_key();
+                if owner != public_key {
                     return Ok(NodeMessagingDuty::SendToClient(MsgEnvelope {
                         message: Message::CmdError {
-                            error: CmdError::Data(sn_data_types::Error::InvalidOwners),
+                            error: CmdError::Data(MessageError::InvalidOwners(public_key)),
                             id: MessageId::new(),
                             correlation_id: msg.id(),
                             cmd_origin: msg.origin.address(),

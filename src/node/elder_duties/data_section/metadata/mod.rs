@@ -25,7 +25,8 @@ use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
-use sn_data_types::{ElderDuties, Message, MsgEnvelope};
+use sn_messaging::{ElderDuties, Message, MsgEnvelope};
+
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
 
@@ -53,11 +54,7 @@ impl Metadata {
         let map_storage = MapStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
         let sequence_storage =
             SequenceStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
-        let elder_stores = ElderStores::new(
-            blob_register,
-            map_storage,
-            sequence_storage,
-        );
+        let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
         Ok(Self {
             elder_stores,
             wrapping,

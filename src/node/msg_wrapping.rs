@@ -9,10 +9,12 @@
 use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty, utils};
 use crate::{Error, Result};
 use log::info;
-use sn_data_types::{
+use sn_data_types::Signature;
+use sn_messaging::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NodeDuties, Signature, TransientSectionKey,
+    NodeDuties, TransientElderKey, TransientSectionKey,
 };
+
 use xor_name::XorName;
 
 use serde::Serialize;
@@ -284,7 +286,7 @@ impl MsgWrapping {
                     MsgSender::section(TransientSectionKey { bls_key }, duty).ok()?
                 } else {
                     info!("Signing as Node!");
-                    let key = self.keys.elder_key().await?;
+                    let key: TransientElderKey = self.keys.elder_key().await?;
                     if let Signature::BlsShare(sig) = self.keys.sign_as_elder(data).await? {
                         MsgSender::elder(key, duty, sig.share).ok()?
                     } else {

@@ -12,9 +12,11 @@ use sn_data_types::Transfer;
 use crate::Result;
 use serde::export::Formatter;
 use sn_data_types::{
-    Address, Blob, BlobAddress, CreditAgreementProof, MessageId, MsgEnvelope, MsgSender, PublicKey,
-    ReplicaEvent, SignedTransfer, TransferAgreementProof, TransferValidated,
+    Blob, BlobAddress, CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer,
+    TransferAgreementProof, TransferValidated,
 };
+use sn_messaging::{Address, MessageId, MsgEnvelope, MsgSender};
+
 use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;
 use std::fmt::Debug;
@@ -454,32 +456,32 @@ pub enum ChunkReplicationCmd {
     StoreReplicatedBlob(Blob),
 }
 
-// impl From<sn_data_types::TransferCmd> for ChunkReplicationCmd {
-//     fn from(cmd: sn_data_types::TransferCmd) -> Self {
+// impl From<sn_messaging::TransferCmd> for ChunkReplicationCmd {
+//     fn from(cmd: sn_messaging::TransferCmd) -> Self {
 //         match cmd {
 //             #[cfg(feature = "simulated-payouts")]
-//             sn_data_types::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
-//             sn_data_types::TransferCmd::ValidateTransfer(signed_transfer) => {
+//             sn_messaging::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
+//             sn_messaging::TransferCmd::ValidateTransfer(signed_transfer) => {
 //                 Self::ValidateTransfer(signed_transfer)
 //             }
-//             sn_data_types::TransferCmd::RegisterTransfer(transfer_agreement) => {
+//             sn_messaging::TransferCmd::RegisterTransfer(transfer_agreement) => {
 //                 Self::RegisterTransfer(transfer_agreement)
 //             }
 //         }
 //     }
 // }
 
-// impl From<sn_data_types::TransferQuery> for ChunkReplicationQuery {
-//     fn from(cmd: sn_data_types::TransferQuery) -> Self {
+// impl From<sn_messaging::TransferQuery> for ChunkReplicationQuery {
+//     fn from(cmd: sn_messaging::TransferQuery) -> Self {
 //         match cmd {
-//             sn_data_types::TransferQuery::GetReplicaKeys(transfer) => {
+//             sn_messaging::TransferQuery::GetReplicaKeys(transfer) => {
 //                 Self::GetReplicaKeys(transfer)
 //             }
-//             sn_data_types::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
-//             sn_data_types::TransferQuery::GetHistory { at, since_version } => {
+//             sn_messaging::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
+//             sn_messaging::TransferQuery::GetHistory { at, since_version } => {
 //                 Self::GetHistory { at, since_version }
 //             }
-//             sn_data_types::TransferQuery::GetStoreCost { requester, bytes } => {
+//             sn_messaging::TransferQuery::GetStoreCost { requester, bytes } => {
 //                 Self::GetStoreCost { requester, bytes }
 //             }
 //         }
@@ -679,32 +681,30 @@ pub enum TransferCmd {
     RegisterSectionPayout(TransferAgreementProof),
 }
 
-impl From<sn_data_types::TransferCmd> for TransferCmd {
-    fn from(cmd: sn_data_types::TransferCmd) -> Self {
+impl From<sn_messaging::TransferCmd> for TransferCmd {
+    fn from(cmd: sn_messaging::TransferCmd) -> Self {
         match cmd {
             #[cfg(feature = "simulated-payouts")]
-            sn_data_types::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
-            sn_data_types::TransferCmd::ValidateTransfer(signed_transfer) => {
+            sn_messaging::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
+            sn_messaging::TransferCmd::ValidateTransfer(signed_transfer) => {
                 Self::ValidateTransfer(signed_transfer)
             }
-            sn_data_types::TransferCmd::RegisterTransfer(transfer_agreement) => {
+            sn_messaging::TransferCmd::RegisterTransfer(transfer_agreement) => {
                 Self::RegisterTransfer(transfer_agreement)
             }
         }
     }
 }
 
-impl From<sn_data_types::TransferQuery> for TransferQuery {
-    fn from(cmd: sn_data_types::TransferQuery) -> Self {
+impl From<sn_messaging::TransferQuery> for TransferQuery {
+    fn from(cmd: sn_messaging::TransferQuery) -> Self {
         match cmd {
-            sn_data_types::TransferQuery::GetReplicaKeys(transfer) => {
-                Self::GetReplicaKeys(transfer)
-            }
-            sn_data_types::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
-            sn_data_types::TransferQuery::GetHistory { at, since_version } => {
+            sn_messaging::TransferQuery::GetReplicaKeys(transfer) => Self::GetReplicaKeys(transfer),
+            sn_messaging::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
+            sn_messaging::TransferQuery::GetHistory { at, since_version } => {
                 Self::GetHistory { at, since_version }
             }
-            sn_data_types::TransferQuery::GetStoreCost { requester, bytes } => {
+            sn_messaging::TransferQuery::GetStoreCost { requester, bytes } => {
                 Self::GetStoreCost { requester, bytes }
             }
         }

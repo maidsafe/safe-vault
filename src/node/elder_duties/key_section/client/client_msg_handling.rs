@@ -14,7 +14,9 @@ use crate::{Error, Result};
 use dashmap::{mapref::entry::Entry, DashMap};
 use log::{error, info, trace, warn};
 use rand::{CryptoRng, Rng};
-use sn_data_types::{Address, HandshakeRequest, Message, MessageId, MsgEnvelope, PublicKey};
+use sn_data_types::{HandshakeRequest, PublicKey};
+use sn_messaging::{Address, Message, MessageId, MsgEnvelope};
+
 use sn_routing::SendStream;
 use std::{
     fmt::{self, Display, Formatter},

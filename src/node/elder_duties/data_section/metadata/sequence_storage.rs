@@ -8,18 +8,22 @@
 
 use crate::{
     chunk_store::{SequenceChunkStore, UsedSpace},
+    error::convert_to_error_message,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
     Error, Result,
 };
-use log::{error,info};
+use log::info;
 use sn_data_types::{
-    CmdError, Error as DtError, Message, MessageId, MsgSender, QueryResponse, Result as NdResult,
-    Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp, SequenceEntry, SequenceIndex,
-    SequencePolicyWriteOp, SequencePrivatePolicy, SequencePublicPolicy, SequenceRead, SequenceUser,
-    SequenceWrite,
+    Error as DtError, Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp,
+    SequenceEntry, SequenceIndex, SequencePolicyWriteOp, SequencePrivatePolicy,
+    SequencePublicPolicy, SequenceUser,
 };
+use sn_messaging::{
+    CmdError, Message, MessageId, MsgSender, QueryResponse, SequenceRead, SequenceWrite,
+};
+
 use std::fmt::{self, Display, Formatter};
 
 /// Operations over the data type Sequence.
@@ -92,12 +96,9 @@ impl SequenceStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let result = if self.chunks.has(data.address()) {
-            Err(DtError::DataExists)
+            Err(Error::DataExists)
         } else {
-            self.chunks
-                .put(&data)
-                .await
-                .map_err(|error| DtError::NetworkOther(error.to_string()))
+            self.chunks.put(&data).await
         };
         self.ok_or_error(result, msg_id, &origin).await
     }
@@ -108,7 +109,9 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = self.get_chunk(address, SequenceAction::Read, origin);
+        let result = self
+            .get_chunk(address, SequenceAction::Read, origin)
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -127,18 +130,8 @@ impl SequenceStorage {
         address: SequenceAddress,
         action: SequenceAction,
         origin: &MsgSender,
-    ) -> Result<Sequence, DtError> {
-        //let requester_key = utils::own_key(requester).ok_or(DtError::AccessDenied)?;
-        let data = self.chunks.get(&address)
-            .map_err(|error|  
-                {
-                    error!("Error getting chun: {:?}", error);
-                    DtError::NoSuchData }
-                )?;
-                // match error {
-            // Error::NoSuchChunk => DtError::NoSuchData,
-            // err => err DtError::
-        // })?;
+    ) -> Result<Sequence> {
+        let data = self.chunks.get(&address)?;
 
         data.check_permission(action, Some(origin.id().public_key()), None)?;
         Ok(data)
@@ -150,37 +143,26 @@ impl SequenceStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = match self
-            .chunks
-            .get(&address)
-            .map_err(|error| match error {
-                Error::NoSuchChunk => DtError::NoSuchData,
-                error => DtError::NetworkOther(error.to_string().into()),
-            })
-            .and_then(|sequence| {
-                // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
-                if sequence.address().is_pub() {
-                    return Err(DtError::InvalidOperation);
-                }
+        let result = match self.chunks.get(&address).and_then(|sequence| {
+            // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
+            if sequence.address().is_pub() {
+                return Err(Error::InvalidOperation);
+            }
 
-                if origin.is_client() {
-                    let pk = origin.id().public_key();
-                    let policy = sequence.private_policy(Some(pk))?;
+            let pk = origin.id().public_key();
+            if origin.is_client() {
+                let policy = sequence.private_policy(Some(pk))?;
 
-                    if policy.owner != pk {
-                        Err(DtError::InvalidOwners)
-                    } else {
-                        Ok(())
-                    }
+                if policy.owner != pk {
+                    Err(Error::InvalidOwners(pk))
                 } else {
-                    Err(DtError::InvalidOwners)
+                    Ok(())
                 }
-            }) {
-            Ok(()) => self
-                .chunks
-                .delete(&address)
-                .await
-                .map_err(|error| DtError::NetworkOther(error.to_string().into())),
+            } else {
+                Err(Error::InvalidOwners(pk))
+            }
+        }) {
+            Ok(()) => self.chunks.delete(&address).await,
             Err(error) => Err(error),
         };
 
@@ -199,8 +181,9 @@ impl SequenceStorage {
             .and_then(|sequence| {
                 sequence
                     .in_range(range.0, range.1, Some(origin.id().public_key()))?
-                    .ok_or(DtError::NoSuchEntry)
-            });
+                    .ok_or(Error::NetworkData(DtError::NoSuchEntry))
+            })
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -228,9 +211,10 @@ impl SequenceStorage {
                         sequence.len(Some(origin.id().public_key()))? - 1,
                         entry.to_vec(),
                     )),
-                    None => Err(DtError::NoSuchEntry),
+                    None => Err(Error::NetworkData(DtError::NoSuchEntry)),
                 },
-            );
+            )
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -260,7 +244,8 @@ impl SequenceStorage {
                     let policy = sequence.private_policy(Some(origin.id().public_key()))?;
                     Ok(policy.owner)
                 }
-            });
+            })
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -283,7 +268,12 @@ impl SequenceStorage {
     ) -> Result<NodeMessagingDuty> {
         let result = self
             .get_chunk(address, SequenceAction::Read, origin)
-            .and_then(|sequence| sequence.permissions(user, Some(origin.id().public_key())));
+            .and_then(|sequence| {
+                sequence
+                    .permissions(user, Some(origin.id().public_key()))
+                    .map_err(|e| e.into())
+            })
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -310,10 +300,11 @@ impl SequenceStorage {
                     let policy = sequence.public_policy()?;
                     policy.clone()
                 } else {
-                    return Err(DtError::CrdtUnexpectedState);
+                    return Err(Error::NetworkData(DtError::CrdtUnexpectedState));
                 };
                 Ok(res)
-            });
+            })
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -340,10 +331,11 @@ impl SequenceStorage {
                     let policy = sequence.private_policy(Some(origin.id().public_key()))?;
                     policy.clone()
                 } else {
-                    return Err(DtError::CrdtUnexpectedState);
+                    return Err(Error::NetworkData(DtError::CrdtUnexpectedState));
                 };
                 Ok(res)
-            });
+            })
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -451,23 +443,20 @@ impl SequenceStorage {
         action: SequenceAction,
         origin: &MsgSender,
         write_fn: F,
-    ) -> NdResult<()>
+    ) -> Result<()>
     where
-        F: FnOnce(Sequence) -> NdResult<Sequence>,
+        F: FnOnce(Sequence) -> Result<Sequence>,
     {
         info!("Getting Sequence chunk for Edit");
         let result = self.get_chunk(address, action, origin)?;
         let sequence = write_fn(result)?;
         info!("Edited Sequence chunk successfully");
-        self.chunks
-            .put(&sequence)
-            .await
-            .map_err(|error| DtError::NetworkOther(error.to_string().into()),)
+        self.chunks.put(&sequence).await
     }
 
     async fn ok_or_error<T>(
         &self,
-        result: NdResult<T>,
+        result: Result<T>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
@@ -475,7 +464,7 @@ impl SequenceStorage {
             Ok(_) => return Ok(NodeMessagingDuty::NoOp),
             Err(error) => {
                 info!("Error on writing Sequence! {:?}", error);
-                error
+                convert_to_error_message(error)
             }
         };
         self.wrapping

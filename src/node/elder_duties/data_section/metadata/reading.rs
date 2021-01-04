@@ -9,15 +9,14 @@
 //! Read operations on data.
 
 use super::{
-    blob_register::BlobRegister, elder_stores::ElderStores,
-    map_storage::MapStorage, sequence_storage::SequenceStorage,
+    blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
+    sequence_storage::SequenceStorage,
 };
 use crate::node::node_ops::NodeMessagingDuty;
 use crate::{Error, Result};
 use log::info;
-use sn_data_types::{
-    BlobRead, DataQuery, MapRead, Message, MessageId, MsgEnvelope, MsgSender, Query,
-    SequenceRead,
+use sn_messaging::{
+    BlobRead, DataQuery, MapRead, Message, MessageId, MsgEnvelope, MsgSender, Query, SequenceRead,
 };
 
 pub(super) async fn get_result(
@@ -74,4 +73,3 @@ async fn sequence(
 ) -> Result<NodeMessagingDuty> {
     storage.read(read, msg_id, &origin).await // sequence data currently stay at elders, so the msg is not needed
 }
-

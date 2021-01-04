@@ -12,7 +12,8 @@ use super::chunk_storage::ChunkStorage;
 use crate::node::node_ops::NodeMessagingDuty;
 use crate::{Error, Result};
 use log::error;
-use sn_data_types::{BlobWrite, Error as DtError, MsgEnvelope};
+use sn_data_types::Error as DtError;
+use sn_messaging::{BlobWrite, MsgEnvelope};
 
 pub(super) async fn get_result(
     write: &BlobWrite,

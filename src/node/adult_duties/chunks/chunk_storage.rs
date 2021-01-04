@@ -7,14 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 pub use crate::chunk_store::UsedSpace;
-use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty};
-use crate::{chunk_store::BlobChunkStore, node::state_db::NodeInfo, Result};
-use log::{error, info};
-use sn_data_types::{
-    Address, AdultDuties, Blob, BlobAddress, CmdError, Error as DtError, Message, MessageId,
-    MsgSender, NodeCmdError, NodeDataError, NodeDataQuery, NodeDataQueryResponse, NodeEvent,
-    NodeQuery, NodeQueryResponse, QueryResponse, Result as NdResult, Signature,
+use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty, Error};
+use crate::{
+    chunk_store::BlobChunkStore, error::convert_to_error_message, node::state_db::NodeInfo, Result,
 };
+use log::{error, info};
+use sn_data_types::{Blob, BlobAddress, Signature};
+use sn_messaging::{
+    Address, AdultDuties, CmdError, Error as ErrorMessage, Message, MessageId, MsgSender,
+    NodeCmdError, NodeDataError, NodeDataQuery, NodeDataQueryResponse, NodeEvent, NodeQuery,
+    NodeQueryResponse, QueryResponse,
+};
+
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -41,9 +45,15 @@ impl ChunkStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         if let Err(error) = self.try_store(data, origin).await {
+            let message_error = match error {
+                Error::InvalidOwners(pk) => ErrorMessage::InvalidOwners(pk),
+                Error::DataExists => ErrorMessage::DataExists,
+
+                error => ErrorMessage::UnexpectedNodeError(error.to_string()),
+            };
             return self
                 .wrapping
-                .error(CmdError::Data(error), msg_id, &origin.address())
+                .error(CmdError::Data(message_error), msg_id, &origin.address())
                 .await;
         }
         Ok(NodeMessagingDuty::NoOp)
@@ -66,31 +76,40 @@ impl ChunkStorage {
                 id: MessageId::new(),
                 correlation_id: msg_id,
             },
-            Err(error) => Message::NodeCmdError {
-                id: MessageId::new(),
-                error: NodeCmdError::Data(NodeDataError::ChunkReplication {
-                    address: *data.address(),
-                    error,
-                }),
-                correlation_id: msg_id,
-                cmd_origin: origin.address(),
-            },
+            Err(error) => {
+                let message_error = match error {
+                    Error::InvalidOwners(pk) => ErrorMessage::InvalidOwners(pk),
+                    Error::DataExists => ErrorMessage::DataExists,
+
+                    error => ErrorMessage::UnexpectedNodeError(error.to_string()),
+                };
+
+                Message::NodeCmdError {
+                    id: MessageId::new(),
+                    error: NodeCmdError::Data(NodeDataError::ChunkReplication {
+                        address: *data.address(),
+                        error: message_error,
+                    }),
+                    correlation_id: msg_id,
+                    cmd_origin: origin.address(),
+                }
+            }
         };
         self.wrapping.send_to_node(message).await
     }
 
-    async fn try_store(&mut self, data: &Blob, origin: &MsgSender) -> NdResult<()> {
+    async fn try_store(&mut self, data: &Blob, origin: &MsgSender) -> Result<()> {
         info!("TRYING TO STORE BLOB");
         let id = origin.id().public_key();
 
         if data.is_unpub() {
-            let data_owner = *data.owner().ok_or(DtError::InvalidOwners)?;
+            let data_owner = *data.owner().ok_or(Error::InvalidOwners(id))?;
             info!("Blob is unpub");
             info!("DATA OWNER: {:?}", data_owner);
             info!("ID OWNER: {:?}", id);
             if data_owner != id {
                 info!("INVALID OWNER! Returning error");
-                return Err(DtError::InvalidOwners);
+                return Err(Error::InvalidOwners(id));
             }
         }
 
@@ -100,12 +119,9 @@ impl ChunkStorage {
                 self,
                 data.address()
             );
-            return Err(DtError::DataExists);
+            return Err(Error::DataExists);
         }
-        self.chunks
-            .put(&data)
-            .await
-            .map_err(|error| error.to_string().into())
+        self.chunks.put(&data).await
     }
 
     pub(crate) async fn get(
@@ -117,7 +133,8 @@ impl ChunkStorage {
         let result = self
             .chunks
             .get(address)
-            .map_err(|error| error.to_string().into());
+            .map_err(|_| ErrorMessage::NoSuchData);
+        // .map_err(|error| error.to_string());
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -161,10 +178,7 @@ impl ChunkStorage {
         msg_id: MessageId,
         origin: Address,
     ) -> Result<NodeMessagingDuty> {
-        let result = self
-            .chunks
-            .get(&address)
-            .map_err(|error| error.to_string().into());
+        let result = self.chunks.get(&address).map_err(convert_to_error_message);
 
         self.wrapping
             .send_to_node(Message::NodeQueryResponse {
@@ -232,13 +246,14 @@ impl ChunkStorage {
 
         let result = match self.chunks.get(&address) {
             Ok(Blob::Private(data)) => {
-                if *data.owner() == origin.id().public_key() {
+                let pk = origin.id().public_key();
+                if *data.owner() == pk {
                     self.chunks
                         .delete(&address)
                         .await
-                        .map_err(|error| error.to_string().into())
+                        .map_err(|_error| ErrorMessage::FailedToDelete)
                 } else {
-                    Err(DtError::InvalidOwners)
+                    Err(ErrorMessage::InvalidOwners(pk))
                 }
             }
             Ok(_) => {
@@ -246,9 +261,9 @@ impl ChunkStorage {
                     "{}: Invalid DeletePrivate(Blob::Public) encountered: {:?}",
                     self, msg_id
                 );
-                Err(DtError::InvalidOperation)
+                Err(ErrorMessage::InvalidOperation)
             }
-            _ => Err(DtError::NoSuchKey),
+            _ => Err(ErrorMessage::NoSuchKey),
             //err @ Err(_) => err.map_err(|error| error.to_string().into()),
         };
 

@@ -20,10 +20,12 @@ use crate::{
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
-use sn_data_types::{
-    Address, ElderDuties, Error as DtError, Message, MessageId, Money, NodeQuery,
-    NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery, PublicKey,
+use sn_data_types::{Error as DtError, Money, PublicKey};
+use sn_messaging::{
+    Address, ElderDuties, Error as ErrorMessage, Message, MessageId, NodeQuery, NodeQueryResponse,
+    NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery,
 };
+
 use sn_transfers::TransferActor;
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -304,7 +306,7 @@ impl Rewards {
         let age = match self.node_rewards.get_mut(&node_id) {
             None => {
                 warn!("Invalid operation: Node not found {}.", node_id);
-                return Err(Error::NetworkData(DtError::NoSuchBalance));
+                return Err(Error::NodeNotFound);
             }
             Some(state) => {
                 match *state {
@@ -378,7 +380,7 @@ impl Rewards {
                 return self
                     .wrapping
                     .send_to_node(Message::NodeQueryResponse {
-                        response: Rewards(GetWalletId(Err(DtError::NetworkOther(
+                        response: Rewards(GetWalletId(Err(ErrorMessage::UnexpectedNodeError(
                             "Node is not being relocated.".to_string(),
                         )))),
                         id: MessageId::in_response_to(&msg_id),

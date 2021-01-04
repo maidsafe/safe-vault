@@ -11,7 +11,7 @@ use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, trace};
 use rand::{CryptoRng, Rng};
-use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey, Signature};
+use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey};
 use sn_routing::SendStream;
 use std::{
     fmt::{self, Display, Formatter},
@@ -62,7 +62,7 @@ impl Onboarding {
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
         stream: &mut SendStream,
-        rng: &mut G,
+        _rng: &mut G,
     ) -> Result<()> {
         match handshake {
             HandshakeRequest::Bootstrap(client_key) => {

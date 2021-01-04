@@ -15,7 +15,8 @@ use crate::{Error, Network, Result};
 use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace};
-use sn_data_types::{MsgEnvelope, PublicKey};
+use sn_data_types::PublicKey;
+use sn_messaging::MsgEnvelope;
 use sn_routing::{Event as RoutingEvent, MIN_AGE};
 use xor_name::XorName;
 

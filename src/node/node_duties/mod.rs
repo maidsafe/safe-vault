@@ -25,7 +25,8 @@ use crate::{chunk_store::UsedSpace, Error, Network, Result};
 use log::{info, trace, warn};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
-use sn_data_types::{Message, MessageId, NodeCmd, NodeSystemCmd, PublicKey};
+use sn_data_types::PublicKey;
+use sn_messaging::{Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeSystemCmd};
 
 #[allow(clippy::large_enum_variant)]
 pub enum DutyLevel {
@@ -113,8 +114,7 @@ impl NodeDuties {
     }
 
     async fn notify_section_of_our_storage(&mut self) -> Result<NodeOperation> {
-        let wrapping =
-            NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
+        let wrapping = NodeMsgWrapping::new(self.node_info.keys(), MsgNodeDuties::NodeConfig);
         let node_id = self.node_info.public_key().await;
         wrapping
             .send_to_section(
@@ -132,8 +132,7 @@ impl NodeDuties {
     }
 
     async fn register_wallet(&mut self, wallet: PublicKey) -> Result<NodeOperation> {
-        let wrapping =
-            NodeMsgWrapping::new(self.node_info.keys(), sn_data_types::NodeDuties::NodeConfig);
+        let wrapping = NodeMsgWrapping::new(self.node_info.keys(), MsgNodeDuties::NodeConfig);
         wrapping
             .send_to_section(
                 Message::NodeCmd {

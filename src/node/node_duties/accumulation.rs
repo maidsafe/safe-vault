@@ -8,9 +8,9 @@
 
 use crate::{utils, Error, Result};
 use log::{error, info};
-use sn_data_types::{
-    Duty, MessageId, MsgEnvelope, MsgSender, SignatureShare, TransientSectionKey as SectionKey,
-};
+use sn_data_types::SignatureShare;
+use sn_messaging::{Duty, MessageId, MsgEnvelope, MsgSender, TransientSectionKey as SectionKey};
+
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 type RequestInfo = (MsgEnvelope, MsgSender, Vec<SignatureShare>);

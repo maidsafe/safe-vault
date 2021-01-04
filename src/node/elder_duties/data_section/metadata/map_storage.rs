@@ -8,6 +8,7 @@
 
 use crate::{
     chunk_store::{MapChunkStore, UsedSpace},
+    error::convert_to_error_message,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
     node::state_db::NodeInfo,
@@ -15,10 +16,11 @@ use crate::{
 };
 use log::info;
 use sn_data_types::{
-    CmdError, Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet,
-    MapRead, MapValue, MapWrite, Message, MessageId, MsgSender, PublicKey, QueryResponse,
-    Result as NdResult,
+    Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapValue,
+    PublicKey, Result as NdResult,
 };
+use sn_messaging::{CmdError, MapRead, MapWrite, Message, MessageId, MsgSender, QueryResponse};
+
 use std::fmt::{self, Display, Formatter};
 
 /// Operations over the data type Map.
@@ -100,17 +102,12 @@ impl MapStorage {
         address: &MapAddress,
         origin: &MsgSender,
         action: MapAction,
-    ) -> NdResult<Map> {
-        self.chunks
-            .get(&address)
-            .map_err(|e| match e {
-                Error::NoSuchChunk => DtError::NoSuchData,
-                error =>  DtError::NetworkOther(error.to_string())
-            })
-            .and_then(move |map| {
-                map.check_permissions(action, origin.id().public_key())
-                    .map(move |_| map)
-            })
+    ) -> Result<Map> {
+        self.chunks.get(&address).and_then(move |map| {
+            map.check_permissions(action, origin.id().public_key())
+                .map(move |_| map)
+                .map_err(|error| error.into())
+        })
     }
 
     /// Get Map from the chunk store, update it, and overwrite the stored chunk.
@@ -124,18 +121,10 @@ impl MapStorage {
     where
         F: FnOnce(Map) -> NdResult<Map>,
     {
-        let result = match self.chunks.get(address).map_err(|e| match e {
-            Error::NoSuchChunk => DtError::NoSuchData,
-            error =>  DtError::NetworkOther(error.to_string().into())
-            ,
-        }) {
+        let result = match self.chunks.get(address) {
             Ok(data) => match mutation_fn(data) {
-                Ok(map) => self
-                    .chunks
-                    .put(&map)
-                    .await
-                    .map_err(|error| DtError::NetworkOther(error.to_string().into())),
-                    Err(error) => Err(error),
+                Ok(map) => self.chunks.put(&map).await,
+                Err(error) => Err(error.into()),
             },
             Err(error) => Err(error),
         };
@@ -151,12 +140,9 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let result = if self.chunks.has(data.address()) {
-            Err(DtError::DataExists)
+            Err(Error::DataExists)
         } else {
-            self.chunks
-                .put(&data)
-                .await
-                .map_err(|error| DtError::NetworkOther(error.to_string()))
+            self.chunks.put(&data).await
         };
         self.ok_or_error(result, msg_id, origin).await
     }
@@ -167,21 +153,17 @@ impl MapStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = match self.chunks.get(&address).map_err(|e| match e {
-            Error::NoSuchChunk => DtError::NoSuchData,
-            error => DtError::NetworkOther(error.to_string().into()),
-        }) {
+        let result = match self.chunks.get(&address) {
             Ok(map) => match map.check_is_owner(origin.id().public_key()) {
                 Ok(()) => {
                     info!("Deleting Map");
-                    self.chunks
-                        .delete(&address)
-                        .await
-                        .map_err(|error| DtError::NetworkOther(error.to_string().into()),)
-                    }
-                Err(e) => {
+                    self.chunks.delete(&address).await
+                }
+                Err(_e) => {
                     info!("Error: Delete Map called by non-owner");
-                    Err(DtError::AccessDenied(origin.id().public_key()))
+                    Err(Error::NetworkData(DtError::AccessDenied(
+                        origin.id().public_key(),
+                    )))
                 }
             },
             Err(error) => Err(error),
@@ -247,7 +229,10 @@ impl MapStorage {
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
-        let result = self.get_chunk(&address, origin, MapAction::Read);
+        let result = self
+            .get_chunk(&address, origin, MapAction::Read)
+            .map_err(convert_to_error_message);
+
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -270,7 +255,9 @@ impl MapStorage {
     ) -> Result<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)
-            .map(|data| data.shell());
+            .map(|data| data.shell())
+            .map_err(convert_to_error_message);
+
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -293,7 +280,9 @@ impl MapStorage {
     ) -> Result<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)
-            .map(|data| data.version());
+            .map(|data| data.version())
+            .map_err(convert_to_error_message);
+
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -316,18 +305,21 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let res = self.get_chunk(&address, origin, MapAction::Read);
-        let result = res.and_then(|data| match data {
-            Map::Seq(map) => map
-                .get(key)
-                .cloned()
-                .map(MapValue::from)
-                .ok_or(DtError::NoSuchEntry),
-            Map::Unseq(map) => map
-                .get(key)
-                .cloned()
-                .map(MapValue::from)
-                .ok_or(DtError::NoSuchEntry),
-        });
+        let result = res
+            .and_then(|data| match data {
+                Map::Seq(map) => map
+                    .get(key)
+                    .cloned()
+                    .map(MapValue::from)
+                    .ok_or(Error::NetworkData(DtError::NoSuchEntry)),
+                Map::Unseq(map) => map
+                    .get(key)
+                    .cloned()
+                    .map(MapValue::from)
+                    .ok_or(Error::NetworkData(DtError::NoSuchEntry)),
+            })
+            .map_err(convert_to_error_message);
+
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -350,7 +342,9 @@ impl MapStorage {
     ) -> Result<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)
-            .map(|data| data.keys());
+            .map(|data| data.keys())
+            .map_err(convert_to_error_message);
+
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -372,10 +366,13 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let res = self.get_chunk(&address, origin, MapAction::Read);
-        let result = res.map(|data| match data {
-            Map::Seq(map) => map.values().into(),
-            Map::Unseq(map) => map.values().into(),
-        });
+        let result = res
+            .map(|data| match data {
+                Map::Seq(map) => map.values().into(),
+                Map::Unseq(map) => map.values().into(),
+            })
+            .map_err(convert_to_error_message);
+
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -397,10 +394,13 @@ impl MapStorage {
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         let res = self.get_chunk(&address, origin, MapAction::Read);
-        let result = res.map(|data| match data {
-            Map::Seq(map) => map.entries().clone().into(),
-            Map::Unseq(map) => map.entries().clone().into(),
-        });
+        let result = res
+            .map(|data| match data {
+                Map::Seq(map) => map.entries().clone().into(),
+                Map::Unseq(map) => map.entries().clone().into(),
+            })
+            .map_err(convert_to_error_message);
+
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -423,7 +423,8 @@ impl MapStorage {
     ) -> Result<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)
-            .map(|data| data.permissions());
+            .map(|data| data.permissions())
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -447,7 +448,12 @@ impl MapStorage {
     ) -> Result<NodeMessagingDuty> {
         let result = self
             .get_chunk(&address, origin, MapAction::Read)
-            .and_then(|data| data.user_permissions(user).map(MapPermissionSet::clone));
+            .and_then(|data| {
+                data.user_permissions(user)
+                    .map_err(|e| e.into())
+                    .map(MapPermissionSet::clone)
+            })
+            .map_err(convert_to_error_message);
         self.wrapping
             .send_to_section(
                 Message::QueryResponse {
@@ -463,14 +469,16 @@ impl MapStorage {
 
     async fn ok_or_error(
         &self,
-        result: NdResult<()>,
+        result: Result<()>,
         msg_id: MessageId,
         origin: &MsgSender,
     ) -> Result<NodeMessagingDuty> {
         if let Err(error) = result {
+            let messaging_error = convert_to_error_message(error);
+
             info!("MapStorage: Writing chunk FAILED!");
             self.wrapping
-                .error(CmdError::Data(error), msg_id, &origin.address())
+                .error(CmdError::Data(messaging_error), msg_id, &origin.address())
                 .await
         } else {
             info!("MapStorage: Writing chunk PASSED!");
