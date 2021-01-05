@@ -36,10 +36,8 @@ tiny-keccak = "1.5.0"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-sn_data_types = {path="../sn_data_types"}
-# sn_data_types = "~0.12.0"
-sn_transfers = {path="../sn_transfers"}
-# sn_transfers = "~0.2.8"
+sn_data_types = "~0.13.0"
+sn_transfers = "~0.2.9"
 self_encryption = "~0.19.4"
 ed25519 = "1.0.1"
 signature = "1.1.0"
@@ -48,7 +46,7 @@ sn_launch_tool = "~0.0.5"
 dashmap = "3.11.10"
 anyhow="1.0.36" 
 thiserror="1.0.23"
-sn_messaging=  { path="../sn_messaging"}
+sn_messaging="1.2.0"
 
   [dependencies.bytes]
   version = "~0.5.4"
@@ -87,9 +85,8 @@ tempdir = "~0.3.7"
 futures = "~0.3.5"
 
   [dev_dependencies.sn_client]
-  version = "0.44.11"
+  version = "0.44.12"
   features = [ "simulated-payouts" ]
-  path="../sn_client"
 
 
   [dev_dependencies.tokio]
