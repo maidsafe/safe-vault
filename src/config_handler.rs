@@ -27,7 +27,7 @@ const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 17] = [
+const ARGS: [&str; 19] = [
     "wallet-id",
     "max-capacity",
     "root-dir",
@@ -45,6 +45,8 @@ const ARGS: [&str; 17] = [
     "update-only",
     "upnp-lease-duration",
     "local",
+    "fresh",
+    "clean",
 ];
 
 /// Node configuration
@@ -103,6 +105,17 @@ impl Config {
         };
 
         let command_line_args = Config::clap().get_matches();
+
+        if command_line_args.occurrences_of(ARGS[17]) != 0 {
+            config = Config::default();
+        }
+
+        if command_line_args.occurrences_of(ARGS[18]) != 0 {
+            Self::clear_from_disk().unwrap_or_else(|_| {
+                log::error!("Error deleting config file from disk");
+            })
+        }
+
         for arg in &ARGS {
             let occurrences = command_line_args.occurrences_of(arg);
             if occurrences != 0 {
@@ -282,9 +295,21 @@ impl Config {
             self.update_only = occurrences >= 1;
         } else if arg == ARGS[16] {
             self.local = occurrences >= 1;
+        } else if arg == ARGS[17] {
+            self.network_config.fresh = occurrences >= 1;
+        } else if arg == ARGS[18] {
+            self.network_config.clean = occurrences >= 1;
         } else {
             println!("ERROR");
         }
+    }
+
+    fn clear_from_disk() -> Result<()> {
+        let path = project_dirs()?.join(CONFIG_FILE);
+        if path.exists() {
+            std::fs::remove_file(path)?;
+        }
+        Ok(())
     }
 
     /// Reads the default node config file.
@@ -381,6 +406,8 @@ mod test {
             ["update", "None"],
             ["update-only", "None"],
             ["local", "None"],
+            ["fresh", "None"],
+            ["clean", "None"],
             ["upnp-lease-duration", "180"],
         ];
 
