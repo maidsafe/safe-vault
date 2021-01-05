@@ -14,8 +14,8 @@ use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::info;
 use sn_data_types::{
-    CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignedTransfer,
-    TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
+    CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignedTransfer, TransferAgreementProof,
+    TransferPropagated, TransferRegistered, TransferValidated,
 };
 use sn_transfers::{Error as TransfersError, WalletReplica};
 use std::collections::BTreeMap;

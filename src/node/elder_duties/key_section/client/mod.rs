@@ -36,8 +36,9 @@ pub struct ClientGateway {
 }
 
 impl ClientGateway {
-    pub async fn new(info: &NodeInfo, routing: Network) -> Result<Self> {
-        let onboarding = Onboarding::new(info.public_key().await, routing.clone());
+    pub async fn new(_info: &NodeInfo, routing: Network) -> Result<Self> {
+        // TODO: remove this onboarding
+        let onboarding = Onboarding::new(routing.clone());
         let client_msg_handling = ClientMsgHandling::new(onboarding);
 
         let gateway = Self {

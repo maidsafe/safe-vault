@@ -100,6 +100,7 @@ pub(crate) fn new_periodic_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     Ok(result?)
 }
 
+#[allow(dead_code)]
 pub(crate) fn random_vec<R: CryptoRng + Rng>(rng: &mut R, size: usize) -> Vec<u8> {
     rng.sample_iter(&Standard).take(size).collect()
 }

@@ -27,15 +27,13 @@ use std::{
 /// taking place between a connecting client and
 /// the Elders of this section.
 pub struct Onboarding {
-    node_id: PublicKey,
     routing: Network,
     clients: DashMap<SocketAddr, PublicKey>,
 }
 
 impl Onboarding {
-    pub fn new(node_id: PublicKey, routing: Network) -> Self {
+    pub fn new(routing: Network) -> Self {
         Self {
-            node_id,
             routing,
             clients: Default::default(),
         }
