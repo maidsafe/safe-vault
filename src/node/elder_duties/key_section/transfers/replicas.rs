@@ -347,7 +347,7 @@ impl Replicas {
 
     async fn create_genesis(&self) -> Result<CreditAgreementProof> {
         // This means we are the first node in the network.
-        let balance = 1; //u32::MAX as u64 * 1_000_000_000;
+        let balance = u32::MAX as u64 * 1_000_000_000;
         let signed_credit = get_genesis(
             balance,
             PublicKey::Bls(self.info.peer_replicas.public_key()),

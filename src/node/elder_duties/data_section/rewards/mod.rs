@@ -93,7 +93,6 @@ impl Rewards {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    #[allow(unused)]
     pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
         info!("Rewards: Catching up with our Replicas (section actor history)!");
         // prepare actor init

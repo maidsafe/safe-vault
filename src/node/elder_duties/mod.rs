@@ -111,20 +111,18 @@ impl ElderDuties {
     ///
     async fn relocated_node_joined(
         &mut self,
-        _old_node_id: XorName,
-        _new_node_id: XorName,
-        _age: u8,
+        old_node_id: XorName,
+        new_node_id: XorName,
+        age: u8,
     ) -> Result<NodeOperation> {
-        // self.data_section
-        //     .relocated_node_joined(old_node_id, new_node_id, age)
-        //     .await
-        Ok(NodeOperation::NoOp)
+        self.data_section
+            .relocated_node_joined(old_node_id, new_node_id, age)
+            .await
     }
 
     ///
-    async fn member_left(&mut self, _node_id: XorName, _age: u8) -> Result<NodeOperation> {
-        //self.data_section.member_left(node_id, age).await
-        Ok(NodeOperation::NoOp)
+    async fn member_left(&mut self, node_id: XorName, age: u8) -> Result<NodeOperation> {
+        self.data_section.member_left(node_id, age).await
     }
 
     ///
@@ -136,11 +134,11 @@ impl ElderDuties {
             op => ops.push(op),
         };
         debug!("Key section completed elder change update.");
-        // match self.data_section.elders_changed().await? {
-        //     NodeOperation::NoOp => (),
-        //     op => ops.push(op),
-        // };
-        // debug!("Data section completed elder change update.");
+        match self.data_section.elders_changed().await? {
+            NodeOperation::NoOp => (),
+            op => ops.push(op),
+        };
+        debug!("Data section completed elder change update.");
         if prefix != self.prefix {
             info!("Split occured");
             info!("New prefix is: {:?}", prefix);
@@ -148,10 +146,10 @@ impl ElderDuties {
                 NodeOperation::NoOp => (),
                 op => ops.push(op),
             };
-            // match self.data_section.section_split(prefix).await? {
-            //     NodeOperation::NoOp => (),
-            //     op => ops.push(op),
-            // };
+            match self.data_section.section_split(prefix).await? {
+                NodeOperation::NoOp => (),
+                op => ops.push(op),
+            };
         }
 
         Ok(ops.into())
