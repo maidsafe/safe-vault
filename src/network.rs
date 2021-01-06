@@ -128,11 +128,7 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn send_message_to_client(
-        &mut self,
-        peer_addr: SocketAddr,
-        msg: Bytes,
-    ) -> Result<()> {
+    pub async fn send_message_to_client(&self, peer_addr: SocketAddr, msg: Bytes) -> Result<()> {
         self.routing
             .lock()
             .await

@@ -8,7 +8,7 @@
 
 use crate::{Error, Result};
 use bytes::Bytes;
-use log::info;
+use log::error;
 use sn_data_types::{Error as DtError, HandshakeRequest};
 use sn_messaging::{Message, MsgEnvelope};
 use std::net::SocketAddr;
@@ -64,7 +64,7 @@ pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Result
     let hs = match bincode::deserialize(&bytes) {
         Ok(hs @ HandshakeRequest::Bootstrap(_)) | Ok(hs @ HandshakeRequest::Join(_)) => hs,
         Err(err) => {
-            info!(
+            error!(
                 "Failed to deserialize client input from {} as a handshake: {}",
                 peer_addr, err
             );

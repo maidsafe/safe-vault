@@ -8,9 +8,9 @@
 
 use crate::{utils, Network};
 use crate::{Error, Result};
+use bytes::Bytes;
 use dashmap::DashMap;
 use log::{debug, error, info, trace};
-use rand::{CryptoRng, Rng};
 use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey};
 use sn_routing::SendStream;
 use std::{
@@ -38,30 +38,13 @@ impl Onboarding {
             clients: Default::default(),
         }
     }
-
-    /// Query
-    pub fn get_public_key(&self, peer_addr: SocketAddr) -> Option<PublicKey> {
-        let value_ref = self.clients.get(&peer_addr)?;
-        let value = value_ref.to_owned();
-        Some(value)
-    }
-
-    // pub fn remove_client(&mut self, peer_addr: SocketAddr) {
-    //     if let Some(public_key) = self.clients.remove(&peer_addr) {
-    //         info!("{}: Removed client {:?} on {}", self, public_key, peer_addr);
-    //     } else {
-    //         let _ = self.client_candidates.remove(&peer_addr);
-    //         info!("{}: Removed client candidate on {}", self, peer_addr);
-    //     }
-    // }
-
-    pub async fn onboard_client<G: CryptoRng + Rng>(
+    pub async fn onboard_client(
         &self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
         stream: &mut SendStream,
-        _rng: &mut G,
     ) -> Result<()> {
+        info!("Onboarding client w/ peer addr: {:?}", peer_addr);
         match handshake {
             HandshakeRequest::Bootstrap(client_key) => {
                 self.try_bootstrap(peer_addr, &client_key, stream).await
@@ -95,6 +78,7 @@ impl Onboarding {
             "{}: Trying to bootstrap..: {} on {}",
             self, client_key, peer_addr
         );
+
         let elders = if self.routing.matches_our_prefix((*client_key).into()).await {
             self.routing.our_elder_addresses().await
         } else {
@@ -112,8 +96,14 @@ impl Onboarding {
                 closest_known_elders
             }
         };
+
+        info!("elders for client determined");
         let bytes = utils::serialise(&HandshakeResponse::Join(elders))?;
-        // Hmmmm, what to do about this response.... we don't need a duty response here?
+
+        info!("sending bytes back");
+
+        // let res = self.send_bytes_to(peer_addr, bytes).await;
+
         let res = futures::executor::block_on(stream.send_user_msg(bytes));
 
         match res {
@@ -147,6 +137,15 @@ impl Onboarding {
             );
             Err(Error::Onboarding)
         }
+    }
+
+    /// Use routing to send a message to a client peer address
+    pub async fn send_bytes_to(&self, peer_addr: SocketAddr, bytes: Bytes) -> Result<()> {
+        self.routing
+            .send_message_to_client(peer_addr, bytes)
+            .await?;
+
+        Ok(())
     }
 
     // pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {

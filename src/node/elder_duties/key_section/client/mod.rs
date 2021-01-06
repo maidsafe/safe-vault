@@ -20,9 +20,7 @@ use crate::{
     node::state_db::NodeInfo,
     Error, Network, Result,
 };
-use log::{error, info, trace, warn};
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
+use log::{error, trace, warn};
 use sn_data_types::Error as DtError;
 use sn_messaging::{Address, MsgEnvelope};
 use sn_routing::Event as RoutingEvent;
@@ -37,7 +35,6 @@ pub struct ClientGateway {
 
 impl ClientGateway {
     pub async fn new(_info: &NodeInfo, routing: Network) -> Result<Self> {
-        // TODO: remove this onboarding
         let onboarding = Onboarding::new(routing.clone());
         let client_msg_handling = ClientMsgHandling::new(onboarding);
 
@@ -80,36 +77,38 @@ impl ClientGateway {
         trace!("Processing client event");
         match event {
             RoutingEvent::ClientMessageReceived {
-                content, src, send, ..
+                content,
+                src,
+                mut send,
+                ..
             } => {
-                let existing_client = self.client_msg_handling.get_public_key(src);
-                if let Some(public_key) = existing_client {
-                    let msg = try_deserialize_msg(&content)?;
-                    info!("Deserialized client msg from {}", public_key);
-                    trace!("Deserialized client msg is {:?}", msg.message);
-                    if !validate_client_sig(&msg) {
-                        return Err(Error::NetworkData(DtError::InvalidSignature));
+                // This check was about checking we knew and client was valid... but even if we don't
+                // we should be handling it...
+                match try_deserialize_handshake(&content, src) {
+                    Ok(hs) => {
+                        let _ = self
+                            .client_msg_handling
+                            .process_handshake(hs, src, &mut send)
+                            .await;
+                        Ok(NodeOperation::NoOp)
                     }
-                    match self
-                        .client_msg_handling
-                        .track_incoming(&msg.message, src, send)
-                        .await
-                    {
-                        Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg(msg).into()),
-                        Err(e) => Err(e),
-                    }
-                } else {
-                    match try_deserialize_handshake(&content, src) {
-                        Ok(hs) => {
-                            let mut rng = rand::thread_rng();
-                            let mut rng = ChaChaRng::from_seed(rng.gen());
-                            let _ = self
-                                .client_msg_handling
-                                .process_handshake(hs, src, send, &mut rng)
-                                .await;
-                            Ok(NodeOperation::NoOp)
+                    Err(_e) => {
+                        // this is not a handshake, so lets try processing as client message...
+                        let msg = try_deserialize_msg(&content)?;
+
+                        trace!("Deserialized client msg is {:?}", msg.message);
+                        if !validate_client_sig(&msg) {
+                            return Err(Error::NetworkData(DtError::InvalidSignature));
                         }
-                        Err(e) => Err(e),
+
+                        match self
+                            .client_msg_handling
+                            .track_incoming_message(&msg.message, src)
+                            .await
+                        {
+                            Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg(msg).into()),
+                            Err(e) => Err(e),
+                        }
                     }
                 }
             }
