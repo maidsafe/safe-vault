@@ -13,7 +13,7 @@ use crate::{
 };
 use crate::{Error, Result};
 use sn_data_types::{
-    CreditAgreementProof, Keypair, Money, PublicKey, ReplicaEvent, SignedTransfer,
+    CreditAgreementProof, Keypair, Money, PublicKey, ReplicaEvent, SignedTransferShare,
     TransferValidated, WalletInfo,
 };
 use sn_messaging::{Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery};
@@ -163,10 +163,6 @@ impl SectionFunds {
                 };
             }
 
-            // ---- TODO TODO
-            // ------ NB: THIS PART NEEDS THE MULTI SIG ACTOR ----
-            // ---- TODO TODO
-
             // Transfer the money from
             // previous actor to new actor.
             use NodeCmd::*;
@@ -184,10 +180,11 @@ impl SectionFunds {
                     self.wrapping
                         .send_to_section(
                             Message::NodeCmd {
-                                cmd: Transfers(ValidateSectionPayout(SignedTransfer {
-                                    debit: event.signed_debit,
-                                    credit: event.signed_credit,
-                                })),
+                                cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
+                                    event.signed_debit.as_share()?,
+                                    event.signed_credit.as_share()?,
+                                    self.actor.owner().public_key_set()?,
+                                )?)),
                                 id: MessageId::new(),
                             },
                             true,
@@ -231,10 +228,11 @@ impl SectionFunds {
                 self.wrapping
                     .send_to_section(
                         Message::NodeCmd {
-                            cmd: Transfers(ValidateSectionPayout(SignedTransfer {
-                                debit: event.signed_debit,
-                                credit: event.signed_credit,
-                            })),
+                            cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
+                                event.signed_debit.as_share()?,
+                                event.signed_credit.as_share()?,
+                                self.actor.owner().public_key_set()?,
+                            )?)),
                             id: MessageId::new(),
                         },
                         true,

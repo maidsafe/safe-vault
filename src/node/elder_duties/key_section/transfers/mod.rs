@@ -32,6 +32,7 @@ use sn_data_types::{
     PublicKey,
     ReplicaEvent,
     SignedTransfer,
+    SignedTransferShare,
     TransferAgreementProof,
     WalletInfo,
 };
@@ -538,12 +539,13 @@ impl Transfers {
     /// proof by this individual Elder, that the transfer is valid.
     async fn validate_section_payout(
         &self,
-        transfer: SignedTransfer,
+        transfer: SignedTransferShare,
         msg_id: MessageId,
         origin: Address,
     ) -> Result<NodeMessagingDuty> {
-        let message = match self.replicas.validate(transfer).await {
-            Ok(event) => Message::NodeEvent {
+        let message = match self.replicas.propose_validation(&transfer).await {
+            Ok(None) => return Ok(NodeMessagingDuty::NoOp),
+            Ok(Some(event)) => Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(event),
                 id: MessageId::new(),
                 correlation_id: msg_id,

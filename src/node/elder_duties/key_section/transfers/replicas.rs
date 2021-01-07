@@ -563,9 +563,8 @@ impl Replicas {
 
 impl Replicas {
     /// Used with multisig replicas.
-    #[allow(unused)]
     pub async fn propose_validation(
-        &mut self,
+        &self,
         signed_transfer: &SignedTransferShare,
     ) -> Result<Option<TransferValidated>> {
         debug!("MultisigReplica validating transfer: {:?}", signed_transfer);
