@@ -21,7 +21,7 @@ pub struct RateLimit {
 }
 
 impl RateLimit {
-    /// Ctor
+    /// gets a new instance of rate limit
     pub fn new(network: Network, capacity: Capacity) -> RateLimit {
         Self { network, capacity }
     }
@@ -36,6 +36,23 @@ impl RateLimit {
         let all_nodes = self.network.our_adults().await.len() as u8;
 
         RateLimit::rate_limit(bytes, full_nodes, all_nodes, prefix_len)
+    }
+
+    ///
+    pub fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+        self.capacity.increase_full_node_count(node_id)
+    }
+
+    ///
+    pub async fn check_network_storage(&self) -> bool {
+        info!("Checking network storage");
+        let all_nodes = self.network.our_adults().await.len() as f64;
+        let full_nodes = self.capacity.full_nodes() as f64;
+        let usage_ratio = full_nodes / all_nodes;
+        info!("Total number of adult nodes: {:?}", all_nodes);
+        info!("Number of Full adult nodes: {:?}", full_nodes);
+        info!("Section storage usage ratio: {:?}", usage_ratio);
+        usage_ratio > MAX_NETWORK_STORAGE_RATIO
     }
 
     fn rate_limit(bytes: u64, full_nodes: u8, all_nodes: u8, prefix_len: usize) -> Money {
@@ -55,29 +72,14 @@ impl RateLimit {
     fn max_section_nanos(prefix_len: usize) -> u64 {
         (MAX_SUPPLY as f64 / 2_f64.powf(prefix_len as f64)).floor() as u64
     }
-
-    ///
-    pub fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
-        self.capacity.increase_full_node_count(node_id)
-    }
-
-    ///
-    pub async fn check_network_storage(&self) -> bool {
-        info!("Checking network storage");
-        let all_nodes = self.network.our_adults().await.len() as f64;
-        let full_nodes = self.capacity.full_nodes() as f64;
-        let usage_ratio = full_nodes / all_nodes;
-        info!("Total number of adult nodes: {:?}", all_nodes);
-        info!("Number of Full adult nodes: {:?}", full_nodes);
-        info!("Section storage usage ratio: {:?}", usage_ratio);
-        usage_ratio > MAX_NETWORK_STORAGE_RATIO
-    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::Result;
+    use sn_messaging::DataCmd;
+    use std::mem;
 
     #[test]
     fn calculates_rate_limit() -> Result<()> {
@@ -98,7 +100,7 @@ mod test {
         // first split leads to each section having half the tokens
         let first_split_nanos = RateLimit::max_section_nanos(1);
         assert_eq!(MAX_SUPPLY / 2, first_split_nanos);
-        // some coins remain in section up to 2.6 * 10^18 sections, (which is more than one billion times one billion sections).
+        // some tokens remain in section up to 2.6 * 10^18 sections, (which is more than one billion times one billion sections).
         let last_split_nanos = RateLimit::max_section_nanos(61);
         assert!(last_split_nanos > 0);
         Ok(())
@@ -204,9 +206,12 @@ mod test {
     #[test]
     fn rate_limit_is_applied_up_to_3400_billion_nodes() -> Result<()> {
         // setup
-        // the size of the actual DataCmd is used,
-        // which will be at least 928 bytes
-        let minimum_storage_bytes = 928;
+        // The size of the actual DataCmd
+        // is used for storecost calc,
+        // (currently at least 928 bytes).
+        // In general, the size of a type is not stable across compilations,
+        // but it is close enough for our purposes here.
+        let minimum_storage_bytes = mem::size_of::<DataCmd>() as u64;
         let half_full_nodes = 99;
         let big_section_node_count = 199;
         let big_prefix_len = 34;
@@ -229,9 +234,12 @@ mod test {
     #[ignore] // this test fails under the current assumptions (max network size is not realistic)
     fn rate_limit_is_applied_up_to_max_network_size() -> Result<()> {
         // setup
-        // the size of the actual DataCmd is used,
-        // which will be at least 928 bytes
-        let minimum_storage_bytes = 928;
+        // The size of the actual DataCmd
+        // is used for storecost calc,
+        // (currently at least 928 bytes);
+        // In general, the size of a type is not stable across compilations,
+        // but it is close enough for our purposes here.
+        let minimum_storage_bytes = mem::size_of::<DataCmd>() as u64;
         let half_full_nodes = 99;
         let big_section_node_count = 199;
         let big_prefix_len = 256;
