@@ -124,6 +124,7 @@ mod test {
     use super::*;
     use crate::Result;
     use bls::SecretKey;
+    use bls::SecretKeySet;
     use sn_data_types::{PublicKey, ReplicaEvent, TransferPropagated};
     use sn_transfers::get_genesis;
     use tempdir::TempDir;
@@ -135,7 +136,14 @@ mod test {
         let root_dir = tmp_dir.into_path();
         let mut store = TransferStore::new(id, &root_dir, Init::New)?;
         let wallet_id = get_random_pk();
-        let genesis_credit_proof = get_genesis(10, wallet_id)?;
+        let mut rng = rand::thread_rng();
+        let bls_secret_key = SecretKeySet::random(0, &mut rng);
+        let genesis_credit_proof = get_genesis(
+            10,
+            wallet_id,
+            bls_secret_key.public_keys(),
+            bls_secret_key.secret_key_share(0),
+        )?;
         store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
             credit_proof: genesis_credit_proof.clone(),
             crediting_replica_keys: get_random_pk(),

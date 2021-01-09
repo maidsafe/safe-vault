@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::genesis::get_genesis;
 use super::store::TransferStore;
 use crate::{utils::Init, Error, ReplicaInfo, Result};
 use bls::PublicKeySet;
@@ -348,10 +347,13 @@ impl Replicas {
     async fn create_genesis(&self) -> Result<CreditAgreementProof> {
         // This means we are the first node in the network.
         let balance = u32::MAX as u64 * 1_000_000_000;
-        let signed_credit = get_genesis(
-            balance,
-            PublicKey::Bls(self.info.peer_replicas.public_key()),
-        )?;
+        let signed_credit = self
+            .info
+            .signing
+            .lock()
+            .await
+            .try_genesis(balance)?
+            .signed_credit;
         let replica_credit_sig = self
             .info
             .signing
@@ -576,6 +578,7 @@ impl Replicas {
 
         // Access to the specific wallet is now serialised!
         let mut wallet = self.load_wallet(&store, actors.clone()).await?;
+        debug!("MultisigReplica wallet loaded: {:?}", id);
         if let Some(proposal) = wallet.propose_validation(signed_transfer)? {
             // apply the event
             let event = ReplicaEvent::TransferValidationProposed(proposal.clone());
