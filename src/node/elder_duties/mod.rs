@@ -146,10 +146,16 @@ impl ElderDuties {
         {
             return Ok(NodeOperation::NoOp);
         }
+
         info!("Elder change updates initiated");
+
         let _ = self.pending_section_keys.push(new_section_key);
         if prefix != self.prefix {
             let _ = self.pending_prefixes.push(prefix);
+        }
+        // handle changes sequentially
+        if self.pending_section_keys.len() > 1 {
+            return Ok(NodeOperation::NoOp);
         }
 
         // 1. First we must update data section..
@@ -164,6 +170,9 @@ impl ElderDuties {
             return Ok(NodeOperation::NoOp);
         }
         let new_section_key = self.pending_section_keys.remove(0);
+        if new_section_key == self.section_key {
+            return Ok(NodeOperation::NoOp);
+        }
 
         // 2. Then we must update key section..
         let mut ops = Vec::new();
@@ -172,6 +181,9 @@ impl ElderDuties {
             op => ops.push(op),
         };
         debug!("Key section completed elder change update.");
+        // 3. And then set current section key.
+        self.section_key = new_section_key;
+        debug!("Elder change update completed.");
 
         if !self.pending_prefixes.is_empty() {
             let prefix = self.pending_prefixes.remove(0);
@@ -186,7 +198,18 @@ impl ElderDuties {
                     NodeOperation::NoOp => (),
                     op => ops.push(op),
                 };
+                // 4. And then set current prefix.
+                self.prefix = prefix;
             }
+        }
+
+        // if changes have queued up, make sure the queue is worked down
+        if !self.pending_section_keys.is_empty() {
+            let new_section_key = self.pending_section_keys.remove(0);
+            ops.push(
+                self.initiate_elder_change(self.prefix, new_section_key)
+                    .await?,
+            );
         }
 
         Ok(ops.into())

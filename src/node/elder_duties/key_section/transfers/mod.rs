@@ -231,6 +231,7 @@ impl Transfers {
                     .await
             }
             PropagateTransfer(debit_agreement) => {
+                debug!("---->>> PropagateTransfer!!!!!!");
                 self.receive_propagated(&debit_agreement, msg_id, origin)
                     .await
             }
@@ -664,7 +665,6 @@ impl Transfers {
                     cmd_origin: origin,
                 }
             }
-
             Err(_e) => unimplemented!("receive_propagated"),
         };
         self.wrapping.send_to_node(message).await

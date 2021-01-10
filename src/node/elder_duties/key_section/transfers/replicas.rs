@@ -575,6 +575,7 @@ impl Replicas {
         let mut wallet = self.load_wallet(&store, actors.clone()).await?;
         debug!("MultisigReplica wallet loaded: {:?}", id);
         if let Some(proposal) = wallet.propose_validation(signed_transfer)? {
+            debug!("TransferValidationProposed!");
             // apply the event
             let event = ReplicaEvent::TransferValidationProposed(proposal.clone());
             wallet.apply(event)?;

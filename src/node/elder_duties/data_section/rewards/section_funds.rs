@@ -352,27 +352,6 @@ impl SectionFunds {
         // // // clear finished
         // // cannot do this here: self.state.finished.clear();
 
-        // We checked above that next_actor was some,
-        // only case this could fail is if we're multi threading here.
-        // (which we don't really have reason for here)
-
-        // let replica_credit_sig = self
-        //     .info
-        //     .signing
-        //     .lock()
-        //     .await
-        //     .sign_validated_credit(&signed_credit)?
-        //     .unwrap();
-        // let mut credit_sig_shares = BTreeMap::new();
-        // let _ = credit_sig_shares.insert(0, replica_credit_sig.share);
-
-        // let debiting_replicas_sig = sn_data_types::Signature::Bls(
-        //     self.info
-        //         .peer_replicas
-        //         .combine_signatures(&credit_sig_shares)
-        //         .map_err(|e| Error::Logic(e.to_string()))?,
-        // );
-
         // Credit the transfer to the new actor.
         match self.actor.from_history(vec![TransferPropagated(
             sn_data_types::TransferPropagated {
