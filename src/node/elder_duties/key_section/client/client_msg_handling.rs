@@ -101,19 +101,22 @@ impl ClientMsgHandling {
         client_address: SocketAddr,
         stream: SendStream,
     ) -> Result<()> {
-        trace!("Tracking incoming client message");
+        let msg_id = msg.id();
+
+        trace!("Tracking incoming client message {:?}", msg_id);
 
         with_chaos!({
-            debug!("Chaos: Dropping incoming message");
+            debug!("Chaos: Dropping incoming message {:?}", msg_id);
             return Ok(());
         });
-
-        let msg_id = msg.id();
 
         // We could have received a group decision containing a client msg,
         // before receiving the msg from that client directly.
         if let Some((_, msg)) = self.tracked_outgoing.remove(&msg_id) {
-            warn!("Tracking incoming: Prior group decision on msg found.");
+            warn!(
+                "Tracking incoming: Prior group decision on msg {:?} found.",
+                msg_id
+            );
             let _ = self.match_outgoing(&msg).await;
         }
 
@@ -129,16 +132,14 @@ impl ClientMsgHandling {
     }
 
     pub async fn match_outgoing(&self, msg: &MsgEnvelope) -> Result<()> {
-        trace!("Matching outgoing message");
+        let msg_id = msg.id();
+
+        trace!("Matching outgoing message {:?}", msg_id);
 
         match msg.destination()? {
             Address::Client { .. } => (),
             _ => {
-                error!(
-                    "{} for message-id {:?}, Invalid destination.",
-                    self,
-                    msg.id()
-                );
+                error!("{} for message-id {:?}, Invalid destination.", self, msg_id);
                 return Err(Error::InvalidMessage);
             }
         };
@@ -150,23 +151,32 @@ impl ClientMsgHandling {
             _ => {
                 error!(
                     "{} for message-id {:?}, Invalid message for client.",
-                    self,
-                    msg.id()
+                    self, msg_id
                 );
                 return Err(Error::InvalidMessage);
             }
         };
 
-        trace!("Message outgoing, correlates to {:?}", correlation_id);
+        trace!(
+            "Message {:?} outgoing, correlates to {:?}",
+            msg_id,
+            correlation_id
+        );
         // Query responses are sent on the stream from the connection.
         // Events/CmdErrors are sent to the held stream from the bootstrap process.
         match self.tracked_incoming.remove(&correlation_id) {
             Some((_, (peer_addr, mut stream))) => {
                 if is_query_response {
-                    trace!("Sending QueryResponse on request's stream");
+                    trace!(
+                        "Sending QueryResponse on request's stream for message {:?}",
+                        correlation_id
+                    );
                     send_message_on_stream(&msg, &mut stream).await?
                 } else {
-                    trace!("Attempting to use bootstrap stream");
+                    trace!(
+                        "Attempting to use bootstrap stream for message {:?}",
+                        correlation_id
+                    );
                     if let Some(pk) = self.get_public_key(peer_addr) {
                         // get the streams and ownership
                         if let Some((_, streams)) = self.notification_streams.remove(&pk) {
@@ -179,10 +189,16 @@ impl ClientMsgHandling {
 
                             let _ = self.notification_streams.insert(pk, used_streams);
                         } else {
-                            error!("Could not find stream for Message response")
+                            error!(
+                                "Could not find stream for Message {:?} response",
+                                correlation_id
+                            )
                         }
                     } else {
-                        error!("Could not find PublicKey for Message response")
+                        error!(
+                            "Could not find PublicKey for Message {:?} response",
+                            correlation_id
+                        )
                     }
                 }
             }
@@ -201,16 +217,20 @@ impl ClientMsgHandling {
 }
 
 async fn send_message_on_stream(message: &MsgEnvelope, stream: &mut SendStream) -> Result<()> {
-    trace!("Sending message on stream");
+    let msg_id = message.id();
+    trace!("Sending message {:?} on stream", msg_id);
     let bytes = utils::serialise(message)?;
 
     let res = stream.send_user_msg(bytes).await;
 
     match res {
-        Ok(()) => info!("Message sent successfully to client via stream"),
+        Ok(()) => info!(
+            "Message {:?} sent successfully to client via stream",
+            msg_id
+        ),
         Err(error) => error!(
-            "There was an error sending client message on the stream:  {:?}",
-            error
+            "There was an error sending client message {:?} on the stream:  {:?}",
+            msg_id, error
         ),
     };
     Ok(())
