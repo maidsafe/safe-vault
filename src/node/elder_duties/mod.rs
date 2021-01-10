@@ -15,7 +15,7 @@ use crate::{
     chunk_store::UsedSpace,
     node::node_ops::{ElderDuty, NodeOperation},
     node::state_db::NodeInfo,
-    Network, Result,
+    Error, Network, Result,
 };
 use log::{debug, info, trace};
 use sn_data_types::{PublicKey, WalletInfo};
@@ -26,6 +26,9 @@ use xor_name::XorName;
 /// Duties carried out by an Elder node.
 pub struct ElderDuties {
     prefix: Prefix,
+    pending_prefixes: Vec<Prefix>,
+    section_key: PublicKey,
+    pending_section_keys: Vec<PublicKey>,
     key_section: KeySection,
     data_section: DataSection,
 }
@@ -38,12 +41,19 @@ impl ElderDuties {
         network: Network,
     ) -> Result<Self> {
         let prefix = network.our_prefix().await;
+        let section_key = network
+            .section_public_key()
+            .await
+            .ok_or(Error::InvalidOperation)?;
         let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
         let rate_limit = RateLimit::new(network.clone(), Capacity::new(dbs.clone()));
         let key_section = KeySection::new(info, rate_limit, network.clone()).await?;
         let data_section = DataSection::new(info, dbs, used_space, wallet_info, network).await?;
         Ok(Self {
             prefix,
+            pending_prefixes: vec![],
+            section_key,
+            pending_section_keys: vec![],
             key_section,
             data_section,
         })
@@ -81,7 +91,7 @@ impl ElderDuties {
                 self.relocated_node_joined(old_node_id, new_node_id, age)
                     .await
             }
-            ProcessElderChange { prefix, .. } => self.elders_changed(prefix).await,
+            ProcessElderChange { prefix, key, .. } => self.initiate_elder_change(prefix, key).await,
             RunAsKeySection(the_key_duty) => {
                 self.key_section
                     .process_key_section_duty(the_key_duty)
@@ -126,30 +136,57 @@ impl ElderDuties {
     }
 
     ///
-    async fn elders_changed(&mut self, prefix: Prefix) -> Result<NodeOperation> {
-        info!("Elders changed");
+    async fn initiate_elder_change(
+        &mut self,
+        prefix: Prefix,
+        new_section_key: PublicKey,
+    ) -> Result<NodeOperation> {
+        if new_section_key == self.section_key
+            || self.pending_section_keys.contains(&new_section_key)
+        {
+            return Ok(NodeOperation::NoOp);
+        }
+        info!("Elder change updates initiated");
+        let _ = self.pending_section_keys.push(new_section_key);
+        if prefix != self.prefix {
+            let _ = self.pending_prefixes.push(prefix);
+        }
+
+        // 1. First we must update data section..
+        self.data_section
+            .initiate_elder_change(new_section_key)
+            .await
+    }
+
+    /// TODO
+    pub async fn finish_elder_change(&mut self) -> Result<NodeOperation> {
+        if self.pending_section_keys.is_empty() {
+            return Ok(NodeOperation::NoOp);
+        }
+        let new_section_key = self.pending_section_keys.remove(0);
+
+        // 2. Then we must update key section..
         let mut ops = Vec::new();
-        match self.key_section.elders_changed().await? {
+        match self.key_section.elders_changed(new_section_key).await? {
             NodeOperation::NoOp => (),
             op => ops.push(op),
         };
         debug!("Key section completed elder change update.");
-        match self.data_section.elders_changed().await? {
-            NodeOperation::NoOp => (),
-            op => ops.push(op),
-        };
-        debug!("Data section completed elder change update.");
-        if prefix != self.prefix {
-            info!("Split occured");
-            info!("New prefix is: {:?}", prefix);
-            match self.key_section.section_split(prefix).await? {
-                NodeOperation::NoOp => (),
-                op => ops.push(op),
-            };
-            match self.data_section.section_split(prefix).await? {
-                NodeOperation::NoOp => (),
-                op => ops.push(op),
-            };
+
+        if !self.pending_prefixes.is_empty() {
+            let prefix = self.pending_prefixes.remove(0);
+            if prefix != self.prefix {
+                info!("Split occurred");
+                info!("New prefix is: {:?}", prefix);
+                match self.key_section.section_split(prefix).await? {
+                    NodeOperation::NoOp => (),
+                    op => ops.push(op),
+                };
+                match self.data_section.section_split(prefix).await? {
+                    NodeOperation::NoOp => (),
+                    op => ops.push(op),
+                };
+            }
         }
 
         Ok(ops.into())

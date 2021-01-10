@@ -17,7 +17,6 @@ use sn_data_types::{
     TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
 };
 use sn_transfers::{Error as TransfersError, WalletOwner, WalletReplica};
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use xor_name::Prefix;
@@ -347,35 +346,31 @@ impl Replicas {
     async fn create_genesis(&self) -> Result<CreditAgreementProof> {
         // This means we are the first node in the network.
         let balance = u32::MAX as u64 * 1_000_000_000;
-        let signed_credit = self
-            .info
-            .signing
-            .lock()
-            .await
-            .try_genesis(balance)?
-            .signed_credit;
-        let replica_credit_sig = self
-            .info
-            .signing
-            .lock()
-            .await
-            .sign_validated_credit(&signed_credit)?
-            .unwrap();
-        let mut credit_sig_shares = BTreeMap::new();
-        let _ = credit_sig_shares.insert(0, replica_credit_sig.share);
+        let signed_credit = self.info.signing.lock().await.try_genesis(balance)?;
+        //.signed_credit;
+        // let replica_credit_sig = self
+        //     .info
+        //     .signing
+        //     .lock()
+        //     .await
+        //     .sign_validated_credit(&signed_credit)?
+        //     .unwrap();
+        // let mut credit_sig_shares = BTreeMap::new();
+        // let _ = credit_sig_shares.insert(0, replica_credit_sig.share);
 
-        let debiting_replicas_sig = sn_data_types::Signature::Bls(
-            self.info
-                .peer_replicas
-                .combine_signatures(&credit_sig_shares)
-                .map_err(|e| Error::Logic(e.to_string()))?,
-        );
+        // let debiting_replicas_sig = sn_data_types::Signature::Bls(
+        //     self.info
+        //         .peer_replicas
+        //         .combine_signatures(&credit_sig_shares)
+        //         .map_err(|e| Error::Logic(e.to_string()))?,
+        // );
 
-        Ok(CreditAgreementProof {
-            signed_credit,
-            debiting_replicas_sig,
-            debiting_replicas_keys: self.info.peer_replicas.clone(),
-        })
+        // Ok(CreditAgreementProof {
+        //     signed_credit,
+        //     debiting_replicas_sig,
+        //     debiting_replicas_keys: self.info.peer_replicas.clone(),
+        // })
+        Ok(signed_credit)
     }
 
     /// This is the one and only infusion of money to the system. Ever.

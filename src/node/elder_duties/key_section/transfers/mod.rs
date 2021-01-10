@@ -237,6 +237,7 @@ impl Transfers {
         }
     }
 
+    ///
     pub fn update_replica_keys(&mut self, info: ReplicaInfo) -> Result<NodeMessagingDuty> {
         self.replicas.update_replica_keys(info);
         Ok(NodeMessagingDuty::NoOp)
@@ -627,11 +628,14 @@ impl Transfers {
             Err(e) => {
                 let message_error = convert_to_error_message(e)?;
                 self.wrapping
-                    .error(
-                        CmdError::Transfer(TransferError::TransferRegistration(message_error)),
-                        msg_id,
-                        &origin,
-                    )
+                    .send_to_node(Message::NodeCmdError {
+                        error: NodeCmdError::Transfers(
+                            NodeTransferError::SectionPayoutRegistration(message_error),
+                        ),
+                        id: MessageId::new(),
+                        correlation_id: msg_id,
+                        cmd_origin: origin,
+                    })
                     .await
             }
         }

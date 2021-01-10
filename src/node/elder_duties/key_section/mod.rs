@@ -87,7 +87,9 @@ impl KeySection {
     }
 
     // Update our replica with the latest keys
-    pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
+    pub async fn elders_changed(&mut self, _new_section_key: PublicKey) -> Result<NodeOperation> {
+        // TODO: Query sn_routing for info for [new_section_key]
+        // specifically (regardless of how far back that was) - i.e. not the current info!
         let secret_key_share = self.network.secret_key_share().await?;
         let id = secret_key_share.public_key_share();
         let key_index = self.network.our_index().await?;

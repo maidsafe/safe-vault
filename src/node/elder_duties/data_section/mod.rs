@@ -20,8 +20,8 @@ use crate::{
     node::state_db::NodeInfo,
     utils, Error, Network, Result,
 };
-//use log::info;
-use sn_data_types::WalletInfo;
+use log::info;
+use sn_data_types::{PublicKey, WalletInfo};
 use sn_messaging::{Address, MessageId};
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
@@ -86,11 +86,18 @@ impl DataSection {
     }
 
     /// Transition the section funds account to the new key.
-    pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
+    pub async fn initiate_elder_change(
+        &mut self,
+        _new_section_key: PublicKey,
+    ) -> Result<NodeOperation> {
+        // TODO: Query sn_routing for info for [new_section_key]
+        // specifically (regardless of how far back that was) - i.e. not the current info!
+
         // if we were demoted, we should not call this at all,
         // make sure demoted is handled properly first, so that
         // EldersChanged doesn't lead to calling this method..
         if let Some(new_section_key) = self.network.section_public_key().await {
+            info!("Processing Elder change in data section");
             let new_keypair_share = utils::key_pair(self.network.clone()).await?;
             self.rewards
                 .init_transition(new_section_key, new_keypair_share)

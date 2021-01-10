@@ -9,7 +9,7 @@
 use super::validator::Validator;
 use crate::{
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{NodeMessagingDuty, NodeOperation},
+    node::node_ops::{self, NodeMessagingDuty, NodeOperation},
 };
 use crate::{Error, Result};
 use sn_data_types::{
@@ -270,11 +270,15 @@ impl SectionFunds {
 
             // If we are transitioning to a new actor,
             // we replace the old with the new.
-            self.try_transition(proof.credit_proof())?;
+            let transitioned = self.try_transition(proof.credit_proof())?;
 
             // If there are queued payouts,
             // the first in queue will be executed.
-            let queued_op = self.try_pop_queue().await?;
+            // (NB: If we were transitioning, we cannot do this until Transfers has transitioned as well!)
+            let mut queued_op = NodeOperation::NoOp;
+            if !transitioned {
+                queued_op = self.try_pop_queue().await?;
+            }
 
             // We ask of our Replicas to register this transfer.
             let reg_op = self
@@ -325,9 +329,9 @@ impl SectionFunds {
 
     /// Wallet transition, step 3.
     /// If we are transitioning to a new actor, we replace the old with the new.
-    fn try_transition(&mut self, credit_proof: CreditAgreementProof) -> Result<()> {
+    fn try_transition(&mut self, credit_proof: CreditAgreementProof) -> Result<bool> {
         if !self.is_transition_credit(&credit_proof) {
-            return Ok(());
+            return Ok(false);
         }
         // hmm.. it would actually be a bug
         // if we have a payout in flight...
@@ -345,9 +349,29 @@ impl SectionFunds {
             .next_actor
             .take()
             .ok_or_else(|| Error::Logic("Could not set the next actor".to_string()))?;
+        // // // clear finished
+        // // cannot do this here: self.state.finished.clear();
+
         // We checked above that next_actor was some,
         // only case this could fail is if we're multi threading here.
         // (which we don't really have reason for here)
+
+        // let replica_credit_sig = self
+        //     .info
+        //     .signing
+        //     .lock()
+        //     .await
+        //     .sign_validated_credit(&signed_credit)?
+        //     .unwrap();
+        // let mut credit_sig_shares = BTreeMap::new();
+        // let _ = credit_sig_shares.insert(0, replica_credit_sig.share);
+
+        // let debiting_replicas_sig = sn_data_types::Signature::Bls(
+        //     self.info
+        //         .peer_replicas
+        //         .combine_signatures(&credit_sig_shares)
+        //         .map_err(|e| Error::Logic(e.to_string()))?,
+        // );
 
         // Credit the transfer to the new actor.
         match self.actor.from_history(vec![TransferPropagated(
@@ -365,7 +389,7 @@ impl SectionFunds {
         // Wallet transition is completed!
         info!("Wallet transition is completed!");
 
-        Ok(())
+        Ok(true)
     }
 
     fn apply(&mut self, event: ActorEvent) -> Result<()> {
