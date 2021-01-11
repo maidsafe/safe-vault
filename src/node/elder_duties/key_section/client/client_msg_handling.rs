@@ -12,7 +12,7 @@ use crate::utils;
 use crate::with_chaos;
 use crate::{Error, Result};
 use dashmap::{mapref::entry::Entry, DashMap};
-use log::{debug, error, info, trace, warn};
+use log::{error, info, trace, warn};
 use sn_data_types::HandshakeRequest;
 use sn_messaging::{Address, Message, MessageId, MsgEnvelope};
 
