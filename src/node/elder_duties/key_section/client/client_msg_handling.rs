@@ -102,7 +102,10 @@ impl ClientMsgHandling {
             Address::Client { .. } => (),
             _ => {
                 error!("{} for message-id {:?}, Invalid destination.", self, msg_id);
-                return Err(Error::InvalidMessage);
+                return Err(Error::InvalidMessage(
+                    msg_id,
+                    "Address::Client was expected".to_string(),
+                ));
             }
         };
 
@@ -120,7 +123,10 @@ impl ClientMsgHandling {
                     self,
                     message.id()
                 );
-                return Err(Error::InvalidMessage);
+                return Err(Error::InvalidMessage(
+                    message.id(),
+                    "Not a client message".to_string(),
+                ));
             }
         };
 

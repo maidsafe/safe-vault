@@ -191,7 +191,7 @@ impl Replicas {
             store.try_insert(ReplicaEvent::TransferValidated(event.clone()))?;
             Ok(event)
         } else {
-            Err(Error::InvalidMessage)
+            Err(Error::InvalidSignedTransfer(signed_transfer.id()))
         }
     }
 
@@ -281,7 +281,7 @@ impl Replicas {
                 return Ok(event);
             }
         }
-        Err(Error::InvalidMessage)
+        Err(Error::InvalidPropagatedTransfer(credit_proof.clone()))
     }
 
     async fn load_key_lock(&self, id: PublicKey) -> Result<Arc<Mutex<TransferStore>>> {

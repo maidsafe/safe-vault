@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_data_types::Error as DtError;
-use sn_messaging::Error as ErrorMessage;
+// use bls::PublicKey;
+use sn_data_types::{Error as DtError, PublicKey};
+use sn_messaging::{Error as ErrorMessage, MessageId};
 use std::io;
 use thiserror::Error;
 #[allow(clippy::large_enum_variant)]
@@ -79,13 +80,21 @@ pub enum Error {
     /// Transfer has already been registered
     #[error("Transfer has already been registered")]
     TransferAlreadyRegistered,
+    /// Transfer message is invalid.
+    #[error("Signed transfer for Dot: '{0:?}' is not valid. Debit or credit are missing")]
+    InvalidSignedTransfer(crdts::Dot<PublicKey>),
+
+    /// Transfer message is invalid.
+    #[error("Propagated Credit Agreement proof is not valid. Proof received: {0:?}")]
+    InvalidPropagatedTransfer(sn_data_types::CreditAgreementProof),
+
     /// Message is invalid.
-    #[error("Message is invalid")]
-    InvalidMessage,
+    #[error("Message with id: '{0:?}' is invalid. {1}")]
+    InvalidMessage(MessageId, String),
 
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
-    InvalidOwners(sn_data_types::PublicKey),
+    InvalidOwners(PublicKey),
 
     /// Data operation is invalid, eg private operation on public data
     #[error("Invalid operation")]
