@@ -12,7 +12,6 @@ use bytes::Bytes;
 use dashmap::DashMap;
 use log::{debug, error, info, trace};
 use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey};
-use sn_routing::SendStream;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -42,12 +41,11 @@ impl Onboarding {
         &self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
-        stream: &mut SendStream,
     ) -> Result<()> {
         info!("Onboarding client w/ peer addr: {:?}", peer_addr);
         match handshake {
             HandshakeRequest::Bootstrap(client_key) => {
-                self.try_bootstrap(peer_addr, &client_key, stream).await
+                self.try_bootstrap(peer_addr, &client_key).await
             }
             HandshakeRequest::Join(client_key) => self.try_join(peer_addr, client_key).await,
         }
@@ -61,12 +59,7 @@ impl Onboarding {
         true
     }
 
-    async fn try_bootstrap(
-        &self,
-        peer_addr: SocketAddr,
-        client_key: &PublicKey,
-        stream: &mut SendStream,
-    ) -> Result<()> {
+    async fn try_bootstrap(&self, peer_addr: SocketAddr, client_key: &PublicKey) -> Result<()> {
         if !self.shall_bootstrap(&peer_addr) {
             info!(
                 "{}: Redundant bootstrap..: {} on {}",
@@ -102,9 +95,7 @@ impl Onboarding {
 
         info!("sending bytes back");
 
-        // let res = self.send_bytes_to(peer_addr, bytes).await;
-
-        let res = futures::executor::block_on(stream.send_user_msg(bytes));
+        let res = self.send_bytes_to(peer_addr, bytes).await;
 
         match res {
             Ok(()) => Ok(()),

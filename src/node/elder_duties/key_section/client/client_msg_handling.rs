@@ -12,11 +12,11 @@ use crate::utils;
 use crate::with_chaos;
 use crate::{Error, Result};
 use dashmap::{mapref::entry::Entry, DashMap};
-use log::{debug,error, info, trace, warn};
+#[cfg(features = "chaos")]
+use log::debug;
+use log::{error, info, trace, warn};
 use sn_data_types::HandshakeRequest;
 use sn_messaging::{Address, Message, MessageId, MsgEnvelope};
-
-use sn_routing::SendStream;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -26,7 +26,6 @@ use std::{
 /// between client and network.
 pub struct ClientMsgHandling {
     onboarding: Onboarding,
-    // notification_streams: DashMap<PublicKey, Vec<SendStream>>,
     tracked_incoming: DashMap<MessageId, SocketAddr>,
     tracked_outgoing: DashMap<MessageId, MsgEnvelope>,
 }
@@ -35,36 +34,27 @@ impl ClientMsgHandling {
     pub fn new(onboarding: Onboarding) -> Self {
         Self {
             onboarding,
-            // notification_streams: Default::default(),
             tracked_incoming: Default::default(),
             tracked_outgoing: Default::default(),
         }
     }
 
-
     pub async fn process_handshake(
         &self,
         handshake: HandshakeRequest,
         peer_addr: SocketAddr,
-        stream: &mut SendStream,
-        // rng: &mut G,
     ) -> Result<()> {
         trace!("Processing client handshake");
-        let mut the_stream = stream;
 
         with_chaos!({
-            log::debug!("Chaos: Dropping handshake");
+            debug!("Chaos: Dropping handshake");
             return Ok(());
         });
 
-        let result = self
-            .onboarding
-            .onboard_client(handshake, peer_addr, &mut the_stream)
-            .await;
+        let result = self.onboarding.onboard_client(handshake, peer_addr).await;
 
         result
     }
-
 
     /// Track client socket address and msg_id for coordinating responses
     pub async fn track_incoming_message(
@@ -77,7 +67,7 @@ impl ClientMsgHandling {
         trace!("Tracking incoming client message {:?}", msg_id);
 
         with_chaos!({
-            log::debug!("Chaos: Dropping incoming message {:?}", msg_id);
+            debug!("Chaos: Dropping incoming message {:?}", msg_id);
             return Ok(());
         });
 

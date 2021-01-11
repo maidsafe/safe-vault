@@ -76,20 +76,12 @@ impl ClientGateway {
     async fn process_client_event(&self, event: RoutingEvent) -> Result<NodeOperation> {
         trace!("Processing client event");
         match event {
-            RoutingEvent::ClientMessageReceived {
-                content,
-                src,
-                mut send,
-                ..
-            } => {
+            RoutingEvent::ClientMessageReceived { content, src, .. } => {
                 // This check was about checking we knew and client was valid... but even if we don't
                 // we should be handling it...
                 match try_deserialize_handshake(&content, src) {
                     Ok(hs) => {
-                        let _ = self
-                            .client_msg_handling
-                            .process_handshake(hs, src, &mut send)
-                            .await;
+                        let _ = self.client_msg_handling.process_handshake(hs, src).await;
                         Ok(NodeOperation::NoOp)
                     }
                     Err(_e) => {
