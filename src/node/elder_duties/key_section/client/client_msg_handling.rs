@@ -12,7 +12,7 @@ use crate::utils;
 use crate::with_chaos;
 use crate::{Error, Result};
 use dashmap::{mapref::entry::Entry, DashMap};
-use log::{error, info, trace, warn};
+use log::{debug,error, info, trace, warn};
 use sn_data_types::HandshakeRequest;
 use sn_messaging::{Address, Message, MessageId, MsgEnvelope};
 
@@ -41,11 +41,6 @@ impl ClientMsgHandling {
         }
     }
 
-    // pub fn get_public_key(&self, peer_addr: SocketAddr) -> Option<PublicKey> {
-    //     debug!("-------------------------  Attempting to get client key for socketaddr : {:?} ", peer_addr);
-
-    //     self.onboarding.get_public_key(peer_addr)
-    // }
 
     pub async fn process_handshake(
         &self,
@@ -58,7 +53,7 @@ impl ClientMsgHandling {
         let mut the_stream = stream;
 
         with_chaos!({
-            debug!("Chaos: Dropping handshake");
+            log::debug!("Chaos: Dropping handshake");
             return Ok(());
         });
 
@@ -70,23 +65,19 @@ impl ClientMsgHandling {
         result
     }
 
-    // pub fn remove_client(&mut self, peer_addr: SocketAddr) {
-    //     self.onboarding.remove_client(peer_addr)
-    // }
 
     /// Track client socket address and msg_id for coordinating responses
     pub async fn track_incoming_message(
         &self,
         msg: &Message,
         client_address: SocketAddr,
-        // stream: SendStream,
     ) -> Result<()> {
         let msg_id = msg.id();
 
         trace!("Tracking incoming client message {:?}", msg_id);
 
         with_chaos!({
-            debug!("Chaos: Dropping incoming message {:?}", msg_id);
+            log::debug!("Chaos: Dropping incoming message {:?}", msg_id);
             return Ok(());
         });
 
