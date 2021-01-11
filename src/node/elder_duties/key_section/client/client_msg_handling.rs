@@ -147,14 +147,8 @@ impl ClientMsgHandling {
 
         match self.tracked_incoming.remove(&correlation_id) {
             Some((_, client_address)) => {
-                trace!("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-
                 let bytes = utils::serialise(message)?;
 
-                trace!("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-                trace!("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-                trace!("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
-                trace!("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
                 trace!("will send message via qp2p");
                 self.onboarding.send_bytes_to(client_address, bytes).await
             }
