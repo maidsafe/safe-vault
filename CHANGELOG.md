@@ -21,6 +21,25 @@ All notable changes to this project will be documented in this file. See [standa
 
 * **rate_limit tests:** use u64 instead of f64.. ([56db5ab](https://github.com/maidsafe/sn_node/commit/56db5abbeedcf5bd0820bd2a18e5810f51c05225))
 
+### [0.25.19](https://github.com/maidsafe/sn_node/compare/v0.25.18...v0.25.19) (2021-01-14)
+
+
+### Features
+
+* **errors:** add new more specific errors for invalid messages ([38a801a](https://github.com/maidsafe/sn_node/commit/38a801a57004b65305f01e6de7fb16131c9184a7))
+* remove bootstrap stream listening also ([74855e2](https://github.com/maidsafe/sn_node/commit/74855e2bc2b1b14631c5921f52a40c3c16ea1dd6))
+* remove stream storage for client management ([3313cd5](https://github.com/maidsafe/sn_node/commit/3313cd51d67541d8011b2295569d0cf1489a9128))
+* **deps:** use updated client ([468b690](https://github.com/maidsafe/sn_node/commit/468b6901f5b4c3c8ceaca3c0b7bf9f7f79f45e0d))
+* **errors:** use thiserror for error construction ([946e3c2](https://github.com/maidsafe/sn_node/commit/946e3c2e38d88afd3082a9d345db1fbef155359b))
+* remove client challenge ([50e3ed4](https://github.com/maidsafe/sn_node/commit/50e3ed45802c09ada8af2f1b8b2315e4e20319e7))
+* **config:** add support for --clean and --fresh flags ([0c29503](https://github.com/maidsafe/sn_node/commit/0c2950305eafeddc9f193e49bd246028f56dfb57))
+* **errors:** use thiserror for error construction ([678384e](https://github.com/maidsafe/sn_node/commit/678384e741822c1fa29b8cb1e6b48be160235316))
+
+
+### Bug Fixes
+
+* **rate_limit tests:** use u64 instead of f64.. ([56db5ab](https://github.com/maidsafe/sn_node/commit/56db5abbeedcf5bd0820bd2a18e5810f51c05225))
+
 ### [0.25.18](https://github.com/maidsafe/sn_node/compare/v0.25.17...v0.25.18) (2020-12-21)
 
 ### [0.25.17](https://github.com/maidsafe/sn_node/compare/v0.25.16...v0.25.17) (2020-12-21)
