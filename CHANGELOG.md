@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### [0.25.20](https://github.com/maidsafe/sn_node/compare/v0.25.19...v0.25.20) (2021-01-14)
 
+### [0.25.20](https://github.com/maidsafe/sn_node/compare/v0.25.19...v0.25.20) (2021-01-14)
+
 ### [0.25.19](https://github.com/maidsafe/sn_node/compare/v0.25.18...v0.25.19) (2021-01-14)
 
 
