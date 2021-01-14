@@ -662,17 +662,53 @@ impl NetworkMsgAnalysis {
         let from_single_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
-
         let shall_process =
             from_single_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
 
-        if !shall_process {
-            return Ok(RewardDuty::NoOp);
+        if shall_process {
+            use NodeRewardQuery::GetNodeWalletId;
+            return match &msg.message {
+                Message::NodeEvent {
+                    event: NodeEvent::SectionPayoutValidated(validation),
+                    id,
+                    ..
+                } => Ok(RewardDuty::ProcessCmd {
+                    cmd: RewardCmd::ReceivePayoutValidation(validation.clone()),
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                }),
+                Message::NodeQuery {
+                    query:
+                        NodeQuery::Rewards(GetNodeWalletId {
+                            old_node_id,
+                            new_node_id,
+                        }),
+                    id,
+                } => Ok(RewardDuty::ProcessQuery {
+                    query: RewardQuery::GetNodeWalletId {
+                        old_node_id: *old_node_id,
+                        new_node_id: *new_node_id,
+                    },
+                    msg_id: *id,
+                    origin: msg.origin.address(),
+                }),
+                _ => Ok(RewardDuty::NoOp),
+            };
         }
+
         // SectionPayoutValidated and GetNodeWalletId
         // do not need accumulation since they are accumulated in the domain logic.
 
-        use NodeRewardQuery::GetNodeWalletId;
+        let from_single_transfers_elder = || {
+            msg.most_recent_sender().is_elder()
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+        };
+        let shall_process =
+            from_single_transfers_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
+        if !shall_process {
+            return Ok(RewardDuty::NoOp);
+        }
+
         match &msg.message {
             Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(validation),
@@ -680,21 +716,6 @@ impl NetworkMsgAnalysis {
                 ..
             } => Ok(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::ReceivePayoutValidation(validation.clone()),
-                msg_id: *id,
-                origin: msg.origin.address(),
-            }),
-            Message::NodeQuery {
-                query:
-                    NodeQuery::Rewards(GetNodeWalletId {
-                        old_node_id,
-                        new_node_id,
-                    }),
-                id,
-            } => Ok(RewardDuty::ProcessQuery {
-                query: RewardQuery::GetNodeWalletId {
-                    old_node_id: *old_node_id,
-                    new_node_id: *new_node_id,
-                },
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),
