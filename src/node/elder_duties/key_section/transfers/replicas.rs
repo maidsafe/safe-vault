@@ -131,9 +131,8 @@ impl Replicas {
             };
 
             // Acquire lock of the wallet.
-            let key_lock = self.load_key_lock(id).await?;
+            let key_lock = self.get_load_or_create_store(id).await?; // .load_key_lock(id).await?;
             let mut store = key_lock.lock().await;
-
             // Access to the specific wallet is now serialised!
             store.try_insert(e.to_owned())?;
         }
@@ -347,29 +346,6 @@ impl Replicas {
         // This means we are the first node in the network.
         let balance = u32::MAX as u64 * 1_000_000_000;
         let signed_credit = self.info.signing.lock().await.try_genesis(balance)?;
-        //.signed_credit;
-        // let replica_credit_sig = self
-        //     .info
-        //     .signing
-        //     .lock()
-        //     .await
-        //     .sign_validated_credit(&signed_credit)?
-        //     .unwrap();
-        // let mut credit_sig_shares = BTreeMap::new();
-        // let _ = credit_sig_shares.insert(0, replica_credit_sig.share);
-
-        // let debiting_replicas_sig = sn_data_types::Signature::Bls(
-        //     self.info
-        //         .peer_replicas
-        //         .combine_signatures(&credit_sig_shares)
-        //         .map_err(|e| Error::Logic(e.to_string()))?,
-        // );
-
-        // Ok(CreditAgreementProof {
-        //     signed_credit,
-        //     debiting_replicas_sig,
-        //     debiting_replicas_keys: self.info.peer_replicas.clone(),
-        // })
         Ok(signed_credit)
     }
 
@@ -500,7 +476,7 @@ impl Replicas {
         Ok(())
     }
 
-    #[cfg(feature = "simulated-payouts")]
+    //#[cfg(feature = "simulated-payouts")]
     async fn get_load_or_create_store(
         &self,
         id: PublicKey,
@@ -604,5 +580,192 @@ impl Replicas {
             }
         }
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Replicas;
+    use crate::{Error, ReplicaInfo, Result};
+    use bls::{PublicKeySet, SecretKeySet};
+    use futures::{executor::block_on as run, lock::Mutex};
+    use sn_data_types::{Keypair, Money, PublicKey, SignedTransferShare};
+    use sn_routing::SectionProofChain;
+    use sn_transfers::{ActorEvent, ReplicaValidator, TransferActor as Actor, Wallet, WalletOwner};
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use tempdir::TempDir;
+
+    #[test]
+    fn section_actor_transition() -> Result<()> {
+        let root_dir = temp_dir()?;
+        let (mut section, peer_replicas) = get_section(root_dir.path().to_path_buf(), 1)?;
+        println!("Got genesis section");
+
+        let (genesis_replicas, mut actor) = section.remove(0);
+        let _ = run(genesis_replicas.initiate(&[]))?;
+        println!("Genesis replica initiated");
+
+        let section_key = PublicKey::Bls(genesis_replicas.replicas_pk_set().public_key());
+
+        // make sure all keys are the same
+        assert_eq!(peer_replicas, actor.owner().public_key_set()?);
+        assert_eq!(section_key, PublicKey::Bls(peer_replicas.public_key()));
+
+        // we are genesis, we should get the genesis event via this call
+        let events = run(genesis_replicas.history(section_key))?;
+        match actor.from_history(events.clone())? {
+            Some(event) => actor.apply(ActorEvent::TransfersSynched(event))?,
+            None => {
+                return Err(Error::Logic(format!(
+                    "We should be able to synch genesis event here."
+                )))
+            }
+        }
+
+        // Elders changed!
+        let (section, peer_replicas) = get_section(root_dir.path().to_path_buf(), 2)?;
+        let recipient = PublicKey::Bls(peer_replicas.public_key());
+
+        // transfer the section funds to new section actor
+        let init = match actor.transfer(
+            actor.balance(),
+            recipient,
+            format!("Transition to next section actor"),
+        )? {
+            Some(init) => init,
+            None => return Err(Error::Logic(format!("We should be able to transfer here."))),
+        };
+        // the new elder will not partake in this operation (hence only one doing it here)
+        let _ = actor.apply(ActorEvent::TransferInitiated(init.clone()))?;
+        println!("Transition to next actor initiated");
+
+        let signed_transfer = SignedTransferShare::new(
+            init.signed_debit.as_share()?,
+            init.signed_credit.as_share()?,
+            actor.owner().public_key_set()?,
+        )?;
+
+        let validation = match run(genesis_replicas.propose_validation(&signed_transfer))? {
+            Some(validation) => validation,
+            None => {
+                return Err(Error::Logic(format!(
+                    "We should be able to propose validation here."
+                )))
+            }
+        };
+        println!("Transfer validation proposed and validated");
+
+        // accumulate validations
+        let event = match actor.receive(validation)? {
+            Some(event) => event,
+            None => {
+                return Err(Error::Logic(format!(
+                    "We should be able to receive validation here."
+                )))
+            }
+        };
+        println!("Validation received");
+        match event.proof {
+            Some(transfer_proof) => {
+                let _registered = run(genesis_replicas.register(&transfer_proof))?;
+                println!("Validation registered");
+                // since we register at same replicas that we propagate to, this step is not strictly necessary:
+                let _propagated =
+                    run(genesis_replicas.receive_propagated(&transfer_proof.credit_proof()))?;
+                println!("Validation propagated");
+            }
+            None => return Err(Error::Logic(format!("We should have a proof here."))),
+        }
+
+        let history = run(genesis_replicas.history(section_key))?;
+        println!("Genesis history len: {:?}", history.len());
+
+        for (elder_replicas, mut actor) in section {
+            let _ = run(elder_replicas.initiate(&history))?;
+            match actor.from_history(history.clone())? {
+                Some(event) => actor.apply(ActorEvent::TransfersSynched(event))?,
+                None => {
+                    return Err(Error::Logic(format!(
+                        "We should be able to synch actor here."
+                    )))
+                }
+            }
+            assert_eq!(
+                actor.balance(),
+                Money::from_nano(u32::MAX as u64 * 1_000_000_000)
+            );
+            assert_eq!(actor.balance(), run(elder_replicas.balance(actor.id()))?);
+        }
+        println!("FULL FLOW COMPLETED!");
+
+        Ok(())
+    }
+
+    fn temp_dir() -> Result<TempDir> {
+        TempDir::new("test").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
+    }
+
+    type Section = Vec<(Replicas, Actor<Validator>)>;
+    fn get_section(root_dir: PathBuf, count: u8) -> Result<(Section, PublicKeySet)> {
+        let mut rng = rand::thread_rng();
+        let threshold = count as usize - 1;
+        let bls_secret_key = SecretKeySet::random(threshold, &mut rng);
+        let peer_replicas = bls_secret_key.public_keys();
+
+        let section = (0..count as usize)
+            .into_iter()
+            .map(|key_index| get_replica(key_index, bls_secret_key.clone(), root_dir.clone()))
+            .filter_map(|res| res.ok())
+            .collect();
+
+        Ok((section, peer_replicas))
+    }
+
+    fn get_replica(
+        key_index: usize,
+        bls_secret_key: SecretKeySet,
+        root_dir: PathBuf,
+    ) -> Result<(Replicas, Actor<Validator>)> {
+        let peer_replicas = bls_secret_key.public_keys();
+        let secret_key_share = bls_secret_key.secret_key_share(key_index);
+        let id = secret_key_share.public_key_share();
+        let signing =
+            sn_transfers::ReplicaSigning::new(secret_key_share, key_index, peer_replicas.clone());
+        let info = ReplicaInfo {
+            id,
+            key_index,
+            peer_replicas: peer_replicas.clone(),
+            section_proof_chain: SectionProofChain::new(peer_replicas.public_key()),
+            signing: Arc::new(Mutex::new(signing)),
+            initiating: true,
+        };
+        let replicas = Replicas::new(root_dir, info)?;
+
+        let keypair =
+            Keypair::new_bls_share(0, bls_secret_key.secret_key_share(0), peer_replicas.clone());
+        let owner = WalletOwner::Multi(peer_replicas.clone());
+        let wallet = Wallet::new(owner);
+        let actor = Actor::from_snapshot(
+            wallet,
+            Arc::new(keypair),
+            peer_replicas.clone(),
+            Validator {},
+        );
+
+        Ok((replicas, actor))
+    }
+
+    /// Should be validating
+    /// other replica groups, i.e.
+    /// make sure they are run at Elders
+    /// of sections we know of.
+    /// TBD.
+    pub struct Validator {}
+
+    impl ReplicaValidator for Validator {
+        fn is_valid(&self, _replica_group: PublicKey) -> bool {
+            true
+        }
     }
 }
