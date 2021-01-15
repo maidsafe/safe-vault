@@ -160,10 +160,7 @@ impl Transfers {
                 cmd,
                 msg_id,
                 origin,
-            } => self
-                .process_cmd(cmd, *msg_id, origin.clone())
-                .await
-                .convert(),
+            } => self.process_cmd(cmd, *msg_id, origin.clone()).await,
             NoOp => Ok(NodeOperation::NoOp),
         }
     }
@@ -207,10 +204,10 @@ impl Transfers {
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: Address,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeOperation> {
         use TransferCmd::*;
-        debug!("Processing Transfer CMD in keysection");
-        match cmd {
+        debug!("Processing cmd in Transfers mod");
+        let result = match cmd {
             InitiateReplica(events) => self.initiate_replica(events).await,
             ProcessPayment(msg) => self.process_payment(msg).await,
             #[cfg(feature = "simulated-payouts")]
@@ -227,15 +224,16 @@ impl Transfers {
                 self.register(&debit_agreement, msg_id, origin).await
             }
             RegisterSectionPayout(debit_agreement) => {
-                self.register_section_payout(&debit_agreement, msg_id, origin)
-                    .await
+                return self
+                    .register_section_payout(&debit_agreement, msg_id, origin)
+                    .await;
             }
             PropagateTransfer(debit_agreement) => {
-                debug!("---->>> PropagateTransfer!!!!!!");
                 self.receive_propagated(&debit_agreement, msg_id, origin)
                     .await
             }
-        }
+        };
+        result.convert()
     }
 
     ///
@@ -464,6 +462,8 @@ impl Transfers {
         // todo: validate signature
         let result = match self.replicas.history(wallet_id).await {
             Ok(history) => Ok(WalletInfo {
+                // if we haven't transitioned yet, then this will be wrong!
+                // (it will still be the previous keyset..)
                 replicas: self.replicas.replicas_pk_set(),
                 history,
             }),
@@ -611,24 +611,49 @@ impl Transfers {
         proof: &TransferAgreementProof,
         msg_id: MessageId,
         origin: Address,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeOperation> {
         use NodeCmd::*;
+        use NodeEvent::*;
         use NodeTransferCmd::*;
         match self.replicas.register(proof).await {
             Ok(event) => {
-                self.wrapping
-                    .send_to_section(
-                        Message::NodeCmd {
-                            cmd: Transfers(PropagateTransfer(event.transfer_proof)),
-                            id: MessageId::new(),
-                        },
-                        true,
-                    )
-                    .await
+                let mut ops: Vec<NodeOperation> = vec![];
+                // notify sending section
+                ops.push(
+                    self.wrapping
+                        .send_to_section(
+                            Message::NodeEvent {
+                                event: SectionPayoutRegistered {
+                                    from: event.transfer_proof.sender(),
+                                    to: event.transfer_proof.recipient(),
+                                },
+                                id: MessageId::in_response_to(&msg_id),
+                                correlation_id: msg_id,
+                            },
+                            true,
+                        )
+                        .await?
+                        .into(),
+                );
+                // notify receiving section
+                ops.push(
+                    self.wrapping
+                        .send_to_section(
+                            Message::NodeCmd {
+                                cmd: Transfers(PropagateTransfer(event.transfer_proof)),
+                                id: MessageId::new(),
+                            },
+                            true,
+                        )
+                        .await?
+                        .into(),
+                );
+                Ok(ops.into())
             }
             Err(e) => {
                 let message_error = convert_to_error_message(e)?;
-                self.wrapping
+                Ok(self
+                    .wrapping
                     .send_to_node(Message::NodeCmdError {
                         error: NodeCmdError::Transfers(
                             NodeTransferError::SectionPayoutRegistration(message_error),
@@ -637,7 +662,8 @@ impl Transfers {
                         correlation_id: msg_id,
                         cmd_origin: origin,
                     })
-                    .await
+                    .await?
+                    .into())
             }
         }
     }

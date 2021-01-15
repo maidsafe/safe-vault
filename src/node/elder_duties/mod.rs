@@ -91,7 +91,13 @@ impl ElderDuties {
                 self.relocated_node_joined(old_node_id, new_node_id, age)
                     .await
             }
-            ProcessElderChange { prefix, key, .. } => self.initiate_elder_change(prefix, key).await,
+            InitiateElderChange { prefix, key, .. } => {
+                self.initiate_elder_change(prefix, key).await
+            }
+            FinishElderChange {
+                previous_key,
+                new_key,
+            } => self.finish_elder_change(previous_key, new_key).await,
             RunAsKeySection(the_key_duty) => {
                 self.key_section
                     .process_key_section_duty(the_key_duty)
@@ -164,9 +170,16 @@ impl ElderDuties {
             .await
     }
 
-    /// TODO
-    pub async fn finish_elder_change(&mut self) -> Result<NodeOperation> {
+    ///
+    pub async fn finish_elder_change(
+        &mut self,
+        previous_key: PublicKey,
+        new_key: PublicKey,
+    ) -> Result<NodeOperation> {
         if self.pending_section_keys.is_empty() {
+            return Ok(NodeOperation::NoOp);
+        }
+        if self.section_key != previous_key || new_key != self.pending_section_keys[0] {
             return Ok(NodeOperation::NoOp);
         }
         let new_section_key = self.pending_section_keys.remove(0);

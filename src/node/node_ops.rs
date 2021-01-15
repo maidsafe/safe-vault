@@ -225,13 +225,18 @@ pub enum ElderDuty {
     /// Elder changes means the section public key
     /// changes as well, which leads to necessary updates
     /// of various places using the multisig of the section.
-    ProcessElderChange {
+    InitiateElderChange {
         /// The prefix of our section.
         prefix: Prefix,
         /// The BLS public key of our section.
         key: PublicKey,
         /// The set of elders of our section.
         elders: BTreeSet<XorName>,
+    },
+    ///
+    FinishElderChange {
+        previous_key: PublicKey,
+        new_key: PublicKey,
     },
     ProcessRelocatedMember {
         /// The id of the node at the previous section.

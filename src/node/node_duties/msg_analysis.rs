@@ -116,11 +116,17 @@ impl NetworkMsgAnalysis {
             NodeDuty::NoOp => (),
             op => return Ok(op.into()),
         }
+        match self.try_elder_duties(&msg).await? {
+            // Identified as an ElderDuty
+            ElderDuty::NoOp => (),
+            op => return Ok(op.into()),
+        }
         error!("Unknown message destination: {:?}", msg.id());
         Err(Error::Logic("Unknown message destination".to_string()))
     }
 
     async fn try_system_cmd(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
+        info!("Msg analysis: try_system_cmd..");
         use NodeCmd::*;
         use NodeSystemCmd::*;
         // Check if it a message from adult
@@ -139,6 +145,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_messaging(&self, msg: &MsgEnvelope) -> Result<NodeMessagingDuty> {
+        info!("Msg analysis: try_messaging..");
         use Address::*;
         let destined_for_network = match msg.destination()? {
             Client(address) => !self.self_is_handler_for(&address).await,
@@ -157,6 +164,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_node_duties(&self, msg: &MsgEnvelope) -> Result<NodeDuty> {
+        info!("Msg analysis: try_node_duties..");
         // From Transfer module, we get
         // `CatchUpWithSectionWallet` query response.
 
@@ -189,6 +197,38 @@ impl NetworkMsgAnalysis {
                 Ok(NodeDuty::InitSectionWallet(info.clone()))
             }
             _ => Ok(NodeDuty::NoOp),
+        }
+    }
+
+    async fn try_elder_duties(&self, msg: &MsgEnvelope) -> Result<ElderDuty> {
+        info!("Msg analysis: try_elder_duties..");
+        // From Transfer module, we get
+        // `SectionPayoutRegistered` event.
+
+        let sender = msg.most_recent_sender();
+
+        let duty = if let Some(duty) = sender.duty() {
+            duty
+        } else {
+            return Ok(ElderDuty::NoOp);
+        };
+        let from_transfer_section =
+            || sender.is_elder() && matches!(duty, Duty::Elder(ElderDuties::Transfer));
+        let shall_process =
+            from_transfer_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+        if !shall_process {
+            return Ok(ElderDuty::NoOp);
+        }
+
+        match &msg.message {
+            Message::NodeEvent {
+                event: NodeEvent::SectionPayoutRegistered { from, to },
+                ..
+            } => Ok(ElderDuty::FinishElderChange {
+                previous_key: *from,
+                new_key: *to,
+            }),
+            _ => Ok(ElderDuty::NoOp),
         }
     }
 
@@ -388,6 +428,7 @@ impl NetworkMsgAnalysis {
 
     // todo: eval all msg types!
     async fn try_client_entry(&self, msg: &MsgEnvelope) -> Result<GatewayDuty> {
+        info!("Msg analysis: try_client_entry..");
         let is_our_client_msg = match msg.destination()? {
             Address::Client(address) => self.self_is_handler_for(&address).await,
             _ => false,
@@ -406,6 +447,7 @@ impl NetworkMsgAnalysis {
     /// accumulated (can be seen since the sender is `Section`),
     /// it is time to actually carry out the write operation.
     async fn try_metadata(&self, msg: &MsgEnvelope) -> Result<MetadataDuty> {
+        info!("Msg analysis: try_metadata..");
         let is_data_cmd = || {
             matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
@@ -449,6 +491,7 @@ impl NetworkMsgAnalysis {
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
     async fn try_adult(&self, msg: &MsgEnvelope) -> Result<AdultDuty> {
+        info!("Msg analysis: try_adult..");
         let sender = msg.most_recent_sender();
         let dst = msg.destination()?;
         let duty = if let Some(duty) = sender.duty() {
@@ -500,7 +543,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_chunk_replication(&self, msg: &MsgEnvelope) -> Result<AdultDuty> {
-        info!("Trying chunk replication");
+        info!("Msg analysis: try_chunk_replication..");
         use ChunkReplicationDuty::*;
 
         use ChunkReplicationCmd::*;
@@ -622,6 +665,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_wallet_register(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
+        info!("Msg analysis: try_wallet_register..");
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
@@ -654,6 +698,7 @@ impl NetworkMsgAnalysis {
 
     // Check non-accumulated reward msgs.
     async fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
+        info!("Msg analysis: try_nonacc_rewards..");
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
@@ -662,21 +707,21 @@ impl NetworkMsgAnalysis {
         let from_single_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
-        let shall_process =
-            from_single_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
+        // When non-genesis node assumes Elder duties
+        let from_node_cfg = || {
+            msg.most_recent_sender().is_any_node()
+                && matches!(duty, Duty::Node(NodeDuties::NodeConfig))
+        };
+        let shall_process = (from_single_rewards_elder() || from_node_cfg())
+            && self.is_dst_for(msg).await?
+            && self.is_elder().await;
+
+        use NodeRewardQuery::GetNodeWalletId;
+        // GetNodeWalletId
+        // does not need accumulation since its accumulated in the domain logic.
 
         if shall_process {
-            use NodeRewardQuery::GetNodeWalletId;
             return match &msg.message {
-                Message::NodeEvent {
-                    event: NodeEvent::SectionPayoutValidated(validation),
-                    id,
-                    ..
-                } => Ok(RewardDuty::ProcessCmd {
-                    cmd: RewardCmd::ReceivePayoutValidation(validation.clone()),
-                    msg_id: *id,
-                    origin: msg.origin.address(),
-                }),
                 Message::NodeQuery {
                     query:
                         NodeQuery::Rewards(GetNodeWalletId {
@@ -696,8 +741,8 @@ impl NetworkMsgAnalysis {
             };
         }
 
-        // SectionPayoutValidated and GetNodeWalletId
-        // do not need accumulation since they are accumulated in the domain logic.
+        // SectionPayoutValidated
+        // does not need accumulation since its accumulated in the domain logic.
 
         let from_single_transfers_elder = || {
             msg.most_recent_sender().is_elder()
@@ -708,7 +753,6 @@ impl NetworkMsgAnalysis {
         if !shall_process {
             return Ok(RewardDuty::NoOp);
         }
-
         match &msg.message {
             Message::NodeEvent {
                 event: NodeEvent::SectionPayoutValidated(validation),
@@ -725,6 +769,7 @@ impl NetworkMsgAnalysis {
 
     // Check accumulated reward msgs.
     async fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
+        info!("Msg analysis: try_accumulated_rewards..");
         let sender = msg.most_recent_sender();
         let dst = msg.destination()?;
         let duty = if let Some(duty) = sender.duty() {
@@ -796,17 +841,16 @@ impl NetworkMsgAnalysis {
 
     // Check internal transfer cmds.
     async fn try_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
-        info!("Msg analysis: try_nonacc_transfers..");
         match self.try_nonacc_transfers(msg).await? {
             TransferDuty::NoOp => (),
             op => return Ok(op),
         };
-        info!("Msg analysis: try_accumulated_transfers..");
         self.try_accumulated_transfers(msg).await
     }
 
     // Check accumulated transfer msgs.
     async fn try_accumulated_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
+        info!("Msg analysis: try_accumulated_transfers..");
         let sender = msg.most_recent_sender();
         let dst = msg.destination()?;
         let duty = if let Some(duty) = sender.duty() {
@@ -843,7 +887,8 @@ impl NetworkMsgAnalysis {
 
     // Check non accumulated transfer msgss.
     async fn try_nonacc_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
-        // From Transfer module we get `PropagateTransfer`.
+        info!("Msg analysis: try_nonacc_transfers..");
+        // From Transfer module we get `PropagateTransfer` and `GetReplicaEvents`.
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
@@ -858,7 +903,6 @@ impl NetworkMsgAnalysis {
 
         use NodeTransferCmd::*;
         if shall_process {
-            use NodeTransferQuery::GetReplicaEvents;
             return match &msg.message {
                 Message::NodeCmd {
                     cmd: NodeCmd::Transfers(PropagateTransfer(proof)),
@@ -895,16 +939,15 @@ impl NetworkMsgAnalysis {
         }
 
         // From Rewards module, we get
-        // `ValidateSectionPayout` and `RegisterSectionPayout`.
+        // `ValidateSectionPayout`, `RegisterSectionPayout`, `CatchUpWithSectionWallet` and `GetNewSectionWallet`.
+        use NodeTransferQuery::*;
 
         let from_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
-
         let shall_process =
             from_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
         if shall_process {
-            use NodeTransferQuery::*;
             return match &msg.message {
                 Message::NodeCmd {
                     cmd: NodeCmd::Transfers(ValidateSectionPayout(signed_transfer)),
@@ -942,7 +985,7 @@ impl NetworkMsgAnalysis {
             };
         }
 
-        // CatchUpWithSectionWallet is sent both by NodeCfg and Rewards.
+        // `CatchUpWithSectionWallet` is sent both by NodeCfg and Rewards, `GetNewSectionWallet` by both NodeCfg and Transfers.
         let from_node_cfg = || {
             msg.most_recent_sender().is_any_node()
                 && matches!(duty, Duty::Node(NodeDuties::NodeConfig))
@@ -959,6 +1002,14 @@ impl NetworkMsgAnalysis {
                 id,
             } => Ok(TransferDuty::ProcessQuery {
                 query: TransferQuery::CatchUpWithSectionWallet(*public_key),
+                msg_id: *id,
+                origin: msg.origin.address(),
+            }),
+            Message::NodeQuery {
+                query: NodeQuery::Transfers(GetNewSectionWallet(public_key)),
+                id,
+            } => Ok(TransferDuty::ProcessQuery {
+                query: TransferQuery::GetNewSectionWallet(*public_key),
                 msg_id: *id,
                 origin: msg.origin.address(),
             }),

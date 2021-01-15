@@ -9,7 +9,7 @@
 use super::validator::Validator;
 use crate::{
     node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{self, NodeMessagingDuty, NodeOperation},
+    node::node_ops::{NodeMessagingDuty, NodeOperation},
 };
 use crate::{Error, Result};
 use sn_data_types::{

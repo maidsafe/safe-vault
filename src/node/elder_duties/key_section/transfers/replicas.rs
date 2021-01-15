@@ -614,12 +614,12 @@ mod test {
 
         // we are genesis, we should get the genesis event via this call
         let events = run(genesis_replicas.history(section_key))?;
-        match actor.from_history(events.clone())? {
+        match actor.from_history(events)? {
             Some(event) => actor.apply(ActorEvent::TransfersSynched(event))?,
             None => {
-                return Err(Error::Logic(format!(
-                    "We should be able to synch genesis event here."
-                )))
+                return Err(Error::Logic(
+                    "We should be able to synch genesis event here.".to_string(),
+                ))
             }
         }
 
@@ -631,10 +631,14 @@ mod test {
         let init = match actor.transfer(
             actor.balance(),
             recipient,
-            format!("Transition to next section actor"),
+            "Transition to next section actor".to_string(),
         )? {
             Some(init) => init,
-            None => return Err(Error::Logic(format!("We should be able to transfer here."))),
+            None => {
+                return Err(Error::Logic(
+                    "We should be able to transfer here.".to_string(),
+                ))
+            }
         };
         // the new elder will not partake in this operation (hence only one doing it here)
         let _ = actor.apply(ActorEvent::TransferInitiated(init.clone()))?;
@@ -649,9 +653,9 @@ mod test {
         let validation = match run(genesis_replicas.propose_validation(&signed_transfer))? {
             Some(validation) => validation,
             None => {
-                return Err(Error::Logic(format!(
-                    "We should be able to propose validation here."
-                )))
+                return Err(Error::Logic(
+                    "We should be able to propose validation here.".to_string(),
+                ))
             }
         };
         println!("Transfer validation proposed and validated");
@@ -660,9 +664,9 @@ mod test {
         let event = match actor.receive(validation)? {
             Some(event) => event,
             None => {
-                return Err(Error::Logic(format!(
-                    "We should be able to receive validation here."
-                )))
+                return Err(Error::Logic(
+                    "We should be able to receive validation here.".to_string(),
+                ))
             }
         };
         println!("Validation received");
@@ -675,7 +679,7 @@ mod test {
                     run(genesis_replicas.receive_propagated(&transfer_proof.credit_proof()))?;
                 println!("Validation propagated");
             }
-            None => return Err(Error::Logic(format!("We should have a proof here."))),
+            None => return Err(Error::Logic("We should have a proof here.".to_string())),
         }
 
         let history = run(genesis_replicas.history(section_key))?;
@@ -686,9 +690,9 @@ mod test {
             match actor.from_history(history.clone())? {
                 Some(event) => actor.apply(ActorEvent::TransfersSynched(event))?,
                 None => {
-                    return Err(Error::Logic(format!(
-                        "We should be able to synch actor here."
-                    )))
+                    return Err(Error::Logic(
+                        "We should be able to synch actor here.".to_string(),
+                    ))
                 }
             }
             assert_eq!(
@@ -746,12 +750,7 @@ mod test {
             Keypair::new_bls_share(0, bls_secret_key.secret_key_share(0), peer_replicas.clone());
         let owner = WalletOwner::Multi(peer_replicas.clone());
         let wallet = Wallet::new(owner);
-        let actor = Actor::from_snapshot(
-            wallet,
-            Arc::new(keypair),
-            peer_replicas.clone(),
-            Validator {},
-        );
+        let actor = Actor::from_snapshot(wallet, Arc::new(keypair), peer_replicas, Validator {});
 
         Ok((replicas, actor))
     }
