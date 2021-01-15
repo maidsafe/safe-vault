@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_node"
 readme = "README.md"
 repository = "https://github.com/maidsafe/sn_node"
-version = "0.25.25"
+version = "0.25.26"
 
 [package.metadata.cargo-udeps.ignore]
 development = [ "sn_client", "maplit" ]
@@ -44,10 +44,10 @@ signature = "1.1.0"
 xor_name = "1.1.0"
 sn_launch_tool = "~0.0.5"
 dashmap = "3.11.10"
-anyhow = "1.0.36" 
+anyhow = "1.0.36"
 thiserror = "1.0.23"
-sn_messaging="1.5.1"
- 
+sn_messaging = "1.5.1"
+
   [dependencies.bytes]
   version = "1.0.1"
   features = [ "serde" ]

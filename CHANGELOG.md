@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.26](https://github.com/maidsafe/sn_node/compare/v0.25.25...v0.25.26) (2021-01-15)
+
+
+### Features
+
+* **errors:** more mapping to sn_messages ([22fdd7d](https://github.com/maidsafe/sn_node/commit/22fdd7dcdb523178b422d5d12627b98b1cc592f2))
+
 ### [0.25.25](https://github.com/maidsafe/sn_node/compare/v0.25.24...v0.25.25) (2021-01-14)
 
 ### [0.25.24](https://github.com/maidsafe/sn_node/compare/v0.25.23...v0.25.24) (2021-01-14)
