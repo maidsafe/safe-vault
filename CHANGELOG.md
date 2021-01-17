@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.27](https://github.com/maidsafe/sn_node/compare/v0.25.26...v0.25.27) (2021-01-17)
+
+
+### Bug Fixes
+
+* dont use bincode for envelope deserialization ([818f75b](https://github.com/maidsafe/sn_node/commit/818f75b3a405d9b80e403d8d9f21e6e2803b332b))
+
 ### [0.25.26](https://github.com/maidsafe/sn_node/compare/v0.25.25...v0.25.26) (2021-01-15)
 
 
