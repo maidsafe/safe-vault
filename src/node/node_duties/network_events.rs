@@ -148,7 +148,7 @@ impl NetworkEvents {
     }
 
     async fn evaluate_msg(&mut self, content: Bytes) -> Result<NodeOperation> {
-        match bincode::deserialize::<MsgEnvelope>(&content) {
+        match MsgEnvelope::from(content) {
             Ok(msg) => {
                 info!("Message Envelope received. Contents: {:?}", &msg);
                 self.analysis.evaluate(&msg).await
