@@ -103,11 +103,11 @@ jobs:
           name: sn_node-${{ matrix.target }}-prod
           path: artifacts
 
-  # Unfortunately, for artifact retrieval, there's not really a way to avoid having this huge list of
-  # 'download-artifact' actions. We could perhaps implement our own 'retrieve all build artifacts'
-  # action.
+  # Deploy to GH Release and S3 if we're on a `chore(release):` commit
   deploy:
-    if: github.repository_owner == 'maidsafe'
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      startsWith(github.event.head_commit.message, 'chore(release):')
     name: Deploy
     runs-on: ubuntu-latest
     needs: [build_win_mac, build_linux]
@@ -149,11 +149,7 @@ jobs:
         shell: bash
         run: chmod -R +x artifacts/prod
       - shell: bash
-        run: make package-commit_hash-artifacts-for-deploy
-        if: "!startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')"
-      - shell: bash
         run: make package-version-artifacts-for-deploy
-        if: startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')
 
       # Get release description (requires generated archives)
       - shell: bash
@@ -164,7 +160,6 @@ jobs:
           description="${description//$'\n'/'%0A'}"
           description="${description//$'\r'/'%0D'}"
           echo "::set-output name=description::$description"
-        if: startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')
 
       # Upload all the release archives to S3
       - name: Upload archives to S3
@@ -179,7 +174,6 @@ jobs:
           draft: false
           prerelease: false
           body: ${{ steps.release_description.outputs.description }}
-        if: startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')
 
       # Upload zip files
       - uses: actions/upload-release-asset@v1.0.1
@@ -188,21 +182,20 @@ jobs:
           asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-x86_64-unknown-linux-musl.zip
           asset_name: sn_node-${{ steps.versioning.outputs.version }}-x86_64-unknown-linux-musl.zip
           asset_content_type: application/zip
-        if: startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')
+
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-msvc.zip
           asset_name: sn_node-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-msvc.zip
           asset_content_type: application/zip
-        if: startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')
+
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-x86_64-apple-darwin.zip
           asset_name: sn_node-${{ steps.versioning.outputs.version }}-x86_64-apple-darwin.zip
           asset_content_type: application/zip
-        if: startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')
 
       # Upload tar files
       - uses: actions/upload-release-asset@v1.0.1
@@ -211,23 +204,22 @@ jobs:
           asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-x86_64-unknown-linux-musl.tar.gz
           asset_name: sn_node-${{ steps.versioning.outputs.version }}-x86_64-unknown-linux-musl.tar.gz
           asset_content_type: application/zip
-        if: startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')
+
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-msvc.tar.gz
           asset_name: sn_node-${{ steps.versioning.outputs.version }}-x86_64-pc-windows-msvc.tar.gz
           asset_content_type: application/zip
-        if: startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')
+
       - uses: actions/upload-release-asset@v1.0.1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: deploy/prod/sn_node-${{ steps.versioning.outputs.version }}-x86_64-apple-darwin.tar.gz
           asset_name: sn_node-${{ steps.versioning.outputs.version }}-x86_64-apple-darwin.tar.gz
           asset_content_type: application/zip
-        if: startsWith(steps.commit_message.outputs.commit_message, 'chore(release)')
 
-  # Publish if we're on a release commit
+  # Publish if we're on a `chore(release):` commit
   publish:
     name: Publish
     runs-on: ubuntu-latest

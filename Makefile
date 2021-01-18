@@ -55,21 +55,7 @@ endif
 	rustup target add x86_64-unknown-linux-musl
 	cargo build --release --target x86_64-unknown-linux-musl --verbose
 	find target/x86_64-unknown-linux-musl/release \
-		-maxdepth 1 -type f -exec cp '{}' artifacts \;		
-
-package-commit_hash-artifacts-for-deploy:
-	rm -f *.tar
-	rm -rf ${DEPLOY_PATH}
-	mkdir -p ${DEPLOY_PROD_PATH}
-
-	tar -C artifacts/prod/x86_64-unknown-linux-musl/release \
-        -cvf sn_node-${COMMIT_HASH}-x86_64-unknown-linux-musl.tar sn_node
-	tar -C artifacts/prod/x86_64-pc-windows-msvc/release \
-        -cvf sn_node-${COMMIT_HASH}-x86_64-pc-windows-msvc.tar sn_node.exe
-	tar -C artifacts/prod/x86_64-apple-darwin/release \
-        -cvf sn_node-${COMMIT_HASH}-x86_64-apple-darwin.tar sn_node
-
-	mv *.tar ${DEPLOY_PROD_PATH}
+		-maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
 package-version-artifacts-for-deploy:
