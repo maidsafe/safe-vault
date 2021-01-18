@@ -50,9 +50,7 @@ impl ClientMsgHandling {
             return Ok(());
         });
 
-        let result = self.onboarding.onboard_client(handshake, peer_addr).await;
-
-        result
+        self.onboarding.onboard_client(handshake, peer_addr).await
     }
 
     /// Track client socket address and msg_id for coordinating responses
