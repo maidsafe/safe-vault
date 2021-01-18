@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-20.04
     # Dont run if we're on a release commit
     if: |
-      github.repository_owner == 'maidsafe' &&
+      github.repository_owner == 'S-Coyle' &&
       !startsWith(github.event.head_commit.message, 'chore(release):')
     steps:
       - uses: actions/checkout@v2
