@@ -718,7 +718,6 @@ mod test {
         let peer_replicas = bls_secret_key.public_keys();
 
         let section = (0..count as usize)
-            .into_iter()
             .map(|key_index| get_replica(key_index, bls_secret_key.clone(), root_dir.clone()))
             .filter_map(|res| res.ok())
             .collect();
