@@ -467,7 +467,7 @@ impl Transfers {
                 replicas: self.replicas.replicas_pk_set(),
                 history,
             }),
-            Err(e) => Err(convert_to_error_message(e)),
+            Err(e) => Err(convert_to_error_message(e)?),
         };
 
         self.wrapping
