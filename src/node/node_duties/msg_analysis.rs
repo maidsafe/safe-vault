@@ -513,7 +513,7 @@ impl NetworkMsgAnalysis {
                 };
 
                 // Verify that the message was sent from the section
-                let verify_section_authority = section_authority.verify(&message.serialise()?);
+                let verify_section_authority = section_authority.verify(&message.serialize()?);
 
                 let given_section_pk = &section_authority
                     .id()

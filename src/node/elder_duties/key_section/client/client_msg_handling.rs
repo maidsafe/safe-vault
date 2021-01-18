@@ -133,7 +133,7 @@ impl ClientMsgHandling {
 
         match self.tracked_incoming.remove(&correlation_id) {
             Some((_, client_address)) => {
-                let bytes = message.serialise()?;
+                let bytes = message.serialize()?;
 
                 trace!("will send message via qp2p");
                 self.onboarding.send_bytes_to(client_address, bytes).await

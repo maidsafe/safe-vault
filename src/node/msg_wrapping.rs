@@ -97,7 +97,7 @@ impl AdultMsgWrapping {
     ) -> Result<NodeMessagingDuty> {
         let (key, sig) = self
             .inner
-            .ed_key_sig(&message.serialise()?)
+            .ed_key_sig(&message.serialize()?)
             .await
             .ok_or_else(|| Error::Logic("Could not sign with Node key".to_string()))?;
         let origin = MsgSender::adult(key, duty, sig)?;

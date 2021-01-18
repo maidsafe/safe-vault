@@ -122,7 +122,7 @@ impl Accumulation {
                 )));
             }
         };
-        let signed_data = &msg.message.serialise()?;
+        let signed_data = &msg.message.serialize()?;
         for sig in &signatures {
             if !public_key_set
                 .public_key_share(sig.index)

@@ -57,7 +57,7 @@ impl NetworkSender {
 
         let result = self
             .network
-            .send_message(SrcLocation::Node(name), dst, msg.serialise()?)
+            .send_message(SrcLocation::Node(name), dst, msg.serialize()?)
             .await;
 
         result.map_or_else(
@@ -81,7 +81,7 @@ impl NetworkSender {
         msg: &MsgEnvelope,
     ) -> Result<NodeOperation> {
         let name = self.network.name().await;
-        let bytes = &msg.serialise()?;
+        let bytes = &msg.serialize()?;
         for target in targets {
             self.network
                 .send_message(
@@ -117,7 +117,7 @@ impl NetworkSender {
         } else {
             SrcLocation::Section(self.network.our_prefix().await)
         };
-        let result = self.network.send_message(src, dst, msg.serialise()?).await;
+        let result = self.network.send_message(src, dst, msg.serialize()?).await;
 
         result.map_or_else(
             |err| {

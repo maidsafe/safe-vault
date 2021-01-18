@@ -86,6 +86,9 @@ impl ClientGateway {
                     }
                     Err(_e) => {
                         // this is not a handshake, so lets try processing as client message...
+                        trace!(
+                            "Message is not a handshake, so let's process it as client message..."
+                        );
                         let msg = try_deserialize_msg(content)?;
 
                         trace!("Deserialized client msg is {:?}", msg.message);

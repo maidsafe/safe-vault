@@ -8,7 +8,7 @@
 
 use crate::{Error, Result};
 use bytes::Bytes;
-use log::error;
+use log::warn;
 use sn_data_types::{Error as DtError, HandshakeRequest};
 use sn_messaging::{Message, MsgEnvelope};
 use std::net::SocketAddr;
@@ -30,7 +30,7 @@ kinds of input; messages and handshake requests.
 /// of the network.
 
 pub fn try_deserialize_msg(bytes: Bytes) -> Result<MsgEnvelope> {
-    let msg = match MsgEnvelope::from(bytes) {
+    match MsgEnvelope::from(bytes) {
         Ok(
             msg
             @
@@ -46,33 +46,37 @@ pub fn try_deserialize_msg(bytes: Bytes) -> Result<MsgEnvelope> {
                 message: Message::Query { .. },
                 ..
             },
-        ) => msg,
-        _ => return Err(Error::Logic("Error deserializing Client msg".to_string())), // Only cmds and queries from client are allowed through here.
-    };
-
-    if msg.origin.is_client() {
-        Ok(msg)
-    } else {
-        Err(Error::Logic(format!(
-            "{:?}: Msg origin is not Client",
-            msg.id()
-        )))
+        ) => {
+            if msg.origin.is_client() {
+                Ok(msg)
+            } else {
+                Err(Error::Logic(format!(
+                    "{}: Msg origin is not Client",
+                    msg.id()
+                )))
+            }
+        }
+        // Only cmds and queries from client are allowed through here.
+        other => Err(Error::Logic(format!(
+            "Error deserializing Client msg: {:?}",
+            other
+        ))),
     }
 }
 
 pub fn try_deserialize_handshake(bytes: &Bytes, peer_addr: SocketAddr) -> Result<HandshakeRequest> {
-    let hs = match bincode::deserialize(&bytes) {
-        Ok(hs @ HandshakeRequest::Bootstrap(_)) | Ok(hs @ HandshakeRequest::Join(_)) => hs,
+    match bincode::deserialize(&bytes) {
+        Ok(hs @ HandshakeRequest::Bootstrap(_)) | Ok(hs @ HandshakeRequest::Join(_)) => Ok(hs),
         Err(err) => {
-            error!(
+            warn!(
                 "Failed to deserialize client input from {} as a handshake: {}",
                 peer_addr, err
             );
-            return Err(Error::NetworkData(DtError::FailedToParse(format!(
+
+            Err(Error::NetworkData(DtError::FailedToParse(format!(
                 "Failed to deserialize client input from {} as a handshake: {}",
                 peer_addr, err
-            ))));
+            ))))
         }
-    };
-    Ok(hs)
+    }
 }
