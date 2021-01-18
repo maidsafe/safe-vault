@@ -9,7 +9,7 @@ on:
 
 jobs:
   generate-and-deploy:
-    if: ${{ github.repository_owner == 'maidsafe' }}
+    if: github.repository_owner == 'maidsafe'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
