@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Network};
+use crate::{utils, ElderState};
 use crate::{Error, Result};
 use bytes::Bytes;
 use dashmap::DashMap;
@@ -26,14 +26,14 @@ use std::{
 /// taking place between a connecting client and
 /// the Elders of this section.
 pub struct Onboarding {
-    routing: Network,
+    elder_state: ElderState,
     clients: DashMap<SocketAddr, PublicKey>,
 }
 
 impl Onboarding {
-    pub fn new(routing: Network) -> Self {
+    pub fn new(elder_state: ElderState) -> Self {
         Self {
-            routing,
+            elder_state,
             clients: Default::default(),
         }
     }
@@ -72,12 +72,12 @@ impl Onboarding {
             self, client_key, peer_addr
         );
 
-        let elders = if self.routing.matches_our_prefix((*client_key).into()).await {
-            self.routing.our_elder_addresses().await
+        let elders = if self.elder_state.prefix().matches(&(*client_key).into()) {
+            self.elder_state.elders().await.to_vec()
         } else {
             let closest_known_elders = self
-                .routing
-                .our_elder_addresses_sorted_by_distance_to(&(*client_key).into())
+                .elder_state
+                .elders_sorted_by_distance_to(&(*client_key).into())
                 .await;
             if closest_known_elders.is_empty() {
                 trace!(
@@ -86,7 +86,7 @@ impl Onboarding {
                 );
                 return Ok(());
             } else {
-                closest_known_elders
+                closest_known_elders.into_iter().copied().collect()
             }
         };
 
@@ -119,7 +119,7 @@ impl Onboarding {
             "{}: Trying to join..: {} on {}",
             self, client_key, peer_addr
         );
-        if self.routing.matches_our_prefix(client_key.into()).await {
+        if self.elder_state.prefix().matches(&client_key.into()) {
             Ok(())
         } else {
             debug!(
@@ -132,11 +132,7 @@ impl Onboarding {
 
     /// Use routing to send a message to a client peer address
     pub async fn send_bytes_to(&self, peer_addr: SocketAddr, bytes: Bytes) -> Result<()> {
-        self.routing
-            .send_message_to_client(peer_addr, bytes)
-            .await?;
-
-        Ok(())
+        self.elder_state.send_to_client(peer_addr, bytes).await
     }
 
     // pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {

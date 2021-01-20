@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -15,11 +15,10 @@ mod writing;
 
 use crate::{
     capacity::ChunkHolderDbs,
-    chunk_store::UsedSpace,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{IntoNodeOp, MetadataDuty, NodeOperation},
-    node::state_db::NodeInfo,
-    Error, Network, Result,
+    node::NodeInfo,
+    ElderState, Error, Result,
 };
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
@@ -46,14 +45,12 @@ impl Metadata {
     pub async fn new(
         node_info: &NodeInfo,
         dbs: ChunkHolderDbs,
-        used_space: UsedSpace,
-        routing: Network,
+        elder_state: ElderState,
     ) -> Result<Self> {
-        let wrapping = ElderMsgWrapping::new(node_info.keys(), ElderDuties::Metadata);
-        let blob_register = BlobRegister::new(dbs, wrapping.clone(), routing)?;
-        let map_storage = MapStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
-        let sequence_storage =
-            SequenceStorage::new(node_info, used_space.clone(), wrapping.clone()).await?;
+        let wrapping = ElderMsgWrapping::new(elder_state.clone(), ElderDuties::Metadata);
+        let blob_register = BlobRegister::new(dbs, wrapping.clone(), elder_state)?;
+        let map_storage = MapStorage::new(node_info, wrapping.clone()).await?;
+        let sequence_storage = SequenceStorage::new(node_info, wrapping.clone()).await?;
         let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
         Ok(Self {
             elder_stores,

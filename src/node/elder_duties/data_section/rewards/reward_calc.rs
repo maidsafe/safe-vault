@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -7,25 +7,24 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Age;
-use crate::Network;
 use sn_data_types::Money;
+use sn_routing::Prefix;
 
 /// Calculation of reward for nodes.
 pub struct RewardCalc {
-    network: Network,
+    prefix: Prefix,
 }
 
 impl RewardCalc {
     /// Ctor
-    pub fn new(network: Network) -> RewardCalc {
-        Self { network }
+    pub fn new(prefix: Prefix) -> RewardCalc {
+        Self { prefix }
     }
 
     /// Calculates the reward for a node
     /// when it has reached a certain age.
     pub async fn reward(&self, age: Age) -> Money {
-        let prefix = self.network.our_prefix().await;
-        let prefix_len = prefix.bit_count();
+        let prefix_len = self.prefix.bit_count();
         RewardCalc::reward_from(age, prefix_len)
     }
 

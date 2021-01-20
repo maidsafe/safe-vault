@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,19 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::keys::NodeSigningKeys, node::node_ops::NodeMessagingDuty};
+use crate::{node::node_ops::NodeMessagingDuty, AdultState, ElderState, NodeState};
 use crate::{Error, Result};
 use log::info;
+use serde::Serialize;
 use sn_data_types::Signature;
 use sn_messaging::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
-    NodeDuties, TransientElderKey, TransientSectionKey,
+    NodeDuties, TransientSectionKey,
 };
-
-use xor_name::XorName;
-
-use serde::Serialize;
 use std::collections::BTreeSet;
+use xor_name::XorName;
 
 /// Wrapping of msgs sent by Elders.
 #[derive(Clone)]
@@ -44,13 +42,13 @@ pub struct NodeMsgWrapping {
 /// to be sent on the wire.
 #[derive(Clone)]
 struct MsgWrapping {
-    keys: NodeSigningKeys,
+    node_state: NodeState,
     duty: Duty,
 }
 
 impl NodeMsgWrapping {
-    pub fn new(keys: NodeSigningKeys, duty: NodeDuties) -> Self {
-        let inner = MsgWrapping::new(keys, Duty::Node(duty));
+    pub fn new(node_state: NodeState, duty: NodeDuties) -> Self {
+        let inner = MsgWrapping::new(node_state, Duty::Node(duty));
         Self { inner }
     }
 
@@ -68,13 +66,13 @@ impl NodeMsgWrapping {
 }
 
 impl AdultMsgWrapping {
-    pub fn new(keys: NodeSigningKeys, duty: AdultDuties) -> Self {
-        let inner = MsgWrapping::new(keys, Duty::Adult(duty));
+    pub fn new(adult_state: AdultState, duty: AdultDuties) -> Self {
+        let inner = MsgWrapping::new(NodeState::Adult(adult_state), Duty::Adult(duty));
         Self { inner }
     }
 
-    pub async fn name(&self) -> XorName {
-        self.inner.keys.name().await
+    pub fn name(&self) -> XorName {
+        self.inner.name()
     }
 
     pub async fn send_to_section(
@@ -117,8 +115,8 @@ impl AdultMsgWrapping {
 }
 
 impl ElderMsgWrapping {
-    pub fn new(keys: NodeSigningKeys, duty: ElderDuties) -> Self {
-        let inner = MsgWrapping::new(keys, Duty::Elder(duty));
+    pub fn new(elder_state: ElderState, duty: ElderDuties) -> Self {
+        let inner = MsgWrapping::new(NodeState::Elder(elder_state), Duty::Elder(duty));
         Self { inner }
     }
 
@@ -176,8 +174,15 @@ impl ElderMsgWrapping {
 }
 
 impl MsgWrapping {
-    pub fn new(keys: NodeSigningKeys, duty: Duty) -> Self {
-        Self { keys, duty }
+    pub fn new(node_state: NodeState, duty: Duty) -> Self {
+        Self { node_state, duty }
+    }
+
+    pub fn name(&self) -> XorName {
+        match &self.node_state {
+            NodeState::Adult(state) => state.node_name(),
+            NodeState::Elder(state) => state.node_name(),
+        }
     }
 
     pub async fn send_to_client(&self, message: Message) -> Result<NodeMessagingDuty> {
@@ -277,24 +282,30 @@ impl MsgWrapping {
     async fn sign<T: Serialize>(&self, data: &T, as_section: bool) -> Option<MsgSender> {
         let sender = match self.duty {
             Duty::Adult(duty) => {
+                info!("Signing data as Adult.");
                 let (key, sig) = self.ed_key_sig(data).await?;
                 MsgSender::adult(key, duty, sig).ok()?
             }
             Duty::Elder(duty) => {
+                let elder_state = match &self.node_state {
+                    NodeState::Adult(_) => return None,
+                    NodeState::Elder(state) => state,
+                };
                 if as_section {
-                    let bls_key = self.keys.public_key_set().await?.public_key();
+                    info!("Signing data as Section.");
+                    let bls_key = elder_state.public_key_set().public_key();
                     MsgSender::section(TransientSectionKey { bls_key }, duty).ok()?
                 } else {
-                    info!("Signing as Node!");
-                    let key: TransientElderKey = self.keys.elder_key().await?;
-                    if let Signature::BlsShare(sig) = self.keys.sign_as_elder(data).await? {
-                        MsgSender::elder(key, duty, sig.share).ok()?
+                    info!("Signing data as Elder.");
+                    if let Signature::BlsShare(sig) = elder_state.sign_as_elder(data).ok()? {
+                        MsgSender::elder(elder_state.elder_key(), duty, sig.share).ok()?
                     } else {
                         return None;
                     }
                 }
             }
             Duty::Node(_) => {
+                info!("Signing data as Node.");
                 let (key, sig) = self.ed_key_sig(data).await?;
                 MsgSender::any_node(key, self.duty, sig).ok()?
             }
@@ -307,19 +318,25 @@ impl MsgWrapping {
         &self,
         data: &T,
     ) -> Option<(ed25519_dalek::PublicKey, ed25519_dalek::Signature)> {
-        let key = self.keys.node_id().await;
-        let sig = match self.keys.sign_as_node(data).await.ok() {
-            Some(Signature::Ed25519(key)) => key,
-            _ => return None,
+        let key = match &self.node_state {
+            NodeState::Adult(state) => state.node_id(),
+            NodeState::Elder(state) => state.node_id(),
         };
-        Some((key, sig))
+
+        // NB: Need to implement ed25519 sig in elder_state
+        None
+
+        // let sig = match self.elder_state.sign_as_node(data).ok() {
+        //     Some(Signature::Ed25519(sig)) => sig,
+        //     _ => return None,
+        // };
+        // Some((key, sig))
     }
 
     async fn set_proxy(&self, msg: &MsgEnvelope, as_section: bool) -> Option<MsgEnvelope> {
         // origin signs the message, while proxies sign the envelope
         let mut msg = msg.clone();
         msg.add_proxy(self.sign(&msg.message, as_section).await?);
-
         Some(msg)
     }
 }

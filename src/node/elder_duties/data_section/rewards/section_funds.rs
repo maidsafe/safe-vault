@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,21 +8,24 @@
 
 use super::validator::Validator;
 use crate::{
-    node::msg_wrapping::ElderMsgWrapping,
-    node::node_ops::{NodeMessagingDuty, NodeOperation},
+    node::{
+        msg_wrapping::ElderMsgWrapping,
+        node_ops::{NodeMessagingDuty, NodeOperation},
+    },
+    utils, ElderState, Error, Result,
 };
-use crate::{Error, Result};
+use log::{error, info};
 use sn_data_types::{
-    CreditAgreementProof, Keypair, Money, PublicKey, ReplicaEvent, SignedTransferShare,
-    TransferValidated, WalletInfo,
+    CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignedTransferShare, TransferValidated,
+    WalletInfo,
 };
 use sn_messaging::{Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery};
-use std::sync::Arc;
-use xor_name::XorName;
-
-use log::{error, info};
 use sn_transfers::{ActorEvent, TransferActor};
-use std::collections::{BTreeSet, VecDeque};
+use std::{
+    collections::{BTreeSet, VecDeque},
+    sync::Arc,
+};
+use xor_name::XorName;
 use ActorEvent::*;
 
 /// The management of section funds,
@@ -47,7 +50,7 @@ struct State {
     queued_payouts: VecDeque<Payout>,
     payout_in_flight: Option<Payout>,
     finished: BTreeSet<XorName>, // this set grows within acceptable bounds, since transitions do not happen that often, and at every section split, the set is cleared..
-    pending_actor: Option<(PublicKey, Keypair)>,
+    pending_actor: Option<ElderState>,
     /// While awaiting payout completion
     next_actor: Option<TransferActor<Validator>>, // we could do a queue here, and when starting transition skip all but the last one, but that is also prone to edge case problems..
 }
@@ -86,11 +89,7 @@ impl SectionFunds {
     /// Wallet transition, step 1.
     /// At Elder churn, we must transition to a new wallet.
     /// We start by querying network for the Replicas of this new wallet.
-    pub async fn init_transition(
-        &mut self,
-        new_wallet: PublicKey,
-        new_keypair_share: Keypair,
-    ) -> Result<NodeMessagingDuty> {
+    pub async fn init_transition(&mut self, elder_state: ElderState) -> Result<NodeMessagingDuty> {
         info!("Initiating transition to new section wallet...");
         if self.has_initiated_transition() {
             info!("has_initiated_transition");
@@ -106,7 +105,8 @@ impl SectionFunds {
             return Err(Error::Logic("Has payout in flight".to_string()));
         }
 
-        self.state.pending_actor = Some((new_wallet, new_keypair_share));
+        let new_wallet = elder_state.section_public_key();
+        self.state.pending_actor = Some(elder_state);
 
         self.wrapping
             .send_to_section(
@@ -132,7 +132,8 @@ impl SectionFunds {
             info!("is_transitioning");
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
-        if let Some((_, new_keypair_share)) = self.state.pending_actor.take() {
+        if let Some(elder_state) = self.state.pending_actor.take() {
+            let new_keypair_share = utils::key_pair(elder_state.clone()).await?;
             let actor =
                 TransferActor::from_info(Arc::new(new_keypair_share), new_wallet, Validator {})?;
             let wallet_id = actor.id();

@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -9,7 +9,7 @@
 use crate::node::node_ops::{
     MetadataDuty, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty,
 };
-use crate::Network;
+use crate::ElderState;
 use crate::{Error, Result};
 use log::{info, warn};
 use sn_messaging::{Cmd, CmdError, Error as MessageError, Message, MessageId, MsgEnvelope, Query};
@@ -20,12 +20,12 @@ use sn_messaging::{Cmd, CmdError, Error as MessageError, Message, MessageId, Msg
 /// Evaluates msgs sent directly from a client,
 /// i.e. not remote msgs from the network.
 pub struct ClientMsgAnalysis {
-    routing: Network,
+    elder_state: ElderState,
 }
 
 impl ClientMsgAnalysis {
-    pub fn new(routing: Network) -> Self {
-        Self { routing }
+    pub fn new(elder_state: ElderState) -> Self {
+        Self { elder_state }
     }
 
     pub async fn evaluate(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
@@ -87,7 +87,7 @@ impl ClientMsgAnalysis {
         };
         let shall_process = || is_data_read() && msg.origin.is_client();
 
-        if !shall_process() || !self.is_dst_for(msg).await || !self.is_elder().await {
+        if !shall_process() || !self.is_dst_for(msg).await {
             return Ok(NodeOperation::NoOp);
         }
 
@@ -110,7 +110,7 @@ impl ClientMsgAnalysis {
 
         let shall_process = || is_data_write() && msg.origin.is_client();
 
-        if !shall_process() || !self.is_dst_for(msg).await || !self.is_elder().await {
+        if !shall_process() || !self.is_dst_for(msg).await {
             return Ok(NodeOperation::NoOp);
         }
 
@@ -128,8 +128,7 @@ impl ClientMsgAnalysis {
                 cmd: Cmd::Transfer(cmd),
                 ..
             } => {
-                if !msg.origin.is_client() || !self.is_dst_for(msg).await || !self.is_elder().await
-                {
+                if !msg.origin.is_client() || !self.is_dst_for(msg).await {
                     return Ok(NodeOperation::NoOp);
                 }
                 TransferDuty::ProcessCmd {
@@ -142,8 +141,7 @@ impl ClientMsgAnalysis {
                 query: Query::Transfer(query),
                 ..
             } => {
-                if !msg.origin.is_client() || !self.is_dst_for(msg).await || !self.is_elder().await
-                {
+                if !msg.origin.is_client() || !self.is_dst_for(msg).await {
                     return Ok(NodeOperation::NoOp);
                 }
                 TransferDuty::ProcessQuery {
@@ -159,14 +157,10 @@ impl ClientMsgAnalysis {
 
     async fn is_dst_for(&self, msg: &MsgEnvelope) -> bool {
         if let Ok(dst) = msg.destination() {
-            self.routing.matches_our_prefix(dst.xorname()).await
+            self.elder_state.prefix().matches(&dst.xorname())
         } else {
             warn!("Invalid dst of msg: {:?}", msg);
             false
         }
-    }
-
-    async fn is_elder(&self) -> bool {
-        self.routing.is_elder().await
     }
 }

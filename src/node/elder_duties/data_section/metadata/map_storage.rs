@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -11,7 +11,7 @@ use crate::{
     error::convert_to_error_message,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::NodeMessagingDuty,
-    node::state_db::NodeInfo,
+    node::NodeInfo,
     Error, Result,
 };
 use log::info;
@@ -30,11 +30,8 @@ pub(super) struct MapStorage {
 }
 
 impl MapStorage {
-    pub(super) async fn new(
-        node_info: &NodeInfo,
-        used_space: UsedSpace,
-        wrapping: ElderMsgWrapping,
-    ) -> Result<Self> {
+    pub(super) async fn new(node_info: &NodeInfo, wrapping: ElderMsgWrapping) -> Result<Self> {
+        let used_space = UsedSpace::new(node_info.max_storage_capacity);
         let chunks = MapChunkStore::new(node_info.path(), used_space, node_info.init_mode).await?;
         Ok(Self { chunks, wrapping })
     }

@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//mod genesis;
 pub mod replicas;
 pub mod store;
 
@@ -14,13 +13,12 @@ use self::replicas::Replicas;
 use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
-    node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{
         ElderDuty, IntoNodeOp, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty,
         TransferCmd, TransferDuty, TransferQuery,
     },
-    utils, Error, ReplicaInfo, Result,
+    utils, ElderState, Error, ReplicaInfo, Result,
 };
 use log::{debug, info, trace, warn};
 #[cfg(feature = "simulated-payouts")]
@@ -79,8 +77,8 @@ pub struct Transfers {
 }
 
 impl Transfers {
-    pub fn new(keys: NodeSigningKeys, replicas: Replicas, rate_limit: RateLimit) -> Self {
-        let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Transfer);
+    pub fn new(elder_state: ElderState, replicas: Replicas, rate_limit: RateLimit) -> Self {
+        let wrapping = ElderMsgWrapping::new(elder_state, ElderDuties::Transfer);
         Self {
             replicas,
             rate_limit,
@@ -134,10 +132,10 @@ impl Transfers {
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that
     /// the other group is now responsible for.
-    pub async fn section_split(&self, prefix: Prefix) -> Result<NodeOperation> {
+    pub async fn split_section(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         let _ = self.replicas.keep_keys_of(prefix).await?;
-        Ok(NodeOperation::NoOp)
+        Ok(())
     }
 
     ///
@@ -237,9 +235,9 @@ impl Transfers {
     }
 
     ///
-    pub fn update_replica_keys(&mut self, info: ReplicaInfo) -> Result<NodeMessagingDuty> {
-        self.replicas.update_replica_keys(info);
-        Ok(NodeMessagingDuty::NoOp)
+    pub fn update_replica_info(&mut self, info: ReplicaInfo, rate_limit: RateLimit) {
+        self.rate_limit = rate_limit;
+        self.replicas.update_replica_info(info);
     }
 
     /// Initiates a new Replica with the

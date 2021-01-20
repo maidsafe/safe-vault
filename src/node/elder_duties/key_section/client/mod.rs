@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -17,8 +17,8 @@ use self::{
 };
 use crate::{
     node::node_ops::{GatewayDuty, KeySectionDuty, NodeMessagingDuty, NodeOperation},
-    node::state_db::NodeInfo,
-    Error, Network, Result,
+    node::NodeInfo,
+    ElderState, Error, Result,
 };
 use log::{error, trace, warn};
 use sn_data_types::Error as DtError;
@@ -30,17 +30,17 @@ use std::fmt::{self, Display, Formatter};
 /// back and forth between a client and the network.
 pub struct ClientGateway {
     client_msg_handling: ClientMsgHandling,
-    routing: Network,
+    elder_state: ElderState,
 }
 
 impl ClientGateway {
-    pub async fn new(_info: &NodeInfo, routing: Network) -> Result<Self> {
-        let onboarding = Onboarding::new(routing.clone());
+    pub async fn new(_info: &NodeInfo, elder_state: ElderState) -> Result<Self> {
+        let onboarding = Onboarding::new(elder_state.clone());
         let client_msg_handling = ClientMsgHandling::new(onboarding);
 
         let gateway = Self {
             client_msg_handling,
-            routing,
+            elder_state,
         };
 
         Ok(gateway)
@@ -59,7 +59,7 @@ impl ClientGateway {
     async fn try_find_client(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         trace!("trying to find client...");
         if let Address::Client(xorname) = &msg.destination()? {
-            if self.routing.matches_our_prefix(*xorname).await {
+            if self.elder_state.prefix().matches(xorname) {
                 trace!("Message matches gateway prefix");
                 let _ = self.client_msg_handling.match_outgoing(msg).await;
                 return Ok(NodeOperation::NoOp);

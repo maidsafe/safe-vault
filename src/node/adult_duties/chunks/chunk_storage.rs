@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,10 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use crate::chunk_store::UsedSpace;
-use crate::node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty, Error};
+//pub use crate::chunk_store::UsedSpace;
 use crate::{
-    chunk_store::BlobChunkStore, error::convert_to_error_message, node::state_db::NodeInfo, Result,
+    chunk_store::{BlobChunkStore, UsedSpace},
+    error::convert_to_error_message,
+    node::{msg_wrapping::AdultMsgWrapping, node_ops::NodeMessagingDuty, Error},
+    AdultState, Result,
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress, Signature};
@@ -18,7 +20,6 @@ use sn_messaging::{
     NodeCmdError, NodeDataError, NodeDataQuery, NodeDataQueryResponse, NodeEvent, NodeQuery,
     NodeQueryResponse, QueryResponse,
 };
-
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -32,9 +33,11 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) async fn new(node_info: &NodeInfo, used_space: UsedSpace) -> Result<Self> {
+    pub(crate) async fn new(adult_state: AdultState) -> Result<Self> {
+        let node_info = adult_state.info();
+        let used_space = UsedSpace::new(node_info.max_storage_capacity);
         let chunks = BlobChunkStore::new(node_info.path(), used_space, node_info.init_mode).await?;
-        let wrapping = AdultMsgWrapping::new(node_info.keys(), AdultDuties::ChunkStorage);
+        let wrapping = AdultMsgWrapping::new(adult_state, AdultDuties::ChunkStorage);
         Ok(Self { chunks, wrapping })
     }
 
@@ -151,7 +154,7 @@ impl ChunkStorage {
             query: NodeQuery::Data(NodeDataQuery::GetChunk {
                 section_authority,
                 address,
-                new_holder: self.wrapping.name().await,
+                new_holder: self.wrapping.name(),
                 current_holders: current_holders.clone(),
             }),
             id: MessageId::new(),

@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -13,16 +13,16 @@ mod validator;
 use self::section_funds::{Payout, SectionFunds};
 pub use self::{reward_calc::RewardCalc, validator::Validator};
 use crate::{
-    node::keys::NodeSigningKeys,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{
         IntoNodeOp, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty, RewardQuery,
     },
+    ElderState,
 };
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
-use sn_data_types::{Error as DtError, Keypair, Money, PublicKey};
+use sn_data_types::{Error as DtError, Money, PublicKey};
 use sn_messaging::{
     Address, ElderDuties, Error as ErrorMessage, Message, MessageId, NodeQuery, NodeQueryResponse,
     NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery,
@@ -62,11 +62,11 @@ pub enum NodeRewards {
 
 impl Rewards {
     pub fn new(
-        keys: NodeSigningKeys,
+        elder_state: ElderState,
         actor: TransferActor<Validator>,
         reward_calc: RewardCalc,
     ) -> Self {
-        let wrapping = ElderMsgWrapping::new(keys, ElderDuties::Rewards);
+        let wrapping = ElderMsgWrapping::new(elder_state, ElderDuties::Rewards);
         let section_funds = SectionFunds::new(actor, wrapping.clone());
         Self {
             node_rewards: Default::default(),
@@ -113,13 +113,9 @@ impl Rewards {
 
     /// After Elder change, we transition to a new
     /// transfer actor, as there is now a new keypair for it.
-    pub async fn init_transition(
-        &mut self,
-        new_section_key: PublicKey,
-        new_keypair_share: Keypair,
-    ) -> Result<NodeOperation> {
+    pub async fn init_transition(&mut self, elder_state: ElderState) -> Result<NodeOperation> {
         self.section_funds
-            .init_transition(new_section_key, new_keypair_share)
+            .init_transition(elder_state)
             .await
             .convert()
     }
@@ -209,11 +205,11 @@ impl Rewards {
     }
 
     /// On section splits, we are paying out to Elders.
-    pub async fn payout_rewards(&mut self, node_ids: BTreeSet<XorName>) -> Result<NodeOperation> {
+    pub async fn payout_rewards(&mut self, node_ids: BTreeSet<&XorName>) -> Result<NodeOperation> {
         let mut payouts: Vec<NodeOperation> = vec![];
         for node_id in node_ids {
             // Try get the wallet..
-            let (wallet, age) = match self.node_rewards.get(&node_id) {
+            let (wallet, age) = match self.node_rewards.get(node_id) {
                 None => {
                     warn!("No wallet found for node: {}.", node_id);
                     continue;
@@ -238,7 +234,7 @@ impl Rewards {
                     amount: Money::from_nano(
                         self.reward_calc.reward(age).await.as_nano() / age as u64,
                     ),
-                    node_id,
+                    node_id: *node_id,
                 })
                 .await?;
 

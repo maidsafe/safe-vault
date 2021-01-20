@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,24 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod state_db;
-
 mod adult_duties;
 mod elder_duties;
-mod keys;
 mod msg_wrapping;
 mod node_duties;
 mod node_ops;
+pub mod state_db;
 
 use crate::{
     node::{
-        keys::NodeSigningKeys,
         node_duties::NodeDuties,
         node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
-        state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup, NodeInfo},
+        state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup},
     },
     utils::Init,
-    Config, Error, Network, Result,
+    Config, Error, Network, NodeInfo, Result,
 };
 use bls::SecretKey;
 use log::{error, info};
@@ -77,11 +74,10 @@ impl Node {
 
         let (reward_key, _age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
         let (network_api, network_events) = Network::new(config).await?;
-        let keys = NodeSigningKeys::new(network_api.clone());
 
         let node_info = NodeInfo {
-            first: config.is_first(),
-            keys,
+            genesis: config.is_first(),
+            node_id: PublicKey::Ed25519(network_api.public_key().await),
             root_dir: root_dir_buf,
             init_mode: Init::New,
             /// Upper limit in bytes for allowed network storage on this node.

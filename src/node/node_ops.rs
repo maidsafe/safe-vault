@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -120,6 +120,22 @@ pub enum NodeDuty {
     AssumeAdultDuties,
     /// On being promoted, an Adult node becomes an Elder.
     AssumeElderDuties,
+    /// Elder changes means the section public key
+    /// changes as well, which leads to necessary updates
+    /// of various places using the multisig of the section.
+    InitiateElderChange {
+        /// The prefix of our section.
+        prefix: Prefix,
+        /// The BLS public key of our section.
+        key: PublicKey,
+        /// The set of elders of our section.
+        elders: BTreeSet<XorName>,
+    },
+    ///
+    FinishElderChange {
+        previous_key: PublicKey,
+        new_key: PublicKey,
+    },
     ///
     InitSectionWallet(WalletInfo),
     /// Sending messages on to the network.
@@ -150,6 +166,8 @@ impl Debug for NodeDuty {
             Self::ProcessNetworkEvent(event) => event.fmt(f),
             Self::NoOp => write!(f, "No op."),
             Self::StorageFull => write!(f, "StorageFull"),
+            Self::InitiateElderChange { .. } => write!(f, "InitiateElderChange"),
+            Self::FinishElderChange { .. } => write!(f, "FinishElderChange"),
         }
     }
 }
@@ -221,22 +239,6 @@ pub enum ElderDuty {
     ProcessLostMember {
         name: XorName,
         age: u8,
-    },
-    /// Elder changes means the section public key
-    /// changes as well, which leads to necessary updates
-    /// of various places using the multisig of the section.
-    InitiateElderChange {
-        /// The prefix of our section.
-        prefix: Prefix,
-        /// The BLS public key of our section.
-        key: PublicKey,
-        /// The set of elders of our section.
-        elders: BTreeSet<XorName>,
-    },
-    ///
-    FinishElderChange {
-        previous_key: PublicKey,
-        new_key: PublicKey,
     },
     ProcessRelocatedMember {
         /// The id of the node at the previous section.

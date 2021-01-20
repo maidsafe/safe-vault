@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -116,11 +116,6 @@ impl NetworkMsgAnalysis {
             NodeDuty::NoOp => (),
             op => return Ok(op.into()),
         }
-        match self.try_elder_duties(&msg).await? {
-            // Identified as an ElderDuty
-            ElderDuty::NoOp => (),
-            op => return Ok(op.into()),
-        }
         error!("Unknown message destination: {:?}", msg.id());
         Err(Error::Logic("Unknown message destination".to_string()))
     }
@@ -182,53 +177,38 @@ impl NetworkMsgAnalysis {
         };
         let shall_process =
             from_transfer_section() && self.is_dst_for(msg).await? && self.is_elder().await;
-        if !shall_process {
-            return Ok(NodeDuty::NoOp);
+        if shall_process {
+            use NodeQueryResponse::Transfers;
+            use NodeTransferQueryResponse::*;
+            return match &msg.message {
+                Message::NodeQueryResponse {
+                    response: Transfers(CatchUpWithSectionWallet(Ok(info))),
+                    ..
+                } => {
+                    info!("We have a CatchUpWithSectionWallet query response!");
+                    Ok(NodeDuty::InitSectionWallet(info.clone()))
+                }
+                _ => Ok(NodeDuty::NoOp),
+            };
         }
 
-        use NodeQueryResponse::Transfers;
-        use NodeTransferQueryResponse::*;
-        match &msg.message {
-            Message::NodeQueryResponse {
-                response: Transfers(CatchUpWithSectionWallet(Ok(info))),
-                ..
-            } => {
-                info!("We have a CatchUpWithSectionWallet query response!");
-                Ok(NodeDuty::InitSectionWallet(info.clone()))
-            }
-            _ => Ok(NodeDuty::NoOp),
-        }
-    }
-
-    async fn try_elder_duties(&self, msg: &MsgEnvelope) -> Result<ElderDuty> {
-        info!("Msg analysis: try_elder_duties..");
-        // From Transfer module, we get
-        // `SectionPayoutRegistered` event.
-
-        let sender = msg.most_recent_sender();
-
-        let duty = if let Some(duty) = sender.duty() {
-            duty
-        } else {
-            return Ok(ElderDuty::NoOp);
-        };
-        let from_transfer_section =
+        let from_transfer_elder =
             || sender.is_elder() && matches!(duty, Duty::Elder(ElderDuties::Transfer));
         let shall_process =
-            from_transfer_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+            from_transfer_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
         if !shall_process {
-            return Ok(ElderDuty::NoOp);
+            return Ok(NodeDuty::NoOp);
         }
 
         match &msg.message {
             Message::NodeEvent {
                 event: NodeEvent::SectionPayoutRegistered { from, to },
                 ..
-            } => Ok(ElderDuty::FinishElderChange {
+            } => Ok(NodeDuty::FinishElderChange {
                 previous_key: *from,
                 new_key: *to,
             }),
-            _ => Ok(ElderDuty::NoOp),
+            _ => Ok(NodeDuty::NoOp),
         }
     }
 

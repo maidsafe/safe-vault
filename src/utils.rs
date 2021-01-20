@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,7 +8,7 @@
 
 //! Utilities
 
-use crate::{config_handler::Config, Error, Network, Result};
+use crate::{config_handler::Config, ElderState, Error, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use bytes::Bytes;
 use flexi_logger::{DeferredNow, Logger};
@@ -116,12 +116,12 @@ pub(crate) fn deserialise<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
 }
 
 // NB: needs to allow for nodes not having a key share yet?
-pub(crate) async fn key_pair(routing: Network) -> Result<Keypair> {
-    let index = routing.our_index().await?;
-    let bls_secret_key = routing.secret_key_share().await?;
+pub(crate) async fn key_pair(elder_state: ElderState) -> Result<Keypair> {
+    let index = elder_state.key_index();
+    let bls_secret_key = elder_state.secret_key_share();
     let secret = SerdeSecret(bls_secret_key.clone());
     let public = bls_secret_key.public_key_share();
-    let public_key_set = routing.public_key_set().await?;
+    let public_key_set = elder_state.public_key_set().clone();
     Ok(Keypair::BlsShare(BlsKeypairShare {
         index,
         secret,

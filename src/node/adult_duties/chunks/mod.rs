@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -10,15 +10,16 @@ mod chunk_storage;
 mod reading;
 mod writing;
 
-use crate::{node::node_ops::NodeMessagingDuty, node::state_db::NodeInfo, Error, Result};
+use crate::{
+    node::node_ops::{NodeDuty, NodeMessagingDuty, NodeOperation},
+    AdultState, Error, Result,
+};
 use chunk_storage::ChunkStorage;
-
 use log::{info, trace};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     Address, DataQuery, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, Query,
 };
-
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -31,13 +32,12 @@ pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.8;
 pub(crate) struct Chunks {
     chunk_storage: ChunkStorage,
 }
-use crate::node::node_ops::{NodeDuty, NodeOperation};
-pub use chunk_storage::UsedSpace;
 
 impl Chunks {
-    pub async fn new(node_info: &NodeInfo, used_space: UsedSpace) -> Result<Self> {
-        let chunk_storage = ChunkStorage::new(node_info, used_space).await?;
-        Ok(Self { chunk_storage })
+    pub async fn new(adult_state: AdultState) -> Result<Self> {
+        Ok(Self {
+            chunk_storage: ChunkStorage::new(adult_state).await?,
+        })
     }
 
     pub async fn receive_msg(&mut self, msg: MsgEnvelope) -> Result<NodeMessagingDuty> {

@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -140,7 +140,7 @@ impl Replicas {
     }
 
     ///
-    pub fn update_replica_keys(&mut self, info: ReplicaInfo) {
+    pub fn update_replica_info(&mut self, info: ReplicaInfo) {
         self.info = info;
     }
 

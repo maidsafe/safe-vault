@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -11,7 +11,7 @@ use crate::{
     error::convert_to_error_message,
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{NodeMessagingDuty, NodeOperation},
-    Error, Network, Result, ToDbKey,
+    ElderState, Error, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
@@ -44,7 +44,7 @@ struct HolderMetadata {
 /// Operations over the data type Blob.
 pub(super) struct BlobRegister {
     dbs: ChunkHolderDbs,
-    routing: Network,
+    elder_state: ElderState,
     wrapping: ElderMsgWrapping,
 }
 
@@ -52,11 +52,11 @@ impl BlobRegister {
     pub(super) fn new(
         dbs: ChunkHolderDbs,
         wrapping: ElderMsgWrapping,
-        routing: Network,
+        elder_state: ElderState,
     ) -> Result<Self> {
         Ok(Self {
             dbs,
-            routing,
+            elder_state,
             wrapping,
         })
     }
@@ -532,8 +532,8 @@ impl BlobRegister {
     // Used to fetch the list of holders for a new chunk.
     async fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
         //let closest_adults =
-        self.routing
-            .our_adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
+        self.elder_state
+            .adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
             .await
 
         // TODO: Investigate elder blob storage

@@ -52,6 +52,7 @@ xor_name = "1.1.0"
 sn_launch_tool = "~0.0.11"
 dashmap = "3.11.10"
 thiserror = "1.0.23"
+itertools = "0.10.0"
 
   [dependencies.bytes]
   version = "1.0.1"

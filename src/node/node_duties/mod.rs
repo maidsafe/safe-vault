@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -7,19 +7,24 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 pub mod messaging;
+mod elder_constellation;
 mod msg_analysis;
 mod network_events;
 
-use crate::node::{
-    adult_duties::AdultDuties,
-    elder_duties::ElderDuties,
-    msg_wrapping::NodeMsgWrapping,
-    node_duties::messaging::Messaging,
-    node_ops::{IntoNodeOp, NodeDuty, NodeOperation, RewardCmd, RewardDuty},
-    state_db::NodeInfo,
+use self::elder_constellation::ElderConstellation;
+use crate::{
+    node::{
+        adult_duties::AdultDuties,
+        elder_duties::ElderDuties,
+        msg_wrapping::NodeMsgWrapping,
+        node_duties::messaging::Messaging,
+        node_ops::{IntoNodeOp, NodeDuty, NodeOperation, RewardCmd, RewardDuty},
+        NodeInfo,
+    },
+    AdultState, ElderState, NodeState,
 };
-use crate::{chunk_store::UsedSpace, Error, Network, Result};
-use log::{info, trace, warn};
+use crate::{Error, Network, Result};
+use log::{info, trace};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use sn_data_types::{PublicKey, WalletInfo};
@@ -29,10 +34,10 @@ use sn_messaging::{
 };
 
 #[allow(clippy::large_enum_variant)]
-pub enum DutyLevel {
+pub enum Stage {
     Infant,
     Adult(AdultDuties),
-    Elder(ElderDuties),
+    Elder(ElderConstellation),
 }
 
 /// Node duties are those that all nodes
@@ -41,7 +46,7 @@ pub enum DutyLevel {
 /// duties to be carried out, depending on the level.
 pub struct NodeDuties {
     node_info: NodeInfo,
-    duty_level: DutyLevel,
+    stage: Stage,
     network_events: NetworkEvents,
     messaging: Messaging,
     network_api: Network,
@@ -71,7 +76,7 @@ impl NodeDuties {
         let messaging = Messaging::new(network_api.clone());
         Self {
             node_info,
-            duty_level: DutyLevel::Infant,
+            stage: Stage::Infant,
             network_events,
             messaging,
             network_api,
@@ -79,27 +84,35 @@ impl NodeDuties {
     }
 
     pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
-        use DutyLevel::*;
-        match &mut self.duty_level {
+        use Stage::*;
+        match &mut self.stage {
             Adult(ref mut duties) => Some(duties),
             _ => None,
         }
     }
 
     pub fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
-        use DutyLevel::*;
-
-        let level = match &mut self.duty_level {
-            Elder(ref mut duties) => Some(duties),
+        match &mut self.stage {
+            Stage::Elder(ref mut elder) => Some(elder.duties()),
             _ => None,
-        };
+        }
+    }
 
-        info!(
-            "Checking duty level: are we an Elder? {:?}",
-            level.is_some()
-        );
+    fn adult_state(&mut self) -> Result<AdultState> {
+        Ok(match self.adult_duties() {
+            Some(duties) => duties.state().clone(),
+            None => return Err(Error::InvalidOperation),
+        })
+    }
 
-        level
+    fn node_state(&mut self) -> Result<NodeState> {
+        Ok(match self.elder_duties() {
+            Some(duties) => NodeState::Elder(duties.state().clone()),
+            None => match self.adult_duties() {
+                Some(duties) => NodeState::Adult(duties.state().clone()),
+                None => return Err(Error::InvalidOperation),
+            },
+        })
     }
 
     pub async fn process_node_duty(&mut self, duty: NodeDuty) -> Result<NodeOperation> {
@@ -109,6 +122,13 @@ impl NodeDuties {
             RegisterWallet(wallet) => self.register_wallet(wallet).await,
             AssumeAdultDuties => self.assume_adult_duties().await,
             AssumeElderDuties => self.begin_transition_to_elder().await,
+            InitiateElderChange { prefix, key, .. } => {
+                self.initiate_elder_change(prefix, key).await
+            }
+            FinishElderChange {
+                previous_key,
+                new_key,
+            } => self.finish_elder_change(previous_key, new_key).await,
             InitSectionWallet(wallet_info) => self.finish_transition_to_elder(wallet_info).await,
             ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
             ProcessNetworkEvent(event) => {
@@ -122,8 +142,13 @@ impl NodeDuties {
     }
 
     async fn notify_section_of_our_storage(&mut self) -> Result<NodeOperation> {
-        let wrapping = NodeMsgWrapping::new(self.node_info.keys(), MsgNodeDuties::NodeConfig);
-        let node_id = self.node_info.public_key().await;
+        let adult_state = match self.adult_duties() {
+            Some(duties) => duties.state().clone(),
+            None => return Err(Error::InvalidOperation),
+        };
+        let wrapping =
+            NodeMsgWrapping::new(NodeState::Adult(adult_state), MsgNodeDuties::NodeConfig);
+        let node_id = self.node_info.node_id;
         wrapping
             .send_to_section(
                 Message::NodeCmd {
@@ -140,13 +165,14 @@ impl NodeDuties {
     }
 
     async fn register_wallet(&mut self, wallet: PublicKey) -> Result<NodeOperation> {
-        let wrapping = NodeMsgWrapping::new(self.node_info.keys(), MsgNodeDuties::NodeConfig);
+        let node_state = self.node_state()?;
+        let wrapping = NodeMsgWrapping::new(node_state.clone(), MsgNodeDuties::NodeConfig);
         wrapping
             .send_to_section(
                 Message::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet {
                         wallet,
-                        section: self.node_info.public_key().await.into(),
+                        section: PublicKey::Ed25519(node_state.node_id()).into(),
                     }),
                     id: MessageId::new(),
                 },
@@ -158,10 +184,8 @@ impl NodeDuties {
 
     async fn assume_adult_duties(&mut self) -> Result<NodeOperation> {
         trace!("Assuming Adult duties..");
-        use DutyLevel::*;
-        let used_space = UsedSpace::new(self.node_info.max_storage_capacity);
-        if let Ok(duties) = AdultDuties::new(&self.node_info, used_space).await {
-            self.duty_level = Adult(duties);
+        if let Ok(duties) = AdultDuties::new(self.adult_state()?).await {
+            self.stage = Stage::Adult(duties);
             // NB: This is wrong, shouldn't write to disk here,
             // let it be upper layer resp.
             // Also, "Error-to-Unit" is not a good conversion..
@@ -171,11 +195,11 @@ impl NodeDuties {
     }
 
     async fn begin_transition_to_elder(&mut self) -> Result<NodeOperation> {
-        if matches!(self.duty_level, DutyLevel::Elder(_)) {
+        if matches!(self.stage, Stage::Elder(_)) {
             return Ok(NodeOperation::NoOp);
         }
 
-        if self.node_info.first {
+        if self.node_info.genesis {
             return self
                 .finish_transition_to_elder(WalletInfo {
                     replicas: self.network_api.public_key_set().await?,
@@ -185,8 +209,11 @@ impl NodeDuties {
         }
 
         trace!("Beginning transition to Elder duties.");
-        let wrapping =
-            NodeMsgWrapping::new(self.node_info.keys(), sn_messaging::NodeDuties::NodeConfig);
+
+        let wrapping = NodeMsgWrapping::new(
+            NodeState::Adult(self.adult_state()?),
+            sn_messaging::NodeDuties::NodeConfig,
+        );
         if let Some(wallet_id) = self.network_api.section_public_key().await {
             use NodeTransferQuery::GetNewSectionWallet;
             return wrapping
@@ -208,69 +235,85 @@ impl NodeDuties {
         &mut self,
         wallet_info: WalletInfo,
     ) -> Result<NodeOperation> {
-        use DutyLevel::*;
-        if matches!(self.duty_level, Elder(_)) {
+        if matches!(self.stage, Stage::Elder(_)) {
             return Ok(NodeOperation::NoOp);
         }
 
         trace!("Finishing transition to Elder..");
-        let used_space = UsedSpace::new(self.node_info.max_storage_capacity);
-        match ElderDuties::new(
-            &self.node_info,
-            wallet_info,
-            used_space,
+
+        let mut ops: Vec<NodeOperation> = vec![];
+        let state = ElderState::new(&self.node_info, self.network_api.clone()).await?;
+        let mut duties = ElderDuties::new(wallet_info, state.clone()).await?;
+
+        // 1. Initiate duties.
+        ops.push(duties.initiate(self.node_info.genesis).await?);
+        self.stage = Stage::Elder(ElderConstellation::new(
+            self.node_info.clone(),
+            duties,
             self.network_api.clone(),
-        )
-        .await
-        {
-            Ok(duties) => {
-                let mut duties = duties;
-                let mut ops: Vec<NodeOperation> = vec![];
+        ));
+        // NB: This is wrong, shouldn't write to disk here,
+        // let it be upper layer resp.
+        // Also, "Error-to-Unit" is not a good conversion..
+        //dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
+        info!("Successfully assumed Elder duties!");
 
-                // 1. Initiate duties.
-                ops.push(duties.initiate(self.node_info.first).await?);
+        let node_id = state.node_name();
 
-                self.duty_level = Elder(duties);
-                // NB: This is wrong, shouldn't write to disk here,
-                // let it be upper layer resp.
-                // Also, "Error-to-Unit" is not a good conversion..
-                //dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
-                info!("Successfully assumed Elder duties!");
-
-                let node_id = self.network_api.name().await;
-
-                // 2. Add own node id to rewards.
-                ops.push(
-                    RewardDuty::ProcessCmd {
-                        cmd: RewardCmd::AddNewNode(node_id),
-                        msg_id: MessageId::new(),
-                        origin: Address::Node(node_id),
-                    }
-                    .into(),
-                );
-
-                // 3. Add own wallet to rewards.
-                ops.push(
-                    RewardDuty::ProcessCmd {
-                        cmd: RewardCmd::SetNodeWallet {
-                            node_id,
-                            wallet_id: self.node_info.reward_key,
-                        },
-                        msg_id: MessageId::new(),
-                        origin: Address::Node(node_id),
-                    }
-                    .into(),
-                );
-
-                Ok(ops.into())
+        // 2. Add own node id to rewards.
+        ops.push(
+            RewardDuty::ProcessCmd {
+                cmd: RewardCmd::AddNewNode(node_id),
+                msg_id: MessageId::new(),
+                origin: Address::Node(node_id),
             }
-            Err(e) => {
-                warn!("Was not able to assume Elder duties! {:?}", e);
-                Err(Error::Logic(format!(
-                    "Not able to assume Elder Duties: {:?}",
-                    e
-                )))
+            .into(),
+        );
+
+        // 3. Add own wallet to rewards.
+        ops.push(
+            RewardDuty::ProcessCmd {
+                cmd: RewardCmd::SetNodeWallet {
+                    node_id,
+                    wallet_id: self.node_info.reward_key,
+                },
+                msg_id: MessageId::new(),
+                origin: Address::Node(node_id),
             }
+            .into(),
+        );
+
+        Ok(ops.into())
+    }
+
+    ///
+    async fn initiate_elder_change(
+        &mut self,
+        prefix: sn_routing::Prefix,
+        new_section_key: PublicKey,
+    ) -> Result<NodeOperation> {
+        match &mut self.stage {
+            Stage::Infant => Ok(NodeOperation::NoOp),
+            Stage::Adult(_adult) => {
+                let state =
+                    AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
+                let duties = AdultDuties::new(state).await?;
+                self.stage = Stage::Adult(duties);
+                Ok(NodeOperation::NoOp)
+            }
+            Stage::Elder(elder) => elder.initiate_elder_change(prefix, new_section_key).await,
+        }
+    }
+
+    ///
+    pub async fn finish_elder_change(
+        &mut self,
+        previous_key: PublicKey,
+        new_key: PublicKey,
+    ) -> Result<NodeOperation> {
+        match &mut self.stage {
+            Stage::Infant | Stage::Adult(_) => Ok(NodeOperation::NoOp),
+            Stage::Elder(elder) => elder.finish_elder_change(previous_key, new_key).await,
         }
     }
 }

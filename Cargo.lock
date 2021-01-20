@@ -327,7 +327,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "block-modes",
- "itertools",
+ "itertools 0.9.0",
  "log",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -1295,6 +1295,15 @@ name = "itertools"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37d572918e350e82412fe766d24b15e6682fb2ed2bbe018280caa810397cb319"
 dependencies = [
  "either",
 ]
@@ -2453,6 +2462,7 @@ dependencies = [
  "fxhash",
  "hex",
  "hex_fmt",
+ "itertools 0.10.0",
  "lazy_static",
  "log",
  "maplit",
@@ -2493,7 +2503,7 @@ dependencies = [
  "ed25519-dalek",
  "futures",
  "hex_fmt",
- "itertools",
+ "itertools 0.9.0",
  "lru_time_cache",
  "qp2p",
  "rand 0.7.3",
@@ -2515,7 +2525,7 @@ source = "git+https://github.com/oetyng/sn_transfers?branch=rewards-flow#c31711e
 dependencies = [
  "bincode",
  "crdts",
- "itertools",
+ "itertools 0.9.0",
  "log",
  "rand 0.7.3",
  "serde",

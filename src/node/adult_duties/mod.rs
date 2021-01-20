@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,27 +8,32 @@
 
 mod chunks;
 
-use self::chunks::{Chunks, UsedSpace};
+use self::chunks::Chunks;
 use crate::{
     node::node_ops::{
         AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
         ChunkStoreDuty, IntoNodeOp, NodeOperation,
     },
-    node::state_db::NodeInfo,
-    Result,
+    AdultState, Result,
 };
 use std::fmt::{self, Display, Formatter};
 
 /// The main duty of an Adult node is
 /// storage and retrieval of data chunks.
 pub struct AdultDuties {
+    state: AdultState,
     chunks: Chunks,
 }
 
 impl AdultDuties {
-    pub async fn new(node_info: &NodeInfo, used_space: UsedSpace) -> Result<Self> {
-        let chunks = Chunks::new(node_info, used_space).await?;
-        Ok(Self { chunks })
+    pub async fn new(state: AdultState) -> Result<Self> {
+        let chunks = Chunks::new(state.clone()).await?;
+        Ok(Self { state, chunks })
+    }
+
+    ///
+    pub fn state(&self) -> &AdultState {
+        &self.state
     }
 
     pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<NodeOperation> {
