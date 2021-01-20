@@ -148,7 +148,7 @@ jobs:
           override: true
 
       # Install and run cargo udeps to find unused cargo dependencies
-      - name: cargo-udeps duplicate dependency check
+      - name: cargo-udeps unused dependency check
         run: |
           cargo install cargo-udeps --locked
           cargo +nightly udeps --all-targets
