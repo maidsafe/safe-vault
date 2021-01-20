@@ -126,8 +126,8 @@ impl ElderConstellation {
             .duties
             .finish_elder_change(new_elder_state.clone())
             .await?;
-        debug!("Key section completed elder change update.");
 
+        debug!("Key section completed elder change update.");
         debug!("Elder change update completed.");
 
         // split section _after_ transition to new constellation
@@ -138,7 +138,6 @@ impl ElderConstellation {
                 NodeOperation::NoOp => (),
                 op => ops.push(op),
             };
-            // 4. And then set current prefix.
         }
 
         // if changes have queued up, make sure the queue is worked down

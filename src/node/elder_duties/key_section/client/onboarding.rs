@@ -77,8 +77,7 @@ impl Onboarding {
         } else {
             let closest_known_elders = self
                 .elder_state
-                .elders_sorted_by_distance_to(&(*client_key).into())
-                .await;
+                .elders_sorted_by_distance_to(&(*client_key).into());
             if closest_known_elders.is_empty() {
                 trace!(
                     "{}: No closest known elders in any section we know of",

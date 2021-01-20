@@ -134,8 +134,7 @@ impl Transfers {
     /// the other group is now responsible for.
     pub async fn split_section(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
-        let _ = self.replicas.keep_keys_of(prefix).await?;
-        Ok(())
+        self.replicas.keep_keys_of(prefix).await
     }
 
     ///
@@ -460,8 +459,9 @@ impl Transfers {
         // todo: validate signature
         let result = match self.replicas.history(wallet_id).await {
             Ok(history) => Ok(WalletInfo {
+                // (Only in first section of network:
                 // if we haven't transitioned yet, then this will be wrong!
-                // (it will still be the previous keyset..)
+                // it will still be the previous keyset..)
                 replicas: self.replicas.replicas_pk_set(),
                 history,
             }),

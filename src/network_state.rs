@@ -228,10 +228,7 @@ impl ElderState {
     }
 
     /// Static state
-    pub async fn elders_sorted_by_distance_to(
-        &self,
-        name: &XorName,
-    ) -> Vec<&(XorName, SocketAddr)> {
+    pub fn elders_sorted_by_distance_to(&self, name: &XorName) -> Vec<&(XorName, SocketAddr)> {
         self.elders
             .iter()
             .sorted_by(|(lhs, _), (rhs, _)| name.cmp_distance(lhs, rhs))

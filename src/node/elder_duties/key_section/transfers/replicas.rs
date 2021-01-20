@@ -131,7 +131,7 @@ impl Replicas {
             };
 
             // Acquire lock of the wallet.
-            let key_lock = self.get_load_or_create_store(id).await?; // .load_key_lock(id).await?;
+            let key_lock = self.get_load_or_create_store(id).await?;
             let mut store = key_lock.lock().await;
             // Access to the specific wallet is now serialised!
             store.try_insert(e.to_owned())?;

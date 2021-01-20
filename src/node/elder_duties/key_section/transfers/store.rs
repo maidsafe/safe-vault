@@ -89,33 +89,6 @@ where
             )));
         }
         self.db.set(key, &event).map_err(Error::PickleDb)
-        // match event {
-        //     ReplicaEvent::KnownGroupAdded(_e) => unimplemented!("to be deprecated"),
-        //     ReplicaEvent::TransferPropagated(e) => {
-        //         if self.db.exists(key) {
-        //             return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
-        //         }
-        //         self.db
-        //             .set(key, &ReplicaEvent::TransferPropagated(e))
-        //             .map_err(Error::PickleDb)
-        //     }
-        //     ReplicaEvent::TransferValidated(e) => {
-        //         if self.db.exists(key) {
-        //             return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
-        //         }
-        //         self.db
-        //             .set(key, &ReplicaEvent::TransferValidated(e))
-        //             .map_err(Error::PickleDb)
-        //     }
-        //     ReplicaEvent::TransferRegistered(e) => {
-        //         if self.db.exists(key) {
-        //             return Err(Error::Logic(format!("Key exists: {}. Event: {:?}", key, e)));
-        //         }
-        //         self.db
-        //             .set(key, &ReplicaEvent::TransferRegistered(e))
-        //             .map_err(Error::PickleDb)
-        //     }
-        // }
     }
 }
 
