@@ -183,14 +183,18 @@ impl NodeDuties {
     }
 
     async fn assume_adult_duties(&mut self) -> Result<NodeOperation> {
-        trace!("Assuming Adult duties..");
-        if let Ok(duties) = AdultDuties::new(self.adult_state()?).await {
-            self.stage = Stage::Adult(duties);
-            // NB: This is wrong, shouldn't write to disk here,
-            // let it be upper layer resp.
-            // Also, "Error-to-Unit" is not a good conversion..
-            //dump_state(AgeGroup::Adult, self.node_info.path(), &self.id).unwrap_or(());
+        if matches!(self.stage, Stage::Adult(_)) {
+            return Ok(NodeOperation::NoOp);
         }
+        trace!("Assuming Adult duties..");
+        let state = AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
+        let duties = AdultDuties::new(state).await?;
+        self.stage = Stage::Adult(duties);
+        trace!("Adult duties assumed.");
+        // NB: This is wrong, shouldn't write to disk here,
+        // let it be upper layer resp.
+        // Also, "Error-to-Unit" is not a good conversion..
+        //dump_state(AgeGroup::Adult, self.node_info.path(), &self.id).unwrap_or(());
         Ok(NodeDuty::RegisterWallet(self.node_info.reward_key).into())
     }
 
