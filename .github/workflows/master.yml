@@ -20,7 +20,7 @@ env:
 jobs:
   build_win_mac:
     if: github.repository_owner == 'maidsafe'
-    name: Build_win_mac
+    name: Build Release - win & mac
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -62,9 +62,53 @@ jobs:
           name: sn_node-${{ matrix.target }}-prod
           path: artifacts
 
+  build_chaos_win_mac:
+    if: github.repository_owner == 'maidsafe'
+    name: Build Chaos - win &mac
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macOS-latest]
+        include:
+          - os: windows-latest
+            build-script: make build-chaos
+            target: x86_64-pc-windows-msvc
+          - os: macOS-latest
+            build-script: make build-chaos
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      # Run build.
+      - shell: bash
+        run: ${{ matrix.build-script }}
+
+      # Upload artifacts.
+      - uses: actions/upload-artifact@master
+        with:
+          name: sn_node-${{ matrix.target }}-chaos
+          path: artifacts
+  
   build_linux:
     if: github.repository_owner == 'maidsafe'
-    name: Build_Linux
+    name: Build Release - Linux
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -103,6 +147,47 @@ jobs:
           name: sn_node-${{ matrix.target }}-prod
           path: artifacts
 
+  build_chaos_linux:
+    if: github.repository_owner == 'maidsafe'
+    name: Build Chaos - Linux
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        include:
+          - os: ubuntu-latest
+            build-script: make musl-chaos
+            target: x86_64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Cache.
+      - name: Cargo cache registry, index and build
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      # Run build.
+      - shell: bash
+        run: ${{ matrix.build-script }}
+
+      # Upload artifacts.
+      - uses: actions/upload-artifact@master
+        with:
+          name: sn_node-${{ matrix.target }}-chaos
+          path: artifacts
+
   # Deploy to GH Release and S3 if we're on a `chore(release):` commit
   deploy:
     if: |
@@ -131,6 +216,21 @@ jobs:
         with:
           name: sn_node-x86_64-apple-darwin-prod
           path: artifacts/prod/x86_64-apple-darwin/release
+      
+      # Also checkout the chaos artifacts built in the previous jobs.
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_node-x86_64-pc-windows-msvc-chaos
+          path: artifacts/chaos/x86_64-pc-windows-msvc/release
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_node-x86_64-unknown-linux-musl-chaos
+          path: artifacts/chaos/x86_64-unknown-linux-musl/release
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_node-x86_64-apple-darwin-chaos
+          path: artifacts/chaos/x86_64-apple-darwin/release
 
       # Get information for the release.
       - shell: bash
@@ -147,7 +247,9 @@ jobs:
       # Create `deploy` directory and put the artifacts into tar/zip archives for deployment with the release.
       - name: chmod
         shell: bash
-        run: chmod -R +x artifacts/prod
+        run: |
+          chmod -R +x artifacts/prod
+          chmod -R +x artifacts/chaos
       - shell: bash
         run: make package-version-artifacts-for-deploy
 
@@ -161,11 +263,13 @@ jobs:
           description="${description//$'\r'/'%0D'}"
           echo "::set-output name=description::$description"
 
-      # Upload all the release archives to S3
+      # Upload all the release archives, including chaos, to S3
       - name: Upload archives to S3
-        run: aws s3 sync deploy/prod s3://sn-node --acl public-read
+        run: |
+          aws s3 sync deploy/prod s3://sn-node --acl public-read
+          aws s3 sync deploy/chaos s3://sn-node --acl public-read
 
-      # Create the release and attach sn_node archives as assets.
+      # Create the GitHub release and attach sn_node archives as assets.
       - uses: csexton/create-release@add-body
         id: create_release
         with:
