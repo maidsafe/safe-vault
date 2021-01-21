@@ -62,10 +62,10 @@ pub struct AdultState {
     prefix: Prefix,
     node_name: XorName,
     node_id: Ed25519PublicKey,
-    public_key_set: PublicKeySet,
     section_proof_chain: SectionProofChain,
     elders: Vec<(XorName, SocketAddr)>,
     adult_reader: AdultReader,
+    node_signing: NodeSigning,
 }
 
 impl AdultState {
@@ -78,12 +78,16 @@ impl AdultState {
             prefix: network.our_prefix().await,
             node_name: network.name().await,
             node_id: network.public_key().await,
-            public_key_set: network.public_key_set().await?,
             section_proof_chain: network.our_history().await,
             elders: network.our_elder_addresses().await,
             adult_reader: AdultReader::new(network.clone()),
+            node_signing: NodeSigning::new(network),
         })
     }
+
+    // ---------------------------------------------------
+    // ----------------- STATIC STATE --------------------
+    // ---------------------------------------------------
 
     /// Static state
     pub fn info(&self) -> &NodeInfo {
@@ -98,6 +102,12 @@ impl AdultState {
     /// Static state
     pub fn node_id(&self) -> Ed25519PublicKey {
         self.node_id
+    }
+
+    /// "Sort of" static; this is calling into routing layer
+    /// but the underlying keys will not change.
+    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
+        self.node_signing.sign_as_node(&data).await
     }
 }
 
@@ -115,6 +125,7 @@ pub struct ElderState {
     elders: Vec<(XorName, SocketAddr)>,
     adult_reader: AdultReader,
     interaction: NodeInteraction,
+    node_signing: NodeSigning,
 }
 
 impl ElderState {
@@ -133,7 +144,8 @@ impl ElderState {
             section_proof_chain: network.our_history().await,
             elders: network.our_elder_addresses().await,
             adult_reader: AdultReader::new(network.clone()),
-            interaction: NodeInteraction::new(network),
+            interaction: NodeInteraction::new(network.clone()),
+            node_signing: NodeSigning::new(network),
         })
     }
 
@@ -246,16 +258,10 @@ impl ElderState {
         }))
     }
 
-    /// Creates a detached Ed25519 signature of `data`.
-    pub fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
-        // NB: TEMP USE OF BLS SIG HERE
-        let data = utils::serialise(data)?;
-        let index = self.key_index();
-        let bls_secret_key = self.secret_key_share();
-        Ok(Signature::BlsShare(SignatureShare {
-            index,
-            share: bls_secret_key.sign(data),
-        }))
+    /// "Sort of" static; this is calling into routing layer
+    /// but the underlying keys will not change.
+    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
+        self.node_signing.sign_as_node(&data).await
     }
 
     // ------ DEPRECATE? -------------
@@ -296,6 +302,24 @@ impl AdultReader {
         self.network
             .our_adults_sorted_by_distance_to(name, count)
             .await
+    }
+}
+
+#[derive(Clone)]
+pub struct NodeSigning {
+    network: Network,
+}
+
+impl NodeSigning {
+    ///
+    pub fn new(network: Network) -> Self {
+        Self { network }
+    }
+
+    // "Sort of" static; this is calling into routing layer
+    // but the underlying keys will not change.
+    pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
+        self.network.sign_as_node(&data).await
     }
 }
 
