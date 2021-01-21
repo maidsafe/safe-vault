@@ -124,6 +124,10 @@ pub async fn run_network() -> Result<(), String> {
         "--local",
         "--num-nodes",
         "11",
+        "--keep-alive-interval-msec",
+        "50",
+        "--idle-timeout-msec",
+        "10000",
     ];
 
     let interval_as_int = &INTERVAL

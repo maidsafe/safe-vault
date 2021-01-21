@@ -1662,9 +1662,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.9.9"
+version = "0.9.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6facff35dbcec3b0c77408f600d2ac2f4a584b84aa086e7c8cc749970e2250cd"
+checksum = "55a8837378792c3f204e04ba492e527839b31a41a12be26c45dac3072110bc4e"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2322,9 +2322,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.0.8"
+version = "0.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0dd50e3bebd1f99e66aa60b0e8c8e77ab5aa4809f3ef487b802439c5964ee42"
+checksum = "a12aaa302536398d4bc19d35d75963360c63302de71f5c68d4b2ba53d235c115"
 dependencies = [
  "directories",
  "env_logger",
@@ -2361,7 +2361,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.25.29"
+version = "0.25.31"
 dependencies = [
  "async-log",
  "base64 0.10.1",
@@ -2405,9 +2405,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.40.0"
+version = "0.41.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2dd3e340a5a944546a270cec37e62f95e396e7bf70638190e7e2385d21d24b5"
+checksum = "d3e240b16e529fd884f88ea0c744f97e30ac73c48ab788d39c399b5fba001900"
 dependencies = [
  "bincode",
  "bls_dkg",
