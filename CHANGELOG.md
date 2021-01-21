@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.32](https://github.com/maidsafe/sn_node/compare/v0.25.31...v0.25.32) (2021-01-21)
+
+
+### Bug Fixes
+
+* **hack:** connection lag via lowering qp2p timeouts ([e6e1375](https://github.com/maidsafe/sn_node/commit/e6e137585f4f6726123a63d94ed981d35614f4c1))
+
 ### [0.25.31](https://github.com/maidsafe/sn_node/compare/v0.25.30...v0.25.31) (2021-01-20)
 
 ### [0.25.30](https://github.com/maidsafe/sn_node/compare/v0.25.29...v0.25.30) (2021-01-19)
