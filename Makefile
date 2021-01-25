@@ -54,11 +54,10 @@ endif
 		-maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
-package-version-artifacts-for-deploy:
+package-prod-version-artifacts-for-deploy:
 	rm -f *.zip *.tar.gz
 	rm -rf ${DEPLOY_PATH}
 	mkdir -p ${DEPLOY_PROD_PATH}
-	mkdir -p ${DEPLOY_CHAOS_PATH}
 
 	zip -j sn_node-${SN_NODE_VERSION}-x86_64-unknown-linux-musl.zip \
 		artifacts/prod/x86_64-unknown-linux-musl/release/sn_node
@@ -86,6 +85,15 @@ package-version-artifacts-for-deploy:
 	tar -C artifacts/prod/x86_64-apple-darwin/release \
 		-zcvf sn_node-latest-x86_64-apple-darwin.tar.gz sn_node
 
+	mv *.zip ${DEPLOY_PROD_PATH}
+	mv sn_node-${SN_NODE_VERSION}-*.tar.gz ${DEPLOY_PROD_PATH}
+	mv sn_node-latest-*.tar.gz ${DEPLOY_PROD_PATH}
+
+.ONESHELL:
+package-chaos-version-artifacts-for-deploy:
+	rm -rf ${DEPLOY_CHAOS_PATH}
+	mkdir -p ${DEPLOY_CHAOS_PATH}
+
 	tar -C artifacts/chaos/x86_64-unknown-linux-musl/release \
 		-zcvf sn_node-CHAOS-${SN_NODE_VERSION}-x86_64-unknown-linux-musl.tar.gz sn_node
 	tar -C artifacts/chaos/x86_64-unknown-linux-musl/release \
@@ -99,7 +107,4 @@ package-version-artifacts-for-deploy:
 	tar -C artifacts/chaos/x86_64-apple-darwin/release \
 		-zcvf sn_node-CHAOS-latest-x86_64-apple-darwin.tar.gz sn_node
 
-	mv *.zip ${DEPLOY_PROD_PATH}
-	mv sn_node-${SN_NODE_VERSION}-*.tar.gz ${DEPLOY_PROD_PATH}
-	mv sn_node-latest-*.tar.gz ${DEPLOY_PROD_PATH}
 	mv sn_node-CHAOS-*.tar.gz ${DEPLOY_CHAOS_PATH}
