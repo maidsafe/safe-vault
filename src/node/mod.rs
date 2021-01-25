@@ -34,6 +34,7 @@ use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
+use tokio::try_join;
 
 /// Main node struct.
 pub struct Node {
@@ -76,7 +77,7 @@ impl Node {
             res
         };
 
-        let (reward_key, _age_group) = tokio::try_join!(reward_key_task, age_group_task)?;
+        let (reward_key, _age_group) = try_join!(reward_key_task, age_group_task)?;
         let (network_api, network_events) = Network::new(config).await?;
         let keys = NodeSigningKeys::new(network_api.clone());
 
@@ -153,27 +154,31 @@ impl Node {
     pub async fn run(&mut self) -> Result<()> {
         let info = self.network_api.our_connection_info().await?;
         info!("Listening for routing events at: {}", info);
+        use rand::Rng;
         while let Some(event) = self.network_events.next().await {
-            info!("New event received from the Network: {:?}", event);
+            let mut rng = rand::thread_rng();
+            let msgid: u64 = rng.gen_range(0, 100000);
+            info!("New event received from the Network (msg: {}): {:?}", msgid, event);
             let duty = if let Event::ClientMessageReceived { .. } = event {
-                info!("Event from client peer: {:?}", event);
+                info!("Event from client peer (msg: {}): {:?}", msgid, event);
                 GatewayDuty::ProcessClientEvent(event).into()
             } else {
+                info!("Event from NODE peer (msg: {})", msgid);
                 NodeDuty::ProcessNetworkEvent(event).into()
             };
-            self.process_while_any(Ok(duty)).await;
+            self.process_while_any(Ok(duty), msgid).await;
         }
 
         Ok(())
     }
 
     /// Keeps processing resulting node operations.
-    async fn process_while_any(&mut self, op: Result<NodeOperation>) {
+    async fn process_while_any(&mut self, op: Result<NodeOperation>, msgid: u64) {
         use NodeOperation::*;
         let mut next_op = op;
         while let Ok(op) = next_op {
             next_op = match op {
-                Single(operation) => match self.process(operation).await {
+                Single(operation) => match self.process(operation,msgid).await {
                     Err(e) => {
                         self.handle_error(&e);
                         Ok(NoOp)
@@ -183,7 +188,7 @@ impl Node {
                 Multiple(ops) => {
                     let mut node_ops = Vec::new();
                     for c in ops.into_iter() {
-                        match self.process(c).await {
+                        match self.process(c, msgid).await {
                             Ok(NoOp) => (),
                             Ok(op) => node_ops.push(op),
                             Err(e) => self.handle_error(&e),
@@ -196,30 +201,38 @@ impl Node {
         }
     }
 
-    async fn process(&mut self, duty: NetworkDuty) -> Result<NodeOperation> {
+    async fn process(&mut self, duty: NetworkDuty, msgid: u64) -> Result<NodeOperation> {
         use NetworkDuty::*;
         match duty {
             RunAsAdult(duty) => {
-                info!("Running as Adult: {:?}", duty);
+                info!("Running as Adult (msg: {}): {:?}", msgid, duty);
                 if let Some(duties) = self.duties.adult_duties() {
-                    duties.process_adult_duty(duty).await
+                    let a = duties.process_adult_duty(duty).await?;
+                    info!("================FINISHED as Adult msg: {} -> {:?}", msgid,a);
+                    Ok(a)
                 } else {
-                    error!("Currently not an Adult!");
+                    error!("Currently not an Adult! (msg: {})", msgid);
+                    info!("================FINISHED as Adult msg: {}", msgid);
                     Err(Error::Logic("Currently not an Adult".to_string()))
                 }
             }
             RunAsElder(duty) => {
-                info!("Running as Elder: {:?}", duty);
+                info!("Running as Elder (msg: {}): {:?}", msgid, duty);
                 if let Some(duties) = self.duties.elder_duties() {
-                    duties.process_elder_duty(duty).await
+                    let a = duties.process_elder_duty(duty).await?;
+                    info!("================FINISHED as Elder msg: {} -> {:?}", msgid, a);
+                    Ok(a)
                 } else {
-                    error!("Currently not an Elder!");
+                    error!("Currently not an Elder! (msg: {})",msgid);
+                    info!("================FINISHED as Elder msg: {}", msgid);
                     Err(Error::Logic("Currently not an Elder".to_string()))
                 }
             }
             RunAsNode(duty) => {
-                info!("Running as Node: {:?}", duty);
-                self.duties.process_node_duty(duty).await
+                info!("Running as Node (msg: {}): {:?}", msgid, duty);
+                let a = self.duties.process_node_duty(duty).await?;
+                info!("================FINISHED as Node msg: {} -> {:?}", msgid, a);
+                Ok(a)
             }
             NoOp => Ok(NodeOperation::NoOp),
         }
