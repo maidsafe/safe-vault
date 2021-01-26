@@ -20,8 +20,8 @@ pub struct Messaging {
 }
 
 impl Messaging {
-    pub fn new(routing: Network) -> Self {
-        let network_sender = NetworkSender::new(routing);
+    pub fn new(network: Network) -> Self {
+        let network_sender = NetworkSender::new(network);
         Self { network_sender }
     }
 

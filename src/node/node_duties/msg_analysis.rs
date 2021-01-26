@@ -31,22 +31,22 @@ use xor_name::XorName;
 /// Evaluates remote msgs from the network,
 /// i.e. not msgs sent directly from a client.
 pub struct NetworkMsgAnalysis {
-    routing: Network,
+    network: Network,
 }
 
 impl NetworkMsgAnalysis {
-    pub fn new(routing: Network) -> Self {
-        Self { routing }
+    pub fn new(network: Network) -> Self {
+        Self { network }
     }
 
     pub async fn is_dst_for(&self, msg: &MsgEnvelope) -> Result<bool> {
         let dst = msg.destination()?;
-        let are_we_dst = dst.xorname() == self.routing.name().await;
+        let are_we_dst = dst.xorname() == self.network.name().await;
         let are_we_origin = self.are_we_origin(&msg).await;
         let is_genesis_node_msg_to_self = are_we_origin && self.is_genesis_request().await;
         let are_we_handler_for_dst = self.self_is_handler_for(&dst.xorname()).await;
         let is_genesis_section_msg_to_section =
-            matches!(dst, Address::Section(_)) && self.routing.our_prefix().await.is_empty();
+            matches!(dst, Address::Section(_)) && self.network.our_prefix().await.is_empty();
         let is_dst = are_we_dst
             || are_we_handler_for_dst
             || is_genesis_node_msg_to_self
@@ -55,9 +55,9 @@ impl NetworkMsgAnalysis {
     }
 
     async fn is_genesis_request(&self) -> bool {
-        let elders = self.routing.our_elder_names().await;
+        let elders = self.network.our_elder_names().await;
         if elders.len() == 1 {
-            elders.contains(&self.routing.name().await)
+            elders.contains(&self.network.name().await)
         } else {
             false
         }
@@ -65,7 +65,7 @@ impl NetworkMsgAnalysis {
 
     async fn are_we_origin(&self, msg: &MsgEnvelope) -> bool {
         let origin = msg.origin.address().xorname();
-        origin == self.routing.name().await
+        origin == self.network.name().await
     }
 
     pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Result<NodeOperation> {
@@ -361,7 +361,7 @@ impl NetworkMsgAnalysis {
                 info!("Verifying GetChunk NodeQueryResponse!");
                 // Recreate original MessageId from Section
                 let msg_id =
-                    MessageId::combine(vec![*blob.address().name(), self.routing.name().await]);
+                    MessageId::combine(vec![*blob.address().name(), self.network.name().await]);
                 if msg_id == *correlation_id {
                     Some(ProcessCmd {
                         cmd: StoreReplicatedBlob(blob),
@@ -384,7 +384,7 @@ impl NetworkMsgAnalysis {
                 ..
             } => {
                 info!("Verifying GetChunk query!");
-                let proof_chain = self.routing.our_history().await;
+                let proof_chain = self.network.our_history().await;
 
                 // Recreate original MessageId from Section
                 let msg_id = MessageId::combine(vec![*address.name(), *new_holder]);
@@ -701,7 +701,7 @@ impl NetworkMsgAnalysis {
                 } => {
                     // This comparison is a good example of the need to use `lazy messaging`,
                     // as to handle that the expected public key is not the same as the current.
-                    if let Some(section_pk) = self.routing.section_public_key().await {
+                    if let Some(section_pk) = self.network.section_public_key().await {
                         if public_key == &section_pk {
                             Ok(TransferDuty::ProcessQuery {
                                 query: TransferQuery::GetReplicaEvents,
@@ -801,22 +801,22 @@ impl NetworkMsgAnalysis {
     }
 
     async fn self_is_handler_for(&self, address: &XorName) -> bool {
-        self.routing.matches_our_prefix(*address).await
+        self.network.matches_our_prefix(*address).await
     }
 
     pub async fn is_elder(&self) -> bool {
-        self.routing.is_elder().await
+        self.network.is_elder().await
     }
 
     pub async fn is_adult(&self) -> bool {
-        !self.routing.is_elder().await && self.routing.age().await > MIN_AGE
+        !self.network.is_elder().await && self.network.age().await > MIN_AGE
     }
 
     pub async fn no_of_elders(&self) -> usize {
-        self.routing.our_elder_addresses().await.len()
+        self.network.our_elder_addresses().await.len()
     }
 
     pub async fn no_of_adults(&self) -> usize {
-        self.routing.our_adults().await.len()
+        self.network.our_adults().await.len()
     }
 }
