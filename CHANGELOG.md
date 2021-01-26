@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.36](https://github.com/maidsafe/sn_node/compare/v0.25.35...v0.25.36) (2021-01-26)
+
+
+### Features
+
+* removal signature aggregate ([8bac521](https://github.com/maidsafe/sn_node/commit/8bac52163748bdc1fde54b3436c042fbd8f46b02))
+
 ### [0.25.35](https://github.com/maidsafe/sn_node/compare/v0.25.34...v0.25.35) (2021-01-25)
 
 ### [0.25.34](https://github.com/maidsafe/sn_node/compare/v0.25.33...v0.25.34) (2021-01-25)
