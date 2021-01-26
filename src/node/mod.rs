@@ -203,6 +203,8 @@ impl Node {
                 info!("Running as Elder: {:?}", duty);
                 if let Some(duties) = self.duties.elder_duties() {
                     duties.process_elder_duty(duty).await
+                } else if self.duties.try_enqueue_elder_duty(duty) {
+                    Ok(NodeOperation::NoOp)
                 } else {
                     error!("Currently not an Elder!");
                     Err(Error::Logic("Currently not an Elder".to_string()))

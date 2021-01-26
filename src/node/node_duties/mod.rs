@@ -18,12 +18,11 @@ use crate::{
         elder_duties::ElderDuties,
         msg_wrapping::NodeMsgWrapping,
         node_duties::messaging::Messaging,
-        node_ops::{IntoNodeOp, NodeDuty, NodeOperation, RewardCmd, RewardDuty},
+        node_ops::{ElderDuty, IntoNodeOp, NodeDuty, NodeOperation, RewardCmd, RewardDuty},
         NodeInfo,
     },
-    AdultState, ElderState, NodeState,
+    AdultState, ElderState, Error, Network, NodeState, Result,
 };
-use crate::{Error, Network, Result};
 use log::{info, trace};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
@@ -32,11 +31,13 @@ use sn_messaging::{
     Address, Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeQuery, NodeSystemCmd,
     NodeTransferQuery,
 };
+use std::collections::VecDeque;
 
 #[allow(clippy::large_enum_variant)]
 pub enum Stage {
     Infant,
     Adult(AdultDuties),
+    AssumingElderDuties(VecDeque<ElderDuty>),
     Elder(ElderConstellation),
 }
 
@@ -95,6 +96,15 @@ impl NodeDuties {
         match &mut self.stage {
             Stage::Elder(ref mut elder) => Some(elder.duties()),
             _ => None,
+        }
+    }
+
+    pub fn try_enqueue_elder_duty(&mut self, duty: ElderDuty) -> bool {
+        if let Stage::AssumingElderDuties(ref mut queue) = self.stage {
+            queue.push_back(duty);
+            true
+        } else {
+            false
         }
     }
 
@@ -199,8 +209,12 @@ impl NodeDuties {
     }
 
     async fn begin_transition_to_elder(&mut self) -> Result<NodeOperation> {
-        if matches!(self.stage, Stage::Elder(_)) {
+        if matches!(self.stage, Stage::Elder(_))
+            || matches!(self.stage, Stage::AssumingElderDuties(_))
+        {
             return Ok(NodeOperation::NoOp);
+        } else if matches!(self.stage, Stage::Infant) {
+            return Err(Error::InvalidOperation);
         }
 
         if self.node_info.genesis {
@@ -212,13 +226,15 @@ impl NodeDuties {
                 .await;
         }
 
-        trace!("Beginning transition to Elder duties.");
-
-        let wrapping = NodeMsgWrapping::new(
-            NodeState::Adult(self.adult_state()?),
-            sn_messaging::NodeDuties::NodeConfig,
-        );
         if let Some(wallet_id) = self.network_api.section_public_key().await {
+            trace!("Beginning transition to Elder duties.");
+            let wrapping = NodeMsgWrapping::new(
+                NodeState::Adult(self.adult_state()?),
+                sn_messaging::NodeDuties::NodeConfig,
+            );
+            // must get the above wrapping instance before overwriting stage
+            self.stage = Stage::AssumingElderDuties(VecDeque::new());
+
             use NodeTransferQuery::GetNewSectionWallet;
             return wrapping
                 .send_to_section(
@@ -239,9 +255,11 @@ impl NodeDuties {
         &mut self,
         wallet_info: WalletInfo,
     ) -> Result<NodeOperation> {
-        if matches!(self.stage, Stage::Elder(_)) {
-            return Ok(NodeOperation::NoOp);
-        }
+        let queued_duties = match self.stage {
+            Stage::Elder(_) => return Ok(NodeOperation::NoOp),
+            Stage::AssumingElderDuties(ref mut queue) => queue,
+            Stage::Infant | Stage::Adult(_) => return Err(Error::InvalidOperation),
+        };
 
         trace!("Finishing transition to Elder..");
 
@@ -251,20 +269,29 @@ impl NodeDuties {
 
         // 1. Initiate duties.
         ops.push(duties.initiate(self.node_info.genesis).await?);
+
+        // 2. Process all enqueued duties.
+        for duty in queued_duties.drain(..) {
+            ops.push(duties.process_elder_duty(duty).await?);
+        }
+
+        // 3. Set new stage
         self.stage = Stage::Elder(ElderConstellation::new(
             self.node_info.clone(),
             duties,
             self.network_api.clone(),
         ));
+
         // NB: This is wrong, shouldn't write to disk here,
         // let it be upper layer resp.
         // Also, "Error-to-Unit" is not a good conversion..
         //dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
+
         info!("Successfully assumed Elder duties!");
 
         let node_id = state.node_name();
 
-        // 2. Add own node id to rewards.
+        // 4. Add own node id to rewards.
         ops.push(
             RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddNewNode(node_id),
@@ -274,7 +301,7 @@ impl NodeDuties {
             .into(),
         );
 
-        // 3. Add own wallet to rewards.
+        // 5. Add own wallet to rewards.
         ops.push(
             RewardDuty::ProcessCmd {
                 cmd: RewardCmd::SetNodeWallet {
@@ -298,6 +325,7 @@ impl NodeDuties {
     ) -> Result<NodeOperation> {
         match &mut self.stage {
             Stage::Infant => Ok(NodeOperation::NoOp),
+            Stage::AssumingElderDuties(_) => Ok(NodeOperation::NoOp), // TODO: Queue up!!
             Stage::Adult(_adult) => {
                 let state =
                     AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
@@ -316,6 +344,7 @@ impl NodeDuties {
         new_key: PublicKey,
     ) -> Result<NodeOperation> {
         match &mut self.stage {
+            Stage::AssumingElderDuties(_) => Ok(NodeOperation::NoOp), // Should be unreachable?
             Stage::Infant | Stage::Adult(_) => Ok(NodeOperation::NoOp),
             Stage::Elder(elder) => elder.finish_elder_change(previous_key, new_key).await,
         }

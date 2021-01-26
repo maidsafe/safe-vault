@@ -768,12 +768,12 @@ impl NetworkMsgAnalysis {
             };
         }
 
-        // `CatchUpWithSectionWallet` is sent both by NodeCfg and Rewards, `GetNewSectionWallet` by both NodeCfg and Transfers.
+        // `CatchUpWithSectionWallet` ann `GetNewSectionWallet` are sent both by NodeCfg and Rewards.
         let from_node_cfg = || {
             msg.most_recent_sender().is_any_node()
                 && matches!(duty, Duty::Node(NodeDuties::NodeConfig))
         };
-        let shall_process = from_node_cfg() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process = from_node_cfg() && self.is_dst_for(msg).await?;
         if !shall_process {
             return Ok(TransferDuty::NoOp);
         }
