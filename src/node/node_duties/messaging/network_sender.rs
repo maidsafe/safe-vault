@@ -46,7 +46,7 @@ impl NetworkSender {
     }
 
     pub async fn send_to_node(&mut self, msg: MsgEnvelope, as_node: bool) -> Result<NodeOperation> {
-        let name = self.network.name().await;
+        let name = self.network.our_name().await;
         let dst = match msg.destination()? {
             Address::Node(xorname) => DstLocation::Node(xorname),
             Address::Section(_) => {
@@ -80,7 +80,7 @@ impl NetworkSender {
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
     ) -> Result<NodeOperation> {
-        let name = self.network.name().await;
+        let name = self.network.our_name().await;
         let bytes = &msg.serialize()?;
         for target in targets {
             self.network
@@ -113,7 +113,7 @@ impl NetworkSender {
         };
         info!("Destination: {:?}", dst);
         let src = if as_node {
-            SrcLocation::Node(self.network.name().await)
+            SrcLocation::Node(self.network.our_name().await)
         } else {
             SrcLocation::Section(self.network.our_prefix().await)
         };

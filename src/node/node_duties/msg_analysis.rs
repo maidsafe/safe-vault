@@ -41,7 +41,7 @@ impl NetworkMsgAnalysis {
 
     pub async fn is_dst_for(&self, msg: &MsgEnvelope) -> Result<bool> {
         let dst = msg.destination()?;
-        let are_we_dst = dst.xorname() == self.network.name().await;
+        let are_we_dst = dst.xorname() == self.network.our_name().await;
         let are_we_origin = self.are_we_origin(&msg).await;
         let is_genesis_node_msg_to_self = are_we_origin && self.is_genesis_request().await;
         let are_we_handler_for_dst = self.self_is_handler_for(&dst.xorname()).await;
@@ -57,7 +57,7 @@ impl NetworkMsgAnalysis {
     async fn is_genesis_request(&self) -> bool {
         let elders = self.network.our_elder_names().await;
         if elders.len() == 1 {
-            elders.contains(&self.network.name().await)
+            elders.contains(&self.network.our_name().await)
         } else {
             false
         }
@@ -65,7 +65,7 @@ impl NetworkMsgAnalysis {
 
     async fn are_we_origin(&self, msg: &MsgEnvelope) -> bool {
         let origin = msg.origin.address().xorname();
-        origin == self.network.name().await
+        origin == self.network.our_name().await
     }
 
     pub async fn evaluate(&mut self, msg: &MsgEnvelope) -> Result<NodeOperation> {
@@ -361,7 +361,7 @@ impl NetworkMsgAnalysis {
                 info!("Verifying GetChunk NodeQueryResponse!");
                 // Recreate original MessageId from Section
                 let msg_id =
-                    MessageId::combine(vec![*blob.address().name(), self.network.name().await]);
+                    MessageId::combine(vec![*blob.address().name(), self.network.our_name().await]);
                 if msg_id == *correlation_id {
                     Some(ProcessCmd {
                         cmd: StoreReplicatedBlob(blob),

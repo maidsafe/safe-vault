@@ -76,7 +76,7 @@ impl AdultState {
         Ok(Self {
             info,
             prefix: network.our_prefix().await,
-            node_name: network.name().await,
+            node_name: network.our_name().await,
             node_id: network.public_key().await,
             section_proof_chain: network.our_history().await,
             elders: network.our_elder_addresses().await,
@@ -136,7 +136,7 @@ impl ElderState {
         Ok(Self {
             info: info.clone(),
             prefix: network.our_prefix().await,
-            node_name: network.name().await,
+            node_name: network.our_name().await,
             node_id: network.public_key().await,
             key_index: network.our_index().await?,
             public_key_set: network.public_key_set().await?,

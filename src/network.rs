@@ -80,7 +80,7 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn name(&self) -> XorName {
+    pub async fn our_name(&self) -> XorName {
         self.routing.lock().await.name().await
     }
 
@@ -248,7 +248,7 @@ impl Network {
     }
 
     async fn our_duties(&self) -> AgeGroup {
-        let our_name = self.name().await;
+        let our_name = self.our_name().await;
         if self.routing.lock().await.is_elder().await {
             AgeGroup::Elder
         } else if self
