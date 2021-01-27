@@ -366,7 +366,10 @@ impl Rewards {
             Some(entry) => entry.clone(),
             None => return Err(Error::NodeNotFound),
         };
-        debug!("Rewards: node {} found as {:?}, deactivating..", node_id, entry);
+        debug!(
+            "Rewards: node {} found as {:?}, deactivating..",
+            node_id, entry
+        );
         let wallet = match entry {
             NodeRewards::Active { wallet, .. } => wallet,
             NodeRewards::AwaitingRelocation(_) => {

@@ -273,6 +273,7 @@ impl NodeDuties {
 
     async fn register_wallet(&mut self, wallet: PublicKey) -> Result<NodeOperation> {
         let node_state = self.node_state()?;
+        info!("Registering wallet: {}", wallet);
         let wrapping = NodeMsgWrapping::new(node_state.clone(), MsgNodeDuties::NodeConfig);
         wrapping
             .send_to_section(
@@ -293,11 +294,11 @@ impl NodeDuties {
         if matches!(self.stage, Stage::Adult(_)) {
             return Ok(NodeOperation::NoOp);
         }
-        trace!("Assuming Adult duties..");
+        info!("Assuming Adult duties..");
         let state = AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
         let duties = AdultDuties::new(state).await?;
         self.stage = Stage::Adult(duties);
-        trace!("Adult duties assumed.");
+        info!("Adult duties assumed.");
         // NB: This is wrong, shouldn't write to disk here,
         // let it be upper layer resp.
         // Also, "Error-to-Unit" is not a good conversion..
@@ -681,11 +682,11 @@ impl NodeDuties {
     ) -> Result<NodeOperation> {
         match &mut self.stage {
             Stage::Infant => Ok(NodeOperation::NoOp),
-            Stage::AssumingElderDuties(_) => Ok(NodeOperation::NoOp), // TODO: Queue up!!
+            Stage::AssumingElderDuties(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::AwaitingGenesisThreshold(_) => Ok(NodeOperation::NoOp),
-            Stage::ProposingGenesis(_) => unimplemented!(),
+            Stage::ProposingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::AccumulatingGenesis(_) => unimplemented!(),
-            Stage::Adult(_adult) => {
+            Stage::Adult(_old_state) => {
                 let state =
                     AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
                 let duties = AdultDuties::new(state).await?;

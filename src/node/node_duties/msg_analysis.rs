@@ -15,7 +15,7 @@ use crate::{
     },
     Error, Network, Result,
 };
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use sn_messaging::{
     Address, AdultDuties::ChunkStorage, Cmd, DataQuery, Duty, ElderDuties, Message, MessageId,
     MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse, NodeDuties, NodeEvent,
@@ -52,17 +52,6 @@ impl NetworkMsgAnalysis {
             || is_genesis_node_msg_to_self
             || is_genesis_section_msg_to_section;
         debug!("is_dst: {}", is_dst);
-        debug!("are_we_dst: {}", are_we_dst);
-        debug!("are_we_handler_for_dst: {}", are_we_handler_for_dst);
-        debug!("are_we_origin: {}", are_we_origin);
-        debug!(
-            "is_genesis_node_msg_to_self: {}",
-            is_genesis_node_msg_to_self
-        );
-        debug!(
-            "is_genesis_section_msg_to_section: {}",
-            is_genesis_section_msg_to_section
-        );
         Ok(is_dst)
     }
 
@@ -135,7 +124,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_system_cmd(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
-        info!("Msg analysis: try_system_cmd..");
+        trace!("Msg analysis: try_system_cmd..");
         use NodeCmd::*;
         use NodeSystemCmd::*;
         // Check if it a message from adult
@@ -154,7 +143,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_messaging(&self, msg: &MsgEnvelope) -> Result<NodeMessagingDuty> {
-        info!("Msg analysis: try_messaging..");
+        trace!("Msg analysis: try_messaging..");
         use Address::*;
         let destined_for_network = match msg.destination()? {
             Client(address) => !self.self_is_handler_for(&address).await,
@@ -173,7 +162,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_node_duties(&self, msg: &MsgEnvelope) -> Result<NodeDuty> {
-        info!("Msg analysis: try_node_duties..");
+        trace!("Msg analysis: try_node_duties..");
         // From Transfer module, we get
         // `CatchUpWithSectionWallet` query response.
 
@@ -251,7 +240,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_client_entry(&self, msg: &MsgEnvelope) -> Result<GatewayDuty> {
-        info!("Msg analysis: try_client_entry..");
+        trace!("Msg analysis: try_client_entry..");
         let is_our_client_msg = match msg.destination()? {
             Address::Client(address) => self.self_is_handler_for(&address).await,
             _ => false,
@@ -270,7 +259,7 @@ impl NetworkMsgAnalysis {
     /// accumulated (can be seen since the sender is `Section`),
     /// it is time to actually carry out the write operation.
     async fn try_metadata(&self, msg: &MsgEnvelope) -> Result<MetadataDuty> {
-        info!("Msg analysis: try_metadata..");
+        trace!("Msg analysis: try_metadata..");
         let is_data_cmd = || {
             matches!(msg.message, Message::Cmd {
                 cmd: Cmd::Data { .. },
@@ -315,7 +304,7 @@ impl NetworkMsgAnalysis {
     /// When the write requests from Elders has been accumulated
     /// at an Adult, it is time to carry out the write operation.
     async fn try_adult(&self, msg: &MsgEnvelope) -> Result<AdultDuty> {
-        info!("Msg analysis: try_adult..");
+        trace!("Msg analysis: try_adult..");
         let sender = msg.most_recent_sender();
         let dst = msg.destination()?;
         let duty = if let Some(duty) = sender.duty() {
@@ -367,7 +356,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_chunk_replication(&self, msg: &MsgEnvelope) -> Result<AdultDuty> {
-        info!("Msg analysis: try_chunk_replication..");
+        trace!("Msg analysis: try_chunk_replication..");
         use ChunkReplicationDuty::*;
 
         use ChunkReplicationCmd::*;
@@ -489,7 +478,7 @@ impl NetworkMsgAnalysis {
     }
 
     async fn try_wallet_register(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
-        info!("Msg analysis: try_wallet_register..");
+        trace!("Msg analysis: try_wallet_register..");
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
@@ -521,7 +510,7 @@ impl NetworkMsgAnalysis {
 
     // Check non-accumulated reward msgs.
     async fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
-        info!("Msg analysis: try_nonacc_rewards..");
+        trace!("Msg analysis: try_nonacc_rewards..");
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
         } else {
@@ -590,7 +579,7 @@ impl NetworkMsgAnalysis {
 
     // Check accumulated reward msgs.
     async fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
-        info!("Msg analysis: try_accumulated_rewards..");
+        trace!("Msg analysis: try_accumulated_rewards..");
         let sender = msg.most_recent_sender();
         let dst = msg.destination()?;
         let duty = if let Some(duty) = sender.duty() {
@@ -671,7 +660,7 @@ impl NetworkMsgAnalysis {
 
     // Check accumulated transfer msgs.
     async fn try_accumulated_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
-        info!("Msg analysis: try_accumulated_transfers..");
+        trace!("Msg analysis: try_accumulated_transfers..");
         let sender = msg.most_recent_sender();
         let dst = msg.destination()?;
         let duty = if let Some(duty) = sender.duty() {
@@ -709,7 +698,7 @@ impl NetworkMsgAnalysis {
 
     // Check non accumulated transfer msgss.
     async fn try_nonacc_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
-        info!("Msg analysis: try_nonacc_transfers..");
+        trace!("Msg analysis: try_nonacc_transfers..");
         // From Transfer module we get `PropagateTransfer` and `GetReplicaEvents`.
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
             duty
