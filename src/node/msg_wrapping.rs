@@ -8,7 +8,7 @@
 
 use crate::{node::node_ops::NodeMessagingDuty, AdultState, ElderState, NodeState};
 use crate::{Error, Result};
-use log::info;
+use log::{info, warn};
 use serde::Serialize;
 use sn_data_types::Signature;
 use sn_messaging::{
@@ -258,6 +258,7 @@ impl MsgWrapping {
                     NodeState::Elder(state) => state,
                 };
                 if as_section {
+                    warn!("Creating section sender!");
                     info!("Signing data as Section.");
                     let bls_key = elder_state.public_key_set().public_key();
                     MsgSender::section(TransientSectionKey { bls_key }, duty)?

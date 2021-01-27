@@ -251,6 +251,7 @@ impl Rewards {
     /// this point, but will as part of starting up.
     /// At age 5 it gets its first reward payout.
     fn add_new_node(&self, node_id: XorName) -> Result<NodeMessagingDuty> {
+        info!("Rewards: New node added: {:?}", node_id);
         let _ = self.node_rewards.insert(node_id, NodeRewards::NewNode);
         Ok(NodeMessagingDuty::NoOp)
     }

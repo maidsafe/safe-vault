@@ -204,6 +204,7 @@ impl Node {
                 if let Some(duties) = self.duties.elder_duties() {
                     duties.process_elder_duty(duty).await
                 } else if self.duties.try_enqueue_elder_duty(duty) {
+                    info!("Enqueued Elder duty");
                     Ok(NodeOperation::NoOp)
                 } else {
                     error!("Currently not an Elder!");

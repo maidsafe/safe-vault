@@ -15,7 +15,7 @@ use crate::{
     },
     Error, Network, Result,
 };
-use log::{error, info};
+use log::{debug, error, info};
 use sn_messaging::{
     Address, AdultDuties::ChunkStorage, Cmd, DataQuery, Duty, ElderDuties, Message, MessageId,
     MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse, NodeDuties, NodeEvent,
@@ -48,9 +48,21 @@ impl NetworkMsgAnalysis {
         let is_genesis_section_msg_to_section =
             matches!(dst, Address::Section(_)) && self.network.our_prefix().await.is_empty();
         let is_dst = are_we_dst
-            || are_we_handler_for_dst
+            || (are_we_handler_for_dst && !are_we_origin)
             || is_genesis_node_msg_to_self
             || is_genesis_section_msg_to_section;
+        debug!("is_dst: {}", is_dst);
+        debug!("are_we_dst: {}", are_we_dst);
+        debug!("are_we_handler_for_dst: {}", are_we_handler_for_dst);
+        debug!("are_we_origin: {}", are_we_origin);
+        debug!(
+            "is_genesis_node_msg_to_self: {}",
+            is_genesis_node_msg_to_self
+        );
+        debug!(
+            "is_genesis_section_msg_to_section: {}",
+            is_genesis_section_msg_to_section
+        );
         Ok(is_dst)
     }
 
@@ -74,6 +86,10 @@ impl NetworkMsgAnalysis {
             NodeMessagingDuty::NoOp => (),
             op => return Ok(op.into()),
         };
+        if !self.is_dst_for(msg).await? {
+            error!("Unknown message destination: {:?}", msg.id());
+            return Err(Error::Logic("Unknown message destination".to_string()));
+        }
         match self.try_system_cmd(&msg).await? {
             NodeOperation::NoOp => (),
             op => return Ok(op),
@@ -169,12 +185,37 @@ impl NetworkMsgAnalysis {
         } else {
             return Ok(NodeDuty::NoOp);
         };
+
+        let from_nodecfg =
+            || sender.is_any_node() && matches!(duty, Duty::Node(NodeDuties::NodeConfig));
+        let shall_process = from_nodecfg() && self.is_elder().await;
+        if shall_process {
+            return match &msg.message {
+                Message::NodeCmd {
+                    cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis { credit, sig }),
+                    ..
+                } => Ok(NodeDuty::ReceiveGenesisProposal {
+                    credit: credit.clone(),
+                    sig: sig.clone(),
+                }),
+                Message::NodeCmd {
+                    cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis { signed_credit, sig }),
+                    ..
+                } => Ok(NodeDuty::ReceiveGenesisAccumulation {
+                    signed_credit: signed_credit.clone(),
+                    sig: sig.clone(),
+                }),
+                _ => Ok(NodeDuty::NoOp),
+            };
+        }
+
         let from_transfer_section = || {
-            (sender.is_section() || sender.address() == dst)
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+            (
+                //sender.is_section()
+                sender.is_elder() || sender.address() == dst
+            ) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-        let shall_process =
-            from_transfer_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process = from_transfer_section() && self.is_elder().await;
         if shall_process {
             use NodeQueryResponse::Transfers;
             use NodeTransferQueryResponse::*;
@@ -192,8 +233,7 @@ impl NetworkMsgAnalysis {
 
         let from_transfer_elder =
             || sender.is_elder() && matches!(duty, Duty::Elder(ElderDuties::Transfer));
-        let shall_process =
-            from_transfer_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process = from_transfer_elder() && self.is_elder().await;
         if !shall_process {
             return Ok(NodeDuty::NoOp);
         }
@@ -245,7 +285,8 @@ impl NetworkMsgAnalysis {
             return Ok(MetadataDuty::NoOp);
         };
         let from_transfer_section = || {
-            sender.is_section()
+            //sender.is_section()
+            sender.is_elder()
                 || (sender.address() == dst) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
 
@@ -259,7 +300,7 @@ impl NetworkMsgAnalysis {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Gateway))
         };
 
-        let is_correct_dst = self.is_dst_for(msg).await? && self.is_elder().await;
+        let is_correct_dst = self.is_elder().await;
 
         let duty = if is_data_query() && from_single_gateway_elder() && is_correct_dst {
             MetadataDuty::ProcessRead(msg.clone()) // TODO: Fix these for type safety
@@ -283,7 +324,8 @@ impl NetworkMsgAnalysis {
             return Ok(AdultNoOp);
         };
         let from_metadata_section = || {
-            sender.is_section()
+            //sender.is_section()
+            sender.is_elder()
                 || (sender.address() == dst) && matches!(duty, Duty::Elder(ElderDuties::Metadata))
         };
 
@@ -305,9 +347,8 @@ impl NetworkMsgAnalysis {
             })
         };
 
-        let shall_process = (from_metadata_section() || from_adult_for_chunk_replication)
-            && self.is_dst_for(&msg).await?
-            && self.is_adult().await;
+        let shall_process =
+            (from_metadata_section() || from_adult_for_chunk_replication) && self.is_adult().await;
 
         if !shall_process {
             return Ok(AdultNoOp);
@@ -455,8 +496,7 @@ impl NetworkMsgAnalysis {
             return Ok(RewardDuty::NoOp);
         };
         let is_node_config = || matches!(duty, Duty::Node(NodeDuties::NodeConfig));
-        let shall_process =
-            is_node_config() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process = is_node_config() && self.is_elder().await;
 
         if !shall_process {
             return Ok(RewardDuty::NoOp);
@@ -495,9 +535,8 @@ impl NetworkMsgAnalysis {
             msg.most_recent_sender().is_any_node()
                 && matches!(duty, Duty::Node(NodeDuties::NodeConfig))
         };
-        let shall_process = (from_single_rewards_elder() || from_node_cfg())
-            && self.is_dst_for(msg).await?
-            && self.is_elder().await;
+        let shall_process =
+            (from_single_rewards_elder() || from_node_cfg()) && self.is_elder().await;
 
         use NodeRewardQuery::GetNodeWalletId;
         // GetNodeWalletId
@@ -531,8 +570,7 @@ impl NetworkMsgAnalysis {
             msg.most_recent_sender().is_elder()
                 && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-        let shall_process =
-            from_single_transfers_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process = from_single_transfers_elder() && self.is_elder().await;
         if !shall_process {
             return Ok(RewardDuty::NoOp);
         }
@@ -561,11 +599,11 @@ impl NetworkMsgAnalysis {
             return Ok(RewardDuty::NoOp);
         };
         let from_rewards_section = || {
-            sender.is_section()
+            //sender.is_section()
+            sender.is_elder()
                 || (sender.address() == dst) && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
-        let shall_process_accumulated =
-            from_rewards_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process_accumulated = from_rewards_section() && self.is_elder().await;
 
         use NodeQueryResponse::Rewards;
         use NodeRewardQueryResponse::GetNodeWalletId;
@@ -588,11 +626,11 @@ impl NetworkMsgAnalysis {
         }
 
         let from_transfer_section = || {
-            sender.is_section()
+            //sender.is_section()
+            sender.is_elder()
                 || (sender.address() == dst) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-        let shall_process_accumulated =
-            from_transfer_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process_accumulated = from_transfer_section() && self.is_elder().await;
 
         if !shall_process_accumulated {
             return Ok(RewardDuty::NoOp);
@@ -643,11 +681,12 @@ impl NetworkMsgAnalysis {
         };
 
         let from_transfers_section = || {
-            (sender.is_section() || sender.address() == dst)
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+            (
+                //sender.is_section()
+                sender.is_elder() || sender.address() == dst
+            ) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-        let shall_process_accumulated =
-            from_transfers_section() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process_accumulated = from_transfers_section() && self.is_elder().await;
         if !shall_process_accumulated {
             return Ok(TransferDuty::NoOp);
         }
@@ -681,8 +720,7 @@ impl NetworkMsgAnalysis {
             msg.most_recent_sender().is_elder()
                 && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
-        let shall_process =
-            from_transfer_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process = from_transfer_elder() && self.is_elder().await;
 
         use NodeTransferCmd::*;
         if shall_process {
@@ -728,8 +766,7 @@ impl NetworkMsgAnalysis {
         let from_rewards_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
-        let shall_process =
-            from_rewards_elder() && self.is_dst_for(msg).await? && self.is_elder().await;
+        let shall_process = from_rewards_elder() && self.is_elder().await;
         if shall_process {
             return match &msg.message {
                 Message::NodeCmd {

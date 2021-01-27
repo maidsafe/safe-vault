@@ -11,8 +11,9 @@ use sn_data_types::Transfer;
 
 use crate::Result;
 use sn_data_types::{
-    Blob, BlobAddress, CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer,
-    SignedTransferShare, TransferAgreementProof, TransferValidated, WalletInfo,
+    Blob, BlobAddress, Credit, CreditAgreementProof, PublicKey, ReplicaEvent, SignatureShare,
+    SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
+    WalletInfo,
 };
 use sn_messaging::{Address, MessageId, MsgEnvelope, MsgSender};
 use std::fmt::Formatter;
@@ -120,6 +121,20 @@ pub enum NodeDuty {
     AssumeAdultDuties,
     /// On being promoted, an Adult node becomes an Elder.
     AssumeElderDuties,
+    /// Bootstrap of genesis section actor.
+    ReceiveGenesisProposal {
+        /// The genesis credit.
+        credit: Credit,
+        /// An individual elder's sig over the credit.
+        sig: SignatureShare,
+    },
+    /// Bootstrap of genesis section actor.
+    ReceiveGenesisAccumulation {
+        /// The genesis credit.
+        signed_credit: SignedCredit,
+        /// An individual elder's sig over the credit.
+        sig: SignatureShare,
+    },
     /// Elder changes means the section public key
     /// changes as well, which leads to necessary updates
     /// of various places using the multisig of the section.
@@ -159,6 +174,8 @@ impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RegisterWallet(_) => write!(f, "RegisterWallet"),
+            Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
+            Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
             Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),
             Self::AssumeElderDuties => write!(f, "AssumeElderDuties"),
             Self::InitSectionWallet { .. } => write!(f, "InitSectionWallet"),

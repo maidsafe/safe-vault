@@ -16,7 +16,7 @@ use crate::{
     ElderState, Result,
 };
 use log::trace;
-use sn_data_types::{PublicKey, WalletInfo};
+use sn_data_types::{PublicKey, TransferPropagated, WalletInfo};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
@@ -50,12 +50,12 @@ impl ElderDuties {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn initiate(&mut self, genesis: bool) -> Result<NodeOperation> {
+    pub async fn initiate(&mut self, genesis: Option<TransferPropagated>) -> Result<NodeOperation> {
         let mut ops = vec![];
-        if genesis {
+        if let Some(genesis) = genesis {
             // if we are genesis
             // does local init, with no roundrip via network messaging
-            ops.push(self.key_section.init_genesis_node().await?);
+            let _ = self.key_section.init_genesis_node(genesis).await?;
         } else {
             ops.push(self.key_section.catchup_with_section().await?);
             ops.push(self.data_section.catchup_with_section().await?);
@@ -66,7 +66,7 @@ impl ElderDuties {
 
     /// Processing of any Elder duty.
     pub async fn process_elder_duty(&mut self, duty: ElderDuty) -> Result<NodeOperation> {
-        trace!("Processing elder duty");
+        trace!("Processing elder duty: {:?}", duty);
         use ElderDuty::*;
         match duty {
             ProcessNewMember(name) => self.new_node_joined(name).await,

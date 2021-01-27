@@ -15,8 +15,8 @@ use crate::{
     error::{convert_dt_error_to_error_message, convert_to_error_message},
     node::msg_wrapping::ElderMsgWrapping,
     node::node_ops::{
-        ElderDuty, IntoNodeOp, NodeMessagingDuty, NodeOperation, RewardCmd, RewardDuty,
-        TransferCmd, TransferDuty, TransferQuery,
+        ElderDuty, IntoNodeOp, NodeMessagingDuty, NodeOperation, TransferCmd, TransferDuty,
+        TransferQuery,
     },
     utils, ElderState, Error, ReplicaInfo, Result,
 };
@@ -25,14 +25,8 @@ use log::{debug, info, trace, warn};
 use sn_data_types::Transfer;
 
 use sn_data_types::{
-    CreditAgreementProof,
-    // Error as DtError,
-    PublicKey,
-    ReplicaEvent,
-    SignedTransfer,
-    SignedTransferShare,
-    TransferAgreementProof,
-    WalletInfo,
+    CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare,
+    TransferAgreementProof, TransferPropagated, WalletInfo,
 };
 use sn_messaging::{
     Address, Cmd, CmdError, ElderDuties, Error as ErrorMessage, Event, Message, MessageId,
@@ -86,27 +80,31 @@ impl Transfers {
         }
     }
 
-    pub async fn genesis(&self) -> Result<NodeOperation> {
-        let _ = self.replicas.initiate(&[]).await?;
-        // if we are genesis, we would get the genesis event via this call
-        let events = self.replicas.history(self.section_wallet_id()).await?;
+    pub async fn genesis(&self, genesis: TransferPropagated) -> Result<()> {
+        let _ = self
+            .replicas
+            .initiate(&[ReplicaEvent::TransferPropagated(genesis)])
+            .await?;
+        // // if we are genesis, we would get the genesis event via this call
+        // let events = self.replicas.history(self.section_wallet_id()).await?;
 
         match self.replicas.balance(self.section_wallet_id()).await {
             Ok(balance) => info!("Genesis balance: {}", balance),
             Err(e) => warn!("what what?!?! {}", e),
         };
 
-        // make sure we init section wallet
-        let section_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
-        Ok(RewardDuty::ProcessCmd {
-            cmd: RewardCmd::InitiateSectionWallet(WalletInfo {
-                replicas: self.replicas.replicas_pk_set(),
-                history: events.to_vec(),
-            }),
-            msg_id: MessageId::new(),
-            origin: Address::Section(section_key.into()),
-        }
-        .into())
+        Ok(())
+        // // make sure we init section wallet
+        // let section_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
+        // Ok(RewardDuty::ProcessCmd {
+        //     cmd: RewardCmd::InitiateSectionWallet(WalletInfo {
+        //         replicas: self.replicas.replicas_pk_set(),
+        //         history: events.to_vec(),
+        //     }),
+        //     msg_id: MessageId::new(),
+        //     origin: Address::Section(section_key.into()),
+        // }
+        // .into())
     }
 
     /// Issues a query to existing Replicas

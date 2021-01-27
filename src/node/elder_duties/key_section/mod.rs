@@ -23,7 +23,7 @@ use crate::{
 };
 use futures::lock::Mutex;
 use log::{info, trace};
-use sn_data_types::PublicKey;
+use sn_data_types::{PublicKey, TransferPropagated};
 use sn_routing::Prefix;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -68,8 +68,8 @@ impl KeySection {
     }
 
     /// Initiates as first node in a network.
-    pub async fn init_genesis_node(&mut self) -> Result<NodeOperation> {
-        self.transfers.genesis().await
+    pub async fn init_genesis_node(&mut self, genesis: TransferPropagated) -> Result<()> {
+        self.transfers.genesis(genesis).await
     }
 
     /// Issues queries to Elders of the section
