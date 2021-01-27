@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.37](https://github.com/maidsafe/sn_node/compare/v0.25.36...v0.25.37) (2021-01-27)
+
+
+### Features
+
+* **launch_tool:** pass RUST_LOG value to the launch_tool --rust-log arg ([662c827](https://github.com/maidsafe/sn_node/commit/662c827817c62b615c5ca68586b32e4278141a4b))
+
 ### [0.25.36](https://github.com/maidsafe/sn_node/compare/v0.25.35...v0.25.36) (2021-01-26)
 
 
