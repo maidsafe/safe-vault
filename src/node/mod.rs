@@ -101,26 +101,29 @@ impl Node {
         };
 
         let mut duties = NodeDuties::new(node_info, network_api.clone()).await;
-        let _ = match age_group {
+        let next_duty = match age_group {
             Infant => Ok(NodeOperation::NoOp),
             Adult => {
+                info!("Starting as Adult");
                 duties
                     .process_node_duty(node_ops::NodeDuty::AssumeAdultDuties)
                     .await
             }
             Elder => {
-                info!("Becoming Elder");
+                info!("Starting as Elder");
                 duties
                     .process_node_duty(node_ops::NodeDuty::AssumeElderDuties)
                     .await
             }
         };
 
-        let node = Self {
+        let mut node = Self {
             duties,
             network_api,
             network_events,
         };
+
+        node.process_while_any(next_duty).await;
 
         Ok(node)
     }
