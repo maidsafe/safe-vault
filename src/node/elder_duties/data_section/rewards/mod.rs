@@ -361,19 +361,35 @@ impl Rewards {
     /// 4. When the section becomes aware that a node has left,
     /// its account is deactivated.
     fn deactivate(&self, node_id: XorName) -> Result<NodeMessagingDuty> {
+        debug!("Rewards: trying to deactivate {}", node_id);
         let entry = match self.node_rewards.get(&node_id) {
             Some(entry) => entry.clone(),
-            None => return Ok(NodeMessagingDuty::NoOp),
+            None => return Err(Error::NodeNotFound),
         };
+        debug!("Rewards: node {} found as {:?}, deactivating..", node_id, entry);
         let wallet = match entry {
             NodeRewards::Active { wallet, .. } => wallet,
+            NodeRewards::AwaitingRelocation(_) => {
+                debug!("Rewards: {} is already awaiting relocation", node_id);
+                return Ok(NodeMessagingDuty::NoOp);
+            }
             NodeRewards::AwaitingActivation { .. } // hmm.. left when AwaitingActivation is a tricky case.. // Might be case for lazy messaging..
-            | NodeRewards::AwaitingRelocation(_)
-            | NodeRewards::NewNode => return Ok(NodeMessagingDuty::NoOp),
+            | NodeRewards::NewNode => {
+                debug!("Rewards: Could not deactivate {}, node was never activated!", node_id);
+                return Err(Error::Logic(format!("Rewards: Could not deactivate {}, node was never activated!", node_id)));
+            }
         };
+        debug!(
+            "Rewards: Active node {} is using wallet {}..",
+            node_id, wallet
+        );
         let _ = self
             .node_rewards
             .insert(node_id, NodeRewards::AwaitingRelocation(wallet));
+        debug!(
+            "Rewards: deactivated {}. It is now awaiting relocation.",
+            node_id
+        );
         Ok(NodeMessagingDuty::NoOp)
     }
 
