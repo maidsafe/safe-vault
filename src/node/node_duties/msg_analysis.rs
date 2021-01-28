@@ -77,7 +77,11 @@ impl NetworkMsgAnalysis {
             op => return Ok(op.into()),
         };
         if !self.is_dst_for(msg).await? {
-            error!("Unknown message destination: {:?}, for {:?}", msg.destination()?, msg.id());
+            error!(
+                "Unknown message destination: {:?}, for {:?}",
+                msg.destination()?,
+                msg.id()
+            );
             return Err(Error::Logic("Unknown message destination".to_string()));
         }
         match self.try_system_cmd(&msg).await? {
@@ -200,10 +204,8 @@ impl NetworkMsgAnalysis {
         }
 
         let from_transfer_section = || {
-            (
-                sender.is_section()
-                 || sender.address() == dst
-            ) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+            (sender.is_section() || sender.address() == dst)
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
         let shall_process = from_transfer_section() && self.is_elder().await;
         if shall_process {
@@ -667,10 +669,8 @@ impl NetworkMsgAnalysis {
         };
 
         let from_transfers_section = || {
-            (
-                sender.is_section()
-                || sender.address() == dst
-            ) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
+            (sender.is_section() || sender.address() == dst)
+                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
         let shall_process_accumulated = from_transfers_section() && self.is_elder().await;
         if !shall_process_accumulated {
