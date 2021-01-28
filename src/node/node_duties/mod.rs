@@ -27,7 +27,7 @@ use log::{debug, info, trace};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use sn_data_types::{
-    Credit, CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignatureShare, SignedCredit,
+    ActorHistory, Credit, CreditAgreementProof, Money, PublicKey, SignatureShare, SignedCredit,
     TransferPropagated, WalletInfo,
 };
 use sn_messaging::{
@@ -583,7 +583,10 @@ impl NodeDuties {
                         .finish_transition_to_elder(
                             WalletInfo {
                                 replicas: genesis.credit_proof.debiting_replicas_keys.clone(),
-                                history: vec![ReplicaEvent::TransferPropagated(genesis.clone())],
+                                history: ActorHistory {
+                                    credits: vec![genesis.credit_proof.clone()],
+                                    debits: vec![],
+                                },
                             },
                             Some(genesis),
                         )

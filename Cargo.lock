@@ -2387,7 +2387,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_data_types"
 version = "0.13.3"
-source = "git+https://github.com/oetyng/sn_data_types?branch=rewards-flow#b4666669f5b78ce2197eea2e5ea786f28708f032"
+source = "git+https://github.com/oetyng/sn_data_types?branch=rewards-flow#f6a420798ce26bc81094993fc0416e2c525ee7f9"
 dependencies = [
  "bincode",
  "crdts",
@@ -2421,7 +2421,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "1.5.5"
-source = "git+https://github.com/oetyng/sn_messaging?branch=rewards-flow#51de54f2551f75da73fd394b1ecf61db726efe8a"
+source = "git+https://github.com/oetyng/sn_messaging?branch=rewards-flow#ae647a184525c1974e2829fe57c37ea11a95366b"
 dependencies = [
  "bytes 1.0.1",
  "cookie-factory",
@@ -2521,7 +2521,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.2.10"
-source = "git+https://github.com/oetyng/sn_transfers?branch=rewards-flow#f06d41a2d5560ddae843b04b72ec60b952b4b69f"
+source = "git+https://github.com/oetyng/sn_transfers?branch=rewards-flow#0dee69e830d517b3a6450e03de45866f49f35ea4"
 dependencies = [
  "bincode",
  "crdts",

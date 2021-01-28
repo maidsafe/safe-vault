@@ -16,7 +16,7 @@ use crate::{
 };
 use log::{error, info};
 use sn_data_types::{
-    CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignedTransferShare, TransferValidated,
+    ActorHistory, CreditAgreementProof, Money, PublicKey, SignedTransferShare, TransferValidated,
     WalletInfo,
 };
 use sn_messaging::{Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery};
@@ -75,10 +75,10 @@ impl SectionFunds {
         self.actor.replicas()
     }
 
-    /// Replica events get synched to section actor instances.
-    pub async fn synch(&mut self, events: Vec<ReplicaEvent>) -> Result<NodeMessagingDuty> {
+    /// Replica history are synched to section actor instances.
+    pub async fn synch(&mut self, history: ActorHistory) -> Result<NodeMessagingDuty> {
         info!("Synching replica events to section transfer actor...");
-        if let Some(event) = self.actor.from_history(events).map_err(Error::Transfer)? {
+        if let Some(event) = self.actor.from_history(history).map_err(Error::Transfer)? {
             self.actor.apply(TransfersSynched(event.clone()))?;
             info!("Synched: {:?}", event);
         }
@@ -343,7 +343,6 @@ impl SectionFunds {
             ));
         }
 
-        use sn_data_types::ReplicaEvent::*;
         // Set the next actor to be our current.
         self.actor = self
             .state
@@ -354,13 +353,10 @@ impl SectionFunds {
         // // cannot do this here: self.state.finished.clear();
 
         // Credit the transfer to the new actor.
-        match self.actor.from_history(vec![TransferPropagated(
-            sn_data_types::TransferPropagated {
-                credit_proof,
-                crediting_replica_keys: self.actor.replicas(),
-                crediting_replica_sig: dummy_sig(),
-            },
-        )]) {
+        match self.actor.from_history(ActorHistory {
+            credits: vec![credit_proof],
+            debits: vec![],
+        }) {
             Ok(Some(event)) => self.apply(TransfersSynched(event))?,
             Ok(None) => (),
             Err(error) => return Err(Error::Transfer(error)),
@@ -393,16 +389,5 @@ impl SectionFunds {
 
     fn has_payout_in_flight(&self) -> bool {
         self.state.payout_in_flight.is_some()
-    }
-}
-
-use bls::SecretKeyShare;
-use sn_data_types::SignatureShare;
-fn dummy_sig() -> SignatureShare {
-    let dummy_shares = SecretKeyShare::default();
-    let dummy_sig = dummy_shares.sign("DUMMY MSG");
-    SignatureShare {
-        index: 0,
-        share: dummy_sig,
     }
 }

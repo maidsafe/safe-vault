@@ -13,8 +13,9 @@ use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::info;
 use sn_data_types::{
-    CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare,
-    TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
+    ActorHistory, CreditAgreementProof, Money, PublicKey, ReplicaEvent, SignedTransfer,
+    SignedTransferShare, TransferAgreementProof, TransferPropagated, TransferRegistered,
+    TransferValidated,
 };
 use sn_transfers::{Error as TransfersError, WalletOwner, WalletReplica};
 use std::path::PathBuf;
@@ -68,9 +69,8 @@ impl Replicas {
         Ok(events)
     }
 
-    /// History of events
-    pub async fn history(&self, id: PublicKey) -> Result<Vec<ReplicaEvent>> {
-        debug!("Replica history get");
+    /// History of actor
+    pub async fn history(&self, id: PublicKey) -> Result<ActorHistory> {
         let store = TransferStore::new(id.into(), &self.root_dir, Init::Load);
 
         if let Err(error) = store {
@@ -81,15 +81,56 @@ impl Replicas {
                 err_string.contains("The system cannot find the file specified");
             if no_such_file_or_dir || system_cannot_find_file {
                 // we have no history yet, so lets report that.
-                return Ok(vec![]);
+                return Ok(ActorHistory::empty());
             }
 
             return Err(error);
         };
 
         let store = store?;
+        let events = store.get_all();
 
-        Ok(store.get_all())
+        if events.is_empty() {
+            return Ok(ActorHistory::empty());
+        }
+
+        let history = ActorHistory {
+            credits: self.get_credits(&events),
+            debits: self.get_debits(events),
+        };
+
+        Ok(history)
+    }
+
+    fn get_credits(&self, events: &[ReplicaEvent]) -> Vec<CreditAgreementProof> {
+        use itertools::Itertools;
+        let valid_credits = events
+            .iter()
+            .filter_map(|e| match e {
+                ReplicaEvent::TransferPropagated(e) => Some(e.credit_proof.clone()),
+                _ => None,
+            })
+            .unique_by(|e| *e.id())
+            .collect();
+
+        valid_credits
+    }
+
+    fn get_debits(&self, events: Vec<ReplicaEvent>) -> Vec<TransferAgreementProof> {
+        use itertools::Itertools;
+        let mut debits: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                ReplicaEvent::TransferRegistered(e) => Some(e),
+                _ => None,
+            })
+            .unique_by(|e| e.id())
+            .map(|e| e.transfer_proof.clone())
+            .collect();
+
+        debits.sort_by_key(|t| t.id().counter);
+
+        debits
     }
 
     ///
@@ -338,6 +379,31 @@ impl Replicas {
         }
     }
 
+    async fn get_load_or_create_store(
+        &self,
+        id: PublicKey,
+    ) -> Result<Arc<Mutex<TransferStore<ReplicaEvent>>>> {
+        let self_lock = self.self_lock.lock().await;
+        // get or create the store for PK.
+        let key_lock = match self.load_key_lock(id).await {
+            Ok(lock) => lock,
+            Err(_) => {
+                let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
+                    Ok(store) => store,
+                    // no key lock, so we create one for this simulated payout...
+                    Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
+                };
+                debug!("store retrieved..");
+                let locked_store = Arc::new(Mutex::new(store));
+                let _ = self.locks.insert(id, locked_store.clone());
+                locked_store
+            }
+        };
+        let _ = self_lock.overflowing_add(0); // resolve: is a usage at end of block necessary to actually engage the lock?
+
+        Ok(key_lock)
+    }
+
     // ------------------------------------------------------------------
     //  ------------------------- Genesis ------------------------------
     // ------------------------------------------------------------------
@@ -476,32 +542,6 @@ impl Replicas {
         Ok(())
     }
 
-    //#[cfg(feature = "simulated-payouts")]
-    async fn get_load_or_create_store(
-        &self,
-        id: PublicKey,
-    ) -> Result<Arc<Mutex<TransferStore<ReplicaEvent>>>> {
-        let self_lock = self.self_lock.lock().await;
-        // get or create the store for PK.
-        let key_lock = match self.load_key_lock(id).await {
-            Ok(lock) => lock,
-            Err(_) => {
-                let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
-                    Ok(store) => store,
-                    // no key lock, so we create one for this simulated payout...
-                    Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
-                };
-                debug!("store retrieved..");
-                let locked_store = Arc::new(Mutex::new(store));
-                let _ = self.locks.insert(id, locked_store.clone());
-                locked_store
-            }
-        };
-        let _ = self_lock.overflowing_add(0); // resolve: is a usage at end of block necessary to actually engage the lock?
-
-        Ok(key_lock)
-    }
-
     /// For now, with test money there is no from wallet.., money is created from thin air.
     #[allow(unused)] // TODO: Can this be removed?
     #[cfg(feature = "simulated-payouts")]
@@ -592,30 +632,32 @@ mod test {
     use sn_data_types::{Keypair, Money, PublicKey, SignedTransferShare};
     use sn_routing::SectionProofChain;
     use sn_transfers::{ActorEvent, ReplicaValidator, TransferActor as Actor, Wallet, WalletOwner};
-    use std::path::PathBuf;
     use std::sync::Arc;
     use tempdir::TempDir;
 
     #[test]
     fn section_actor_transition() -> Result<()> {
-        let root_dir = temp_dir()?;
-        let (mut section, peer_replicas) = get_section(root_dir.path().to_path_buf(), 1)?;
+        let (mut section, peer_replicas) = get_section(1)?;
         println!("Got genesis section");
 
-        let (genesis_replicas, mut actor) = section.remove(0);
+        let (genesis_replicas, mut genesis_actor) = section.remove(0);
         let _ = run(genesis_replicas.initiate(&[]))?;
         println!("Genesis replica initiated");
+        println!(
+            "Genesis balance: {:?}",
+            run(genesis_replicas.balance(genesis_actor.id()))?
+        );
 
         let section_key = PublicKey::Bls(genesis_replicas.replicas_pk_set().public_key());
 
         // make sure all keys are the same
-        assert_eq!(peer_replicas, actor.owner().public_key_set()?);
+        assert_eq!(peer_replicas, genesis_actor.owner().public_key_set()?);
         assert_eq!(section_key, PublicKey::Bls(peer_replicas.public_key()));
 
         // we are genesis, we should get the genesis event via this call
         let events = run(genesis_replicas.history(section_key))?;
-        match actor.from_history(events)? {
-            Some(event) => actor.apply(ActorEvent::TransfersSynched(event))?,
+        match genesis_actor.from_history(events)? {
+            Some(event) => genesis_actor.apply(ActorEvent::TransfersSynched(event))?,
             None => {
                 return Err(Error::Logic(
                     "We should be able to synch genesis event here.".to_string(),
@@ -624,12 +666,12 @@ mod test {
         }
 
         // Elders changed!
-        let (section, peer_replicas) = get_section(root_dir.path().to_path_buf(), 2)?;
+        let (section, peer_replicas) = get_section(2)?;
         let recipient = PublicKey::Bls(peer_replicas.public_key());
 
         // transfer the section funds to new section actor
-        let init = match actor.transfer(
-            actor.balance(),
+        let init = match genesis_actor.transfer(
+            genesis_actor.balance(),
             recipient,
             "Transition to next section actor".to_string(),
         )? {
@@ -641,13 +683,13 @@ mod test {
             }
         };
         // the new elder will not partake in this operation (hence only one doing it here)
-        let _ = actor.apply(ActorEvent::TransferInitiated(init.clone()))?;
+        let _ = genesis_actor.apply(ActorEvent::TransferInitiated(init.clone()))?;
         println!("Transition to next actor initiated");
 
         let signed_transfer = SignedTransferShare::new(
             init.signed_debit.as_share()?,
             init.signed_credit.as_share()?,
-            actor.owner().public_key_set()?,
+            genesis_actor.owner().public_key_set()?,
         )?;
 
         let validation = match run(genesis_replicas.propose_validation(&signed_transfer))? {
@@ -661,7 +703,7 @@ mod test {
         println!("Transfer validation proposed and validated");
 
         // accumulate validations
-        let event = match actor.receive(validation)? {
+        let event = match genesis_actor.receive(validation)? {
             Some(event) => event,
             None => {
                 return Err(Error::Logic(
@@ -674,7 +716,6 @@ mod test {
             Some(transfer_proof) => {
                 let _registered = run(genesis_replicas.register(&transfer_proof))?;
                 println!("Validation registered");
-                // since we register at same replicas that we propagate to, this step is not strictly necessary:
                 let _propagated =
                     run(genesis_replicas.receive_propagated(&transfer_proof.credit_proof()))?;
                 println!("Validation propagated");
@@ -682,24 +723,49 @@ mod test {
             None => return Err(Error::Logic("We should have a proof here.".to_string())),
         }
 
-        let history = run(genesis_replicas.history(section_key))?;
-        println!("Genesis history len: {:?}", history.len());
+        println!(
+            "Genesis balance: {:?}",
+            run(genesis_replicas.balance(genesis_actor.id()))?
+        );
 
-        for (elder_replicas, mut actor) in section {
-            let _ = run(elder_replicas.initiate(&history))?;
-            match actor.from_history(history.clone())? {
-                Some(event) => actor.apply(ActorEvent::TransfersSynched(event))?,
+        let genesis_history = run(genesis_replicas.history(section_key))?;
+        match genesis_actor.from_history(genesis_history)? {
+            Some(event) => genesis_actor.apply(ActorEvent::TransfersSynched(event))?,
+            None => {
+                return Err(Error::Logic(
+                    "We should be able to synch genesis_actor here.".to_string(),
+                ))
+            }
+        }
+        assert_eq!(genesis_actor.balance(), Money::zero());
+        assert_eq!(
+            genesis_actor.balance(),
+            run(genesis_replicas.balance(genesis_actor.id()))?
+        );
+
+        let replica_events = run(genesis_replicas.all_events())?;
+
+        for (elder_replicas, mut next_section_actor_share) in section {
+            let _ = run(elder_replicas.initiate(&replica_events))?;
+            let history = run(elder_replicas.history(next_section_actor_share.id()))?;
+            match next_section_actor_share.from_history(history.clone())? {
+                Some(event) => {
+                    next_section_actor_share.apply(ActorEvent::TransfersSynched(event))?
+                }
                 None => {
                     return Err(Error::Logic(
-                        "We should be able to synch actor here.".to_string(),
+                        "We should be able to synch actor_instance here.".to_string(),
                     ))
                 }
             }
             assert_eq!(
-                actor.balance(),
+                next_section_actor_share.balance(),
                 Money::from_nano(u32::MAX as u64 * 1_000_000_000)
             );
-            assert_eq!(actor.balance(), run(elder_replicas.balance(actor.id()))?);
+            assert_eq!(
+                next_section_actor_share.balance(),
+                run(elder_replicas.balance(next_section_actor_share.id()))?
+            );
         }
         println!("FULL FLOW COMPLETED!");
 
@@ -711,14 +777,14 @@ mod test {
     }
 
     type Section = Vec<(Replicas, Actor<Validator>)>;
-    fn get_section(root_dir: PathBuf, count: u8) -> Result<(Section, PublicKeySet)> {
+    fn get_section(count: u8) -> Result<(Section, PublicKeySet)> {
         let mut rng = rand::thread_rng();
         let threshold = count as usize - 1;
         let bls_secret_key = SecretKeySet::random(threshold, &mut rng);
         let peer_replicas = bls_secret_key.public_keys();
 
         let section = (0..count as usize)
-            .map(|key_index| get_replica(key_index, bls_secret_key.clone(), root_dir.clone()))
+            .map(|key_index| get_replica(key_index, bls_secret_key.clone()))
             .filter_map(|res| res.ok())
             .collect();
 
@@ -728,7 +794,6 @@ mod test {
     fn get_replica(
         key_index: usize,
         bls_secret_key: SecretKeySet,
-        root_dir: PathBuf,
     ) -> Result<(Replicas, Actor<Validator>)> {
         let peer_replicas = bls_secret_key.public_keys();
         let secret_key_share = bls_secret_key.secret_key_share(key_index);
@@ -743,7 +808,8 @@ mod test {
             signing: Arc::new(Mutex::new(signing)),
             initiating: true,
         };
-        let replicas = Replicas::new(root_dir, info)?;
+        let root_dir = temp_dir()?;
+        let replicas = Replicas::new(root_dir.path().to_path_buf(), info)?;
 
         let keypair =
             Keypair::new_bls_share(0, bls_secret_key.secret_key_share(0), peer_replicas.clone());

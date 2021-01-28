@@ -80,31 +80,11 @@ impl Transfers {
         }
     }
 
+    ///
     pub async fn genesis(&self, genesis: TransferPropagated) -> Result<()> {
-        let _ = self
-            .replicas
+        self.replicas
             .initiate(&[ReplicaEvent::TransferPropagated(genesis)])
-            .await?;
-        // // if we are genesis, we would get the genesis event via this call
-        // let events = self.replicas.history(self.section_wallet_id()).await?;
-
-        match self.replicas.balance(self.section_wallet_id()).await {
-            Ok(balance) => info!("Genesis balance: {}", balance),
-            Err(e) => warn!("what what?!?! {}", e),
-        };
-
-        Ok(())
-        // // make sure we init section wallet
-        // let section_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
-        // Ok(RewardDuty::ProcessCmd {
-        //     cmd: RewardCmd::InitiateSectionWallet(WalletInfo {
-        //         replicas: self.replicas.replicas_pk_set(),
-        //         history: events.to_vec(),
-        //     }),
-        //     msg_id: MessageId::new(),
-        //     origin: Address::Section(section_key.into()),
-        // }
-        // .into())
+            .await
     }
 
     /// Issues a query to existing Replicas
