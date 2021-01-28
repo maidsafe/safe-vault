@@ -685,7 +685,7 @@ impl NodeDuties {
             Stage::AssumingElderDuties(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::AwaitingGenesisThreshold(_) => Ok(NodeOperation::NoOp),
             Stage::ProposingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
-            Stage::AccumulatingGenesis(_) => unimplemented!(),
+            Stage::AccumulatingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::Adult(_old_state) => {
                 let state =
                     AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;

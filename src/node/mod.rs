@@ -194,7 +194,6 @@ impl Node {
         use NetworkDuty::*;
         match duty {
             RunAsAdult(duty) => {
-                info!("Running as Adult: {:?}", duty);
                 if let Some(duties) = self.duties.adult_duties() {
                     duties.process_adult_duty(duty).await
                 } else {
@@ -203,7 +202,6 @@ impl Node {
                 }
             }
             RunAsElder(duty) => {
-                info!("Running as Elder: {:?}", duty);
                 if let Some(duties) = self.duties.elder_duties() {
                     duties.process_elder_duty(duty).await
                 } else if self.duties.try_enqueue_elder_duty(duty) {
@@ -214,10 +212,7 @@ impl Node {
                     Err(Error::Logic("Currently not an Elder".to_string()))
                 }
             }
-            RunAsNode(duty) => {
-                info!("Running as Node: {:?}", duty);
-                self.duties.process_node_duty(duty).await
-            }
+            RunAsNode(duty) => self.duties.process_node_duty(duty).await,
             NoOp => Ok(NodeOperation::NoOp),
         }
     }

@@ -335,6 +335,10 @@ impl Rewards {
                 match *state {
                     // ..and validate its state.
                     NodeRewards::AwaitingActivation(age) => age,
+                    NodeRewards::Active { .. } => {
+                        info!("Node already activated.");
+                        return Ok(NodeMessagingDuty::NoOp);
+                    }
                     _ => {
                         warn!("Invalid operation: Node is not awaiting reward activation.");
                         return Err(Error::NetworkData(DtError::InvalidOperation));
@@ -435,9 +439,9 @@ impl Rewards {
         // taken over by the new section.
         let _ = self.node_rewards.remove(&old_node_id);
 
-        // Send the reward counter to the new section.
+        // Send the wallet key to the new section.
         // Once received over there, the new section
-        // will pay out the accumulated rewards to the wallet.
+        // will pay out rewards to the wallet.
         use NodeQueryResponse::*;
         use NodeRewardQueryResponse::*;
         self.wrapping

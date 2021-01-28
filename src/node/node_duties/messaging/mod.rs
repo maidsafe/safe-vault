@@ -10,7 +10,6 @@ pub mod network_sender;
 
 use crate::node::node_ops::{NodeMessagingDuty, NodeOperation};
 use crate::{Network, Result};
-use log::info;
 use network_sender::NetworkSender;
 
 /// Sending of messages
@@ -30,7 +29,6 @@ impl Messaging {
         duty: NodeMessagingDuty,
     ) -> Result<NodeOperation> {
         use NodeMessagingDuty::*;
-        info!("Sending message: {:?}", duty);
         match duty {
             SendToClient(msg) => self.network_sender.send_to_client(msg, true).await,
             SendToNode(msg) => self.network_sender.send_to_node(msg, true).await,
