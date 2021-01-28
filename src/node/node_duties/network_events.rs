@@ -17,7 +17,7 @@ use hex_fmt::HexFmt;
 use log::{error, info, trace};
 use sn_data_types::PublicKey;
 use sn_messaging::MsgEnvelope;
-use sn_routing::{Event as RoutingEvent, MIN_AGE};
+use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use xor_name::XorName;
 
 /// Maps events from the transport layer
@@ -61,10 +61,6 @@ impl NetworkEvents {
 
         trace!("Processing Routing Event: {:?}", event);
         match event {
-            RoutingEvent::PromotedToElder => {
-                info!("Node promoted to Elder");
-                self.duty_cfg.setup_as_elder().await
-            }
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
                 self.log_node_counts().await;
@@ -112,12 +108,36 @@ impl NetworkEvents {
                 key,
                 elders,
                 prefix,
-            } => Ok(ProcessElderChange {
-                prefix,
-                key: PublicKey::Bls(key),
-                elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+                self_status_change,
+            } => {
+                let mut ops = Vec::new();
+                match self_status_change {
+                    NodeElderChange::Promoted => ops.push(self.duty_cfg.setup_as_elder().await?),
+                    NodeElderChange::Demoted => {
+                        let age = network.age().await;
+                        if age > MIN_AGE {
+                            info!("Node promoted to Adult");
+                            info!("Our Age: {:?}", age);
+                            ops.push(self.duty_cfg.setup_as_adult()?);
+                        } else {
+                            info!("We are not Adult, do nothing");
+                            info!("Our Age: {:?}", age);
+                        }
+                    }
+                    NodeElderChange::None => {
+                        trace!("Node status has not changed");
+                    }
+                }
+                ops.push(
+                    ProcessElderChange {
+                        prefix,
+                        key: PublicKey::Bls(key),
+                        elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+                    }
+                    .into(),
+                );
+                Ok(ops.into())
             }
-            .into()),
             RoutingEvent::Relocated { .. } => {
                 // Check our current status
                 let age = network.age().await;
@@ -127,18 +147,6 @@ impl NetworkEvents {
                     self.duty_cfg.setup_as_adult()
                 } else {
                     info!("Our AGE: {:?}", age);
-                    Ok(NodeOperation::NoOp)
-                }
-            }
-            RoutingEvent::Demoted => {
-                let age = network.age().await;
-                if age > MIN_AGE {
-                    info!("Node promoted to Adult");
-                    info!("Our Age: {:?}", age);
-                    self.duty_cfg.setup_as_adult()
-                } else {
-                    info!("We are not Adult, do nothing");
-                    info!("Our Age: {:?}", age);
                     Ok(NodeOperation::NoOp)
                 }
             }
