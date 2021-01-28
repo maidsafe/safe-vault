@@ -20,7 +20,7 @@ env:
 jobs:
   build_win_mac:
     if: github.repository_owner == 'maidsafe'
-    name: Build_win_mac
+    name: Build Windows & macOS
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -44,6 +44,7 @@ jobs:
 
       # Cache.
       - name: Cargo cache registry, index and build
+        if: matrix.os != 'macOS-latest'
         uses: actions/cache@v2
         with:
           path: |
