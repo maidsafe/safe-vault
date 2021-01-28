@@ -47,6 +47,7 @@ impl NetworkMsgAnalysis {
         let are_we_handler_for_dst = self.self_is_handler_for(&dst.xorname()).await;
         let is_genesis_section_msg_to_section =
             matches!(dst, Address::Section(_)) && self.network.our_prefix().await.is_empty();
+
         let is_dst = are_we_dst
             || (are_we_handler_for_dst && !are_we_origin)
             || is_genesis_node_msg_to_self
@@ -76,7 +77,7 @@ impl NetworkMsgAnalysis {
             op => return Ok(op.into()),
         };
         if !self.is_dst_for(msg).await? {
-            error!("Unknown message destination: {:?}", msg.id());
+            error!("Unknown message destination: {:?}, for {:?}", msg.destination()?, msg.id());
             return Err(Error::Logic("Unknown message destination".to_string()));
         }
         match self.try_system_cmd(&msg).await? {
@@ -200,8 +201,8 @@ impl NetworkMsgAnalysis {
 
         let from_transfer_section = || {
             (
-                //sender.is_section()
-                sender.is_elder() || sender.address() == dst
+                sender.is_section()
+                 || sender.address() == dst
             ) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
         let shall_process = from_transfer_section() && self.is_elder().await;
@@ -274,8 +275,7 @@ impl NetworkMsgAnalysis {
             return Ok(MetadataDuty::NoOp);
         };
         let from_transfer_section = || {
-            //sender.is_section()
-            sender.is_elder()
+            sender.is_section()
                 || (sender.address() == dst) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
 
@@ -313,8 +313,7 @@ impl NetworkMsgAnalysis {
             return Ok(AdultNoOp);
         };
         let from_metadata_section = || {
-            //sender.is_section()
-            sender.is_elder()
+            sender.is_section()
                 || (sender.address() == dst) && matches!(duty, Duty::Elder(ElderDuties::Metadata))
         };
 
@@ -588,8 +587,7 @@ impl NetworkMsgAnalysis {
             return Ok(RewardDuty::NoOp);
         };
         let from_rewards_section = || {
-            //sender.is_section()
-            sender.is_elder()
+            sender.is_section()
                 || (sender.address() == dst) && matches!(duty, Duty::Elder(ElderDuties::Rewards))
         };
         let shall_process_accumulated = from_rewards_section() && self.is_elder().await;
@@ -615,8 +613,7 @@ impl NetworkMsgAnalysis {
         }
 
         let from_transfer_section = || {
-            //sender.is_section()
-            sender.is_elder()
+            sender.is_section()
                 || (sender.address() == dst) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
         let shall_process_accumulated = from_transfer_section() && self.is_elder().await;
@@ -671,8 +668,8 @@ impl NetworkMsgAnalysis {
 
         let from_transfers_section = || {
             (
-                //sender.is_section()
-                sender.is_elder() || sender.address() == dst
+                sender.is_section()
+                || sender.address() == dst
             ) && matches!(duty, Duty::Elder(ElderDuties::Transfer))
         };
         let shall_process_accumulated = from_transfers_section() && self.is_elder().await;

@@ -2386,8 +2386,8 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
-version = "0.13.2"
-source = "git+https://github.com/oetyng/sn_data_types?branch=rewards-flow#f7dbd070bf449cf4547c05e0f7041999cc07f421"
+version = "0.13.3"
+source = "git+https://github.com/oetyng/sn_data_types?branch=rewards-flow#b4666669f5b78ce2197eea2e5ea786f28708f032"
 dependencies = [
  "bincode",
  "crdts",
@@ -2446,7 +2446,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.25.37"
+version = "0.25.39"
 dependencies = [
  "async-log",
  "base64 0.10.1",
