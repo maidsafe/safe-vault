@@ -72,21 +72,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alloc-no-stdlib"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5192ec435945d87bc2f70992b4d818154b5feede43c09fb7592146374eac90a6"
-
-[[package]]
-name = "alloc-stdlib"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "697ed7edc0f1711de49ce108c541623a0af97c6c60b2f6e2b65229847ac843c2"
-dependencies = [
- "alloc-no-stdlib",
-]
-
-[[package]]
 name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -133,17 +118,6 @@ dependencies = [
  "proc-macro2 0.4.30",
  "quote 0.6.13",
  "syn 0.15.44",
-]
-
-[[package]]
-name = "async-trait"
-version = "0.1.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d3a45e77e34375a7923b1e8febb049bb011f064714a8e17a1a616fef01da13d"
-dependencies = [
- "proc-macro2 1.0.24",
- "quote 1.0.8",
- "syn 1.0.60",
 ]
 
 [[package]]
@@ -349,27 +323,6 @@ dependencies = [
  "serde",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
-]
-
-[[package]]
-name = "brotli"
-version = "3.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f29919120f08613aadcd4383764e00526fc9f18b6c0895814faeed0dd78613e"
-dependencies = [
- "alloc-no-stdlib",
- "alloc-stdlib",
- "brotli-decompressor",
-]
-
-[[package]]
-name = "brotli-decompressor"
-version = "2.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1052e1c3b8d4d80eb84a8b94f0a1498797b5fb96314c001156a1c761940ef4ec"
-dependencies = [
- "alloc-no-stdlib",
- "alloc-stdlib",
 ]
 
 [[package]]
@@ -2205,26 +2158,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "self_encryption"
-version = "0.19.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec58d4a64752fe962b532e2fa640b60541690e821ec0db4ea4a23334a7ea93fd"
-dependencies = [
- "aes",
- "async-trait",
- "bincode",
- "block-modes",
- "brotli",
- "err-derive",
- "futures",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "serde",
- "tiny-keccak 1.5.0",
- "tokio",
-]
-
-[[package]]
 name = "self_update"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2386,8 +2319,9 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
-version = "0.13.3"
-source = "git+https://github.com/oetyng/sn_data_types?branch=rewards-flow#f6a420798ce26bc81094993fc0416e2c525ee7f9"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ef76832278def48ac752eaaabd65146f39d406e255e521ef97e77ee8a1f69cb"
 dependencies = [
  "bincode",
  "crdts",
@@ -2420,8 +2354,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "1.5.5"
-source = "git+https://github.com/oetyng/sn_messaging?branch=rewards-flow#ae647a184525c1974e2829fe57c37ea11a95366b"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2dc39fb2b48659dec140188d3578c99a42f9d024addad690fa8339780830109"
 dependencies = [
  "bytes 1.0.1",
  "cookie-factory",
@@ -2470,7 +2405,6 @@ dependencies = [
  "quick-error",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
- "self_encryption",
  "self_update",
  "serde",
  "serde_json",
@@ -2520,8 +2454,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.2.10"
-source = "git+https://github.com/oetyng/sn_transfers?branch=rewards-flow#0dee69e830d517b3a6450e03de45866f49f35ea4"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25c80c34f45d082a24d3b15e743aad9810c1d5cf45410adc690ddb1c69ea8298"
 dependencies = [
  "bincode",
  "crdts",
