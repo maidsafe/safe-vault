@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.40](https://github.com/maidsafe/sn_node/compare/v0.25.39...v0.25.40) (2021-01-29)
+
+
+### Features
+
+* **elder_change:** add finish step ([ef17827](https://github.com/maidsafe/sn_node/commit/ef17827de2e120f9f66dd6c1dd76946bfa9626bf))
+* **multisig-actor:** use transfer share logic ([1e437a4](https://github.com/maidsafe/sn_node/commit/1e437a45b8a45f546e193f24f2500677766a64a9))
+* **section_funds:** use other section as replicas ([43e61b6](https://github.com/maidsafe/sn_node/commit/43e61b63e43598c4ac53254b888e81fdb1230235))
+* **transfers:** impl multisig validation proposal ([56a9ef3](https://github.com/maidsafe/sn_node/commit/56a9ef386a11c35f78150f9f812377fa6ba03754))
+
+
+### Bug Fixes
+
+* check for is_section not is_elder in msg_analysis ([fc9841b](https://github.com/maidsafe/sn_node/commit/fc9841b39ce62fabceed1d64c191bb0203ba6753))
+* **adult:** instantiate new adult state ([bd805f2](https://github.com/maidsafe/sn_node/commit/bd805f243e9e498ccd2a7bb951336a926f9f4ff2))
+* **clippy:** remove conversion to same type ([237d791](https://github.com/maidsafe/sn_node/commit/237d791b6d70bfc6c3166fc64685e892fa7ebded))
+* **genesis:** use sn_transfer genesis ([f14b376](https://github.com/maidsafe/sn_node/commit/f14b376beea6f3ea6c8ed4f04624f6d65c29ed95))
+* **init:** process results at assuming duties ([e1a85d6](https://github.com/maidsafe/sn_node/commit/e1a85d603b8baac2c843245365b9c0537bde7811))
+* **msganalysis:** expect validation from transfers ([a5f96fc](https://github.com/maidsafe/sn_node/commit/a5f96fc768e6366cc9ab51130c9cbaf41ea89981))
+* **rewards:** return error when deactivation fails ([452a458](https://github.com/maidsafe/sn_node/commit/452a4582f8abd52193d1e515caa775f520a6786a))
+* add node signing to adult and elder state ([bba2b96](https://github.com/maidsafe/sn_node/commit/bba2b96523d4e4f76a86c6a835baf2fc90657f2a))
+* botched conversion ([f681c24](https://github.com/maidsafe/sn_node/commit/f681c2422ac1e9c9e27121383fb1d50499683384))
+* clippy warnings ([3b667ef](https://github.com/maidsafe/sn_node/commit/3b667ef9e2ffe91d7c03d8af609e4e52d545ec52))
+* enqueue elder ops while assuming elder duties ([88ed190](https://github.com/maidsafe/sn_node/commit/88ed19073620ce1882863f9323cccb0797ea84be))
+
 ### [0.25.39](https://github.com/maidsafe/sn_node/compare/v0.25.38...v0.25.39) (2021-01-28)
 
 ### [0.25.38](https://github.com/maidsafe/sn_node/compare/v0.25.37...v0.25.38) (2021-01-28)
