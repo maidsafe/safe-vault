@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.26.0](https://github.com/maidsafe/sn_node/compare/v0.25.41...v0.26.0) (2021-02-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* rename money to token
+
+* rename money to token ([e3d699c](https://github.com/maidsafe/sn_node/commit/e3d699cce291f9172b79d698cc7edeb3845690ab))
+
 ### [0.25.41](https://github.com/maidsafe/sn_node/compare/v0.25.40...v0.25.41) (2021-02-01)
 
 
