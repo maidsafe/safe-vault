@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Age;
-use sn_data_types::Money;
+use sn_data_types::Token;
 use sn_routing::Prefix;
 
 /// Calculation of reward for nodes.
@@ -23,17 +23,17 @@ impl RewardCalc {
 
     /// Calculates the reward for a node
     /// when it has reached a certain age.
-    pub async fn reward(&self, age: Age) -> Money {
+    pub async fn reward(&self, age: Age) -> Token {
         let prefix_len = self.prefix.bit_count();
         RewardCalc::reward_from(age, prefix_len)
     }
 
-    fn reward_from(age: Age, prefix_len: usize) -> Money {
+    fn reward_from(age: Age, prefix_len: usize) -> Token {
         let time = 2_u64.pow(age as u32);
         let nanos = 1_000_000_000;
         let network_size = 2_u64.pow(prefix_len as u32);
         let steepness_reductor = prefix_len as u64 + 1;
-        Money::from_nano(time * nanos / network_size * steepness_reductor)
+        Token::from_nano(time * nanos / network_size * steepness_reductor)
     }
 }
 
@@ -47,7 +47,7 @@ mod test {
         let age = 5;
         let prefix_len = 1;
         let reward = RewardCalc::reward_from(age, prefix_len);
-        assert!(reward == Money::from_nano(32_000_000_000));
+        assert!(reward == Token::from_nano(32_000_000_000));
         Ok(())
     }
 
@@ -56,7 +56,7 @@ mod test {
         let age = 5;
         let prefix_len = 34;
         let reward = RewardCalc::reward_from(age, prefix_len);
-        assert!(reward >= Money::from_nano(1));
+        assert!(reward >= Token::from_nano(1));
         Ok(())
     }
 }

@@ -2330,9 +2330,9 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
-version = "0.13.5"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79926ec0bd1d22ef3de73a1255d4b609a15184f48a0d6e3ca38a120754d8a895"
+checksum = "e9ab402760a32e0bddfac13b4020208aee88c0455f73c438fd20b6820fc3daf9"
 dependencies = [
  "bincode",
  "crdts",
@@ -2365,9 +2365,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "1.6.1"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b707e95e2bfd40d9ab56caf9191f8da622caf5e4b0c6662f27b2e1ad41de476"
+checksum = "9bd0f7827f57f0da7d0c91aa40f8c809610bbed93cb1e4d91d99dd104747cc97"
 dependencies = [
  "bytes 1.0.1",
  "cookie-factory",
@@ -2466,9 +2466,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.2.12"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78e7e404916a2981a3c534fea25187c3114cb24d23b70e2b66367aa09dee70fa"
+checksum = "6317536cc12796828cf78a7a1eadca5b929fd6cbcca5dcd4fe09529377e805a6"
 dependencies = [
  "bincode",
  "crdts",

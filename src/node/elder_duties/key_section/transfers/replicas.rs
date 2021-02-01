@@ -13,8 +13,8 @@ use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::info;
 use sn_data_types::{
-    ActorHistory, CreditAgreementProof, Money, OwnerType, PublicKey, ReplicaEvent, SignedTransfer,
-    SignedTransferShare, TransferAgreementProof, TransferPropagated, TransferRegistered,
+    ActorHistory, CreditAgreementProof, OwnerType, PublicKey, ReplicaEvent, SignedTransfer,
+    SignedTransferShare, Token, TransferAgreementProof, TransferPropagated, TransferRegistered,
     TransferValidated,
 };
 use sn_transfers::{Error as TransfersError, WalletReplica};
@@ -137,12 +137,12 @@ impl<T: ReplicaSigning> Replicas<T> {
     }
 
     ///
-    pub async fn balance(&self, id: PublicKey) -> Result<Money> {
+    pub async fn balance(&self, id: PublicKey) -> Result<Token> {
         debug!("Replica: Getting balance of: {:?}", id);
         let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
             Ok(store) => store,
             // store load failed, so we return 0 balance
-            Err(_) => return Ok(Money::from_nano(0)),
+            Err(_) => return Ok(Token::from_nano(0)),
         };
 
         let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
@@ -403,7 +403,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         Ok(signed_credit)
     }
 
-    /// This is the one and only infusion of money to the system. Ever.
+    /// This is the one and only infusion of tokens to the system. Ever.
     /// It is carried out by the first node in the network.
     async fn store_genesis<F: FnOnce() -> Result<PublicKey, TransfersError>>(
         &self,
@@ -522,7 +522,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         Ok(())
     }
 
-    /// For now, with test money there is no from wallet.., money is created from thin air.
+    /// For now, with test tokens there is no from wallet.., tokens is created from thin air.
     #[allow(unused)] // TODO: Can this be removed?
     #[cfg(feature = "simulated-payouts")]
     pub async fn test_validate_transfer(&self, signed_transfer: SignedTransfer) -> Result<()> {
@@ -597,7 +597,7 @@ mod test {
     use crate::{Error, Result};
     use bls::{PublicKeySet, SecretKeySet};
     use futures::executor::block_on as run;
-    use sn_data_types::{Keypair, Money, OwnerType, PublicKey, SignedTransferShare};
+    use sn_data_types::{Keypair, OwnerType, PublicKey, SignedTransferShare, Token};
     use sn_routing::SectionProofChain;
     use sn_transfers::{ActorEvent, TransferActor as Actor, Wallet};
     use tempdir::TempDir;
@@ -688,7 +688,7 @@ mod test {
                 ))
             }
         }
-        assert_eq!(genesis_actor.balance(), Money::zero());
+        assert_eq!(genesis_actor.balance(), Token::zero());
         assert_eq!(
             genesis_actor.balance(),
             run(genesis_replicas.balance(genesis_actor.id()))?
@@ -711,7 +711,7 @@ mod test {
             }
             assert_eq!(
                 next_section_actor_share.balance(),
-                Money::from_nano(u32::MAX as u64 * 1_000_000_000)
+                Token::from_nano(u32::MAX as u64 * 1_000_000_000)
             );
             assert_eq!(
                 next_section_actor_share.balance(),

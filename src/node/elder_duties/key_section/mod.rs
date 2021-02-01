@@ -46,7 +46,7 @@ where
 /// The Gateway deals with onboarding (handshakes etc)
 /// and routing messages back and forth to clients.
 /// Payments deals with the payment for data writes,
-/// while transfers deals with sending money between keys.
+/// while transfers deals with sending tokens between keys.
 pub struct KeySection {
     gateway: ClientGateway,
     transfers: Transfers,

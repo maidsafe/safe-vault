@@ -27,7 +27,7 @@ use log::{debug, info, trace};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use sn_data_types::{
-    ActorHistory, Credit, CreditAgreementProof, Money, PublicKey, SignatureShare, SignedCredit,
+    ActorHistory, Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, Token,
     TransferPropagated, WalletInfo,
 };
 use sn_messaging::{
@@ -333,7 +333,7 @@ impl NodeDuties {
             let genesis_balance = u32::MAX as u64 * 1_000_000_000;
             let credit = Credit {
                 id: Default::default(),
-                amount: Money::from_nano(genesis_balance),
+                amount: Token::from_nano(genesis_balance),
                 recipient: elder_state.section_public_key(),
                 msg: "genesis".to_string(),
             };

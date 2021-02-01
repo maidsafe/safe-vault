@@ -11,8 +11,8 @@ use crate::{Error, Result};
 use async_trait::async_trait;
 use bls::{PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare};
 use sn_data_types::{
-    Credit, CreditAgreementProof, Money, PublicKey, SignatureShare, SignedCredit, SignedDebit,
-    SignedTransfer,
+    Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, SignedDebit,
+    SignedTransfer, Token,
 };
 use sn_transfers::ReplicaValidator;
 use std::collections::BTreeMap;
@@ -142,7 +142,7 @@ pub fn get_genesis(
 ) -> Result<CreditAgreementProof> {
     let credit = Credit {
         id: Default::default(),
-        amount: Money::from_nano(balance),
+        amount: Token::from_nano(balance),
         recipient: id,
         msg: "genesis".to_string(),
     };

@@ -7,14 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{ElderState, Error, Result};
-use sn_data_types::{Credit, CreditAgreementProof, Money, SignedCredit};
+use sn_data_types::{Credit, CreditAgreementProof, SignedCredit, Token};
 use std::collections::BTreeMap;
 
 /// Produces a genesis balance for a new network.
 pub async fn get_genesis(balance: u64, elder_state: &ElderState) -> Result<CreditAgreementProof> {
     let credit = Credit {
         id: Default::default(),
-        amount: Money::from_nano(balance),
+        amount: Token::from_nano(balance),
         recipient: elder_state.section_public_key(),
         msg: "genesis".to_string(),
     };

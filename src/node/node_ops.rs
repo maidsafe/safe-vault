@@ -333,7 +333,7 @@ pub enum KeySectionDuty {
     /// and query responses) with earlier client
     /// msgs, as to route them to the correct client.
     RunAsGateway(GatewayDuty),
-    /// Transfers of money between keys, hence also payment for data writes.
+    /// Transfers of tokens between keys, hence also payment for data writes.
     RunAsTransfers(TransferDuty),
     NoOp,
 }
@@ -624,7 +624,7 @@ impl Into<NodeOperation> for RewardDuty {
 
 // --------------- Transfers ---------------
 
-/// Transfers of money on the network
+/// Transfers of tokens on the network
 /// and querying of balances and history.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]

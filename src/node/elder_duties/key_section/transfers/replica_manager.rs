@@ -13,7 +13,7 @@
 // use log::{info, warn};
 
 // use sn_data_types::{
-//     DebitAgreementProof, Error as DtError, Money, PublicKey as NdPublicKey, PublicKey,
+//     DebitAgreementProof, Error as DtError, Token, PublicKey as NdPublicKey, PublicKey,
 //     ReplicaEvent, Result as NdResult, SignedTransfer, TransferPropagated, TransferRegistered,
 //     TransferValidated,
 // };
@@ -94,7 +94,7 @@
 //         self.store.history()
 //     }
 
-//     pub(crate) fn balance(&self, id: &PublicKey) -> Option<Money> {
+//     pub(crate) fn balance(&self, id: &PublicKey) -> Option<Token> {
 //         self.replica.balance(id)
 //     }
 
@@ -356,7 +356,7 @@
 //         Ok(())
 //     }
 
-//     pub async fn get_store_cost(&self, bytes: u64) -> Option<Money> {
+//     pub async fn get_store_cost(&self, bytes: u64) -> Option<Token> {
 //         self.rate_limit.from(bytes).await
 //     }
 // }

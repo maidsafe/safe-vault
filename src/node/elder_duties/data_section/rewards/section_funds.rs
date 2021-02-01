@@ -17,7 +17,7 @@ use crate::{
 };
 use log::{error, info};
 use sn_data_types::{
-    ActorHistory, CreditAgreementProof, Money, PublicKey, SignedTransferShare, TransferValidated,
+    ActorHistory, CreditAgreementProof, PublicKey, SignedTransferShare, Token, TransferValidated,
     WalletInfo,
 };
 use sn_messaging::{Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery};
@@ -38,7 +38,7 @@ pub(super) struct SectionFunds {
 #[derive(Clone)]
 pub struct Payout {
     pub to: PublicKey,
-    pub amount: Money,
+    pub amount: Token,
     pub node_id: XorName,
 }
 
@@ -142,10 +142,10 @@ impl SectionFunds {
                 return Err(Error::Logic("Has payout in flight".to_string()));
             }
 
-            // Get all the money of current actor.
+            // Get all the tokens of current actor.
             let amount = self.actor.balance();
-            if amount == Money::zero() {
-                info!("No money to transfer in this section.");
+            if amount == Token::zero() {
+                info!("No tokens to transfer in this section.");
                 // if zero, then there is nothing to transfer..
                 // so just go ahead and become the new actor.
                 return match self.state.next_actor.take() {
@@ -162,7 +162,7 @@ impl SectionFunds {
                 };
             }
 
-            // Transfer the money from
+            // Transfer the tokens from
             // previous actor to new actor.
             use NodeCmd::*;
             use NodeTransferCmd::*;

@@ -22,7 +22,7 @@ use crate::{
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
-use sn_data_types::{Error as DtError, Money, PublicKey};
+use sn_data_types::{Error as DtError, PublicKey, Token};
 use sn_messaging::{
     Address, ElderDuties, Error as ErrorMessage, Message, MessageId, NodeQuery, NodeQueryResponse,
     NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery,
@@ -226,7 +226,7 @@ impl Rewards {
                 .section_funds
                 .initiate_reward_payout(Payout {
                     to: wallet,
-                    amount: Money::from_nano(
+                    amount: Token::from_nano(
                         self.reward_calc.reward(age).await.as_nano() / age as u64,
                     ),
                     node_id: *node_id,

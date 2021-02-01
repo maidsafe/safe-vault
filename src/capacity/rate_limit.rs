@@ -8,7 +8,7 @@
 
 use crate::{capacity::Capacity, ElderState, Result};
 use log::info;
-use sn_data_types::{Money, PublicKey};
+use sn_data_types::{PublicKey, Token};
 
 const MAX_CHUNK_SIZE: u64 = 1_000_000;
 const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
@@ -31,7 +31,7 @@ impl RateLimit {
 
     /// Calculates the rate limit of write operations,
     /// as a cost to be paid for a certain number of bytes.
-    pub async fn from(&self, bytes: u64) -> Money {
+    pub async fn from(&self, bytes: u64) -> Token {
         let prefix = self.elder_state.prefix();
         let prefix_len = prefix.bit_count();
 
@@ -58,7 +58,7 @@ impl RateLimit {
         usage_ratio > MAX_NETWORK_STORAGE_RATIO
     }
 
-    fn rate_limit(bytes: u64, full_nodes: u8, all_nodes: u8, prefix_len: usize) -> Money {
+    fn rate_limit(bytes: u64, full_nodes: u8, all_nodes: u8, prefix_len: usize) -> Token {
         let available_nodes = (all_nodes - full_nodes) as f64;
         let supply_demand_factor = 0.001
             + (1_f64 / available_nodes).powf(8_f64)
@@ -69,7 +69,7 @@ impl RateLimit {
         let section_supply_share = RateLimit::max_section_nanos(prefix_len) as f64;
         let token_source = steepness_reductor * section_supply_share.powf(0.5_f64);
         let rate_limit = (token_source * data_size_factor * supply_demand_factor).round() as u64;
-        Money::from_nano(rate_limit)
+        Token::from_nano(rate_limit)
     }
 
     fn max_section_nanos(prefix_len: usize) -> u64 {
