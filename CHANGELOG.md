@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.25.41](https://github.com/maidsafe/sn_node/compare/v0.25.40...v0.25.41) (2021-02-01)
+
+
+### Bug Fixes
+
+* remove println ([62b1c07](https://github.com/maidsafe/sn_node/commit/62b1c070fa295211cd565b78454e9417e93e80f4))
+* **deps:** use correct deps ([ca66a89](https://github.com/maidsafe/sn_node/commit/ca66a89ec42f431dad57c9f6086ccff8ca4d5af3))
+* **test:** impl proper sig verification for test signing ([a7fd147](https://github.com/maidsafe/sn_node/commit/a7fd1479f33fe281625404a676c2a7ac285b2e6c))
+* address and remove comments ([a5017c2](https://github.com/maidsafe/sn_node/commit/a5017c22c57a504404d472a1e578216bd2d344fa))
+
 ### [0.25.40](https://github.com/maidsafe/sn_node/compare/v0.25.39...v0.25.40) (2021-01-29)
 
 
