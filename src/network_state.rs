@@ -326,8 +326,6 @@ impl NodeSigning {
     }
 }
 
-use bytes::Bytes;
-
 #[derive(Clone)]
 pub struct NodeInteraction {
     network: Network,
