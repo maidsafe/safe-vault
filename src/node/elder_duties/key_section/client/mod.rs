@@ -8,9 +8,8 @@
 
 mod client_input_parse;
 mod client_msg_handling;
-mod onboarding;
 
-use self::{client_msg_handling::ClientMsgHandling, onboarding::Onboarding};
+use self::client_msg_handling::ClientMsgHandling;
 use crate::{
     node::node_ops::{GatewayDuty, KeySectionDuty, NodeMessagingDuty, NodeOperation},
     ElderState, Error, Result,
@@ -30,8 +29,7 @@ pub struct ClientGateway {
 
 impl ClientGateway {
     pub async fn new(elder_state: ElderState) -> Result<Self> {
-        let onboarding = Onboarding::new(elder_state.clone());
-        let client_msg_handling = ClientMsgHandling::new(onboarding);
+        let client_msg_handling = ClientMsgHandling::new(elder_state.clone());
 
         let gateway = Self {
             client_msg_handling,
