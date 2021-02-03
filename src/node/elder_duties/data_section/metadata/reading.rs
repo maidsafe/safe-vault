@@ -15,7 +15,7 @@ use super::{
 use crate::node::node_ops::NodeMessagingDuty;
 use crate::{Error, Result};
 use log::info;
-use sn_messaging::{
+use sn_messaging::client::{
     BlobRead, DataQuery, MapRead, Message, MessageId, MsgEnvelope, MsgSender, Query, SequenceRead,
 };
 

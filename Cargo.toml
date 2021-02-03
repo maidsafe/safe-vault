@@ -34,10 +34,12 @@ tiny-keccak = "1.5.0"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-sn_routing = "~0.41.6"
+# sn_routing = {git="https://github.com/bochaco/sn_routing", branch="use-sn-messaging-header"}
+sn_routing = { path="../sn_routing"}
+sn_messaging = { path="../sn_messaging"}
 sn_data_types = "~0.14.0"
 sn_transfers = "~0.3.0"
-sn_messaging = "2.0.0"
+# sn_messaging = "2.0.0"
 ed25519 = "1.0.1"
 signature = "1.1.0"
 xor_name = "1.1.0"

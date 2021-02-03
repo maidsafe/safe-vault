@@ -11,7 +11,7 @@ use crate::{Error, Result};
 use log::{info, warn};
 use serde::Serialize;
 use sn_data_types::Signature;
-use sn_messaging::{
+use sn_messaging::client::{
     Address, AdultDuties, CmdError, Duty, ElderDuties, Message, MessageId, MsgEnvelope, MsgSender,
     NodeDuties, TransientSectionKey,
 };

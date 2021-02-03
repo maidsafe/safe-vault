@@ -24,7 +24,7 @@ use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
-use sn_messaging::{ElderDuties, Message, MsgEnvelope};
+use sn_messaging::client::{ElderDuties, Message, MsgEnvelope};
 
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;

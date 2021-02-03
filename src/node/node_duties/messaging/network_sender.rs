@@ -11,7 +11,7 @@ use crate::{
     Error, Network, Result,
 };
 use log::error;
-use sn_messaging::{Address, MsgEnvelope};
+use sn_messaging::client::{Address, MsgEnvelope};
 use sn_routing::{DstLocation, SrcLocation};
 use std::collections::BTreeSet;
 use xor_name::XorName;

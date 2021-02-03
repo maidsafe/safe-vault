@@ -8,7 +8,7 @@
 
 // use bls::PublicKey;
 use sn_data_types::{Error as DtError, PublicKey};
-use sn_messaging::{Error as ErrorMessage, MessageId};
+use sn_messaging::client::{Error as ErrorMessage, MessageId};
 use std::io;
 use thiserror::Error;
 #[allow(clippy::large_enum_variant)]
@@ -51,8 +51,12 @@ pub enum Error {
     #[error("Bincode error:: {0}")]
     Bincode(#[from] bincode::Error),
     /// Network message error.
+    #[error("Client message error:: {0}")]
+    ClientMessage(#[from] sn_messaging::client::Error),
+    /// Network message error.
     #[error("Network message error:: {0}")]
     Message(#[from] sn_messaging::Error),
+
     /// PickleDb error.
     #[error("PickleDb error:: {0}")]
     PickleDb(#[from] pickledb::error::Error),
@@ -94,7 +98,7 @@ pub enum Error {
     Logic(String),
 }
 
-pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::Error> {
+pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {
     match error {
         Error::InvalidOperation => Ok(ErrorMessage::InvalidOperation),
         Error::InvalidOwners(key) => Ok(ErrorMessage::InvalidOwners(key)),
@@ -109,7 +113,7 @@ pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::Err
         error => Err(Error::NoErrorMapping(error.to_string())),
     }
 }
-pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> Result<sn_messaging::Error> {
+pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> Result<sn_messaging::client::Error> {
     match error {
         DtError::InvalidOperation => Ok(ErrorMessage::InvalidOperation),
         DtError::PolicyNotSet => Ok(ErrorMessage::PolicyNotSet),

@@ -12,7 +12,7 @@ use crate::node::node_ops::{
 use crate::ElderState;
 use crate::{Error, Result};
 use log::{info, warn};
-use sn_messaging::{Cmd, CmdError, Error as MessageError, Message, MessageId, MsgEnvelope, Query};
+use sn_messaging::client::{Cmd, CmdError, Error as MessageError, Message, MessageId, MsgEnvelope, Query};
 
 // NB: Just as with the msg_analysis.rs,
 // this approach is not entirely good, so will need to be improved.

@@ -2366,9 +2366,8 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bd0f7827f57f0da7d0c91aa40f8c809610bbed93cb1e4d91d99dd104747cc97"
 dependencies = [
+ "bincode",
  "bytes 1.0.1",
  "cookie-factory",
  "crdts",
@@ -2386,13 +2385,40 @@ dependencies = [
  "sn_data_types",
  "thiserror",
  "threshold_crypto",
- "tiny-keccak 1.5.0",
+ "tiny-keccak 2.0.2",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_messaging"
+version = "2.0.0"
+source = "git+https://github.com/bochaco/sn_messaging.git?branch=support-node-ping-infrastructure-types#2558eb1a12329881ab2e1d5a1be50affef1e008b"
+dependencies = [
+ "bincode",
+ "bytes 1.0.1",
+ "cookie-factory",
+ "crdts",
+ "ed25519",
+ "ed25519-dalek",
+ "hex_fmt",
+ "multibase",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+ "sha3",
+ "signature",
+ "sn_data_types",
+ "thiserror",
+ "threshold_crypto",
+ "tiny-keccak 2.0.2",
  "xor_name",
 ]
 
 [[package]]
 name = "sn_node"
-version = "0.26.3"
+version = "0.26.4"
 dependencies = [
  "async-log",
  "async-trait",
@@ -2424,7 +2450,7 @@ dependencies = [
  "signature",
  "sn_data_types",
  "sn_launch_tool",
- "sn_messaging",
+ "sn_messaging 2.0.0",
  "sn_routing",
  "sn_transfers",
  "structopt",
@@ -2439,8 +2465,6 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.41.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4fa47ac0c7a8a0a31528159bbdbf9b45b61e161ca29ccb14bebb61ea47a385e"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2456,6 +2480,7 @@ dependencies = [
  "rand_chacha 0.2.2",
  "resource_proof",
  "serde",
+ "sn_messaging 2.0.0 (git+https://github.com/bochaco/sn_messaging.git?branch=support-node-ping-infrastructure-types)",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",

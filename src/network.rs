@@ -20,6 +20,7 @@ use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use xor_name::{Prefix, XorName};
+use sn_messaging::client::MsgEnvelope;
 
 ///
 #[derive(Clone)]
@@ -144,7 +145,7 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn send_message_to_client(&self, peer_addr: SocketAddr, msg: Bytes) -> Result<()> {
+    pub async fn send_message_to_client(&self, peer_addr: SocketAddr, msg: MsgEnvelope) -> Result<()> {
         self.routing
             .lock()
             .await

@@ -12,6 +12,7 @@ use bytes::Bytes;
 use dashmap::DashMap;
 use log::{debug, error, info, trace};
 use sn_data_types::{HandshakeRequest, HandshakeResponse, PublicKey};
+use sn_messaging::client::MsgEnvelope;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -51,59 +52,59 @@ impl Onboarding {
         }
     }
 
-    fn shall_bootstrap(&self, peer_addr: &SocketAddr) -> bool {
-        let is_bootstrapped = self.clients.contains_key(peer_addr);
-        if is_bootstrapped {
-            return false;
-        }
-        true
-    }
+    // fn shall_bootstrap(&self, peer_addr: &SocketAddr) -> bool {
+    //     let is_bootstrapped = self.clients.contains_key(peer_addr);
+    //     if is_bootstrapped {
+    //         return false;
+    //     }
+    //     true
+    // }
 
-    async fn try_bootstrap(&self, peer_addr: SocketAddr, client_key: &PublicKey) -> Result<()> {
-        if !self.shall_bootstrap(&peer_addr) {
-            info!(
-                "{}: Redundant bootstrap..: {} on {}",
-                self, client_key, peer_addr
-            );
-            return Ok(());
-        }
-        info!(
-            "{}: Trying to bootstrap..: {} on {}",
-            self, client_key, peer_addr
-        );
+    // async fn try_bootstrap(&self, peer_addr: SocketAddr, client_key: &PublicKey) -> Result<()> {
+    //     if !self.shall_bootstrap(&peer_addr) {
+    //         info!(
+    //             "{}: Redundant bootstrap..: {} on {}",
+    //             self, client_key, peer_addr
+    //         );
+    //         return Ok(());
+    //     }
+    //     info!(
+    //         "{}: Trying to bootstrap..: {} on {}",
+    //         self, client_key, peer_addr
+    //     );
 
-        let elders = if self.elder_state.prefix().matches(&(*client_key).into()) {
-            self.elder_state.elders().await.to_vec()
-        } else {
-            let closest_known_elders = self
-                .elder_state
-                .elders_sorted_by_distance_to(&(*client_key).into());
-            if closest_known_elders.is_empty() {
-                trace!(
-                    "{}: No closest known elders in any section we know of",
-                    self
-                );
-                return Ok(());
-            } else {
-                closest_known_elders.into_iter().copied().collect()
-            }
-        };
+    //     let elders = if self.elder_state.prefix().matches(&(*client_key).into()) {
+    //         self.elder_state.elders().await.to_vec()
+    //     } else {
+    //         let closest_known_elders = self
+    //             .elder_state
+    //             .elders_sorted_by_distance_to(&(*client_key).into());
+    //         if closest_known_elders.is_empty() {
+    //             trace!(
+    //                 "{}: No closest known elders in any section we know of",
+    //                 self
+    //             );
+    //             return Ok(());
+    //         } else {
+    //             closest_known_elders.into_iter().copied().collect()
+    //         }
+    //     };
 
-        info!("elders for client determined");
-        let bytes = utils::serialise(&HandshakeResponse::Join(elders))?;
+    //     info!("elders for client determined");
+    //     let bytes = utils::serialise(&HandshakeResponse::Join(elders))?;
 
-        info!("sending bytes back");
+    //     info!("sending bytes back");
 
-        let res = self.send_bytes_to(peer_addr, bytes).await;
+    //     let res = self.send_message_to(peer_addr, bytes).await;
 
-        match res {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                error!("Error sending on stream {:?}", error);
-                Err(Error::Onboarding)
-            }
-        }
-    }
+    //     match res {
+    //         Ok(()) => Ok(()),
+    //         Err(error) => {
+    //             error!("Error sending on stream {:?}", error);
+    //             Err(Error::Onboarding)
+    //         }
+    //     }
+    // }
 
     /// Handles a received join request from a client.
     async fn try_join(&self, peer_addr: SocketAddr, client_key: PublicKey) -> Result<()> {
@@ -130,8 +131,8 @@ impl Onboarding {
     }
 
     /// Use routing to send a message to a client peer address
-    pub async fn send_bytes_to(&self, peer_addr: SocketAddr, bytes: Bytes) -> Result<()> {
-        self.elder_state.send_to_client(peer_addr, bytes).await
+    pub async fn send_message_to(&self, peer_addr: SocketAddr, envelope: MsgEnvelope) -> Result<()> {
+        self.elder_state.send_to_client(peer_addr, envelope).await
     }
 
     // pub fn notify_client(&mut self, client: &XorName, receipt: &DebitAgreementProof) {

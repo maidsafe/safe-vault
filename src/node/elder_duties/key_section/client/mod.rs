@@ -11,7 +11,6 @@ mod client_msg_handling;
 mod onboarding;
 
 use self::{
-    client_input_parse::{try_deserialize_handshake, try_deserialize_msg},
     client_msg_handling::ClientMsgHandling,
     onboarding::Onboarding,
 };
@@ -21,7 +20,7 @@ use crate::{
 };
 use log::{error, trace, warn};
 use sn_data_types::Error as DtError;
-use sn_messaging::{Address, MsgEnvelope};
+use sn_messaging::client::{Address, MsgEnvelope};
 use sn_routing::Event as RoutingEvent;
 use std::fmt::{self, Display, Formatter};
 
@@ -76,35 +75,23 @@ impl ClientGateway {
         trace!("Processing client event");
         match event {
             RoutingEvent::ClientMessageReceived { content, src, .. } => {
-                // This check was about checking we knew and client was valid... but even if we don't
-                // we should be handling it...
-                match try_deserialize_handshake(&content, src) {
-                    Ok(hs) => {
-                        let _ = self.client_msg_handling.process_handshake(hs, src).await;
-                        Ok(NodeOperation::NoOp)
-                    }
-                    Err(_e) => {
-                        // this is not a handshake, so lets try processing as client message...
-                        trace!(
-                            "Message is not a handshake, so let's process it as client message..."
-                        );
-                        let msg = try_deserialize_msg(content)?;
 
-                        trace!("Deserialized client msg is {:?}", msg.message);
-                        if !validate_client_sig(&msg) {
-                            return Err(Error::NetworkData(DtError::InvalidSignature));
-                        }
+                trace!("Deserialized client msg is {:?}", content.message);
 
-                        match self
-                            .client_msg_handling
-                            .track_incoming_message(&msg.message, src)
-                            .await
-                        {
-                            Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg(msg).into()),
-                            Err(e) => Err(e),
-                        }
-                    }
+                if !validate_client_sig(&content) {
+                    return Err(Error::NetworkData(DtError::InvalidSignature));
                 }
+
+                match self
+                    .client_msg_handling
+                    .track_incoming_message(&content.message, src)
+                    .await
+                {
+                    Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg(content).into()),
+                    Err(e) => Err(e),
+                }
+            
+                
             }
             other => {
                 error!("NOT SUPPORTED YET: {:?}", other);

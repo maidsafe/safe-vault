@@ -23,7 +23,7 @@ use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
 use sn_data_types::{Error as DtError, PublicKey, Token};
-use sn_messaging::{
+use sn_messaging::client::{
     Address, ElderDuties, Error as ErrorMessage, Message, MessageId, NodeQuery, NodeQueryResponse,
     NodeRewardQuery, NodeRewardQueryResponse, NodeTransferQuery,
 };

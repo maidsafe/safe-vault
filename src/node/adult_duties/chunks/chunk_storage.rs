@@ -15,7 +15,7 @@ use crate::{
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress, Signature};
-use sn_messaging::{
+use sn_messaging::client::{
     Address, AdultDuties, CmdError, Error as ErrorMessage, Message, MessageId, MsgSender,
     NodeCmdError, NodeDataError, NodeDataQuery, NodeDataQueryResponse, NodeEvent, NodeQuery,
     NodeQueryResponse, QueryResponse,

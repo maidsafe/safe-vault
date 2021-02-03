@@ -15,7 +15,7 @@ use dashmap::{mapref::entry::Entry, DashMap};
 use log::debug;
 use log::{error, info, trace, warn};
 use sn_data_types::HandshakeRequest;
-use sn_messaging::{Address, Message, MessageId, MsgEnvelope};
+use sn_messaging::client::{Address, Message, MessageId, MsgEnvelope};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -131,10 +131,10 @@ impl ClientMsgHandling {
 
         match self.tracked_incoming.remove(&correlation_id) {
             Some((_, client_address)) => {
-                let bytes = message.serialize()?;
+                // let bytes = message.serialize()?;
 
                 trace!("will send message via qp2p");
-                self.onboarding.send_bytes_to(client_address, bytes).await
+                self.onboarding.send_message_to(client_address, message).await
             }
             None => {
                 info!(

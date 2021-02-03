@@ -13,8 +13,10 @@ use bytes::Bytes;
 use hex_fmt::HexFmt;
 use log::{error, info, trace};
 use sn_data_types::PublicKey;
-use sn_messaging::MsgEnvelope;
-use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
+use sn_messaging::client::MsgEnvelope;
+use sn_routing::{Event as RoutingEvent, 
+    // NodeElderChange,
+     MIN_AGE};
 use xor_name::XorName;
 
 /// Maps events from the transport layer
@@ -103,13 +105,12 @@ impl NetworkEvents {
                 key,
                 elders,
                 prefix,
-                self_status_change,
             } => {
-                let initial_op = match self_status_change {
-                    NodeElderChange::Promoted => NodeDuty::AssumeElderDuties.into(),
-                    NodeElderChange::Demoted => NodeDuty::AssumeAdultDuties.into(),
-                    NodeElderChange::None => NodeOperation::NoOp,
-                };
+                // let initial_op = match self_status_change {
+                //     NodeElderChange::Promoted => NodeDuty::AssumeElderDuties.into(),
+                //     NodeElderChange::Demoted => NodeDuty::AssumeAdultDuties.into(),
+                //     NodeElderChange::None => NodeOperation::NoOp,
+                // };
                 let ops = vec![
                     initial_op,
                     NodeDuty::InitiateElderChange {

@@ -33,7 +33,7 @@ use sn_data_types::{
     CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare,
     TransferAgreementProof, TransferPropagated, WalletInfo,
 };
-use sn_messaging::{
+use sn_messaging::client::{
     Address, Cmd, CmdError, ElderDuties, Error as ErrorMessage, Event, Message, MessageId,
     MsgEnvelope, NodeCmd, NodeCmdError, NodeEvent, NodeQuery, NodeQueryResponse, NodeTransferCmd,
     NodeTransferError, NodeTransferQuery, NodeTransferQueryResponse, QueryResponse, TransferError,

@@ -15,7 +15,7 @@ use sn_data_types::{
     SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
     WalletInfo,
 };
-use sn_messaging::{Address, MessageId, MsgEnvelope, MsgSender};
+use sn_messaging::client::{Address, MessageId, MsgEnvelope, MsgSender};
 use std::fmt::Formatter;
 
 use sn_routing::{Event as RoutingEvent, Prefix};
@@ -488,32 +488,32 @@ pub enum ChunkReplicationCmd {
     StoreReplicatedBlob(Blob),
 }
 
-// impl From<sn_messaging::TransferCmd> for ChunkReplicationCmd {
-//     fn from(cmd: sn_messaging::TransferCmd) -> Self {
+// impl From<sn_messaging::client::TransferCmd> for ChunkReplicationCmd {
+//     fn from(cmd: sn_messaging::client::TransferCmd) -> Self {
 //         match cmd {
 //             #[cfg(feature = "simulated-payouts")]
-//             sn_messaging::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
-//             sn_messaging::TransferCmd::ValidateTransfer(signed_transfer) => {
+//             sn_messaging::client::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
+//             sn_messaging::client::TransferCmd::ValidateTransfer(signed_transfer) => {
 //                 Self::ValidateTransfer(signed_transfer)
 //             }
-//             sn_messaging::TransferCmd::RegisterTransfer(transfer_agreement) => {
+//             sn_messaging::client::TransferCmd::RegisterTransfer(transfer_agreement) => {
 //                 Self::RegisterTransfer(transfer_agreement)
 //             }
 //         }
 //     }
 // }
 
-// impl From<sn_messaging::TransferQuery> for ChunkReplicationQuery {
-//     fn from(cmd: sn_messaging::TransferQuery) -> Self {
+// impl From<sn_messaging::client::TransferQuery> for ChunkReplicationQuery {
+//     fn from(cmd: sn_messaging::client::TransferQuery) -> Self {
 //         match cmd {
-//             sn_messaging::TransferQuery::GetReplicaKeys(transfer) => {
+//             sn_messaging::client::TransferQuery::GetReplicaKeys(transfer) => {
 //                 Self::GetReplicaKeys(transfer)
 //             }
-//             sn_messaging::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
-//             sn_messaging::TransferQuery::GetHistory { at, since_version } => {
+//             sn_messaging::client::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
+//             sn_messaging::client::TransferQuery::GetHistory { at, since_version } => {
 //                 Self::GetHistory { at, since_version }
 //             }
-//             sn_messaging::TransferQuery::GetStoreCost { requester, bytes } => {
+//             sn_messaging::client::TransferQuery::GetStoreCost { requester, bytes } => {
 //                 Self::GetStoreCost { requester, bytes }
 //             }
 //         }
@@ -715,30 +715,30 @@ pub enum TransferCmd {
     RegisterSectionPayout(TransferAgreementProof),
 }
 
-impl From<sn_messaging::TransferCmd> for TransferCmd {
-    fn from(cmd: sn_messaging::TransferCmd) -> Self {
+impl From<sn_messaging::client::TransferCmd> for TransferCmd {
+    fn from(cmd: sn_messaging::client::TransferCmd) -> Self {
         match cmd {
             #[cfg(feature = "simulated-payouts")]
-            sn_messaging::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
-            sn_messaging::TransferCmd::ValidateTransfer(signed_transfer) => {
+            sn_messaging::client::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
+            sn_messaging::client::TransferCmd::ValidateTransfer(signed_transfer) => {
                 Self::ValidateTransfer(signed_transfer)
             }
-            sn_messaging::TransferCmd::RegisterTransfer(transfer_agreement) => {
+            sn_messaging::client::TransferCmd::RegisterTransfer(transfer_agreement) => {
                 Self::RegisterTransfer(transfer_agreement)
             }
         }
     }
 }
 
-impl From<sn_messaging::TransferQuery> for TransferQuery {
-    fn from(cmd: sn_messaging::TransferQuery) -> Self {
+impl From<sn_messaging::client::TransferQuery> for TransferQuery {
+    fn from(cmd: sn_messaging::client::TransferQuery) -> Self {
         match cmd {
-            sn_messaging::TransferQuery::GetReplicaKeys(transfer) => Self::GetReplicaKeys(transfer),
-            sn_messaging::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
-            sn_messaging::TransferQuery::GetHistory { at, since_version } => {
+            sn_messaging::client::TransferQuery::GetReplicaKeys(transfer) => Self::GetReplicaKeys(transfer),
+            sn_messaging::client::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
+            sn_messaging::client::TransferQuery::GetHistory { at, since_version } => {
                 Self::GetHistory { at, since_version }
             }
-            sn_messaging::TransferQuery::GetStoreCost { requester, bytes } => {
+            sn_messaging::client::TransferQuery::GetStoreCost { requester, bytes } => {
                 Self::GetStoreCost { requester, bytes }
             }
         }
