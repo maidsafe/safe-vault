@@ -38,100 +38,37 @@ impl Onboarding {
             clients: Default::default(),
         }
     }
-    pub async fn onboard_client(
-        &self,
-        handshake: HandshakeRequest,
-        peer_addr: SocketAddr,
-    ) -> Result<()> {
-        info!("Onboarding client w/ peer addr: {:?}", peer_addr);
-        match handshake {
-            HandshakeRequest::Bootstrap(client_key) => {
-                self.try_bootstrap(peer_addr, &client_key).await
-            }
-            HandshakeRequest::Join(client_key) => self.try_join(peer_addr, client_key).await,
-        }
-    }
 
-    // fn shall_bootstrap(&self, peer_addr: &SocketAddr) -> bool {
-    //     let is_bootstrapped = self.clients.contains_key(peer_addr);
-    //     if is_bootstrapped {
-    //         return false;
-    //     }
-    //     true
-    // }
-
-    // async fn try_bootstrap(&self, peer_addr: SocketAddr, client_key: &PublicKey) -> Result<()> {
-    //     if !self.shall_bootstrap(&peer_addr) {
+    // /// Handles a received join request from a client.
+    // async fn try_join(&self, peer_addr: SocketAddr, client_key: PublicKey) -> Result<()> {
+    //     if self.clients.contains_key(&peer_addr) {
     //         info!(
-    //             "{}: Redundant bootstrap..: {} on {}",
+    //             "{}: Client is already accepted..: {} on {}",
     //             self, client_key, peer_addr
     //         );
     //         return Ok(());
     //     }
     //     info!(
-    //         "{}: Trying to bootstrap..: {} on {}",
+    //         "{}: Trying to join..: {} on {}",
     //         self, client_key, peer_addr
     //     );
-
-    //     let elders = if self.elder_state.prefix().matches(&(*client_key).into()) {
-    //         self.elder_state.elders().await.to_vec()
+    //     if self.elder_state.prefix().matches(&client_key.into()) {
+    //         Ok(())
     //     } else {
-    //         let closest_known_elders = self
-    //             .elder_state
-    //             .elders_sorted_by_distance_to(&(*client_key).into());
-    //         if closest_known_elders.is_empty() {
-    //             trace!(
-    //                 "{}: No closest known elders in any section we know of",
-    //                 self
-    //             );
-    //             return Ok(());
-    //         } else {
-    //             closest_known_elders.into_iter().copied().collect()
-    //         }
-    //     };
-
-    //     info!("elders for client determined");
-    //     let bytes = utils::serialise(&HandshakeResponse::Join(elders))?;
-
-    //     info!("sending bytes back");
-
-    //     let res = self.send_message_to(peer_addr, bytes).await;
-
-    //     match res {
-    //         Ok(()) => Ok(()),
-    //         Err(error) => {
-    //             error!("Error sending on stream {:?}", error);
-    //             Err(Error::Onboarding)
-    //         }
+    //         debug!(
+    //             "Client {} ({}) wants to join us but we are not its client handler",
+    //             client_key, peer_addr
+    //         );
+    //         Err(Error::Onboarding)
     //     }
     // }
 
-    /// Handles a received join request from a client.
-    async fn try_join(&self, peer_addr: SocketAddr, client_key: PublicKey) -> Result<()> {
-        if self.clients.contains_key(&peer_addr) {
-            info!(
-                "{}: Client is already accepted..: {} on {}",
-                self, client_key, peer_addr
-            );
-            return Ok(());
-        }
-        info!(
-            "{}: Trying to join..: {} on {}",
-            self, client_key, peer_addr
-        );
-        if self.elder_state.prefix().matches(&client_key.into()) {
-            Ok(())
-        } else {
-            debug!(
-                "Client {} ({}) wants to join us but we are not its client handler",
-                client_key, peer_addr
-            );
-            Err(Error::Onboarding)
-        }
-    }
-
     /// Use routing to send a message to a client peer address
-    pub async fn send_message_to(&self, peer_addr: SocketAddr, envelope: MsgEnvelope) -> Result<()> {
+    pub async fn send_message_to(
+        &self,
+        peer_addr: SocketAddr,
+        envelope: MsgEnvelope,
+    ) -> Result<()> {
         self.elder_state.send_to_client(peer_addr, envelope).await
     }
 

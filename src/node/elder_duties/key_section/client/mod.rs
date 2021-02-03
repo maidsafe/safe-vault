@@ -10,10 +10,7 @@ mod client_input_parse;
 mod client_msg_handling;
 mod onboarding;
 
-use self::{
-    client_msg_handling::ClientMsgHandling,
-    onboarding::Onboarding,
-};
+use self::{client_msg_handling::ClientMsgHandling, onboarding::Onboarding};
 use crate::{
     node::node_ops::{GatewayDuty, KeySectionDuty, NodeMessagingDuty, NodeOperation},
     ElderState, Error, Result,
@@ -75,7 +72,6 @@ impl ClientGateway {
         trace!("Processing client event");
         match event {
             RoutingEvent::ClientMessageReceived { content, src, .. } => {
-
                 trace!("Deserialized client msg is {:?}", content.message);
 
                 if !validate_client_sig(&content) {
@@ -87,11 +83,9 @@ impl ClientGateway {
                     .track_incoming_message(&content.message, src)
                     .await
                 {
-                    Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg(content).into()),
+                    Ok(()) => Ok(KeySectionDuty::EvaluateClientMsg(*content).into()),
                     Err(e) => Err(e),
                 }
-            
-                
             }
             other => {
                 error!("NOT SUPPORTED YET: {:?}", other);

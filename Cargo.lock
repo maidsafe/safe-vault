@@ -2366,6 +2366,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "2.0.0"
+source = "git+https://github.com/bochaco/sn_messaging?branch=support-node-ping-infrastructure-types#9007c97cf0e67a02b87d1af759909315def3ad9c"
 dependencies = [
  "bincode",
  "bytes 1.0.1",

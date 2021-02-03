@@ -38,21 +38,6 @@ impl ClientMsgHandling {
         }
     }
 
-    pub async fn process_handshake(
-        &self,
-        handshake: HandshakeRequest,
-        peer_addr: SocketAddr,
-    ) -> Result<()> {
-        trace!("Processing client handshake");
-
-        with_chaos!({
-            debug!("Chaos: Dropping handshake");
-            return Ok(());
-        });
-
-        self.onboarding.onboard_client(handshake, peer_addr).await
-    }
-
     /// Track client socket address and msg_id for coordinating responses
     pub async fn track_incoming_message(
         &self,
@@ -134,7 +119,9 @@ impl ClientMsgHandling {
                 // let bytes = message.serialize()?;
 
                 trace!("will send message via qp2p");
-                self.onboarding.send_message_to(client_address, message).await
+                self.onboarding
+                    .send_message_to(client_address, message.clone())
+                    .await
             }
             None => {
                 info!(

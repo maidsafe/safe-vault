@@ -719,7 +719,9 @@ impl From<sn_messaging::client::TransferCmd> for TransferCmd {
     fn from(cmd: sn_messaging::client::TransferCmd) -> Self {
         match cmd {
             #[cfg(feature = "simulated-payouts")]
-            sn_messaging::client::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
+            sn_messaging::client::TransferCmd::SimulatePayout(transfer) => {
+                Self::SimulatePayout(transfer)
+            }
             sn_messaging::client::TransferCmd::ValidateTransfer(signed_transfer) => {
                 Self::ValidateTransfer(signed_transfer)
             }
@@ -733,8 +735,12 @@ impl From<sn_messaging::client::TransferCmd> for TransferCmd {
 impl From<sn_messaging::client::TransferQuery> for TransferQuery {
     fn from(cmd: sn_messaging::client::TransferQuery) -> Self {
         match cmd {
-            sn_messaging::client::TransferQuery::GetReplicaKeys(transfer) => Self::GetReplicaKeys(transfer),
-            sn_messaging::client::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
+            sn_messaging::client::TransferQuery::GetReplicaKeys(transfer) => {
+                Self::GetReplicaKeys(transfer)
+            }
+            sn_messaging::client::TransferQuery::GetBalance(public_key) => {
+                Self::GetBalance(public_key)
+            }
             sn_messaging::client::TransferQuery::GetHistory { at, since_version } => {
                 Self::GetHistory { at, since_version }
             }

@@ -19,7 +19,9 @@ use sn_data_types::{
     Error as DtError, Map, MapAction, MapAddress, MapEntryActions, MapPermissionSet, MapValue,
     PublicKey, Result as NdResult,
 };
-use sn_messaging::client::{CmdError, MapRead, MapWrite, Message, MessageId, MsgSender, QueryResponse};
+use sn_messaging::client::{
+    CmdError, MapRead, MapWrite, Message, MessageId, MsgSender, QueryResponse,
+};
 
 use std::fmt::{self, Display, Formatter};
 

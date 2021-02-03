@@ -12,6 +12,7 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use futures::lock::Mutex;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature};
+use sn_messaging::client::MsgEnvelope;
 use sn_routing::{
     Config as RoutingConfig, DstLocation, Error as RoutingError, EventStream,
     Routing as RoutingNode, SectionProofChain, SrcLocation,
@@ -20,7 +21,6 @@ use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use xor_name::{Prefix, XorName};
-use sn_messaging::client::MsgEnvelope;
 
 ///
 #[derive(Clone)]
@@ -145,7 +145,11 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn send_message_to_client(&self, peer_addr: SocketAddr, msg: MsgEnvelope) -> Result<()> {
+    pub async fn send_message_to_client(
+        &self,
+        peer_addr: SocketAddr,
+        msg: MsgEnvelope,
+    ) -> Result<()> {
         self.routing
             .lock()
             .await

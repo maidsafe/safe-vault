@@ -113,7 +113,9 @@ pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::cli
         error => Err(Error::NoErrorMapping(error.to_string())),
     }
 }
-pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> Result<sn_messaging::client::Error> {
+pub(crate) fn convert_dt_error_to_error_message(
+    error: DtError,
+) -> Result<sn_messaging::client::Error> {
     match error {
         DtError::InvalidOperation => Ok(ErrorMessage::InvalidOperation),
         DtError::PolicyNotSet => Ok(ErrorMessage::PolicyNotSet),

@@ -27,7 +27,7 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use itertools::Itertools;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
-use sn_messaging::client::{TransientElderKey, MsgEnvelope};
+use sn_messaging::client::{MsgEnvelope, TransientElderKey};
 use sn_routing::SectionProofChain;
 use std::{
     collections::BTreeSet,

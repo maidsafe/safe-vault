@@ -20,7 +20,9 @@ use sn_data_types::{
     ActorHistory, CreditAgreementProof, PublicKey, SignedTransferShare, Token, TransferValidated,
     WalletInfo,
 };
-use sn_messaging::client::{Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery};
+use sn_messaging::client::{
+    Message, MessageId, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery,
+};
 use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
 use xor_name::XorName;
