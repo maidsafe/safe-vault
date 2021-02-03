@@ -19,7 +19,6 @@ use crate::{
         node_ops::{GatewayDuty, NetworkDuty, NodeDuty, NodeOperation},
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup},
     },
-    utils::Init,
     Config, Error, Network, NodeInfo, Result,
 };
 use bls::SecretKey;
@@ -79,7 +78,6 @@ impl Node {
             genesis: config.is_first(),
             node_id: PublicKey::Ed25519(network_api.public_key().await),
             root_dir: root_dir_buf,
-            init_mode: Init::New,
             /// Upper limit in bytes for allowed network storage on this node.
             /// An Adult would be using the space for chunks,
             /// while an Elder uses it for metadata.

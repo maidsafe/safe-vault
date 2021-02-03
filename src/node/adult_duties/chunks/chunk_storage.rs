@@ -36,13 +36,9 @@ impl ChunkStorage {
     pub(crate) async fn new(adult_state: AdultState) -> Result<Self> {
         let node_info = adult_state.info();
         let used_space = UsedSpace::new(node_info.max_storage_capacity);
-        let chunks = BlobChunkStore::new(node_info.path(), used_space, node_info.init_mode).await?;
+        let chunks = BlobChunkStore::new(node_info.path(), used_space).await?;
         let wrapping = AdultMsgWrapping::new(adult_state, AdultDuties::ChunkStorage);
         Ok(Self { chunks, wrapping })
-    }
-
-    pub fn update_msg_wrapping(&mut self, adult_state: AdultState) {
-        self.wrapping = AdultMsgWrapping::new(adult_state, AdultDuties::ChunkStorage);
     }
 
     pub(crate) async fn store(

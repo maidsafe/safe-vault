@@ -31,10 +31,6 @@ impl AdultDuties {
         Ok(Self { state, chunks })
     }
 
-    pub fn update_msg_wrapping(&mut self, adult_state: AdultState) {
-        self.chunks.update_msg_wrapping(adult_state)
-    }
-
     ///
     pub fn state(&self) -> &AdultState {
         &self.state
