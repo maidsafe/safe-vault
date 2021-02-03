@@ -41,6 +41,10 @@ impl ChunkStorage {
         Ok(Self { chunks, wrapping })
     }
 
+    pub fn update_msg_wrapping(&mut self, adult_state: AdultState) {
+        self.wrapping = AdultMsgWrapping::new(adult_state, AdultDuties::ChunkStorage);
+    }
+
     pub(crate) async fn store(
         &mut self,
         data: &Blob,

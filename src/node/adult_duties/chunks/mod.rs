@@ -40,6 +40,10 @@ impl Chunks {
         })
     }
 
+    pub fn update_msg_wrapping(&mut self, adult_state: AdultState) {
+        self.chunk_storage.update_msg_wrapping(adult_state)
+    }
+
     pub async fn receive_msg(&mut self, msg: MsgEnvelope) -> Result<NodeMessagingDuty> {
         trace!(
             "{}: Received ({:?} from src {:?}",

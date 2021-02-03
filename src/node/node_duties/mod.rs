@@ -653,11 +653,10 @@ impl NodeDuties {
             Stage::AwaitingGenesisThreshold(_) => Ok(NodeOperation::NoOp),
             Stage::ProposingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
             Stage::AccumulatingGenesis(_) => Ok(NodeOperation::NoOp), // TODO: Queue up (or something?)!!
-            Stage::Adult(_old_state) => {
+            Stage::Adult(old_state) => {
                 let state =
                     AdultState::new(self.node_info.clone(), self.network_api.clone()).await?;
-                let duties = AdultDuties::new(state).await?;
-                self.stage = Stage::Adult(duties);
+                old_state.update_msg_wrapping(state);
                 Ok(NodeOperation::NoOp)
             }
             Stage::Elder(elder) => elder.initiate_elder_change(prefix, new_section_key).await,
