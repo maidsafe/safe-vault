@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.2](https://github.com/maidsafe/sn_node/compare/v0.26.1...v0.26.2) (2021-02-03)
+
+
+### Bug Fixes
+
+* **adult:** fix adults overwriting their blob chunkstore on churns ([f823ee8](https://github.com/maidsafe/sn_node/commit/f823ee85001a04a2d40054b79b98f0997f17b33e))
+
 ### [0.26.1](https://github.com/maidsafe/sn_node/compare/v0.26.0...v0.26.1) (2021-02-03)
 
 ## [0.26.0](https://github.com/maidsafe/sn_node/compare/v0.25.41...v0.26.0) (2021-02-01)
