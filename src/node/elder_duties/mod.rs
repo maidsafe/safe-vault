@@ -29,12 +29,12 @@ pub struct ElderDuties {
 }
 
 impl ElderDuties {
-    pub async fn new(wallet_info: WalletInfo, state: ElderState) -> Result<Self> {
+    pub async fn new(state: ElderState) -> Result<Self> {
         let info = state.info();
         let dbs = ChunkHolderDbs::new(info.path())?;
         let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs.clone()));
         let key_section = KeySection::new(rate_limit, state.clone()).await?;
-        let data_section = DataSection::new(info, dbs, wallet_info, state.clone()).await?;
+        let data_section = DataSection::new(info, dbs, state.clone()).await?;
         Ok(Self {
             state,
             key_section,
