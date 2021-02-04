@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{replica_signing::ReplicaSigning, store::TransferStore, ReplicaInfo};
-use crate::{utils::Init, Error, Result};
+use crate::{Error, Result};
 use bls::PublicKeySet;
 use dashmap::DashMap;
 use futures::lock::Mutex;
@@ -64,8 +64,7 @@ impl<T: ReplicaSigning> Replicas<T> {
             .locks
             .iter()
             .map(|r| *r.key())
-            // TODO: This presupposes a dump has occured...
-            .filter_map(|id| TransferStore::new(id.into(), &self.root_dir, Init::Load).ok())
+            .filter_map(|id| TransferStore::new(id.into(), &self.root_dir).ok())
             .map(|store| store.get_all())
             .flatten()
             .collect();
@@ -74,7 +73,7 @@ impl<T: ReplicaSigning> Replicas<T> {
 
     /// History of actor
     pub async fn history(&self, id: PublicKey) -> Result<ActorHistory> {
-        let store = TransferStore::new(id.into(), &self.root_dir, Init::Load);
+        let store = TransferStore::new(id.into(), &self.root_dir);
 
         if let Err(error) = store {
             // hmm.. can we handle this in a better way?
@@ -107,16 +106,14 @@ impl<T: ReplicaSigning> Replicas<T> {
 
     fn get_credits(&self, events: &[ReplicaEvent]) -> Vec<CreditAgreementProof> {
         use itertools::Itertools;
-        let valid_credits = events
+        events
             .iter()
             .filter_map(|e| match e {
                 ReplicaEvent::TransferPropagated(e) => Some(e.credit_proof.clone()),
                 _ => None,
             })
             .unique_by(|e| *e.id())
-            .collect();
-
-        valid_credits
+            .collect()
     }
 
     fn get_debits(&self, events: Vec<ReplicaEvent>) -> Vec<TransferAgreementProof> {
@@ -139,7 +136,7 @@ impl<T: ReplicaSigning> Replicas<T> {
     ///
     pub async fn balance(&self, id: PublicKey) -> Result<Token> {
         debug!("Replica: Getting balance of: {:?}", id);
-        let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
+        let store = match TransferStore::new(id.into(), &self.root_dir) {
             Ok(store) => store,
             // store load failed, so we return 0 balance
             Err(_) => return Ok(Token::from_nano(0)),
@@ -290,7 +287,7 @@ impl<T: ReplicaSigning> Replicas<T> {
                     Ok(store) => store,
                     Err(_) => {
                         // no key lock (hence no store), so we create one
-                        let store = TransferStore::new(id.into(), &self.root_dir, Init::New)?;
+                        let store = TransferStore::new(id.into(), &self.root_dir)?;
                         let locked_store = Arc::new(Mutex::new(store));
                         let _ = self.locks.insert(id, locked_store.clone());
                         let _ = self_lock.overflowing_add(0); // resolve: is a usage at end of block necessary to actually engage the lock?
@@ -376,10 +373,10 @@ impl<T: ReplicaSigning> Replicas<T> {
         let key_lock = match self.load_key_lock(id).await {
             Ok(lock) => lock,
             Err(_) => {
-                let store = match TransferStore::new(id.into(), &self.root_dir, Init::Load) {
+                let store = match TransferStore::new(id.into(), &self.root_dir) {
                     Ok(store) => store,
-                    // no key lock, so we create one for this simulated payout...
-                    Err(_e) => TransferStore::new(id.into(), &self.root_dir, Init::New)?,
+                    // no key lock, so we create one for this payout...
+                    Err(_e) => TransferStore::new(id.into(), &self.root_dir)?,
                 };
                 debug!("store retrieved..");
                 let locked_store = Arc::new(Mutex::new(store));
@@ -418,7 +415,7 @@ impl<T: ReplicaSigning> Replicas<T> {
             return Err(Error::BalanceExists);
         }
         // No key lock (hence no store), so we create one
-        let store = TransferStore::new(id.into(), &self.root_dir, Init::New)?;
+        let store = TransferStore::new(id.into(), &self.root_dir)?;
         let locked_store = Arc::new(Mutex::new(store));
         let _ = self.locks.insert(id, locked_store.clone());
         // Acquire lock of the wallet.

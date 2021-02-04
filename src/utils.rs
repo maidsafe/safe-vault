@@ -11,90 +11,34 @@
 use crate::{config_handler::Config, Error, Result};
 use bytes::Bytes;
 use flexi_logger::{DeferredNow, Logger};
-use log::{debug, error};
+use log::debug;
 use log::{Log, Metadata, Record};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
+use std::io::Write;
 use std::{fs, path::Path};
-use std::{io::Write, time::Duration};
 
 const NODE_MODULE_NAME: &str = "sn_node";
-#[allow(unused)]
-const PERIODIC_DUMP_INTERVAL: Duration = Duration::from_secs(60);
-
-/// Specifies whether to try loading cached data from disk, or to just construct a new instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Init {
-    /// Load cached data from disk
-    Load,
-    /// Start a new cache instance
-    New,
-}
 
 pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
     db_name: N,
-    init_mode: Init,
 ) -> Result<PickleDb> {
     let db_path = db_dir.as_ref().join(db_name);
-    if init_mode == Init::New {
-        debug!("Creating auto dump database at {}", db_path.display());
-        fs::create_dir_all(db_dir)?;
-        let _db = PickleDb::new_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
+    debug!("Trying to load Database at {}", db_path.display(),);
+    match PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump) {
+        Ok(db) => Ok(db),
+        Err(_) => {
+            debug!("Database not found, creating it..");
+            let _ = fs::create_dir_all(db_dir)?;
+            let mut _db = PickleDb::new_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
+            // dump is needed to actually write the db to disk.
+            let _ = _db.dump()?;
+            debug!("Created database");
+            PickleDb::load_bin(db_path, PickleDbDumpPolicy::AutoDump).map_err(Error::PickleDb)
+        }
     }
-    debug!(
-        "Loading auto dump database at {}, init mode was {:?}",
-        db_path.display(),
-        init_mode
-    );
-    let result = PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
-    if let Err(ref error) = &result {
-        error!(
-            "Failed to load auto dump db at {}: {}",
-            db_path.display(),
-            error
-        );
-    }
-    Ok(result?)
-}
-
-#[allow(unused)]
-pub(crate) fn new_periodic_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
-    db_dir: D,
-    db_name: N,
-    init_mode: Init,
-) -> Result<PickleDb> {
-    let db_path = db_dir.as_ref().join(db_name);
-    if init_mode == Init::New {
-        debug!("Creating database at {}", db_path.display());
-        match fs::create_dir_all(db_dir) {
-            Ok(_) => Ok(()),
-            Err(error) => {
-                error!("Error making DB. {:?}", error);
-                Err(error)
-            }
-        }?;
-
-        let db = PickleDb::new_bin(
-            db_path,
-            PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL),
-        );
-        return Ok(db);
-    }
-    debug!(
-        "Loading database at {}, init mode was: {:?}",
-        db_path.display(),
-        init_mode
-    );
-    let result = PickleDb::load_bin(
-        db_path.clone(),
-        PickleDbDumpPolicy::PeriodicDump(PERIODIC_DUMP_INTERVAL),
-    );
-    if let Err(ref error) = &result {
-        error!("Failed to load {}: {}", db_path.display(), error);
-    }
-    Ok(result?)
 }
 
 #[allow(dead_code)]

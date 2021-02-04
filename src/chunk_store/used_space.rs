@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::utils::Init;
 use crate::{Error, Result};
-// use crate::node::Init;
 use std::{path::Path, sync::Arc};
 use tokio::sync::Mutex;
 
@@ -70,12 +68,8 @@ impl UsedSpace {
 
     /// Add an object and file store to track used space of a single
     /// `ChunkStore`
-    pub async fn add_local_store<T: AsRef<Path>>(
-        &self,
-        dir: T,
-        init_mode: Init,
-    ) -> Result<StoreId> {
-        inner::UsedSpace::add_local_store(self.inner.clone(), dir, init_mode).await
+    pub async fn add_local_store<T: AsRef<Path>>(&self, dir: T) -> Result<StoreId> {
+        inner::UsedSpace::add_local_store(self.inner.clone(), dir).await
     }
 
     /// Increase the used amount of a single chunk store and the global used value
@@ -168,7 +162,6 @@ mod inner {
         pub async fn add_local_store<T: AsRef<Path>>(
             used_space: Arc<Mutex<UsedSpace>>,
             dir: T,
-            init_mode: Init,
         ) -> Result<StoreId> {
             let mut local_record = OpenOptions::new()
                 .read(true)
@@ -176,9 +169,12 @@ mod inner {
                 .create(true)
                 .open(dir.as_ref().join(USED_SPACE_FILENAME))
                 .await?;
-            let local_value = if init_mode == Init::Load {
-                let mut buffer = vec![];
-                let _ = local_record.read_to_end(&mut buffer).await?;
+
+            // try read
+            let mut buffer = vec![];
+            let could_read = local_record.read_to_end(&mut buffer).await.is_ok();
+            let has_value = !buffer.is_empty();
+            let local_value = if could_read && has_value {
                 // TODO - if this can't be parsed, we should consider emptying `dir` of any chunks.
                 bincode::deserialize::<u64>(&buffer)?
             } else {
@@ -291,8 +287,7 @@ mod inner {
 
 #[cfg(test)]
 mod tests {
-
-    use super::{Error, Init, Result, UsedSpace};
+    use super::{Error, Result, UsedSpace};
     use tempdir::TempDir;
 
     const TEST_STORE_MAX_SIZE: u64 = u64::MAX;
@@ -319,8 +314,7 @@ mod tests {
         let root_dir = create_temp_root()?;
         let store_dir = create_temp_store(&root_dir)?;
         let used_space = UsedSpace::new(TEST_STORE_MAX_SIZE);
-        let id = used_space.add_local_store(&store_dir, Init::New).await?;
-
+        let id = used_space.add_local_store(&store_dir).await?;
         // get a random vec of u64 by adding u32 (avoid overflow)
         let mut rng = rand::thread_rng();
         let bytes = crate::utils::random_vec(&mut rng, std::mem::size_of::<u32>() * NUMS_TO_ADD);

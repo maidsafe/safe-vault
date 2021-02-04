@@ -32,7 +32,7 @@ pub(super) struct MapStorage {
 impl MapStorage {
     pub(super) async fn new(node_info: &NodeInfo, wrapping: ElderMsgWrapping) -> Result<Self> {
         let used_space = UsedSpace::new(node_info.max_storage_capacity);
-        let chunks = MapChunkStore::new(node_info.path(), used_space, node_info.init_mode).await?;
+        let chunks = MapChunkStore::new(node_info.path(), used_space).await?;
         Ok(Self { chunks, wrapping })
     }
 

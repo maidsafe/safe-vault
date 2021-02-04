@@ -21,7 +21,7 @@
 // What things do we _need_ to access most current state of?
 // - ..
 
-use crate::{utils, Network, Result};
+use crate::{Network, Result};
 use bls::{PublicKeySet, PublicKeyShare};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use itertools::Itertools;
@@ -354,9 +354,7 @@ impl NodeInteraction {
     }
 }
 
-/// Info about the node used
-/// to init its various dbs
-/// (among things).
+/// Info about the node.
 #[derive(Clone)]
 pub struct NodeInfo {
     ///
@@ -365,8 +363,6 @@ pub struct NodeInfo {
     pub node_id: PublicKey,
     ///
     pub root_dir: PathBuf,
-    ///
-    pub init_mode: utils::Init,
     /// Upper limit in bytes for allowed network storage on this node.
     /// An Adult would be using the space for chunks,
     /// while an Elder uses it for metadata.

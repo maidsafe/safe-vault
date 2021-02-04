@@ -558,7 +558,7 @@ impl NodeDuties {
                 }
                 Ok(NodeOperation::NoOp)
             }
-            _ => return Err(Error::InvalidOperation),
+            _ => Err(Error::InvalidOperation),
         }
     }
 

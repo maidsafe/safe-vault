@@ -24,7 +24,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macOS-latest]
+        os: [windows-latest, macos-latest]
         include:
           - os: windows-latest
             build-script: make build
@@ -154,28 +154,28 @@ jobs:
         run: make package-version-artifacts-for-deploy
 
       # Get release description (requires generated archives)
-      - shell: bash
+      - name: Generate Release Description
+        shell: bash
         id: release_description
         run: |
-          description=$(./scripts/get_release_description.sh ${{ steps.versioning.outputs.version }})
-          description="${description//'%'/'%25'}"
-          description="${description//$'\n'/'%0A'}"
-          description="${description//$'\r'/'%0D'}"
-          echo "::set-output name=description::$description"
+          ./scripts/get_release_description.sh ${{ steps.versioning.outputs.version }} > RELEASE_DESCRIPTION.txt
 
       # Upload all the release archives to S3
       - name: Upload archives to S3
         run: aws s3 sync deploy/prod s3://sn-node --acl public-read
-
-      # Create the release and attach sn_node archives as assets.
-      - uses: csexton/create-release@add-body
+      
+      # Create the release and attach the generated description
+      - name: Create GitHub Release
         id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.versioning.outputs.version }}
-          release_name: sn_node
+          tag_name: v${{ steps.versioning.outputs.version }}
+          release_name: sn_node v${{ steps.versioning.outputs.version }}
           draft: false
           prerelease: false
-          body: ${{ steps.release_description.outputs.description }}
+          body_path: RELEASE_DESCRIPTION.txt
 
       # Upload zip files
       - uses: actions/upload-release-asset@v1.0.1
