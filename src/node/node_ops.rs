@@ -488,38 +488,6 @@ pub enum ChunkReplicationCmd {
     StoreReplicatedBlob(Blob),
 }
 
-// impl From<sn_messaging::client::TransferCmd> for ChunkReplicationCmd {
-//     fn from(cmd: sn_messaging::client::TransferCmd) -> Self {
-//         match cmd {
-//             #[cfg(feature = "simulated-payouts")]
-//             sn_messaging::client::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
-//             sn_messaging::client::TransferCmd::ValidateTransfer(signed_transfer) => {
-//                 Self::ValidateTransfer(signed_transfer)
-//             }
-//             sn_messaging::client::TransferCmd::RegisterTransfer(transfer_agreement) => {
-//                 Self::RegisterTransfer(transfer_agreement)
-//             }
-//         }
-//     }
-// }
-
-// impl From<sn_messaging::client::TransferQuery> for ChunkReplicationQuery {
-//     fn from(cmd: sn_messaging::client::TransferQuery) -> Self {
-//         match cmd {
-//             sn_messaging::client::TransferQuery::GetReplicaKeys(transfer) => {
-//                 Self::GetReplicaKeys(transfer)
-//             }
-//             sn_messaging::client::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
-//             sn_messaging::client::TransferQuery::GetHistory { at, since_version } => {
-//                 Self::GetHistory { at, since_version }
-//             }
-//             sn_messaging::client::TransferQuery::GetStoreCost { requester, bytes } => {
-//                 Self::GetStoreCost { requester, bytes }
-//             }
-//         }
-//     }
-// }
-
 // --------------- Rewards ---------------
 
 /// Nodes participating in the system are
