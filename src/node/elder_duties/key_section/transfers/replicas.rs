@@ -564,7 +564,7 @@ impl<T: ReplicaSigning> Replicas<T> {
             debug!("TransferValidationProposed!");
             // apply the event
             let event = ReplicaEvent::TransferValidationProposed(proposal.clone());
-            wallet.apply(event)?;
+            wallet.apply(event.clone())?;
             // see if any agreement accumulated
             if let Some(agreed_transfer) = proposal.agreed_transfer {
                 let (replica_debit_sig, replica_credit_sig) =
@@ -579,6 +579,9 @@ impl<T: ReplicaSigning> Replicas<T> {
                 store.try_insert(ReplicaEvent::TransferValidated(event.clone()))?;
                 // return agreed_transfer to requesting _section_
                 return Ok(Some(event));
+            } else {
+                // save the propagation event for later
+                store.try_insert(event)?;
             }
         }
         Ok(None)
