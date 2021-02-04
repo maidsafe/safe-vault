@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.6](https://github.com/maidsafe/sn_node/compare/v0.26.5...v0.26.6) (2021-02-04)
+
+
+### Bug Fixes
+
+* NoOp when elder change has occured for various stages ([5fd50e2](https://github.com/maidsafe/sn_node/commit/5fd50e2951398fb4b9b6b88e06d95219073a52a1))
+* save received transfer propagation ([e72ba81](https://github.com/maidsafe/sn_node/commit/e72ba8177866c53bc31964cf7e834e77665c36d4))
+
 ### [0.26.5](https://github.com/maidsafe/sn_node/compare/v0.26.4...v0.26.5) (2021-02-04)
 
 ### [0.26.4](https://github.com/maidsafe/sn_node/compare/v0.26.3...v0.26.4) (2021-02-04)
