@@ -2365,8 +2365,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "2.0.0"
-source = "git+https://github.com/bochaco/sn_messaging?branch=support-node-ping-infrastructure-types#9007c97cf0e67a02b87d1af759909315def3ad9c"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "737417c0eebf12b32dcf488720e055cfcd71249b0076f7a1cc3e1fcd7a090791"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2465,7 +2466,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.41.6"
+version = "0.42.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd93ff3089c18f2b85d541a13a2e81f8eddc33821cd9edd61824cb0744ccc8ab"
 dependencies = [
  "bincode",
  "bls_dkg",
