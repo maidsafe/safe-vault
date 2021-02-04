@@ -34,10 +34,7 @@ use sn_messaging::client::{
     Address, Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeQuery, NodeSystemCmd,
     NodeTransferQuery,
 };
-use std::{
-    collections::{BTreeMap, VecDeque},
-    unimplemented,
-};
+use std::collections::{BTreeMap, VecDeque};
 
 const GENESIS_ELDER_COUNT: usize = 5;
 
