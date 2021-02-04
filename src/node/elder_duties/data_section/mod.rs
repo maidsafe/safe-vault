@@ -108,7 +108,6 @@ impl DataSection {
     pub async fn new(
         info: &NodeInfo,
         dbs: ChunkHolderDbs,
-        _wallet_info: WalletInfo,
         elder_state: ElderState,
     ) -> Result<Self> {
         // Metadata

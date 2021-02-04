@@ -239,9 +239,7 @@ impl NodeDuties {
                 previous_key,
                 new_key,
             } => self.finish_elder_change(previous_key, new_key).await,
-            InitSectionWallet(wallet_info) => {
-                self.finish_transition_to_elder(wallet_info, None).await
-            }
+            InitSectionWallet(_wallet_info) => self.finish_transition_to_elder(None).await,
             ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
             ProcessNetworkEvent(event) => {
                 self.network_events
@@ -390,20 +388,20 @@ impl NodeDuties {
             // must get the above wrapping instance before overwriting stage
             self.stage = Stage::AssumingElderDuties(VecDeque::new());
 
-            use NodeTransferQuery::CatchUpWithSectionWallet;
-            return wrapping
-                .send_to_section(
-                    Message::NodeQuery {
-                        query: NodeQuery::Transfers(CatchUpWithSectionWallet(wallet_id)),
-                        id: MessageId::new(),
-                    },
-                    true,
-                )
-                .await
-                .convert();
+            // use NodeTransferQuery::CatchUpWithSectionWallet;
+            // return wrapping
+            //     .send_to_section(
+            //         Message::NodeQuery {
+            //             query: NodeQuery::Transfers(CatchUpWithSectionWallet(wallet_id)),
+            //             id: MessageId::new(),
+            //         },
+            //         true,
+            //     )
+            //     .await
+            //     .convert();
         }
 
-        Ok(NodeOperation::NoOp)
+        self.finish_transition_to_elder(None).await
     }
 
     async fn receive_genesis_proposal(
@@ -549,18 +547,7 @@ impl NodeDuties {
                         crediting_replica_sig: credit_sig_share,
                         crediting_replica_keys: bootstrap.elder_state.section_public_key(),
                     };
-                    return self
-                        .finish_transition_to_elder(
-                            WalletInfo {
-                                replicas: genesis.credit_proof.debiting_replicas_keys.clone(),
-                                history: ActorHistory {
-                                    credits: vec![genesis.credit_proof.clone()],
-                                    debits: vec![],
-                                },
-                            },
-                            Some(genesis),
-                        )
-                        .await;
+                    return self.finish_transition_to_elder(Some(genesis)).await;
                 }
                 Ok(NodeOperation::NoOp)
             }
@@ -570,7 +557,6 @@ impl NodeDuties {
 
     async fn finish_transition_to_elder(
         &mut self,
-        wallet_info: WalletInfo,
         genesis: Option<TransferPropagated>,
     ) -> Result<NodeOperation> {
         let queued_duties = &mut VecDeque::new();
@@ -594,7 +580,7 @@ impl NodeDuties {
 
         let mut ops: Vec<NodeOperation> = vec![];
         let state = ElderState::new(&self.node_info, self.network_api.clone()).await?;
-        let mut duties = ElderDuties::new(wallet_info, state.clone()).await?;
+        let mut duties = ElderDuties::new(state.clone()).await?;
 
         // 1. Initiate duties.
         ops.push(duties.initiate(genesis).await?);
