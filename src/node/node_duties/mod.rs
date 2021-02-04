@@ -671,9 +671,9 @@ impl NodeDuties {
         new_key: PublicKey,
     ) -> Result<NodeOperation> {
         match &mut self.stage {
-            Stage::AwaitingGenesisThreshold(_) => unimplemented!(),
-            Stage::ProposingGenesis(_) => unimplemented!(),
-            Stage::AccumulatingGenesis(_) => unimplemented!(),
+            Stage::AwaitingGenesisThreshold(_) => Ok(NodeOperation::NoOp),
+            Stage::ProposingGenesis(_) => Ok(NodeOperation::NoOp),
+            Stage::AccumulatingGenesis(_) => Ok(NodeOperation::NoOp),
             Stage::AssumingElderDuties(_) => Ok(NodeOperation::NoOp), // Should be unreachable?
             Stage::Infant | Stage::Adult(_) => Ok(NodeOperation::NoOp),
             Stage::Elder(elder) => elder.finish_elder_change(previous_key, new_key).await,
