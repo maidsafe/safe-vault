@@ -30,7 +30,7 @@ use sn_data_types::{
     ActorHistory, Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, Token,
     TransferPropagated, WalletInfo,
 };
-use sn_messaging::{
+use sn_messaging::client::{
     Address, Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeQuery, NodeSystemCmd,
     NodeTransferQuery,
 };
@@ -379,7 +379,7 @@ impl NodeDuties {
             trace!("Beginning transition to Elder duties.");
             let wrapping = NodeMsgWrapping::new(
                 NodeState::Adult(self.adult_state()?),
-                sn_messaging::NodeDuties::NodeConfig,
+                sn_messaging::client::NodeDuties::NodeConfig,
             );
             // must get the above wrapping instance before overwriting stage
             self.stage = Stage::AssumingElderDuties(VecDeque::new());

@@ -2365,10 +2365,11 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bd0f7827f57f0da7d0c91aa40f8c809610bbed93cb1e4d91d99dd104747cc97"
+checksum = "737417c0eebf12b32dcf488720e055cfcd71249b0076f7a1cc3e1fcd7a090791"
 dependencies = [
+ "bincode",
  "bytes 1.0.1",
  "cookie-factory",
  "crdts",
@@ -2386,13 +2387,13 @@ dependencies = [
  "sn_data_types",
  "thiserror",
  "threshold_crypto",
- "tiny-keccak 1.5.0",
+ "tiny-keccak 2.0.2",
  "xor_name",
 ]
 
 [[package]]
 name = "sn_node"
-version = "0.26.2"
+version = "0.26.4"
 dependencies = [
  "async-log",
  "async-trait",
@@ -2438,9 +2439,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.41.6"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4fa47ac0c7a8a0a31528159bbdbf9b45b61e161ca29ccb14bebb61ea47a385e"
+checksum = "dd93ff3089c18f2b85d541a13a2e81f8eddc33821cd9edd61824cb0744ccc8ab"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2456,6 +2457,7 @@ dependencies = [
  "rand_chacha 0.2.2",
  "resource_proof",
  "serde",
+ "sn_messaging",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",

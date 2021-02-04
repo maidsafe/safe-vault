@@ -20,7 +20,7 @@ use sn_data_types::{
     SequenceEntry, SequenceIndex, SequencePolicyWriteOp, SequencePrivatePolicy,
     SequencePublicPolicy, SequenceUser,
 };
-use sn_messaging::{
+use sn_messaging::client::{
     CmdError, Message, MessageId, MsgSender, QueryResponse, SequenceRead, SequenceWrite,
 };
 

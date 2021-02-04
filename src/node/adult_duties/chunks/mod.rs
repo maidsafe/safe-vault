@@ -17,7 +17,7 @@ use crate::{
 use chunk_storage::ChunkStorage;
 use log::{info, trace};
 use sn_data_types::{Blob, BlobAddress};
-use sn_messaging::{
+use sn_messaging::client::{
     Address, DataQuery, Message, MessageId, MsgEnvelope, MsgSender, NodeCmd, NodeDataCmd, Query,
 };
 use std::{

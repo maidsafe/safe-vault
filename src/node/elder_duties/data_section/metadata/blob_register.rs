@@ -16,7 +16,7 @@ use crate::{
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey, Result as NdResult};
-use sn_messaging::{
+use sn_messaging::client::{
     BlobRead, BlobWrite, CmdError, DataQuery, Error as ErrorMessage, Message, MessageId, MsgSender,
     NodeCmd, NodeDataCmd, Query, QueryResponse,
 };

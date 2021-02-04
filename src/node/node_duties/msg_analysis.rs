@@ -16,7 +16,7 @@ use crate::{
     Error, Network, Result,
 };
 use log::{debug, error, info, trace};
-use sn_messaging::{
+use sn_messaging::client::{
     Address, AdultDuties::ChunkStorage, Cmd, DataQuery, Duty, ElderDuties, Message, MessageId,
     MsgEnvelope, NodeCmd, NodeDataCmd, NodeDataQuery, NodeDataQueryResponse, NodeDuties, NodeEvent,
     NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd,

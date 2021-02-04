@@ -13,7 +13,7 @@ use super::{
 use crate::node::node_ops::{IntoNodeOp, NodeMessagingDuty, NodeOperation};
 use crate::{Error, Result};
 use log::info;
-use sn_messaging::{
+use sn_messaging::client::{
     BlobWrite, Cmd, DataCmd, MapWrite, Message, MessageId, MsgEnvelope, MsgSender, SequenceWrite,
 };
 

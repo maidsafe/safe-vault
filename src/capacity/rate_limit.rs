@@ -81,7 +81,7 @@ impl RateLimit {
 mod test {
     use super::*;
     use crate::Result;
-    use sn_messaging::DataCmd;
+    use sn_messaging::client::DataCmd;
     use std::mem;
 
     #[test]
