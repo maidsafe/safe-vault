@@ -15,6 +15,7 @@ pub struct RewardCalc {
     prefix: Prefix,
 }
 
+#[allow(unused)]
 impl RewardCalc {
     /// Ctor
     pub fn new(prefix: Prefix) -> RewardCalc {

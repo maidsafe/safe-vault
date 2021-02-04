@@ -114,11 +114,11 @@ impl NetworkMsgAnalysis {
             AdultNoOp => (),
             op => return Ok(op.into()),
         }
-        match self.try_rewards(&msg).await? {
-            // Identified as a Rewards msg
-            RewardDuty::NoOp => (),
-            op => return Ok(op.into()),
-        };
+        // match self.try_rewards(&msg).await? {
+        //     // Identified as a Rewards msg
+        //     RewardDuty::NoOp => (),
+        //     op => return Ok(op.into()),
+        // };
         match self.try_node_duties(&msg).await? {
             // Identified as a NodeCfg msg
             NodeDuty::NoOp => (),
@@ -466,6 +466,7 @@ impl NetworkMsgAnalysis {
         Ok(duty)
     }
 
+    #[allow(unused)]
     async fn try_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
         match self.try_nonacc_rewards(msg).await? {
             RewardDuty::NoOp => (),
@@ -478,6 +479,7 @@ impl NetworkMsgAnalysis {
         self.try_wallet_register(msg).await
     }
 
+    #[allow(unused)]
     async fn try_wallet_register(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
         trace!("Msg analysis: try_wallet_register..");
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
@@ -510,6 +512,7 @@ impl NetworkMsgAnalysis {
     }
 
     // Check non-accumulated reward msgs.
+    #[allow(unused)]
     async fn try_nonacc_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
         trace!("Msg analysis: try_nonacc_rewards..");
         let duty = if let Some(duty) = msg.most_recent_sender().duty() {
@@ -579,6 +582,7 @@ impl NetworkMsgAnalysis {
     }
 
     // Check accumulated reward msgs.
+    #[allow(unused)]
     async fn try_accumulated_rewards(&self, msg: &MsgEnvelope) -> Result<RewardDuty> {
         trace!("Msg analysis: try_accumulated_rewards..");
         let sender = msg.most_recent_sender();

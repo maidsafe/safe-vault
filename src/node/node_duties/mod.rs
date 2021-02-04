@@ -18,7 +18,7 @@ use crate::{
         elder_duties::ElderDuties,
         msg_wrapping::NodeMsgWrapping,
         node_duties::messaging::Messaging,
-        node_ops::{ElderDuty, IntoNodeOp, NodeDuty, NodeOperation, RewardCmd, RewardDuty},
+        node_ops::{ElderDuty, IntoNodeOp, NodeDuty, NodeOperation}, //, RewardCmd, RewardDuty},
         NodeInfo,
     },
     AdultState, ElderState, Error, Network, NodeState, Result,
@@ -31,7 +31,12 @@ use sn_data_types::{
     TransferPropagated, WalletInfo,
 };
 use sn_messaging::client::{
-    Address, Message, MessageId, NodeCmd, NodeDuties as MsgNodeDuties, NodeQuery, NodeSystemCmd,
+    Message,
+    MessageId,
+    NodeCmd,
+    NodeDuties as MsgNodeDuties,
+    NodeQuery,
+    NodeSystemCmd, // Address,
     NodeTransferQuery,
 };
 use std::collections::{BTreeMap, VecDeque};
@@ -300,7 +305,8 @@ impl NodeDuties {
         // let it be upper layer resp.
         // Also, "Error-to-Unit" is not a good conversion..
         //dump_state(AgeGroup::Adult, self.node_info.path(), &self.id).unwrap_or(());
-        Ok(NodeDuty::RegisterWallet(self.node_info.reward_key).into())
+        //Ok(NodeDuty::RegisterWallet(self.node_info.reward_key).into())
+        Ok(NodeOperation::NoOp)
     }
 
     async fn begin_transition_to_elder(&mut self) -> Result<NodeOperation> {
@@ -610,30 +616,30 @@ impl NodeDuties {
 
         info!("Successfully assumed Elder duties!");
 
-        let node_id = state.node_name();
+        // let node_id = state.node_name();
 
-        // 4. Add own node id to rewards.
-        ops.push(
-            RewardDuty::ProcessCmd {
-                cmd: RewardCmd::AddNewNode(node_id),
-                msg_id: MessageId::new(),
-                origin: Address::Node(node_id),
-            }
-            .into(),
-        );
+        // // 4. Add own node id to rewards.
+        // ops.push(
+        //     RewardDuty::ProcessCmd {
+        //         cmd: RewardCmd::AddNewNode(node_id),
+        //         msg_id: MessageId::new(),
+        //         origin: Address::Node(node_id),
+        //     }
+        //     .into(),
+        // );
 
-        // 5. Add own wallet to rewards.
-        ops.push(
-            RewardDuty::ProcessCmd {
-                cmd: RewardCmd::SetNodeWallet {
-                    node_id,
-                    wallet_id: self.node_info.reward_key,
-                },
-                msg_id: MessageId::new(),
-                origin: Address::Node(node_id),
-            }
-            .into(),
-        );
+        // // 5. Add own wallet to rewards.
+        // ops.push(
+        //     RewardDuty::ProcessCmd {
+        //         cmd: RewardCmd::SetNodeWallet {
+        //             node_id,
+        //             wallet_id: self.node_info.reward_key,
+        //         },
+        //         msg_id: MessageId::new(),
+        //         origin: Address::Node(node_id),
+        //     }
+        //     .into(),
+        // );
 
         Ok(ops.into())
     }

@@ -64,6 +64,7 @@ pub enum NodeRewards {
     AwaitingRelocation(PublicKey),
 }
 
+#[allow(unused)]
 impl Rewards {
     pub fn new(elder_state: ElderState, actor: SectionActor, reward_calc: RewardCalc) -> Self {
         let peer_replicas = elder_state.section_public_key();
