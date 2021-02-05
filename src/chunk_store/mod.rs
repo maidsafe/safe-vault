@@ -17,7 +17,7 @@ mod tests;
 mod used_space;
 
 use crate::error::{Error, Result};
-use crate::{utils, utils::Init};
+use crate::utils;
 use chunk::{Chunk, ChunkId};
 use log::{info, trace};
 use sn_data_types::{Blob, Map, Sequence};
@@ -61,19 +61,16 @@ where
     ///
     /// The maximum storage space is defined by `max_capacity`.  This specifies the max usable by
     /// _all_ `ChunkStores`, not per `ChunkStore`.
-    pub async fn new<P: AsRef<Path>>(
-        root: P,
-        used_space: UsedSpace,
-        init_mode: Init,
-    ) -> Result<Self> {
+    pub async fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 
-        match init_mode {
-            Init::New => Self::create_new_root(&dir)?,
-            Init::Load => trace!("Loading ChunkStore at {}", dir.display()),
+        if fs::read(&dir).is_ok() {
+            trace!("Loading ChunkStore at {}", dir.display());
+        } else {
+            Self::create_new_root(&dir)?
         }
 
-        let id = used_space.add_local_store(&dir, init_mode).await?;
+        let id = used_space.add_local_store(&dir).await?;
         Ok(ChunkStore {
             dir,
             used_space,

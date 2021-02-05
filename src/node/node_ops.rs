@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -11,10 +11,11 @@ use sn_data_types::Transfer;
 
 use crate::Result;
 use sn_data_types::{
-    Blob, BlobAddress, CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer,
-    TransferAgreementProof, TransferValidated,
+    Blob, BlobAddress, Credit, CreditAgreementProof, PublicKey, ReplicaEvent, SignatureShare,
+    SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
+    WalletInfo,
 };
-use sn_messaging::{Address, MessageId, MsgEnvelope, MsgSender};
+use sn_messaging::client::{Address, MessageId, MsgEnvelope, MsgSender};
 use std::fmt::Formatter;
 
 use sn_routing::{Event as RoutingEvent, Prefix};
@@ -22,11 +23,11 @@ use std::collections::BTreeSet;
 use std::fmt::Debug;
 use xor_name::XorName;
 
-pub trait Blah {
+pub trait IntoNodeOp {
     fn convert(self) -> Result<NodeOperation>;
 }
 
-impl Blah for Result<NodeMessagingDuty> {
+impl IntoNodeOp for Result<NodeMessagingDuty> {
     fn convert(self) -> Result<NodeOperation> {
         match self? {
             NodeMessagingDuty::NoOp => Ok(NodeOperation::NoOp),
@@ -117,9 +118,44 @@ pub enum NodeDuty {
     ///
     RegisterWallet(PublicKey),
     /// On being promoted, an Infant node becomes an Adult.
-    BecomeAdult,
+    AssumeAdultDuties,
     /// On being promoted, an Adult node becomes an Elder.
-    BecomeElder,
+    AssumeElderDuties,
+    /// Bootstrap of genesis section actor.
+    ReceiveGenesisProposal {
+        /// The genesis credit.
+        credit: Credit,
+        /// An individual elder's sig over the credit.
+        sig: SignatureShare,
+    },
+    /// Bootstrap of genesis section actor.
+    ReceiveGenesisAccumulation {
+        /// The genesis credit.
+        signed_credit: SignedCredit,
+        /// An individual elder's sig over the credit.
+        sig: SignatureShare,
+    },
+    /// Elder changes means the section public key
+    /// changes as well, which leads to necessary updates
+    /// of various places using the multisig of the section.
+    InitiateElderChange {
+        /// The prefix of our section.
+        prefix: Prefix,
+        /// The BLS public key of our section.
+        key: PublicKey,
+        /// The set of elders of our section.
+        elders: BTreeSet<XorName>,
+    },
+    /// Finishes the multi-step process
+    /// of transitioning to a new elder constellation.
+    FinishElderChange {
+        /// The previous section key.
+        previous_key: PublicKey,
+        /// The new section key.
+        new_key: PublicKey,
+    },
+    /// Initiates the section wallet.
+    InitSectionWallet(WalletInfo),
     /// Sending messages on to the network.
     ProcessMessaging(NodeMessagingDuty),
     /// Receiving and processing events from the network.
@@ -141,12 +177,17 @@ impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RegisterWallet(_) => write!(f, "RegisterWallet"),
-            Self::BecomeAdult => write!(f, "BecomeAdult"),
-            Self::BecomeElder => write!(f, "BecomeElder"),
+            Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
+            Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
+            Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),
+            Self::AssumeElderDuties => write!(f, "AssumeElderDuties"),
+            Self::InitSectionWallet { .. } => write!(f, "InitSectionWallet"),
             Self::ProcessMessaging(duty) => duty.fmt(f),
             Self::ProcessNetworkEvent(event) => event.fmt(f),
             Self::NoOp => write!(f, "No op."),
             Self::StorageFull => write!(f, "StorageFull"),
+            Self::InitiateElderChange { .. } => write!(f, "InitiateElderChange"),
+            Self::FinishElderChange { .. } => write!(f, "FinishElderChange"),
         }
     }
 }
@@ -218,17 +259,6 @@ pub enum ElderDuty {
     ProcessLostMember {
         name: XorName,
         age: u8,
-    },
-    /// Elder changes means the section public key
-    /// changes as well, which leads to necessary updates
-    /// of various places using the multisig of the section.
-    ProcessElderChange {
-        /// The prefix of our section.
-        prefix: Prefix,
-        /// The BLS public key of our section.
-        key: PublicKey,
-        /// The set of elders of our section.
-        elders: BTreeSet<XorName>,
     },
     ProcessRelocatedMember {
         /// The id of the node at the previous section.
@@ -303,7 +333,7 @@ pub enum KeySectionDuty {
     /// and query responses) with earlier client
     /// msgs, as to route them to the correct client.
     RunAsGateway(GatewayDuty),
-    /// Transfers of money between keys, hence also payment for data writes.
+    /// Transfers of tokens between keys, hence also payment for data writes.
     RunAsTransfers(TransferDuty),
     NoOp,
 }
@@ -440,11 +470,13 @@ pub enum ChunkReplicationQuery {
     GetChunk(BlobAddress),
 }
 
-/// Cmds carried out on AT2 Replicas.
+/// Cmds carried out on Adults.
 #[derive(Debug)]
 #[allow(clippy::clippy::large_enum_variant)]
 pub enum ChunkReplicationCmd {
-    /// Request for chunk
+    /// An imperament to retrieve
+    /// a chunk from current holders, in order
+    /// to replicate it locally.
     ReplicateChunk {
         ///
         current_holders: BTreeSet<XorName>,
@@ -455,38 +487,6 @@ pub enum ChunkReplicationCmd {
     },
     StoreReplicatedBlob(Blob),
 }
-
-// impl From<sn_messaging::TransferCmd> for ChunkReplicationCmd {
-//     fn from(cmd: sn_messaging::TransferCmd) -> Self {
-//         match cmd {
-//             #[cfg(feature = "simulated-payouts")]
-//             sn_messaging::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
-//             sn_messaging::TransferCmd::ValidateTransfer(signed_transfer) => {
-//                 Self::ValidateTransfer(signed_transfer)
-//             }
-//             sn_messaging::TransferCmd::RegisterTransfer(transfer_agreement) => {
-//                 Self::RegisterTransfer(transfer_agreement)
-//             }
-//         }
-//     }
-// }
-
-// impl From<sn_messaging::TransferQuery> for ChunkReplicationQuery {
-//     fn from(cmd: sn_messaging::TransferQuery) -> Self {
-//         match cmd {
-//             sn_messaging::TransferQuery::GetReplicaKeys(transfer) => {
-//                 Self::GetReplicaKeys(transfer)
-//             }
-//             sn_messaging::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
-//             sn_messaging::TransferQuery::GetHistory { at, since_version } => {
-//                 Self::GetHistory { at, since_version }
-//             }
-//             sn_messaging::TransferQuery::GetStoreCost { requester, bytes } => {
-//                 Self::GetStoreCost { requester, bytes }
-//             }
-//         }
-//     }
-// }
 
 // --------------- Rewards ---------------
 
@@ -522,7 +522,7 @@ pub enum RewardDuty {
 pub enum RewardCmd {
     /// Initiates a new SectionActor with the
     /// state of existing Replicas in the group.
-    InitiateSectionActor(Vec<ReplicaEvent>),
+    InitiateSectionWallet(WalletInfo),
     /// With the node id.
     AddNewNode(XorName),
     /// Set the account for a node.
@@ -568,7 +568,7 @@ pub enum RewardCmd {
 pub enum RewardQuery {
     /// When a node is relocated from us, the other
     /// section will query for the node wallet id.
-    GetWalletId {
+    GetNodeWalletId {
         /// The id of the node at the previous section.
         old_node_id: XorName,
         /// The id of the node at its new section (i.e. this one).
@@ -592,7 +592,7 @@ impl Into<NodeOperation> for RewardDuty {
 
 // --------------- Transfers ---------------
 
-/// Transfers of money on the network
+/// Transfers of tokens on the network
 /// and querying of balances and history.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
@@ -635,7 +635,9 @@ impl Into<NodeOperation> for TransferDuty {
 #[derive(Debug)]
 pub enum TransferQuery {
     /// Get section actor transfers.
-    GetSectionActorHistory,
+    CatchUpWithSectionWallet(PublicKey),
+    /// Get section actor transfers.
+    GetNewSectionWallet(PublicKey),
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(PublicKey),
     /// Get key balance.
@@ -676,35 +678,41 @@ pub enum TransferCmd {
     /// crediting section, it is applied there.
     PropagateTransfer(CreditAgreementProof),
     /// The validation of a section transfer.
-    ValidateSectionPayout(SignedTransfer),
+    ValidateSectionPayout(SignedTransferShare),
     /// The registration of a section transfer.
     RegisterSectionPayout(TransferAgreementProof),
 }
 
-impl From<sn_messaging::TransferCmd> for TransferCmd {
-    fn from(cmd: sn_messaging::TransferCmd) -> Self {
+impl From<sn_messaging::client::TransferCmd> for TransferCmd {
+    fn from(cmd: sn_messaging::client::TransferCmd) -> Self {
         match cmd {
             #[cfg(feature = "simulated-payouts")]
-            sn_messaging::TransferCmd::SimulatePayout(transfer) => Self::SimulatePayout(transfer),
-            sn_messaging::TransferCmd::ValidateTransfer(signed_transfer) => {
+            sn_messaging::client::TransferCmd::SimulatePayout(transfer) => {
+                Self::SimulatePayout(transfer)
+            }
+            sn_messaging::client::TransferCmd::ValidateTransfer(signed_transfer) => {
                 Self::ValidateTransfer(signed_transfer)
             }
-            sn_messaging::TransferCmd::RegisterTransfer(transfer_agreement) => {
+            sn_messaging::client::TransferCmd::RegisterTransfer(transfer_agreement) => {
                 Self::RegisterTransfer(transfer_agreement)
             }
         }
     }
 }
 
-impl From<sn_messaging::TransferQuery> for TransferQuery {
-    fn from(cmd: sn_messaging::TransferQuery) -> Self {
+impl From<sn_messaging::client::TransferQuery> for TransferQuery {
+    fn from(cmd: sn_messaging::client::TransferQuery) -> Self {
         match cmd {
-            sn_messaging::TransferQuery::GetReplicaKeys(transfer) => Self::GetReplicaKeys(transfer),
-            sn_messaging::TransferQuery::GetBalance(public_key) => Self::GetBalance(public_key),
-            sn_messaging::TransferQuery::GetHistory { at, since_version } => {
+            sn_messaging::client::TransferQuery::GetReplicaKeys(transfer) => {
+                Self::GetReplicaKeys(transfer)
+            }
+            sn_messaging::client::TransferQuery::GetBalance(public_key) => {
+                Self::GetBalance(public_key)
+            }
+            sn_messaging::client::TransferQuery::GetHistory { at, since_version } => {
                 Self::GetHistory { at, since_version }
             }
-            sn_messaging::TransferQuery::GetStoreCost { requester, bytes } => {
+            sn_messaging::client::TransferQuery::GetStoreCost { requester, bytes } => {
                 Self::GetStoreCost { requester, bytes }
             }
         }

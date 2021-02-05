@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -35,6 +35,7 @@ mod chunk_store;
 mod config_handler;
 mod error;
 mod network;
+mod network_state;
 mod node;
 mod to_db_key;
 
@@ -46,22 +47,6 @@ pub use crate::{
     config_handler::{write_connection_info, Config},
     error::{Error, Result},
     network::Network,
+    network_state::{AdultState, ElderState, NodeInfo, NodeState},
     node::Node,
 };
-
-#[derive(Clone, Debug)]
-///
-pub struct ReplicaInfo {
-    id: PublicKeyShare,
-    key_index: usize,
-    peer_replicas: PublicKeySet,
-    section_proof_chain: SectionProofChain,
-    signing: Arc<Mutex<ReplicaSigning>>,
-    initiating: bool,
-}
-
-use bls::{PublicKeySet, PublicKeyShare};
-use futures::lock::Mutex;
-use sn_routing::SectionProofChain;
-use sn_transfers::ReplicaSigning;
-use std::sync::Arc;

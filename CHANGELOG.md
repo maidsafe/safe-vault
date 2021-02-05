@@ -2,6 +2,98 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.7](https://github.com/maidsafe/sn_node/compare/v0.26.6...v0.26.7) (2021-02-04)
+
+
+### Features
+
+* give Config public interface ([4b859d8](https://github.com/maidsafe/sn_node/commit/4b859d8449f6caf75dc544be0cd8652f3adf0ced))
+
+### [0.26.6](https://github.com/maidsafe/sn_node/compare/v0.26.5...v0.26.6) (2021-02-04)
+
+
+### Bug Fixes
+
+* NoOp when elder change has occured for various stages ([5fd50e2](https://github.com/maidsafe/sn_node/commit/5fd50e2951398fb4b9b6b88e06d95219073a52a1))
+* save received transfer propagation ([e72ba81](https://github.com/maidsafe/sn_node/commit/e72ba8177866c53bc31964cf7e834e77665c36d4))
+
+### [0.26.5](https://github.com/maidsafe/sn_node/compare/v0.26.4...v0.26.5) (2021-02-04)
+
+### [0.26.4](https://github.com/maidsafe/sn_node/compare/v0.26.3...v0.26.4) (2021-02-04)
+
+### [0.26.3](https://github.com/maidsafe/sn_node/compare/v0.26.2...v0.26.3) (2021-02-04)
+
+### [0.26.2](https://github.com/maidsafe/sn_node/compare/v0.26.1...v0.26.2) (2021-02-03)
+
+
+### Bug Fixes
+
+* **adult:** fix adults overwriting their blob chunkstore on churns ([f823ee8](https://github.com/maidsafe/sn_node/commit/f823ee85001a04a2d40054b79b98f0997f17b33e))
+
+### [0.26.1](https://github.com/maidsafe/sn_node/compare/v0.26.0...v0.26.1) (2021-02-03)
+
+## [0.26.0](https://github.com/maidsafe/sn_node/compare/v0.25.41...v0.26.0) (2021-02-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* rename money to token
+
+* rename money to token ([e3d699c](https://github.com/maidsafe/sn_node/commit/e3d699cce291f9172b79d698cc7edeb3845690ab))
+
+### [0.25.41](https://github.com/maidsafe/sn_node/compare/v0.25.40...v0.25.41) (2021-02-01)
+
+
+### Bug Fixes
+
+* remove println ([62b1c07](https://github.com/maidsafe/sn_node/commit/62b1c070fa295211cd565b78454e9417e93e80f4))
+* **deps:** use correct deps ([ca66a89](https://github.com/maidsafe/sn_node/commit/ca66a89ec42f431dad57c9f6086ccff8ca4d5af3))
+* **test:** impl proper sig verification for test signing ([a7fd147](https://github.com/maidsafe/sn_node/commit/a7fd1479f33fe281625404a676c2a7ac285b2e6c))
+* address and remove comments ([a5017c2](https://github.com/maidsafe/sn_node/commit/a5017c22c57a504404d472a1e578216bd2d344fa))
+
+### [0.25.40](https://github.com/maidsafe/sn_node/compare/v0.25.39...v0.25.40) (2021-01-29)
+
+
+### Features
+
+* **elder_change:** add finish step ([ef17827](https://github.com/maidsafe/sn_node/commit/ef17827de2e120f9f66dd6c1dd76946bfa9626bf))
+* **multisig-actor:** use transfer share logic ([1e437a4](https://github.com/maidsafe/sn_node/commit/1e437a45b8a45f546e193f24f2500677766a64a9))
+* **section_funds:** use other section as replicas ([43e61b6](https://github.com/maidsafe/sn_node/commit/43e61b63e43598c4ac53254b888e81fdb1230235))
+* **transfers:** impl multisig validation proposal ([56a9ef3](https://github.com/maidsafe/sn_node/commit/56a9ef386a11c35f78150f9f812377fa6ba03754))
+
+
+### Bug Fixes
+
+* check for is_section not is_elder in msg_analysis ([fc9841b](https://github.com/maidsafe/sn_node/commit/fc9841b39ce62fabceed1d64c191bb0203ba6753))
+* **adult:** instantiate new adult state ([bd805f2](https://github.com/maidsafe/sn_node/commit/bd805f243e9e498ccd2a7bb951336a926f9f4ff2))
+* **clippy:** remove conversion to same type ([237d791](https://github.com/maidsafe/sn_node/commit/237d791b6d70bfc6c3166fc64685e892fa7ebded))
+* **genesis:** use sn_transfer genesis ([f14b376](https://github.com/maidsafe/sn_node/commit/f14b376beea6f3ea6c8ed4f04624f6d65c29ed95))
+* **init:** process results at assuming duties ([e1a85d6](https://github.com/maidsafe/sn_node/commit/e1a85d603b8baac2c843245365b9c0537bde7811))
+* **msganalysis:** expect validation from transfers ([a5f96fc](https://github.com/maidsafe/sn_node/commit/a5f96fc768e6366cc9ab51130c9cbaf41ea89981))
+* **rewards:** return error when deactivation fails ([452a458](https://github.com/maidsafe/sn_node/commit/452a4582f8abd52193d1e515caa775f520a6786a))
+* add node signing to adult and elder state ([bba2b96](https://github.com/maidsafe/sn_node/commit/bba2b96523d4e4f76a86c6a835baf2fc90657f2a))
+* botched conversion ([f681c24](https://github.com/maidsafe/sn_node/commit/f681c2422ac1e9c9e27121383fb1d50499683384))
+* clippy warnings ([3b667ef](https://github.com/maidsafe/sn_node/commit/3b667ef9e2ffe91d7c03d8af609e4e52d545ec52))
+* enqueue elder ops while assuming elder duties ([88ed190](https://github.com/maidsafe/sn_node/commit/88ed19073620ce1882863f9323cccb0797ea84be))
+
+### [0.25.39](https://github.com/maidsafe/sn_node/compare/v0.25.38...v0.25.39) (2021-01-28)
+
+### [0.25.38](https://github.com/maidsafe/sn_node/compare/v0.25.37...v0.25.38) (2021-01-28)
+
+### [0.25.37](https://github.com/maidsafe/sn_node/compare/v0.25.36...v0.25.37) (2021-01-27)
+
+
+### Features
+
+* **launch_tool:** pass RUST_LOG value to the launch_tool --rust-log arg ([662c827](https://github.com/maidsafe/sn_node/commit/662c827817c62b615c5ca68586b32e4278141a4b))
+
+### [0.25.36](https://github.com/maidsafe/sn_node/compare/v0.25.35...v0.25.36) (2021-01-26)
+
+
+### Features
+
+* removal signature aggregate ([8bac521](https://github.com/maidsafe/sn_node/commit/8bac52163748bdc1fde54b3436c042fbd8f46b02))
+
 ### [0.25.35](https://github.com/maidsafe/sn_node/compare/v0.25.34...v0.25.35) (2021-01-25)
 
 ### [0.25.34](https://github.com/maidsafe/sn_node/compare/v0.25.33...v0.25.34) (2021-01-25)

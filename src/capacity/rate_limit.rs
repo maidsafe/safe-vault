@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{capacity::Capacity, Network, Result};
+use crate::{capacity::Capacity, ElderState, Result};
 use log::info;
-use sn_data_types::{Money, PublicKey};
+use sn_data_types::{PublicKey, Token};
 
 const MAX_CHUNK_SIZE: u64 = 1_000_000;
 const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
@@ -16,24 +16,27 @@ const MAX_NETWORK_STORAGE_RATIO: f64 = 0.5;
 
 /// Calculation of rate limit for writes.
 pub struct RateLimit {
-    network: Network,
+    elder_state: ElderState,
     capacity: Capacity,
 }
 
 impl RateLimit {
     /// gets a new instance of rate limit
-    pub fn new(network: Network, capacity: Capacity) -> RateLimit {
-        Self { network, capacity }
+    pub fn new(elder_state: ElderState, capacity: Capacity) -> RateLimit {
+        Self {
+            elder_state,
+            capacity,
+        }
     }
 
     /// Calculates the rate limit of write operations,
     /// as a cost to be paid for a certain number of bytes.
-    pub async fn from(&self, bytes: u64) -> Money {
-        let prefix = self.network.our_prefix().await;
+    pub async fn from(&self, bytes: u64) -> Token {
+        let prefix = self.elder_state.prefix();
         let prefix_len = prefix.bit_count();
 
         let full_nodes = self.capacity.full_nodes();
-        let all_nodes = self.network.our_adults().await.len() as u8;
+        let all_nodes = self.elder_state.adults().await.len() as u8;
 
         RateLimit::rate_limit(bytes, full_nodes, all_nodes, prefix_len)
     }
@@ -46,7 +49,7 @@ impl RateLimit {
     ///
     pub async fn check_network_storage(&self) -> bool {
         info!("Checking network storage");
-        let all_nodes = self.network.our_adults().await.len() as f64;
+        let all_nodes = self.elder_state.adults().await.len() as f64;
         let full_nodes = self.capacity.full_nodes() as f64;
         let usage_ratio = full_nodes / all_nodes;
         info!("Total number of adult nodes: {:?}", all_nodes);
@@ -55,7 +58,7 @@ impl RateLimit {
         usage_ratio > MAX_NETWORK_STORAGE_RATIO
     }
 
-    fn rate_limit(bytes: u64, full_nodes: u8, all_nodes: u8, prefix_len: usize) -> Money {
+    fn rate_limit(bytes: u64, full_nodes: u8, all_nodes: u8, prefix_len: usize) -> Token {
         let available_nodes = (all_nodes - full_nodes) as f64;
         let supply_demand_factor = 0.001
             + (1_f64 / available_nodes).powf(8_f64)
@@ -66,7 +69,7 @@ impl RateLimit {
         let section_supply_share = RateLimit::max_section_nanos(prefix_len) as f64;
         let token_source = steepness_reductor * section_supply_share.powf(0.5_f64);
         let rate_limit = (token_source * data_size_factor * supply_demand_factor).round() as u64;
-        Money::from_nano(rate_limit)
+        Token::from_nano(rate_limit)
     }
 
     fn max_section_nanos(prefix_len: usize) -> u64 {
@@ -78,7 +81,7 @@ impl RateLimit {
 mod test {
     use super::*;
     use crate::Result;
-    use sn_messaging::DataCmd;
+    use sn_messaging::client::DataCmd;
     use std::mem;
 
     #[test]

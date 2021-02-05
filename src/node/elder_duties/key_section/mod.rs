@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -13,20 +13,31 @@ mod transfers;
 use self::{
     client::ClientGateway,
     client_msg_analysis::ClientMsgAnalysis,
-    transfers::{replicas::Replicas, Transfers},
+    transfers::{replica_signing::ReplicaSigning, replicas::Replicas, Transfers},
 };
 use crate::{
     capacity::RateLimit,
     node::node_ops::{KeySectionDuty, NodeOperation},
-    node::state_db::NodeInfo,
-    Network, ReplicaInfo, Result,
+    ElderState, Result,
 };
-use futures::lock::Mutex;
 use log::{info, trace};
-use sn_data_types::PublicKey;
+use sn_data_types::{PublicKey, TransferPropagated};
 use sn_routing::Prefix;
-use std::path::PathBuf;
-use std::sync::Arc;
+use transfers::replica_signing::ReplicaSigningImpl;
+
+#[derive(Clone, Debug)]
+///
+pub struct ReplicaInfo<T>
+where
+    T: ReplicaSigning,
+{
+    id: bls::PublicKeyShare,
+    key_index: usize,
+    peer_replicas: bls::PublicKeySet,
+    section_proof_chain: sn_routing::SectionProofChain,
+    signing: T,
+    initiating: bool,
+}
 
 /// A Key Section interfaces with clients,
 /// who are essentially a public key,
@@ -35,26 +46,26 @@ use std::sync::Arc;
 /// The Gateway deals with onboarding (handshakes etc)
 /// and routing messages back and forth to clients.
 /// Payments deals with the payment for data writes,
-/// while transfers deals with sending money between keys.
+/// while transfers deals with sending tokens between keys.
 pub struct KeySection {
     gateway: ClientGateway,
     transfers: Transfers,
     msg_analysis: ClientMsgAnalysis,
-    routing: Network,
+    elder_state: ElderState,
 }
 
 impl KeySection {
-    pub async fn new(info: &NodeInfo, rate_limit: RateLimit, routing: Network) -> Result<Self> {
-        let gateway = ClientGateway::new(info, routing.clone()).await?;
-        let replicas = Self::new_replica_manager(info.root_dir.clone(), routing.clone()).await?;
-        let transfers = Transfers::new(info.keys.clone(), replicas, rate_limit);
-        let msg_analysis = ClientMsgAnalysis::new(routing.clone());
+    pub async fn new(rate_limit: RateLimit, elder_state: ElderState) -> Result<Self> {
+        let gateway = ClientGateway::new(elder_state.clone()).await?;
+        let replicas = Self::transfer_replicas(elder_state.clone())?;
+        let transfers = Transfers::new(elder_state.clone(), replicas, rate_limit);
+        let msg_analysis = ClientMsgAnalysis::new(elder_state.clone());
 
         Ok(Self {
             gateway,
             transfers,
             msg_analysis,
-            routing,
+            elder_state,
         })
     }
 
@@ -64,8 +75,8 @@ impl KeySection {
     }
 
     /// Initiates as first node in a network.
-    pub async fn init_first(&mut self) -> Result<NodeOperation> {
-        self.transfers.init_first().await
+    pub async fn init_genesis_node(&mut self, genesis: TransferPropagated) -> Result<()> {
+        self.transfers.genesis(genesis).await
     }
 
     /// Issues queries to Elders of the section
@@ -77,7 +88,7 @@ impl KeySection {
     }
 
     pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<NodeOperation> {
-        match self.routing.set_joins_allowed(joins_allowed).await {
+        match self.elder_state.set_joins_allowed(joins_allowed).await {
             Ok(()) => {
                 info!("Successfully set joins_allowed to true");
                 Ok(NodeOperation::NoOp)
@@ -87,28 +98,28 @@ impl KeySection {
     }
 
     // Update our replica with the latest keys
-    pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
-        let secret_key_share = self.routing.secret_key_share().await?;
-        let id = secret_key_share.public_key_share();
-        let key_index = self.routing.our_index().await?;
-        let peer_replicas = self.routing.public_key_set().await?;
-        let signing =
-            sn_transfers::ReplicaSigning::new(secret_key_share, key_index, peer_replicas.clone());
+    pub fn elders_changed(&mut self, elder_state: ElderState, rate_limit: RateLimit) {
+        // TODO: Query sn_routing for info for [new_section_key]
+        // specifically (regardless of how far back that was) - i.e. not the current info!
+        let id = elder_state.public_key_share();
+        let key_index = elder_state.key_index();
+        let peer_replicas = elder_state.public_key_set().clone();
+        let signing = ReplicaSigningImpl::new(elder_state.clone());
         let info = ReplicaInfo {
             id,
             key_index,
             peer_replicas,
-            section_proof_chain: self.routing.our_history().await,
-            signing: Arc::new(Mutex::new(signing)),
+            section_proof_chain: elder_state.section_proof_chain().clone(),
+            signing,
             initiating: false,
         };
-        self.transfers.update_replica_keys(info).map(|c| c.into())
+        self.transfers.update_replica_info(info, rate_limit);
     }
 
     /// When section splits, the Replicas in either resulting section
     /// also split the responsibility of their data.
-    pub async fn section_split(&mut self, prefix: Prefix) -> Result<NodeOperation> {
-        self.transfers.section_split(prefix).await
+    pub async fn split_section(&mut self, prefix: Prefix) -> Result<()> {
+        self.transfers.split_section(prefix).await
     }
 
     pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Result<NodeOperation> {
@@ -122,19 +133,18 @@ impl KeySection {
         }
     }
 
-    async fn new_replica_manager(root_dir: PathBuf, routing: Network) -> Result<Replicas> {
-        let secret_key_share = routing.secret_key_share().await?;
-        let key_index = routing.our_index().await?;
-        let peer_replicas = routing.public_key_set().await?;
-        let id = secret_key_share.public_key_share();
-        let signing =
-            sn_transfers::ReplicaSigning::new(secret_key_share, key_index, peer_replicas.clone());
+    fn transfer_replicas(elder_state: ElderState) -> Result<Replicas<ReplicaSigningImpl>> {
+        let root_dir = elder_state.info().root_dir.clone();
+        let id = elder_state.public_key_share();
+        let key_index = elder_state.key_index();
+        let peer_replicas = elder_state.public_key_set().clone();
+        let signing = ReplicaSigningImpl::new(elder_state.clone());
         let info = ReplicaInfo {
             id,
             key_index,
             peer_replicas,
-            section_proof_chain: routing.our_history().await,
-            signing: Arc::new(Mutex::new(signing)),
+            section_proof_chain: elder_state.section_proof_chain().clone(),
+            signing,
             initiating: true,
         };
         let replica_manager = Replicas::new(root_dir, info)?;

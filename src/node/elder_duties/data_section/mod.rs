@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -15,17 +15,15 @@ use self::{
 };
 use crate::{
     capacity::ChunkHolderDbs,
-    chunk_store::UsedSpace,
     node::node_ops::{DataSectionDuty, NodeOperation, RewardCmd, RewardDuty},
-    node::state_db::NodeInfo,
-    utils, Network, Result,
+    node::NodeInfo,
+    ElderState, Result,
 };
 use log::info;
-use sn_messaging::{Address, MessageId};
-
+use sn_data_types::{OwnerType, Result as DtResult, Signing, WalletInfo};
+use sn_messaging::client::{Address, MessageId};
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
-use std::sync::Arc;
 use xor_name::XorName;
 
 /// A DataSection is responsible for
@@ -38,8 +36,68 @@ pub struct DataSection {
     /// Rewards for performing storage
     /// services to the network.
     rewards: Rewards,
-    /// The routing layer.
-    network: Network,
+    /// The network state.
+    elder_state: ElderState,
+}
+
+pub struct ElderSigning {
+    id: OwnerType,
+    elder_state: ElderState,
+}
+
+impl ElderSigning {
+    pub fn new(elder_state: ElderState) -> Self {
+        Self {
+            id: OwnerType::Multi(elder_state.public_key_set().clone()),
+            elder_state,
+        }
+    }
+}
+
+impl Signing for ElderSigning {
+    fn id(&self) -> OwnerType {
+        self.id.clone()
+    }
+
+    fn sign<T: serde::Serialize>(&self, data: &T) -> DtResult<sn_data_types::Signature> {
+        use sn_data_types::Error as DtError;
+        Ok(sn_data_types::Signature::BlsShare(
+            futures::executor::block_on(self.elder_state.sign_as_elder(data))
+                .map_err(|_| DtError::InvalidOperation)?,
+        ))
+    }
+
+    fn verify<T: serde::Serialize>(&self, sig: &sn_data_types::Signature, data: &T) -> bool {
+        let data = match bincode::serialize(data) {
+            Ok(data) => data,
+            Err(_) => return false,
+        };
+        use sn_data_types::Signature::*;
+        match sig {
+            Bls(sig) => {
+                if let OwnerType::Multi(set) = self.id() {
+                    set.public_key().verify(&sig, data)
+                } else {
+                    false
+                }
+            }
+            Ed25519(_) => {
+                if let OwnerType::Single(public_key) = self.id() {
+                    public_key.verify(sig, data).is_ok()
+                } else {
+                    false
+                }
+            }
+            BlsShare(share) => {
+                if let OwnerType::Multi(set) = self.id() {
+                    let pubkey_share = set.public_key_share(share.index);
+                    pubkey_share.verify(&share.share, data)
+                } else {
+                    false
+                }
+            }
+        }
+    }
 }
 
 impl DataSection {
@@ -47,23 +105,22 @@ impl DataSection {
     pub async fn new(
         info: &NodeInfo,
         dbs: ChunkHolderDbs,
-        used_space: UsedSpace,
-        network: Network,
+        wallet_info: WalletInfo,
+        elder_state: ElderState,
     ) -> Result<Self> {
         // Metadata
-        let metadata = Metadata::new(info, dbs, used_space, network.clone()).await?;
+        let metadata = Metadata::new(info, dbs, elder_state.clone()).await?;
 
         // Rewards
-        let keypair = utils::key_pair(network.clone()).await?;
-        let public_key_set = network.public_key_set().await?;
-        let actor = TransferActor::new(Arc::new(keypair), public_key_set, Validator {});
-        let reward_calc = RewardCalc::new(network.clone());
-        let rewards = Rewards::new(info.keys.clone(), actor, reward_calc);
+        let signing = ElderSigning::new(elder_state.clone());
+        let actor = TransferActor::from_info(signing, wallet_info, Validator {})?;
+        let reward_calc = RewardCalc::new(*elder_state.prefix());
+        let rewards = Rewards::new(elder_state.clone(), actor, reward_calc);
 
         Ok(Self {
             metadata,
             rewards,
-            network,
+            elder_state,
         })
     }
 
@@ -81,24 +138,28 @@ impl DataSection {
 
     /// Issues query to Elders of the section
     /// as to catch up with the current state of the replicas.
-    #[allow(unused)]
     pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
         self.rewards.catchup_with_replicas().await
     }
 
     /// Transition the section funds account to the new key.
-    #[allow(unused)]
-    pub async fn elders_changed(&mut self) -> Result<NodeOperation> {
-        info!("updating section public key set in data section!");
-        let pub_key_set = self.network.public_key_set().await?;
-        let keypair = utils::key_pair(self.network.clone()).await?;
-        let actor = TransferActor::new(Arc::new(keypair), pub_key_set, Validator {});
-        self.rewards.transition(actor).await
+    pub async fn initiate_elder_change(
+        &mut self,
+        elder_state: ElderState,
+    ) -> Result<NodeOperation> {
+        info!("Processing Elder change in data section");
+        // TODO: Query sn_routing for info for [new_section_key]
+        // specifically (regardless of how far back that was) - i.e. not the current info!
+
+        // if we were demoted, we should not call this at all,
+        // make sure demoted is handled properly first, so that
+        // EldersChanged doesn't lead to calling this method..
+
+        self.rewards.init_transition(elder_state).await
     }
 
     /// At section split, all Elders get their reward payout.
-    #[allow(unused)]
-    pub async fn section_split(&mut self, prefix: Prefix) -> Result<NodeOperation> {
+    pub async fn split_section(&mut self, prefix: Prefix) -> Result<NodeOperation> {
         // First remove nodes that are no longer in our section.
         let to_remove = self
             .rewards
@@ -109,7 +170,7 @@ impl DataSection {
         self.rewards.remove(to_remove);
 
         // Then payout rewards to all the Elders.
-        let elders = self.network.our_elder_names().await;
+        let elders = self.elder_state.elder_names().await;
         self.rewards.payout_rewards(elders).await
     }
 
@@ -119,7 +180,7 @@ impl DataSection {
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddNewNode(id),
                 msg_id: MessageId::new(),
-                origin: Address::Node(self.network.name().await),
+                origin: Address::Node(self.elder_state.node_name()),
             })
             .await
     }
@@ -127,7 +188,6 @@ impl DataSection {
     /// When a relocated node joins, a DataSection
     /// has a few different things to do, such as
     /// pay out rewards and trigger chunk replication.
-    #[allow(unused)]
     pub async fn relocated_node_joined(
         &mut self,
         old_node_id: XorName,
@@ -143,14 +203,13 @@ impl DataSection {
                     age,
                 },
                 msg_id: MessageId::new(),
-                origin: Address::Node(self.network.name().await),
+                origin: Address::Node(self.elder_state.node_name()),
             })
             .await
     }
 
     /// Name of the node
     /// Age of the node
-    #[allow(unused)]
     pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Result<NodeOperation> {
         // marks the reward account as
         // awaiting claiming of the counter
@@ -159,7 +218,7 @@ impl DataSection {
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::DeactivateNode(node_id),
                 msg_id: MessageId::new(),
-                origin: Address::Node(self.network.name().await),
+                origin: Address::Node(self.elder_state.node_name()),
             })
             .await;
         let second = self.metadata.trigger_chunk_replication(node_id).await;

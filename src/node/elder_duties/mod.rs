@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -12,55 +12,61 @@ mod key_section;
 use self::{data_section::DataSection, key_section::KeySection};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
-    chunk_store::UsedSpace,
     node::node_ops::{ElderDuty, NodeOperation},
-    node::state_db::NodeInfo,
-    Network, Result,
+    ElderState, Result,
 };
-use log::{debug, info, trace};
-use sn_data_types::PublicKey;
+use log::trace;
+use sn_data_types::{PublicKey, TransferPropagated, WalletInfo};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
 pub struct ElderDuties {
-    prefix: Prefix,
+    state: ElderState,
     key_section: KeySection,
     data_section: DataSection,
 }
 
 impl ElderDuties {
-    pub async fn new(info: &NodeInfo, used_space: UsedSpace, network: Network) -> Result<Self> {
-        let prefix = network.our_prefix().await;
-        let dbs = ChunkHolderDbs::new(info.path(), info.init_mode)?;
-        let rate_limit = RateLimit::new(network.clone(), Capacity::new(dbs.clone()));
-        let key_section = KeySection::new(info, rate_limit, network.clone()).await?;
-        let data_section = DataSection::new(info, dbs, used_space, network).await?;
+    pub async fn new(wallet_info: WalletInfo, state: ElderState) -> Result<Self> {
+        let info = state.info();
+        let dbs = ChunkHolderDbs::new(info.path())?;
+        let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs.clone()));
+        let key_section = KeySection::new(rate_limit, state.clone()).await?;
+        let data_section = DataSection::new(info, dbs, wallet_info, state.clone()).await?;
         Ok(Self {
-            prefix,
+            state,
             key_section,
             data_section,
         })
     }
 
+    ///
+    pub fn state(&self) -> &ElderState {
+        &self.state
+    }
+
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn initiate(&mut self, first: bool) -> Result<NodeOperation> {
+    pub async fn initiate(&mut self, genesis: Option<TransferPropagated>) -> Result<NodeOperation> {
         let mut ops = vec![];
-        if first {
-            ops.push(self.key_section.init_first().await?);
+        if let Some(genesis) = genesis {
+            // if we are genesis
+            // does local init, with no roundrip via network messaging
+            let _ = self.key_section.init_genesis_node(genesis).await?;
+        } else {
+            ops.push(self.key_section.catchup_with_section().await?);
+            ops.push(self.data_section.catchup_with_section().await?);
         }
-        ops.push(self.key_section.catchup_with_section().await?);
-        //ops.push(self.data_section.catchup_with_section().await?);
 
         Ok(ops.into())
     }
 
     /// Processing of any Elder duty.
     pub async fn process_elder_duty(&mut self, duty: ElderDuty) -> Result<NodeOperation> {
-        trace!("Processing elder duty");
+        trace!("Processing elder duty: {:?}", duty);
         use ElderDuty::*;
         match duty {
             ProcessNewMember(name) => self.new_node_joined(name).await,
@@ -73,18 +79,17 @@ impl ElderDuties {
                 self.relocated_node_joined(old_node_id, new_node_id, age)
                     .await
             }
-            ProcessElderChange { prefix, .. } => self.elders_changed(prefix).await,
             RunAsKeySection(the_key_duty) => {
                 self.key_section
                     .process_key_section_duty(the_key_duty)
                     .await
             }
             RunAsDataSection(duty) => self.data_section.process_data_section_duty(duty).await,
-            NoOp => Ok(NodeOperation::NoOp),
             StorageFull { node_id } => self.increase_full_node_count(node_id).await,
             SwitchNodeJoin(joins_allowed) => {
                 self.key_section.set_node_join_flag(joins_allowed).await
             }
+            NoOp => Ok(NodeOperation::NoOp),
         }
     }
 
@@ -103,50 +108,43 @@ impl ElderDuties {
     ///
     async fn relocated_node_joined(
         &mut self,
-        _old_node_id: XorName,
-        _new_node_id: XorName,
-        _age: u8,
+        old_node_id: XorName,
+        new_node_id: XorName,
+        age: u8,
     ) -> Result<NodeOperation> {
-        // self.data_section
-        //     .relocated_node_joined(old_node_id, new_node_id, age)
-        //     .await
-        Ok(NodeOperation::NoOp)
+        self.data_section
+            .relocated_node_joined(old_node_id, new_node_id, age)
+            .await
     }
 
     ///
-    async fn member_left(&mut self, _node_id: XorName, _age: u8) -> Result<NodeOperation> {
-        //self.data_section.member_left(node_id, age).await
-        Ok(NodeOperation::NoOp)
+    async fn member_left(&mut self, node_id: XorName, age: u8) -> Result<NodeOperation> {
+        self.data_section.member_left(node_id, age).await
     }
 
     ///
-    async fn elders_changed(&mut self, prefix: Prefix) -> Result<NodeOperation> {
-        info!("Elders changed");
-        let mut ops = Vec::new();
-        match self.key_section.elders_changed().await? {
-            NodeOperation::NoOp => (),
-            op => ops.push(op),
-        };
-        debug!("Key section completed elder change update.");
-        // match self.data_section.elders_changed().await? {
-        //     NodeOperation::NoOp => (),
-        //     op => ops.push(op),
-        // };
-        // debug!("Data section completed elder change update.");
-        if prefix != self.prefix {
-            info!("Split occured");
-            info!("New prefix is: {:?}", prefix);
-            match self.key_section.section_split(prefix).await? {
-                NodeOperation::NoOp => (),
-                op => ops.push(op),
-            };
-            // match self.data_section.section_split(prefix).await? {
-            //     NodeOperation::NoOp => (),
-            //     op => ops.push(op),
-            // };
-        }
+    pub async fn initiate_elder_change(
+        &mut self,
+        elder_state: ElderState,
+    ) -> Result<NodeOperation> {
+        // 1. First we must update data section..
+        self.data_section.initiate_elder_change(elder_state).await
+    }
 
-        Ok(ops.into())
+    ///
+    pub async fn finish_elder_change(&mut self, state: ElderState) -> Result<()> {
+        // 2. Then we must update key section..
+        let info = state.info();
+        let dbs = ChunkHolderDbs::new(info.path())?;
+        let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs));
+        self.key_section.elders_changed(state, rate_limit);
+        Ok(())
+    }
+
+    ///
+    pub async fn split_section(&mut self, prefix: Prefix) -> Result<NodeOperation> {
+        let _ = self.key_section.split_section(prefix).await?;
+        self.data_section.split_section(prefix).await
     }
 }
 

@@ -6,16 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use super::client_input_parse::{try_deserialize_handshake, try_deserialize_msg};
-pub use super::onboarding::Onboarding;
 use crate::with_chaos;
+use crate::ElderState;
 use crate::{Error, Result};
 use dashmap::{mapref::entry::Entry, DashMap};
 #[cfg(features = "chaos")]
 use log::debug;
 use log::{error, info, trace, warn};
-use sn_data_types::HandshakeRequest;
-use sn_messaging::{Address, Message, MessageId, MsgEnvelope};
+use sn_messaging::client::{Address, Message, MessageId, MsgEnvelope};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -24,35 +22,18 @@ use std::{
 /// Tracks incoming and outgoingg messages
 /// between client and network.
 pub struct ClientMsgHandling {
-    onboarding: Onboarding,
+    elder_state: ElderState,
     tracked_incoming: DashMap<MessageId, SocketAddr>,
     tracked_outgoing: DashMap<MessageId, MsgEnvelope>,
 }
 
 impl ClientMsgHandling {
-    pub fn new(onboarding: Onboarding) -> Self {
+    pub fn new(elder_state: ElderState) -> Self {
         Self {
-            onboarding,
+            elder_state,
             tracked_incoming: Default::default(),
             tracked_outgoing: Default::default(),
         }
-    }
-
-    pub async fn process_handshake(
-        &self,
-        handshake: HandshakeRequest,
-        peer_addr: SocketAddr,
-    ) -> Result<()> {
-        trace!("Processing client handshake");
-
-        with_chaos!({
-            debug!("Chaos: Dropping handshake");
-            return Ok(());
-        });
-
-        let result = self.onboarding.onboard_client(handshake, peer_addr).await;
-
-        result
     }
 
     /// Track client socket address and msg_id for coordinating responses
@@ -133,10 +114,10 @@ impl ClientMsgHandling {
 
         match self.tracked_incoming.remove(&correlation_id) {
             Some((_, client_address)) => {
-                let bytes = message.serialize()?;
-
                 trace!("will send message via qp2p");
-                self.onboarding.send_bytes_to(client_address, bytes).await
+                self.elder_state
+                    .send_to_client(client_address, message.clone())
+                    .await
             }
             None => {
                 info!(
@@ -147,7 +128,7 @@ impl ClientMsgHandling {
                 let _ = self
                     .tracked_outgoing
                     .insert(correlation_id, message.clone());
-                return Ok(());
+                Ok(())
             }
         }
     }

@@ -57,42 +57,42 @@ pub struct Config {
     /// The address to be credited when this node farms SafeCoin.
     /// A hex formatted BLS public key.
     #[structopt(short, long, parse(try_from_str))]
-    wallet_id: Option<String>,
+    pub wallet_id: Option<String>,
     /// Upper limit in bytes for allowed network storage on this node.
     #[structopt(short, long)]
-    max_capacity: Option<u64>,
+    pub max_capacity: Option<u64>,
     /// Root directory for ChunkStores and cached state. If not set, it defaults to "root_dir"
     /// within the sn_node project data directory, located at:
     /// Linux: $HOME/.safe/node/root_dir
     /// Windows: {FOLDERID_Profile}/.safe/node/root_dir
     /// MacOS: $HOME/.safe/node/root_dir
     #[structopt(short, long, parse(from_os_str))]
-    root_dir: Option<PathBuf>,
+    pub root_dir: Option<PathBuf>,
     /// Verbose output. `-v` is equivalent to logging with `warn`, `-vv` to `info`, `-vvv` to
     /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
     #[structopt(short, long, parse(from_occurrences))]
-    verbose: u64,
+    pub verbose: u64,
     /// Is the node running for a local section?
     #[structopt(short, long)]
-    local: bool,
+    pub local: bool,
     /// Is this the first node in a section?
     #[structopt(short, long)]
-    first: bool,
+    pub first: bool,
     #[structopt(flatten)]
     #[allow(missing_docs)]
-    network_config: NetworkConfig,
+    pub network_config: NetworkConfig,
     /// dump shell completions for: [bash, fish, zsh, powershell, elvish]
     #[structopt(long)]
-    completions: Option<String>,
+    pub completions: Option<String>,
     /// Send logs to a file within the specified directory
     #[structopt(long)]
-    log_dir: Option<PathBuf>,
+    pub log_dir: Option<PathBuf>,
     /// Attempt to self-update?
     #[structopt(long)]
-    update: bool,
+    pub update: bool,
     /// Attempt to self-update without starting the node process
     #[structopt(long, name = "update-only")]
-    update_only: bool,
+    pub update_only: bool,
 }
 
 impl Config {

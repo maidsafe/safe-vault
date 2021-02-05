@@ -12,6 +12,7 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use futures::lock::Mutex;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature};
+use sn_messaging::client::MsgEnvelope;
 use sn_routing::{
     Config as RoutingConfig, DstLocation, Error as RoutingError, EventStream,
     Routing as RoutingNode, SectionProofChain, SrcLocation,
@@ -47,8 +48,24 @@ impl Network {
 
     pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
         let data = utils::serialise(data)?;
-        let sig = self.routing.lock().await.sign(&data).await;
+        let sig = self.routing.lock().await.sign_as_node(&data).await;
         Ok(Signature::Ed25519(sig))
+    }
+
+    pub async fn sign_as_elder<T: Serialize>(
+        &self,
+        data: &T,
+        public_key: &bls::PublicKey,
+    ) -> Result<bls::SignatureShare> {
+        let data = utils::serialise(data)?;
+        let share = self
+            .routing
+            .lock()
+            .await
+            .sign_as_elder(&data, public_key)
+            .await
+            .map_err(Error::Routing)?;
+        Ok(share)
     }
 
     pub async fn age(&self) -> u8 {
@@ -80,7 +97,7 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn name(&self) -> XorName {
+    pub async fn our_name(&self) -> XorName {
         self.routing.lock().await.name().await
     }
 
@@ -128,20 +145,15 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn send_message_to_client(&self, peer_addr: SocketAddr, msg: Bytes) -> Result<()> {
+    pub async fn send_message_to_client(
+        &self,
+        peer_addr: SocketAddr,
+        msg: MsgEnvelope,
+    ) -> Result<()> {
         self.routing
             .lock()
             .await
             .send_message_to_client(peer_addr, msg)
-            .await
-            .map_err(Error::Routing)
-    }
-
-    pub async fn secret_key_share(&self) -> Result<bls::SecretKeyShare> {
-        self.routing
-            .lock()
-            .await
-            .secret_key_share()
             .await
             .map_err(Error::Routing)
     }
@@ -248,7 +260,7 @@ impl Network {
     }
 
     async fn our_duties(&self) -> AgeGroup {
-        let our_name = self.name().await;
+        let our_name = self.our_name().await;
         if self.routing.lock().await.is_elder().await {
             AgeGroup::Elder
         } else if self

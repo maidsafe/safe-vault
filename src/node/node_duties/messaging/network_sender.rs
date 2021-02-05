@@ -10,8 +10,8 @@ use crate::{
     node::node_ops::{GatewayDuty, NodeMessagingDuty, NodeOperation},
     Error, Network, Result,
 };
-use log::{error, info};
-use sn_messaging::{Address, MsgEnvelope};
+use log::error;
+use sn_messaging::client::{Address, MsgEnvelope};
 use sn_routing::{DstLocation, SrcLocation};
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -46,7 +46,7 @@ impl NetworkSender {
     }
 
     pub async fn send_to_node(&mut self, msg: MsgEnvelope, as_node: bool) -> Result<NodeOperation> {
-        let name = self.network.name().await;
+        let name = self.network.our_name().await;
         let dst = match msg.destination()? {
             Address::Node(xorname) => DstLocation::Node(xorname),
             Address::Section(_) => {
@@ -68,10 +68,7 @@ impl NetworkSender {
                     msg.id()
                 )))
             },
-            |()| {
-                info!("Sent MsgEnvelope to Peer {:?} from node {:?}", dst, name);
-                Ok(NodeOperation::NoOp)
-            },
+            |()| Ok(NodeOperation::NoOp),
         )
     }
 
@@ -80,7 +77,7 @@ impl NetworkSender {
         targets: BTreeSet<XorName>,
         msg: &MsgEnvelope,
     ) -> Result<NodeOperation> {
-        let name = self.network.name().await;
+        let name = self.network.our_name().await;
         let bytes = &msg.serialize()?;
         for target in targets {
             self.network
@@ -94,9 +91,7 @@ impl NetworkSender {
                     |err| {
                         error!("Unable to send MsgEnvelope to Peer: {:?}", err);
                     },
-                    |()| {
-                        info!("Sent MsgEnvelope to Peer {:?} from node {:?}", target, name);
-                    },
+                    |()| {},
                 );
         }
         Ok(NodeOperation::NoOp)
@@ -111,9 +106,8 @@ impl NetworkSender {
             Address::Node(xorname) => DstLocation::Node(xorname),
             Address::Client(xorname) | Address::Section(xorname) => DstLocation::Section(xorname),
         };
-        info!("Destination: {:?}", dst);
         let src = if as_node {
-            SrcLocation::Node(self.network.name().await)
+            SrcLocation::Node(self.network.our_name().await)
         } else {
             SrcLocation::Section(self.network.our_prefix().await)
         };
@@ -127,10 +121,7 @@ impl NetworkSender {
                     msg.id()
                 )))
             },
-            |()| {
-                info!("Sent to section with: {:?}", msg);
-                Ok(NodeOperation::NoOp)
-            },
+            |()| Ok(NodeOperation::NoOp),
         )
     }
 }

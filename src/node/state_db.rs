@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::keys::NodeSigningKeys, utils, Error, Result};
+use crate::{utils, Error, Result};
 use bls::{self, serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokio::fs;
 
 const AGE_GROUP_FILENAME: &str = "age_group";
@@ -53,36 +53,6 @@ pub enum AgeGroup {
     Infant,
     Adult,
     Elder,
-}
-
-/// Info about the node used
-/// to init its various dbs
-/// (among things).
-#[derive(Clone)]
-pub struct NodeInfo {
-    pub first: bool,
-    pub keys: NodeSigningKeys,
-    pub root_dir: PathBuf,
-    pub init_mode: utils::Init,
-    /// Upper limit in bytes for allowed network storage on this node.
-    /// An Adult would be using the space for chunks,
-    /// while an Elder uses it for metadata.
-    pub max_storage_capacity: u64,
-    pub reward_key: sn_data_types::PublicKey,
-}
-
-impl NodeInfo {
-    pub fn path(&self) -> &Path {
-        self.root_dir.as_path()
-    }
-
-    pub async fn public_key(&self) -> sn_data_types::PublicKey {
-        sn_data_types::PublicKey::Ed25519(self.keys.node_id().await)
-    }
-
-    pub fn keys(&self) -> NodeSigningKeys {
-        self.keys.clone()
-    }
 }
 
 ///

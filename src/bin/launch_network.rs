@@ -43,8 +43,10 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 #[cfg(target_os = "windows")]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
-static NODES_DIR: &str = "local-test-network";
-static INTERVAL: &str = "3";
+const NODES_DIR: &str = "local-test-network";
+const INTERVAL: &str = "3";
+const RUST_LOG: &str = "RUST_LOG";
+
 #[tokio::main]
 async fn main() -> Result<(), String> {
     let path = std::path::Path::new("nodes");
@@ -124,11 +126,15 @@ pub async fn run_network() -> Result<(), String> {
         "--local",
         "--num-nodes",
         "11",
-        "--keep-alive-interval-msec",
-        "50",
-        "--idle-timeout-msec",
-        "10000",
     ];
+
+    // If RUST_LOG was set we pass it down to the launch tool
+    // so it's set for each of the nodes logs as well.
+    let rust_log = std::env::var(RUST_LOG).unwrap_or_else(|_| "".to_string());
+    if !rust_log.is_empty() {
+        sn_launch_tool_args.push("--rust-log");
+        sn_launch_tool_args.push(&rust_log);
+    }
 
     let interval_as_int = &INTERVAL
         .parse::<u64>()
