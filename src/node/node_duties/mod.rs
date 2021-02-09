@@ -652,7 +652,13 @@ impl NodeDuties {
                 self.stage = Stage::Adult(duties);
                 Ok(NodeOperation::NoOp)
             }
-            Stage::Elder(elder) => elder.initiate_elder_change(prefix, new_section_key).await,
+            Stage::Elder(elder) => {
+                let previous_key = elder.duties().state().section_public_key();
+                let _ = elder.initiate_elder_change(prefix, new_section_key).await?;
+                elder
+                    .finish_elder_change(previous_key, new_section_key)
+                    .await
+            }
         }
     }
 
