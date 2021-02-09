@@ -107,11 +107,12 @@ impl ElderConstellation {
         new_key: PublicKey,
     ) -> Result<NodeOperation> {
         debug!(">>>> Key section Finishing elder change.");
-
+        debug!(">>new key: {:?}", new_key);
+        debug!(">>previous_key: {:?}", previous_key);
 
         if new_key == previous_key {
-            debug!(">> same keys");
-            return Err(Error::InvalidOperation);
+            debug!(">> same keys; would have been an error w/o the key transfer op. but we dont have it");
+            // return Err(Error::InvalidOperation);
         }
         if self.pending_changes.is_empty() {
             debug!(">> empty changes");
