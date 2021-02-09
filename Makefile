@@ -19,10 +19,10 @@ ifneq ($(UNAME_S),Linux)
 	@echo "This target only applies to Linux - please use the `build` target."
 	@exit 1
 endif
-	rm -rf target
+	# rm -rf target
 	rm -rf artifacts
 	mkdir artifacts
-	sudo apt update -y && sudo apt install -y musl-tools
+	# sudo apt update -y && sudo apt install -y musl-tools
 	rustup target add x86_64-unknown-linux-musl
 	cargo build --release --target x86_64-unknown-linux-musl --verbose
 	find target/x86_64-unknown-linux-musl/release \
