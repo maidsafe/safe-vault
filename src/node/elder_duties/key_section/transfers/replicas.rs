@@ -188,12 +188,17 @@ impl<T: ReplicaSigning> Replicas<T> {
     pub async fn keep_keys_of(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         let keys: Vec<PublicKey> = self.locks.iter().map(|r| *r.key()).collect();
+        info!("Replica is holding {} keys.", keys.len());
         for key in keys.into_iter() {
             if !prefix.matches(&key.into()) {
+                info!("Key is not matching, removing key: {}.", key);
                 let key_lock = self.load_key_lock(key).await?;
                 let _store = key_lock.lock().await;
                 let _ = self.locks.remove(&key);
-                // todo: remove db from disk
+            // todo: remove db from disk
+            //let _ = store.delete()?;
+            } else {
+                info!("Key is matching, keeping key: {}.", key);
             }
         }
         Ok(())
