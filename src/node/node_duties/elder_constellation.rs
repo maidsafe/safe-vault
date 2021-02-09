@@ -100,21 +100,27 @@ impl ElderConstellation {
         previous_key: PublicKey,
         new_key: PublicKey,
     ) -> Result<NodeOperation> {
-        debug!("Key section Finishing elder change.");
+        debug!(">>>> Key section Finishing elder change.");
 
 
         if new_key == previous_key {
+            debug!(">> same keys");
             return Err(Error::InvalidOperation);
         }
         if self.pending_changes.is_empty() {
+            debug!(">> empty changes");
+
             return Ok(NodeOperation::NoOp);
         }
         let old_elder_state = self.duties.state().clone();
         if old_elder_state.section_public_key() != previous_key
             || new_key != self.pending_changes[0].section_key
         {
+            debug!(">> old state and key mismatch");
             return Ok(NodeOperation::NoOp);
         }
+
+        debug!(">> Finishing elder change, past noops");
 
         let mut ops = Vec::new();
         // pop the pending change..
@@ -132,11 +138,12 @@ impl ElderConstellation {
 
         debug!("Key section completed elder change update.");
         debug!("Elder change update completed.");
-
+        debug!(">> Finishing split. Change prefix: {:?}", change.prefix);
+        debug!(">> Finishing split. old state prefix: {:?}", old_elder_state.prefix());
         // split section _after_ transition to new constellation
         if &change.prefix != old_elder_state.prefix() {
-            info!("Split occurred");
-            info!("New prefix is: {:?}", change.prefix);
+            info!(">> Split occurred");
+            info!(">>New prefix is: {:?}", change.prefix);
             match self.duties.split_section(change.prefix).await? {
                 NodeOperation::NoOp => (),
                 op => ops.push(op),
