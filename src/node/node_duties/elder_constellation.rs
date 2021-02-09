@@ -64,6 +64,11 @@ impl ElderConstellation {
         prefix: Prefix,
         new_section_key: PublicKey,
     ) -> Result<NodeOperation> {
+        info!(">>Elder change update called...");
+
+        debug!(">> Prefix we have w/ elder change: {:?}", prefix);
+        debug!(">> New section key w/ change {:?}", new_section_key);
+
         let elder_state = self.duties.state();
 
         if new_section_key == elder_state.section_public_key()
@@ -75,7 +80,7 @@ impl ElderConstellation {
             return Ok(NodeOperation::NoOp);
         }
 
-        info!("Elder change updates initiated");
+        info!(">>Elder change updates initiated");
 
         let _ = self.pending_changes.push(ConstellationChange {
             section_key: new_section_key,
@@ -92,6 +97,7 @@ impl ElderConstellation {
         // Otherwise there is no guarantee of not getting more recent info than expected!
         let new_elder_state = ElderState::new(&self.info, self.network.clone()).await?;
         self.duties.initiate_elder_change(new_elder_state).await
+        
     }
 
     ///
