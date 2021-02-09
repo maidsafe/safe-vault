@@ -100,6 +100,9 @@ impl ElderConstellation {
         previous_key: PublicKey,
         new_key: PublicKey,
     ) -> Result<NodeOperation> {
+        debug!("Key section Finishing elder change.");
+
+
         if new_key == previous_key {
             return Err(Error::InvalidOperation);
         }
