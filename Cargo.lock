@@ -325,13 +325,12 @@ dependencies = [
 
 [[package]]
 name = "bls_signature_aggregator"
-version = "0.1.6"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "046b7dd3a318b32eb0ba730352ba9919d9d12b99f7f70c32378fdb511ca2694e"
+checksum = "6619fa7f72e1ad9043dfc3c5ef1fd260e38449c76dba5b659d78eead60ba1fa9"
 dependencies = [
- "bincode",
- "err-derive",
  "serde",
+ "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
 ]
@@ -2439,9 +2438,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.42.0"
+version = "0.42.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd93ff3089c18f2b85d541a13a2e81f8eddc33821cd9edd61824cb0744ccc8ab"
+checksum = "4ab5a33374b07dc4f7c635e54c7752589bf200b7bcbc97a8249a99f4ccbcf508"
 dependencies = [
  "bincode",
  "bls_dkg",
