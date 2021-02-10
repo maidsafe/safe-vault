@@ -39,7 +39,7 @@ sn_routing = {git="https://github.com/maqi/routing", branch ="testnet_tryout"}
 # sn_routing = "~0.42.0"
 sn_data_types = "~0.14.0"
 sn_transfers = "~0.3.0"
-sn_messaging = "3.0.0"
+sn_messaging = "~3.0.2"
 ed25519 = "1.0.1"
 signature = "1.1.0"
 xor_name = "1.1.0"
