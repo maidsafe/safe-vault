@@ -115,7 +115,7 @@ impl ElderConstellation {
             // return Err(Error::InvalidOperation);
         }
         if self.pending_changes.is_empty() {
-            debug!(">> empty changes");
+            debug!(">> empty changes; nothing more to do");
 
             return Ok(NodeOperation::NoOp);
         }
