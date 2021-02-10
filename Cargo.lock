@@ -2364,9 +2364,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "3.0.0"
+version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "737417c0eebf12b32dcf488720e055cfcd71249b0076f7a1cc3e1fcd7a090791"
+checksum = "e5e53fcef94eec176c9831782f5e95f9e48e66814d2c7639304f605fca55565f"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2439,6 +2439,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.42.4"
+source = "git+https://github.com/maqi/routing?branch=testnet_tryout#5fe9f3691761831a6674aea2742f3fff73adaddb"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2465,9 +2466,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6317536cc12796828cf78a7a1eadca5b929fd6cbcca5dcd4fe09529377e805a6"
+checksum = "c94e8edc973121e93076707bcf2ce3ab88cecac801505813769086e5415f2807"
 dependencies = [
  "bincode",
  "crdts",

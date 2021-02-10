@@ -33,7 +33,9 @@ structopt = "~0.3.17"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0-pre.4"
 sha2 = "0.8.1"
-sn_routing = {path="../sn_routing"}
+sn_routing = {git="https://github.com/maqi/routing", branch ="testnet_tryout"}
+# sn_routing = {path="../sn_routing"}
+# sn_transfers = {path="../sn_transfers"}
 # sn_routing = "~0.42.0"
 sn_data_types = "~0.14.0"
 sn_transfers = "~0.3.0"

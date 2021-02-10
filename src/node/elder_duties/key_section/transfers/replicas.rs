@@ -26,7 +26,7 @@ use xor_name::Prefix;
 use {
     crate::node::node_ops::NodeMessagingDuty,
     bls::{SecretKey, SecretKeySet, SecretKeyShare},
-    log::debug,
+    log::{debug, error},
     rand::thread_rng,
     sn_data_types::{Signature, SignatureShare, SignedCredit, SignedDebit, Transfer},
 };
@@ -327,6 +327,9 @@ impl<T: ReplicaSigning> Replicas<T> {
                 wallet.apply(ReplicaEvent::TransferPropagated(event.clone()))?;
             }
             return Ok(event);
+        }
+        else {
+            error!("Error from popagation:{:?}", propagation_result);
         }
         Err(Error::InvalidPropagatedTransfer(credit_proof.clone()))
     }
