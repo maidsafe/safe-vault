@@ -665,18 +665,16 @@ impl NetworkMsgAnalysis {
     async fn try_accumulated_transfers(&self, msg: &MsgEnvelope) -> Result<TransferDuty> {
         trace!("Msg analysis: try_accumulated_transfers..");
         let sender = msg.most_recent_sender();
-        let dst = msg.destination()?;
         let duty = if let Some(duty) = sender.duty() {
             duty
         } else {
             return Ok(TransferDuty::NoOp);
         };
 
-        let from_transfers_section = || {
-            (sender.is_section() || sender.address() == dst)
-                && matches!(duty, Duty::Elder(ElderDuties::Transfer))
-        };
-        let shall_process_accumulated = from_transfers_section() && self.is_elder().await;
+        let from_transfers_section =
+            || sender.is_elder() && matches!(duty, Duty::Elder(ElderDuties::Transfer));
+        let shall_process_accumulated =
+            from_transfers_section() && self.is_elder().await && !self.are_we_origin(msg).await;
         if !shall_process_accumulated {
             return Ok(TransferDuty::NoOp);
         }

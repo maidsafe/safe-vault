@@ -110,6 +110,10 @@ impl Network {
             .map_err(Error::Routing)
     }
 
+    pub async fn section_chain(&self) -> SectionProofChain {
+        self.routing.lock().await.section_chain().await
+    }
+
     pub async fn our_prefix(&self) -> Prefix {
         self.routing.lock().await.our_prefix().await
     }

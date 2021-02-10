@@ -24,7 +24,7 @@
 use super::ElderDuties;
 use crate::{ElderState, Network, NodeInfo, Result};
 
-use crate::{node::node_ops::NodeOperation, Error};
+use crate::node::node_ops::NodeOperation;
 use log::{debug, info};
 use sn_data_types::PublicKey;
 use sn_routing::Prefix;
@@ -97,7 +97,6 @@ impl ElderConstellation {
         // Otherwise there is no guarantee of not getting more recent info than expected!
         let new_elder_state = ElderState::new(&self.info, self.network.clone()).await?;
         self.duties.initiate_elder_change(new_elder_state).await
-        
     }
 
     ///
@@ -146,7 +145,10 @@ impl ElderConstellation {
         debug!("Key section completed elder change update.");
         debug!("Elder change update completed.");
         debug!(">> Finishing split. Change prefix: {:?}", change.prefix);
-        debug!(">> Finishing split. old state prefix: {:?}", old_elder_state.prefix());
+        debug!(
+            ">> Finishing split. old state prefix: {:?}",
+            old_elder_state.prefix()
+        );
         // split section _after_ transition to new constellation
         if &change.prefix != old_elder_state.prefix() {
             info!(">> Split occurred");

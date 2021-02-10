@@ -27,17 +27,15 @@ use log::{debug, info, trace};
 use msg_analysis::NetworkMsgAnalysis;
 use network_events::NetworkEvents;
 use sn_data_types::{
-    ActorHistory, Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, Token,
-    TransferPropagated, WalletInfo,
+    Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, Token,
+    TransferPropagated,
 };
 use sn_messaging::client::{
     Message,
     MessageId,
     NodeCmd,
     NodeDuties as MsgNodeDuties,
-    NodeQuery,
     NodeSystemCmd, // Address,
-    NodeTransferQuery,
 };
 use std::collections::{BTreeMap, VecDeque};
 
@@ -199,6 +197,7 @@ impl NodeDuties {
         }
     }
 
+    #[allow(unused)]
     fn adult_state(&mut self) -> Result<AdultState> {
         Ok(match self.adult_duties() {
             Some(duties) => duties.state().clone(),
@@ -319,13 +318,16 @@ impl NodeDuties {
 
         let is_genesis_section = self.network_api.our_prefix().await.is_empty();
         let elder_count = self.network_api.our_elder_names().await.len();
+        let section_chain_len = self.network_api.section_chain().await.len();
+
         debug!(
-            "begin_transition_to_elder. is_genesis_section: {}, elder_count: {}",
-            is_genesis_section, elder_count
+            "begin_transition_to_elder. is_genesis_section: {}, elder_count: {}, section_chain_len: {}",
+            is_genesis_section, elder_count, section_chain_len
         );
         if is_genesis_section
             && elder_count == GENESIS_ELDER_COUNT
             && matches!(self.stage, Stage::Adult(_))
+            && section_chain_len <= 5
         {
             // this is the case when we are the GENESIS_ELDER_COUNT-th Elder!
             debug!("threshold reached; proposing genesis!");
@@ -368,7 +370,8 @@ impl NodeDuties {
                 )
                 .await
                 .convert();
-        } else if is_genesis_section && elder_count < GENESIS_ELDER_COUNT {
+        } else if is_genesis_section && elder_count < GENESIS_ELDER_COUNT && section_chain_len <= 5
+        {
             debug!("AwaitingGenesisThreshold!");
             self.stage = Stage::AwaitingGenesisThreshold(VecDeque::new());
             return Ok(NodeOperation::NoOp);
@@ -376,12 +379,9 @@ impl NodeDuties {
 
         debug!("Beginning normal transition to Elder.");
 
-        if let Some(wallet_id) = self.network_api.section_public_key().await {
+        if let Some(_wallet_id) = self.network_api.section_public_key().await {
             trace!("Beginning transition to Elder duties.");
-            let wrapping = NodeMsgWrapping::new(
-                NodeState::Adult(self.adult_state()?),
-                sn_messaging::client::NodeDuties::NodeConfig,
-            );
+
             // must get the above wrapping instance before overwriting stage
             self.stage = Stage::AssumingElderDuties(VecDeque::new());
 

@@ -21,7 +21,7 @@ use crate::{
     Result,
 };
 use log::info;
-use sn_data_types::{OwnerType, Result as DtResult, Signing, WalletInfo};
+use sn_data_types::{OwnerType, Result as DtResult, Signing};
 //use sn_messaging::client::{Address, MessageId};
 use sn_routing::Prefix;
 //use sn_transfers::TransferActor;

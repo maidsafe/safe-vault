@@ -2439,7 +2439,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.42.4"
-source = "git+https://github.com/maqi/routing?branch=testnet_tryout#5fe9f3691761831a6674aea2742f3fff73adaddb"
+source = "git+https://github.com/yoga07/sn_routing?branch=proof-chain#b710d7c10d60037f171f99ef596f4f646ce96a37"
 dependencies = [
  "bincode",
  "bls_dkg",

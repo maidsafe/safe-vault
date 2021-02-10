@@ -16,7 +16,7 @@ use crate::{
     ElderState, Result,
 };
 use log::trace;
-use sn_data_types::{PublicKey, TransferPropagated, WalletInfo};
+use sn_data_types::{PublicKey, TransferPropagated};
 use sn_routing::Prefix;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;

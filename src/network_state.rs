@@ -25,6 +25,7 @@ use crate::{Network, Result};
 use bls::{PublicKeySet, PublicKeyShare};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use itertools::Itertools;
+use log::debug;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
 use sn_messaging::client::{MsgEnvelope, TransientElderKey};
@@ -35,7 +36,6 @@ use std::{
     path::{Path, PathBuf},
 };
 use xor_name::{Prefix, XorName};
-use log::debug;
 
 #[derive(Clone)]
 ///
@@ -133,8 +133,10 @@ impl ElderState {
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
     #[allow(clippy::eval_order_dependence)]
     pub async fn new(info: &NodeInfo, network: Network) -> Result<Self> {
-
-        debug!(">> setting up elderstate, PK from routing is: {:?}", PublicKey::Bls(network.public_key_set().await?.public_key()));
+        debug!(
+            ">> setting up elderstate, PK from routing is: {:?}",
+            PublicKey::Bls(network.public_key_set().await?.public_key())
+        );
         Ok(Self {
             info: info.clone(),
             prefix: network.our_prefix().await,
