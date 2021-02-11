@@ -680,8 +680,8 @@ impl Transfers {
                     cmd_origin: origin,
                 }
             }
-            Err(Error::Transfer(error)) => {
-                error!("Error must be handled at receive_propagated, {:?}", error);
+            Err(Error::InvalidPropagatedTransfer(error)) => {
+                error!(">> Error now being handled w/ fake Nosuchkeymsg at receive_propagated, {:?}", error);
 
                 // Nonsense error just not to crash node for now. Should be converted properly to be handled at client.
                 Message::NodeCmdError {
