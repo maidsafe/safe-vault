@@ -31,10 +31,9 @@ jobs:
           override: true
           components: rustfmt, clippy
 
-      # Cache
+      # Cache.
       - name: Cargo cache registry, index and build
-        if: matrix.os != 'macOS-latest'
-        uses: actions/cache@v2
+        uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -50,6 +49,15 @@ jobs:
       - name: Clippy checks
         run: cargo clippy --all-targets
 
+  check_pr_size:
+    name: Check PR size doesn't break set limit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: maidsafe/pr_size_checker@v1.1
+      with:
+        max_lines_changed: 200
+  
   coverage:
     if: github.repository_owner == 'maidsafe'
     name: Code coverage check
@@ -66,8 +74,7 @@ jobs:
       
       # Cache.
       - name: Cargo cache registry, index and build
-        if: matrix.os != 'macOS-latest'
-        uses: actions/cache@v2
+        uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -112,8 +119,7 @@ jobs:
 
       # Cache.
       - name: Cargo cache registry, index and build
-        if: matrix.os != 'macOS-latest'
-        uses: actions/cache@v2
+        uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry

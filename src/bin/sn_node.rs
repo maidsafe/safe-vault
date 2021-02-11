@@ -30,7 +30,7 @@
 use log::{self, error, info};
 use self_update::{cargo_crate_version, Status};
 use sn_node::{self, utils, write_connection_info, Config, Node};
-use std::{io::Write, process};
+use std::{collections::HashSet, io::Write, net::SocketAddr, process};
 use structopt::{clap, StructOpt};
 
 const IGD_ERROR_MESSAGE: &str = "Automatic Port forwarding Failed. Check if UPnP is enabled in your router's settings and try again. \
@@ -123,19 +123,13 @@ async fn run_node() {
 
     match node.our_connection_info().await {
         Ok(our_conn_info) => {
-            println!(
-                "Node connection info:\n{}",
-                serde_json::to_string(&our_conn_info)
-                    .unwrap_or_else(|_| "Failed to serialize connection info".into())
-            );
-            info!(
-                "Node connection info: {}",
-                serde_json::to_string(&our_conn_info)
-                    .unwrap_or_else(|_| "Failed to serialize connection info".into())
-            );
+            println!("Node connection info:\n{:?}", our_conn_info);
+            info!("Node connection info: {:?}", our_conn_info);
 
+            // If it's first/genesis node write its contact address
             if config.is_first() {
-                let _ = write_connection_info(&our_conn_info).unwrap_or_else(|err| {
+                let contact_info: HashSet<SocketAddr> = vec![our_conn_info].into_iter().collect();
+                let _ = write_connection_info(&contact_info).unwrap_or_else(|err| {
                     log::error!("Unable to write config to disk: {}", err);
                     Default::default()
                 });

@@ -16,6 +16,7 @@ use std::convert::Infallible;
 use std::net::AddrParseError;
 use std::num::ParseIntError;
 use std::{
+    collections::HashSet,
     fs::{self, File},
     io::{self, BufReader},
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -103,7 +104,6 @@ impl Config {
             Ok(Some(config)) => config,
             Ok(None) | Err(_) => Default::default(),
         };
-
         let command_line_args = Config::clap().get_matches();
 
         if command_line_args.occurrences_of(ARGS[17]) != 0 {
@@ -350,8 +350,8 @@ impl Config {
 /// Writes connection info to file for use by clients.
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn write_connection_info(peer_addr: &SocketAddr) -> Result<PathBuf> {
-    write_file(CONNECTION_INFO_FILE, peer_addr)
+pub fn write_connection_info(contacts: &HashSet<SocketAddr>) -> Result<PathBuf> {
+    write_file(CONNECTION_INFO_FILE, contacts)
 }
 
 fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<PathBuf>
