@@ -90,7 +90,7 @@ impl KeySection {
     pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<NodeOperation> {
         match self.elder_state.set_joins_allowed(joins_allowed).await {
             Ok(()) => {
-                info!("Successfully set joins_allowed to true");
+                info!("Successfully set joins_allowed to '{}'", joins_allowed);
                 Ok(NodeOperation::NoOp)
             }
             Err(e) => Err(e),

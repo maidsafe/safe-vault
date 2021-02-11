@@ -735,8 +735,9 @@ impl NetworkMsgAnalysis {
                                 origin: msg.origin.address(),
                             })
                         } else {
-                            error!("Unexpected public key!");
-                            Err(Error::Logic("Unexpected PK".to_string()))
+                            let msg = format!("Our curent section's PK ({}) doesn't match the PK of the GetReplicaEvents request ({})", section_pk, public_key);
+                            error!("{}", msg);
+                            Err(Error::Logic(msg))
                         }
                     } else {
                         error!("No section public key found!");
