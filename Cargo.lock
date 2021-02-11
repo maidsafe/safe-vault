@@ -2467,8 +2467,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c94e8edc973121e93076707bcf2ce3ab88cecac801505813769086e5415f2807"
+source = "git+https://github.com/joshuef/sn_transfers?branch=MissingKeyHack#59e76069b3405fd2ae6495e78842a069a4203d53"
 dependencies = [
  "bincode",
  "crdts",
