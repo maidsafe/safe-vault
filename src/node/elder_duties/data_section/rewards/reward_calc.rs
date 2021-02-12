@@ -40,7 +40,7 @@ impl RewardCalc {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Result;
+    use crate::{Error, Result};
 
     #[test]
     fn first_reward_is_32bn_nanos() -> Result<()> {
@@ -48,7 +48,15 @@ mod test {
         let prefix_len = 1;
         let reward = RewardCalc::reward_from(age, prefix_len);
         assert!(reward == Token::from_nano(32_000_000_000));
-        Ok(())
+        let correct_token = Token::from_nano(32_000_000_000);
+        if reward != correct_token {
+            Err(Error::Logic(format!(
+                "Incorrect reward, expected {} == {}",
+                reward, correct_token
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     #[test]
@@ -56,7 +64,14 @@ mod test {
         let age = 5;
         let prefix_len = 34;
         let reward = RewardCalc::reward_from(age, prefix_len);
-        assert!(reward >= Token::from_nano(1));
-        Ok(())
+        let correct_token = Token::from_nano(1);
+        if reward < correct_token {
+            Err(Error::Logic(format!(
+                "Incorrect reward calc, expected {} >= {}",
+                reward, correct_token,
+            )))
+        } else {
+            Ok(())
+        }
     }
 }

@@ -53,12 +53,12 @@ impl BlobRegister {
         dbs: ChunkHolderDbs,
         wrapping: ElderMsgWrapping,
         elder_state: ElderState,
-    ) -> Result<Self> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             dbs,
             elder_state,
             wrapping,
-        })
+        }
     }
 
     pub(super) async fn write(

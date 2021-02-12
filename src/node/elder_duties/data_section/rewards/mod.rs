@@ -145,38 +145,36 @@ impl Rewards {
         _origin: Address,
     ) -> Result<NodeOperation> {
         use RewardCmd::*;
-        let result = match cmd {
+        match cmd {
             InitiateSectionWallet(info) => {
                 if self.section_funds.has_initiated_transition() {
-                    self.section_funds.complete_transition(info).await?.into()
+                    Ok(self.section_funds.complete_transition(info).await?.into())
                 } else if self.section_funds.replicas()
                     != PublicKey::Bls(info.replicas.public_key())
                 {
                     return Err(Error::Logic("crap..".to_string()));
                 } else {
-                    self.section_funds.synch(info.history).await?.into()
+                    Ok(self.section_funds.synch(info.history).await?.into())
                 }
             }
-            AddNewNode(node_id) => self.add_new_node(node_id)?.into(),
+            AddNewNode(node_id) => Ok(self.add_new_node(node_id).into()),
             SetNodeWallet { node_id, wallet_id } => {
-                self.set_node_wallet(node_id, wallet_id)?.into()
+                Ok(self.set_node_wallet(node_id, wallet_id)?.into())
             }
             AddRelocatingNode {
                 old_node_id,
                 new_node_id,
                 age,
-            } => self
+            } => Ok(self
                 .add_relocating_node(old_node_id, new_node_id, age)
                 .await?
-                .into(),
+                .into()),
             ActivateNodeRewards { id, node_id } => {
-                self.activate_node_rewards(id, node_id).await?.into()
+                Ok(self.activate_node_rewards(id, node_id).await?.into())
             }
-            DeactivateNode(node_id) => self.deactivate(node_id)?.into(),
-            ReceivePayoutValidation(validation) => self.section_funds.receive(validation).await?,
-        };
-
-        Ok(result)
+            DeactivateNode(node_id) => Ok(self.deactivate(node_id)?.into()),
+            ReceivePayoutValidation(validation) => self.section_funds.receive(validation).await,
+        }
     }
 
     async fn process_reward_query(
@@ -245,10 +243,10 @@ impl Rewards {
     /// It still hasn't registered a wallet id at
     /// this point, but will as part of starting up.
     /// At age 5 it gets its first reward payout.
-    fn add_new_node(&self, node_id: XorName) -> Result<NodeMessagingDuty> {
+    fn add_new_node(&self, node_id: XorName) -> NodeMessagingDuty {
         info!("Rewards: New node added: {:?}", node_id);
         let _ = self.node_rewards.insert(node_id, NodeRewards::NewNode);
-        Ok(NodeMessagingDuty::NoOp)
+        NodeMessagingDuty::NoOp
     }
 
     /// 1. A new node registers a wallet id for future reward payout.

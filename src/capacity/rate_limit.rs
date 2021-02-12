@@ -80,7 +80,7 @@ impl RateLimit {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Result;
+    use crate::{Error, Result};
     use sn_messaging::client::DataCmd;
     use std::mem;
 
@@ -91,22 +91,42 @@ mod test {
         let all_nodes = 8;
         let full_nodes = 7;
         let rate_limit = RateLimit::rate_limit(bytes, full_nodes, all_nodes, prefix_len).as_nano();
-        assert_eq!(rate_limit, 2076594);
-        Ok(())
+        if rate_limit != 2076594 {
+            Err(Error::Logic(format!("Incorrect rate limit {}", rate_limit)))
+        } else {
+            Ok(())
+        }
     }
 
     #[test]
     fn calculates_max_section_nanos() -> Result<()> {
         // prefix zero is one section so is responsible for all tokens
         let first_section_nanos = RateLimit::max_section_nanos(0);
-        assert_eq!(MAX_SUPPLY, first_section_nanos);
+        if MAX_SUPPLY != first_section_nanos {
+            return Err(Error::Logic(format!(
+                "first section limit does not equal maximum, expected {} == {}",
+                MAX_SUPPLY, first_section_nanos
+            )));
+        }
         // first split leads to each section having half the tokens
         let first_split_nanos = RateLimit::max_section_nanos(1);
-        assert_eq!(MAX_SUPPLY / 2, first_split_nanos);
+        if MAX_SUPPLY / 2 != first_split_nanos {
+            return Err(Error::Logic(format!(
+                "first split does not half of maximum, expected {} == {}",
+                MAX_SUPPLY / 2,
+                first_split_nanos
+            )));
+        }
         // some tokens remain in section up to 2.6 * 10^18 sections, (which is more than one billion times one billion sections).
         let last_split_nanos = RateLimit::max_section_nanos(61);
-        assert!(last_split_nanos > 0);
-        Ok(())
+        if last_split_nanos == 0 {
+            Err(Error::Logic(format!(
+                "last split nanos must be greater than 0, expected {} > 0",
+                last_split_nanos
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     // -------------------------------------------------------------
@@ -129,13 +149,14 @@ mod test {
         let one_mb_less_one_byte = one_mb_bytes - 1;
         let small = RateLimit::rate_limit(one_mb_less_one_byte, full_nodes, all_nodes, prefix_len)
             .as_nano();
-        assert!(
-            small <= standard_rl,
-            "small chunks don't cost less, expect {} <= {}",
-            small,
-            standard_rl
-        );
-        Ok(())
+        if small > standard_rl {
+            Err(Error::Logic(format!(
+                "small chunks don't cost less, expect {} <= {}",
+                small, standard_rl
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     #[test]
@@ -151,13 +172,14 @@ mod test {
         let big_prefix_len = prefix_len + 1;
         let big =
             RateLimit::rate_limit(one_mb_bytes, full_nodes, all_nodes, big_prefix_len).as_nano();
-        assert!(
-            big <= standard_rl,
-            "larger network is not cheaper, expect {} <= {}",
-            big,
-            standard_rl
-        );
-        Ok(())
+        if big > standard_rl {
+            Err(Error::Logic(format!(
+                "larger network is not cheaper, expect {} <= {}",
+                big, standard_rl
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     #[test]
@@ -173,13 +195,14 @@ mod test {
         let less_full_nodes = full_nodes - 1;
         let empty =
             RateLimit::rate_limit(one_mb_bytes, less_full_nodes, all_nodes, prefix_len).as_nano();
-        assert!(
-            empty <= standard_rl,
-            "less full section is not cheaper, expect {} <= {}",
-            empty,
-            standard_rl
-        );
-        Ok(())
+        if empty > standard_rl {
+            Err(Error::Logic(format!(
+                "less full section is not cheaper, expect {} <= {}",
+                empty, standard_rl
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     #[test]
@@ -197,13 +220,14 @@ mod test {
         let reduced =
             RateLimit::rate_limit(one_kb_bytes, full_nodes, all_nodes, prefix_len).as_nano();
         let combined = 1024 * reduced;
-        assert!(
-            standard_rl <= combined,
-            "one big chunk is not cheaper than many small ones, expect {} <= {}",
-            standard_rl,
-            combined
-        );
-        Ok(())
+        if combined < standard_rl {
+            Err(Error::Logic(format!(
+                "one big chunk is not cheaper than many small ones, expect {} <= {}",
+                standard_rl, combined
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     #[test]
@@ -226,11 +250,14 @@ mod test {
             big_prefix_len,
         )
         .as_nano();
-        assert!(
-            endcost > 0,
-            "cost is not greater than zero up to 3400 billion nodes",
-        );
-        Ok(())
+        if endcost == 0 {
+            Err(Error::Logic(format!(
+                "cost is not greater than zero up to 3400 billion nodes, expected {} > 0",
+                endcost,
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     #[test]
@@ -254,12 +281,14 @@ mod test {
             big_prefix_len,
         )
         .as_nano();
-        assert!(
-            endcost > 0,
-            "cost is not always greater than zero: cost is {}",
-            endcost
-        );
-        Ok(())
+        if endcost == 0 {
+            Err(Error::Logic(format!(
+                "cost is not always greater than zero: cost is {}",
+                endcost
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     #[test]
@@ -278,12 +307,13 @@ mod test {
             first_section_prefix,
         )
         .as_nano();
-        assert!(
-            startcost < max_initial_cost,
-            "initial cost {} is above {}",
-            startcost,
-            max_initial_cost
-        );
-        Ok(())
+        if startcost >= max_initial_cost {
+            Err(Error::Logic(format!(
+                "initial cost {} is above {}",
+                startcost, max_initial_cost
+            )))
+        } else {
+            Ok(())
+        }
     }
 }
