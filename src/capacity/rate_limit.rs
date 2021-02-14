@@ -80,23 +80,21 @@ impl RateLimit {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Result;
     use sn_messaging::client::DataCmd;
     use std::mem;
 
     #[test]
-    fn calculates_rate_limit() -> Result<()> {
+    fn calculates_rate_limit() {
         let bytes = 1_000;
         let prefix_len = 0;
         let all_nodes = 8;
         let full_nodes = 7;
         let rate_limit = RateLimit::rate_limit(bytes, full_nodes, all_nodes, prefix_len).as_nano();
         assert_eq!(rate_limit, 2076594);
-        Ok(())
     }
 
     #[test]
-    fn calculates_max_section_nanos() -> Result<()> {
+    fn calculates_max_section_nanos() {
         // prefix zero is one section so is responsible for all tokens
         let first_section_nanos = RateLimit::max_section_nanos(0);
         assert_eq!(MAX_SUPPLY, first_section_nanos);
@@ -106,7 +104,6 @@ mod test {
         // some tokens remain in section up to 2.6 * 10^18 sections, (which is more than one billion times one billion sections).
         let last_split_nanos = RateLimit::max_section_nanos(61);
         assert!(last_split_nanos > 0);
-        Ok(())
     }
 
     // -------------------------------------------------------------
@@ -116,7 +113,7 @@ mod test {
     // These tests are of the type 'all things being equal, then ...'
 
     #[test]
-    fn rate_limit_smaller_chunks_cost_less() -> Result<()> {
+    fn rate_limit_smaller_chunks_cost_less() {
         // setup
         let one_mb_bytes = 1024 * 1024;
         let prefix_len = 0;
@@ -135,11 +132,10 @@ mod test {
             small,
             standard_rl
         );
-        Ok(())
     }
 
     #[test]
-    fn rate_limit_larger_net_is_cheaper() -> Result<()> {
+    fn rate_limit_larger_net_is_cheaper() {
         // setup
         let one_mb_bytes = 1024 * 1024;
         let prefix_len = 2; // first couple of sections see an increase in cost, whereafter it is strictly decreasing
@@ -157,11 +153,10 @@ mod test {
             big,
             standard_rl
         );
-        Ok(())
     }
 
     #[test]
-    fn rate_limit_emptier_section_is_cheaper() -> Result<()> {
+    fn rate_limit_emptier_section_is_cheaper() {
         // setup
         let one_mb_bytes = 1024 * 1024;
         let prefix_len = 0;
@@ -179,12 +174,11 @@ mod test {
             empty,
             standard_rl
         );
-        Ok(())
     }
 
     #[test]
     #[ignore] // these tests fail with the current implementation
-    fn rate_limit_single_store_is_cheaper_than_same_bytes_over_multiple() -> Result<()> {
+    fn rate_limit_single_store_is_cheaper_than_same_bytes_over_multiple() {
         // setup
         let one_mb_bytes = 1024 * 1024;
         let prefix_len = 0;
@@ -203,11 +197,10 @@ mod test {
             standard_rl,
             combined
         );
-        Ok(())
     }
 
     #[test]
-    fn rate_limit_is_applied_up_to_3400_billion_nodes() -> Result<()> {
+    fn rate_limit_is_applied_up_to_3400_billion_nodes() {
         // setup
         // The size of the actual DataCmd
         // is used for storecost calc,
@@ -230,12 +223,11 @@ mod test {
             endcost > 0,
             "cost is not greater than zero up to 3400 billion nodes",
         );
-        Ok(())
     }
 
     #[test]
     #[ignore] // this test fails under the current assumptions (max network size is not realistic)
-    fn rate_limit_is_applied_up_to_max_network_size() -> Result<()> {
+    fn rate_limit_is_applied_up_to_max_network_size() {
         // setup
         // The size of the actual DataCmd
         // is used for storecost calc,
@@ -259,11 +251,10 @@ mod test {
             "cost is not always greater than zero: cost is {}",
             endcost
         );
-        Ok(())
     }
 
     #[test]
-    fn rate_limit_first_chunk_has_a_reasonable_cost() -> Result<()> {
+    fn rate_limit_first_chunk_has_a_reasonable_cost() {
         // setup
         let one_mb_bytes = 1024 * 1024;
         let max_initial_cost = 1_000 * 1_000_000_000; // 1000 tokens
@@ -284,6 +275,5 @@ mod test {
             startcost,
             max_initial_cost
         );
-        Ok(())
     }
 }

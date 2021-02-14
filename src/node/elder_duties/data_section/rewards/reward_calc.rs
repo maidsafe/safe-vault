@@ -40,23 +40,20 @@ impl RewardCalc {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Result;
 
     #[test]
-    fn first_reward_is_32bn_nanos() -> Result<()> {
+    fn first_reward_is_32bn_nanos() {
         let age = 5;
         let prefix_len = 1;
         let reward = RewardCalc::reward_from(age, prefix_len);
         assert!(reward == Token::from_nano(32_000_000_000));
-        Ok(())
     }
 
     #[test]
-    fn min_reward_payable_up_to_at_least_2000bn_nodes() -> Result<()> {
+    fn min_reward_payable_up_to_at_least_2000bn_nodes() {
         let age = 5;
         let prefix_len = 34;
         let reward = RewardCalc::reward_from(age, prefix_len);
         assert!(reward >= Token::from_nano(1));
-        Ok(())
     }
 }

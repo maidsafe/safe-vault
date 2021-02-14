@@ -604,7 +604,7 @@ mod test {
 
     #[test]
     fn section_actor_transition() -> Result<()> {
-        let (mut section, peer_replicas) = get_section(1)?;
+        let (mut section, peer_replicas) = get_section(1);
 
         let (genesis_replicas, mut genesis_actor) = section.remove(0);
         let _ = run(genesis_replicas.initiate(&[]))?;
@@ -627,7 +627,7 @@ mod test {
         }
 
         // Elders changed!
-        let (section, peer_replicas) = get_section(2)?;
+        let (section, peer_replicas) = get_section(2);
         let recipient = PublicKey::Bls(peer_replicas.public_key());
 
         // transfer the section funds to new section actor
@@ -727,7 +727,7 @@ mod test {
     }
 
     type Section = Vec<(Replicas<TestReplicaSigning>, Actor<Validator, Keypair>)>;
-    fn get_section(count: u8) -> Result<(Section, PublicKeySet)> {
+    fn get_section(count: u8) -> (Section, PublicKeySet) {
         let mut rng = rand::thread_rng();
         let threshold = count as usize - 1;
         let bls_secret_key = SecretKeySet::random(threshold, &mut rng);
@@ -738,7 +738,7 @@ mod test {
             .filter_map(|res| res.ok())
             .collect();
 
-        Ok((section, peer_replicas))
+        (section, peer_replicas)
     }
 
     fn get_replica(
