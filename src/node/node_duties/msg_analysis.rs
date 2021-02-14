@@ -264,10 +264,13 @@ impl NetworkMsgAnalysis {
     async fn try_metadata(&self, msg: &MsgEnvelope) -> Result<MetadataDuty> {
         trace!("Msg analysis: try_metadata..");
         let is_data_cmd = || {
-            matches!(msg.message, Message::Cmd {
-                cmd: Cmd::Data { .. },
-                ..
-            })
+            matches!(
+                msg.message,
+                Message::Cmd {
+                    cmd: Cmd::Data { .. },
+                    ..
+                }
+            )
         };
         let sender = msg.most_recent_sender();
         let dst = msg.destination()?;
@@ -282,10 +285,13 @@ impl NetworkMsgAnalysis {
         };
 
         let is_data_query = || {
-            matches!(msg.message, Message::Query {
-                query: Query::Data(_),
-                ..
-            })
+            matches!(
+                msg.message,
+                Message::Query {
+                    query: Query::Data(_),
+                    ..
+                }
+            )
         };
         let from_single_gateway_elder = || {
             msg.most_recent_sender().is_elder() && matches!(duty, Duty::Elder(ElderDuties::Gateway))
@@ -323,18 +329,23 @@ impl NetworkMsgAnalysis {
 
         // TODO: Should not accumulate queries, just pass them through.
         let is_chunk_query = || {
-            matches!(msg.message, Message::Query {
-                query: Query::Data(DataQuery::Blob(_)),
-                ..
-            })
+            matches!(
+                msg.message,
+                Message::Query {
+                    query: Query::Data(DataQuery::Blob(_)),
+                    ..
+                }
+            )
         };
 
         let is_chunk_cmd = || {
-            matches!(msg.message,
-            Message::NodeCmd {
-                cmd:NodeCmd::Data(NodeDataCmd::Blob(_)),
-                ..
-            })
+            matches!(
+                msg.message,
+                Message::NodeCmd {
+                    cmd: NodeCmd::Data(NodeDataCmd::Blob(_)),
+                    ..
+                }
+            )
         };
 
         let shall_process =

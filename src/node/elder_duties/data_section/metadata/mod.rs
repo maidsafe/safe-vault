@@ -48,7 +48,7 @@ impl Metadata {
         elder_state: ElderState,
     ) -> Result<Self> {
         let wrapping = ElderMsgWrapping::new(elder_state.clone(), ElderDuties::Metadata);
-        let blob_register = BlobRegister::new(dbs, wrapping.clone(), elder_state)?;
+        let blob_register = BlobRegister::new(dbs, wrapping.clone(), elder_state);
         let map_storage = MapStorage::new(node_info, wrapping.clone()).await?;
         let sequence_storage = SequenceStorage::new(node_info, wrapping.clone()).await?;
         let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);

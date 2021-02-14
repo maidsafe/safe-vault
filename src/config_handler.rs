@@ -28,7 +28,7 @@ const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 19] = [
+const ARGS: [&str; 20] = [
     "wallet-id",
     "max-capacity",
     "root-dir",
@@ -48,6 +48,7 @@ const ARGS: [&str; 19] = [
     "local",
     "fresh",
     "clean",
+    "clear-data",
 ];
 
 /// Node configuration
@@ -92,8 +93,11 @@ pub struct Config {
     #[structopt(long)]
     pub update: bool,
     /// Attempt to self-update without starting the node process
-    #[structopt(long, name = "update-only")]
+    #[structopt(long)]
     pub update_only: bool,
+    /// Delete all data from a previous node running on the same PC
+    #[structopt(long)]
+    pub clear_data: bool,
 }
 
 impl Config {
@@ -106,11 +110,11 @@ impl Config {
         };
         let command_line_args = Config::clap().get_matches();
 
-        if command_line_args.occurrences_of(ARGS[17]) != 0 {
+        if command_line_args.occurrences_of("fresh") != 0 {
             config = Config::default();
         }
 
-        if command_line_args.occurrences_of(ARGS[18]) != 0 {
+        if command_line_args.occurrences_of("clean") != 0 {
             Self::clear_from_disk().unwrap_or_else(|_| {
                 log::error!("Error deleting config file from disk");
             })
@@ -126,6 +130,10 @@ impl Config {
                 }
             }
         }
+
+        config.clear_data_from_disk().unwrap_or_else(|_| {
+            log::error!("Error deleting data file from disk");
+        });
 
         Ok(config)
     }
@@ -217,63 +225,63 @@ impl Config {
     }
 
     pub(crate) fn set_value(&mut self, arg: &str, value: &str) -> Result<(), Error> {
-        if arg == ARGS[0] {
+        if arg == "wallet-id" {
             self.wallet_id =
                 Some(value.parse().map_err(|e: Infallible| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == ARGS[1] {
+        } else if arg == "max-capacity" {
             self.max_capacity =
                 Some(value.parse().map_err(|e: ParseIntError| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == ARGS[2] {
+        } else if arg == "root-dir" {
             self.root_dir =
                 Some(value.parse().map_err(|e: Infallible| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == ARGS[3] {
+        } else if arg == "verbose" {
             self.verbose = value
                 .parse()
                 .map_err(|e: ParseIntError| Error::Logic(format!("Config file error: {:?}", e)))?;
-        } else if arg == ARGS[4] {
+        } else if arg == "hard-coded-contacts" {
             self.network_config.hard_coded_contacts = serde_json::from_str(value)
                 .map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
-        } else if arg == ARGS[5] {
+        } else if arg == "port" {
             self.network_config.port =
                 Some(value.parse().map_err(|e: ParseIntError| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == ARGS[6] {
+        } else if arg == "ip" {
             self.network_config.ip = Some(value.parse().map_err(|e: AddrParseError| {
                 Error::Logic(format!("Config file error: {:?}", e))
             })?);
-        } else if arg == ARGS[11] {
+        } else if arg == "completions" {
             self.completions =
                 Some(value.parse().map_err(|e: Infallible| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == ARGS[12] {
+        } else if arg == "log-dir" {
             self.log_dir =
                 Some(value.parse().map_err(|e: Infallible| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == ARGS[7] {
+        } else if arg == "max-msg-size-allowed" {
             self.network_config.max_msg_size_allowed =
                 Some(value.parse().map_err(|e: ParseIntError| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == ARGS[8] {
+        } else if arg == "idle-timeout-msec" {
             self.network_config.idle_timeout_msec =
                 Some(value.parse().map_err(|e: ParseIntError| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == ARGS[9] {
+        } else if arg == "keep-alive-interval-msec" {
             self.network_config.keep_alive_interval_msec =
                 Some(value.parse().map_err(|e: ParseIntError| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == ARGS[15] {
+        } else if arg == "upnp-lease-duration" {
             self.network_config.upnp_lease_duration =
                 Some(value.parse().map_err(|e: ParseIntError| {
                     Error::Logic(format!("Config file error: {:?}", e))
@@ -285,20 +293,22 @@ impl Config {
     }
 
     pub(crate) fn set_flag(&mut self, arg: &str, occurrences: u64) {
-        if arg == ARGS[3] {
+        if arg == "verbose" {
             self.verbose = occurrences;
-        } else if arg == ARGS[10] {
+        } else if arg == "first" {
             self.first = occurrences >= 1;
-        } else if arg == ARGS[13] {
+        } else if arg == "update" {
             self.update = occurrences >= 1;
-        } else if arg == ARGS[14] {
+        } else if arg == "update-only" {
             self.update_only = occurrences >= 1;
-        } else if arg == ARGS[16] {
+        } else if arg == "local" {
             self.local = occurrences >= 1;
-        } else if arg == ARGS[17] {
+        } else if arg == "fresh" {
             self.network_config.fresh = occurrences >= 1;
-        } else if arg == ARGS[18] {
+        } else if arg == "clean" {
             self.network_config.clean = occurrences >= 1;
+        } else if arg == "clear-data" {
+            self.clear_data = occurrences >= 1;
         } else {
             println!("ERROR");
         }
@@ -308,6 +318,17 @@ impl Config {
         let path = project_dirs()?.join(CONFIG_FILE);
         if path.exists() {
             std::fs::remove_file(path)?;
+        }
+        Ok(())
+    }
+
+    // Clear data from of a previous node running on the same PC
+    fn clear_data_from_disk(&self) -> Result<()> {
+        if self.clear_data {
+            let path = project_dirs()?.join(self.root_dir()?);
+            if path.exists() {
+                std::fs::remove_dir_all(&path)?;
+            }
         }
         Ok(())
     }
@@ -409,6 +430,7 @@ mod test {
             ["fresh", "None"],
             ["clean", "None"],
             ["upnp-lease-duration", "180"],
+            ["clear-data", "None"],
         ];
 
         for arg in &ARGS {
@@ -437,6 +459,7 @@ mod test {
                 log_dir: None,
                 update: false,
                 update_only: false,
+                clear_data: false,
             };
             let empty_config = config.clone();
             if let Some(val) = matches.value_of(arg) {

@@ -45,13 +45,13 @@ where
 }
 
 impl<T: ReplicaSigning> Replicas<T> {
-    pub(crate) fn new(root_dir: PathBuf, info: ReplicaInfo<T>) -> Result<Self> {
-        Ok(Self {
+    pub(crate) fn new(root_dir: PathBuf, info: ReplicaInfo<T>) -> Self {
+        Self {
             root_dir,
             info,
             locks: Default::default(),
             self_lock: Arc::new(Mutex::new(0)),
-        })
+        }
     }
 
     /// -----------------------------------------------------------------
@@ -758,7 +758,7 @@ mod test {
             initiating: true,
         };
         let root_dir = temp_dir()?;
-        let replicas = Replicas::new(root_dir.path().to_path_buf(), info)?;
+        let replicas = Replicas::new(root_dir.path().to_path_buf(), info);
 
         let keypair =
             Keypair::new_bls_share(0, bls_secret_key.secret_key_share(0), peer_replicas.clone());

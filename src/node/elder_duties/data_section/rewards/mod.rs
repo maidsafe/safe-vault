@@ -157,7 +157,7 @@ impl Rewards {
                     self.section_funds.synch(info.history).await?.into()
                 }
             }
-            AddNewNode(node_id) => self.add_new_node(node_id)?.into(),
+            AddNewNode(node_id) => self.add_new_node(node_id).into(),
             SetNodeWallet { node_id, wallet_id } => {
                 self.set_node_wallet(node_id, wallet_id)?.into()
             }
@@ -245,10 +245,10 @@ impl Rewards {
     /// It still hasn't registered a wallet id at
     /// this point, but will as part of starting up.
     /// At age 5 it gets its first reward payout.
-    fn add_new_node(&self, node_id: XorName) -> Result<NodeMessagingDuty> {
+    fn add_new_node(&self, node_id: XorName) -> NodeMessagingDuty {
         info!("Rewards: New node added: {:?}", node_id);
         let _ = self.node_rewards.insert(node_id, NodeRewards::NewNode);
-        Ok(NodeMessagingDuty::NoOp)
+        NodeMessagingDuty::NoOp
     }
 
     /// 1. A new node registers a wallet id for future reward payout.

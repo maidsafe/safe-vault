@@ -57,7 +57,7 @@ pub struct KeySection {
 impl KeySection {
     pub async fn new(rate_limit: RateLimit, elder_state: ElderState) -> Result<Self> {
         let gateway = ClientGateway::new(elder_state.clone()).await?;
-        let replicas = Self::transfer_replicas(elder_state.clone())?;
+        let replicas = Self::transfer_replicas(elder_state.clone());
         let transfers = Transfers::new(elder_state.clone(), replicas, rate_limit);
         let msg_analysis = ClientMsgAnalysis::new(elder_state.clone());
 
@@ -133,7 +133,7 @@ impl KeySection {
         }
     }
 
-    fn transfer_replicas(elder_state: ElderState) -> Result<Replicas<ReplicaSigningImpl>> {
+    fn transfer_replicas(elder_state: ElderState) -> Replicas<ReplicaSigningImpl> {
         let root_dir = elder_state.info().root_dir.clone();
         let id = elder_state.public_key_share();
         let key_index = elder_state.key_index();
@@ -147,7 +147,6 @@ impl KeySection {
             signing,
             initiating: true,
         };
-        let replica_manager = Replicas::new(root_dir, info)?;
-        Ok(replica_manager)
+        Replicas::new(root_dir, info)
     }
 }

@@ -82,10 +82,13 @@ impl ClientMsgAnalysis {
     /// just send back the response, for the client to accumulate.
     async fn try_data(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         let is_data_read = || {
-            matches!(msg.message, Message::Query {
-                query: Query::Data { .. },
-                ..
-            })
+            matches!(
+                msg.message,
+                Message::Query {
+                    query: Query::Data { .. },
+                    ..
+                }
+            )
         };
         let shall_process = || is_data_read() && msg.origin.is_client();
 
@@ -104,10 +107,13 @@ impl ClientMsgAnalysis {
     /// so there is no reason to accumulate it here.
     async fn try_data_payment(&self, msg: &MsgEnvelope) -> Result<NodeOperation> {
         let is_data_write = || {
-            matches!(msg.message, Message::Cmd {
-                cmd: Cmd::Data { .. },
-                ..
-            })
+            matches!(
+                msg.message,
+                Message::Cmd {
+                    cmd: Cmd::Data { .. },
+                    ..
+                }
+            )
         };
 
         let shall_process = || is_data_write() && msg.origin.is_client();
