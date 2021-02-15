@@ -101,13 +101,8 @@ impl Network {
         self.routing.lock().await.name().await
     }
 
-    pub async fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.routing
-            .lock()
-            .await
-            .our_connection_info()
-            .await
-            .map_err(Error::Routing)
+    pub async fn our_connection_info(&mut self) -> SocketAddr {
+        self.routing.lock().await.our_connection_info()
     }
 
     pub async fn our_prefix(&self) -> Prefix {

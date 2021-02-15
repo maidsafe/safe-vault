@@ -34,8 +34,8 @@ const ARGS: [&str; 20] = [
     "root-dir",
     "verbose",
     "hard-coded-contacts",
-    "port",
-    "ip",
+    "local-port",
+    "local-ip",
     "max-msg-size-allowed",
     "idle-timeout-msec",
     "keep-alive-interval-msec",
@@ -221,7 +221,7 @@ impl Config {
 
     /// Set the Quic-P2P `ip` configuration to 127.0.0.1.
     pub fn listen_on_loopback(&mut self) {
-        self.network_config.ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
+        self.network_config.local_ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
     pub(crate) fn set_value(&mut self, arg: &str, value: &str) -> Result<(), Error> {
@@ -247,13 +247,13 @@ impl Config {
         } else if arg == "hard-coded-contacts" {
             self.network_config.hard_coded_contacts = serde_json::from_str(value)
                 .map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
-        } else if arg == "port" {
-            self.network_config.port =
+        } else if arg == "local-port" {
+            self.network_config.local_port =
                 Some(value.parse().map_err(|e: ParseIntError| {
                     Error::Logic(format!("Config file error: {:?}", e))
                 })?);
-        } else if arg == "ip" {
-            self.network_config.ip = Some(value.parse().map_err(|e: AddrParseError| {
+        } else if arg == "local-ip" {
+            self.network_config.local_ip = Some(value.parse().map_err(|e: AddrParseError| {
                 Error::Logic(format!("Config file error: {:?}", e))
             })?);
         } else if arg == "completions" {
@@ -416,8 +416,8 @@ mod test {
             ["root-dir", "dir"],
             ["verbose", "None"],
             ["hard-coded-contacts", "[\"127.0.0.1:33292\"]"],
-            ["port", "1"],
-            ["ip", "127.0.0.1"],
+            ["local-port", "1"],
+            ["local-ip", "127.0.0.1"],
             ["max-msg-size-allowed", "1"],
             ["idle-timeout-msec", "1"],
             ["keep-alive-interval-msec", "1"],

@@ -124,11 +124,8 @@ impl Node {
     }
 
     /// Returns our connection info.
-    pub async fn our_connection_info(&mut self) -> Result<SocketAddr> {
-        self.network_api
-            .our_connection_info()
-            .await
-            .map_err(From::from)
+    pub async fn our_connection_info(&mut self) -> SocketAddr {
+        self.network_api.our_connection_info().await
     }
 
     /// Returns whether routing node is in elder state.
@@ -140,7 +137,7 @@ impl Node {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
-        let info = self.network_api.our_connection_info().await?;
+        let info = self.network_api.our_connection_info().await;
         info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             info!("New event received from the Network: {:?}", event);
