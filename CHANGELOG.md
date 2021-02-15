@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.14](https://github.com/maidsafe/sn_node/compare/v0.26.13...v0.26.14) (2021-02-15)
+
+
+### Bug Fixes
+
+* adds used_space.reset() and reset() on age-up ([1267872](https://github.com/maidsafe/sn_node/commit/1267872c2e73fc9c440c612c14819850ca303df6))
+* unifies used space across node ([942c7f8](https://github.com/maidsafe/sn_node/commit/942c7f80f7002d95a33d88dfbdb4b143d43442e8))
+
 ### [0.26.13](https://github.com/maidsafe/sn_node/compare/v0.26.12...v0.26.13) (2021-02-15)
 
 ### [0.26.12](https://github.com/maidsafe/sn_node/compare/v0.26.11...v0.26.12) (2021-02-15)
