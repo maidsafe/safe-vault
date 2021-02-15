@@ -12,7 +12,7 @@ mod key_section;
 use self::{data_section::DataSection, key_section::KeySection};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
-    node::node_ops::{ElderDuty, },
+    node::node_ops::{ElderDuty, NetworkDuties, NetworkDuty},
     ElderState, NodeInfo, Result,
 };
 use log::trace;
@@ -53,22 +53,22 @@ impl ElderDuties {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn initiate(&mut self, genesis: Option<TransferPropagated>) -> Result<Vec<NetworkDuty>> {
+    pub async fn initiate(&mut self, genesis: Option<TransferPropagated>) -> Result<NetworkDuties> {
         let mut ops = vec![];
         if let Some(genesis) = genesis {
             // if we are genesis
             // does local init, with no roundrip via network messaging
             let _ = self.key_section.init_genesis_node(genesis).await?;
         } else {
-            ops.push(self.key_section.catchup_with_section().await?);
-            ops.push(self.data_section.catchup_with_section().await?);
+            ops.append(&mut self.key_section.catchup_with_section().await?);
+            ops.append(&mut self.data_section.catchup_with_section().await?);
         }
 
-        Ok(ops.into())
+        Ok(ops)
     }
 
     /// Processing of any Elder duty.
-    pub async fn process_elder_duty(&mut self, duty: ElderDuty) -> Result<Vec<NetworkDuty>> {
+    pub async fn process_elder_duty(&mut self, duty: ElderDuty) -> Result<NetworkDuties> {
         trace!("Processing elder duty: {:?}", duty);
         use ElderDuty::*;
         match duty {
@@ -97,11 +97,11 @@ impl ElderDuties {
     }
 
     ///
-    async fn new_node_joined(&mut self, name: XorName) -> Result<Vec<NetworkDuty>> {
+    async fn new_node_joined(&mut self, name: XorName) -> Result<NetworkDuties> {
         self.data_section.new_node_joined(name).await
     }
 
-    async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<Vec<NetworkDuty>> {
+    async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<NetworkDuties> {
         self.key_section
             .increase_full_node_count(node_id)
             .await
@@ -114,14 +114,14 @@ impl ElderDuties {
         old_node_id: XorName,
         new_node_id: XorName,
         age: u8,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         self.data_section
             .relocated_node_joined(old_node_id, new_node_id, age)
             .await
     }
 
     ///
-    async fn member_left(&mut self, node_id: XorName, age: u8) -> Result<Vec<NetworkDuty>> {
+    async fn member_left(&mut self, node_id: XorName, age: u8) -> Result<NetworkDuties> {
         self.data_section.member_left(node_id, age).await
     }
 
@@ -129,7 +129,7 @@ impl ElderDuties {
     pub async fn initiate_elder_change(
         &mut self,
         elder_state: ElderState,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         // 1. First we must update data section..
         self.data_section.initiate_elder_change(elder_state).await
     }
@@ -148,7 +148,7 @@ impl ElderDuties {
     }
 
     ///
-    pub async fn split_section(&mut self, prefix: Prefix) -> Result<Vec<NetworkDuty>> {
+    pub async fn split_section(&mut self, prefix: Prefix) -> Result<NetworkDuties> {
         let _ = self.key_section.split_section(prefix).await?;
         self.data_section.split_section(prefix).await
     }

@@ -15,7 +15,7 @@ mod writing;
 
 use crate::{
     capacity::ChunkHolderDbs,
-    node::node_ops::{MetadataDuty, },
+    node::node_ops::{MetadataDuty, NetworkDuties},
     node::NodeInfo,
     ElderState, Result,
 };
@@ -49,7 +49,7 @@ impl Metadata {
         Ok(Self { elder_stores })
     }
 
-    pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Result<Vec<NetworkDuty>> {
+    pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Result<NetworkDuties> {
         use MetadataDuty::*;
         match duty {
             ProcessRead { query, id, origin } => {
@@ -65,7 +65,7 @@ impl Metadata {
     // This should be called whenever a node leaves the section. It fetches the list of data that was
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
-    pub async fn trigger_chunk_replication(&mut self, node: XorName) -> Result<Vec<NetworkDuty>> {
+    pub async fn trigger_chunk_replication(&mut self, node: XorName) -> Result<NetworkDuties> {
         self.elder_stores
             .blob_register_mut()
             .replicate_chunks(node)

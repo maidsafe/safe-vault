@@ -9,7 +9,7 @@
 use crate::{
     capacity::ChunkHolderDbs,
     error::convert_to_error_message,
-    node::node_ops::{NodeMessagingDuty, OutgoingMsg},
+    node::node_ops::{NetworkDuties, NetworkDuty, NodeMessagingDuty, OutgoingMsg},
     ElderState, Error, Result, ToDbKey,
 };
 use log::{info, trace, warn};
@@ -297,7 +297,7 @@ impl BlobRegister {
         Ok(())
     }
 
-    pub(super) async fn replicate_chunks(&mut self, holder: XorName) -> Result<Vec<NetworkDuty>> {
+    pub(super) async fn replicate_chunks(&mut self, holder: XorName) -> Result<NetworkDuties> {
         trace!("Replicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder) {
@@ -308,14 +308,14 @@ impl BlobRegister {
         for (address, holders) in chunks_stored {
             cmds.extend(self.get_replication_msgs(address, holders).await);
         }
-        Ok(cmds.into())
+        Ok(cmds)
     }
 
     async fn get_replication_msgs(
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
-    ) -> Vec<Vec<NetworkDuty>> {
+    ) -> NetworkDuties {
         use NodeCmd::*;
         let mut node_ops = Vec::new();
         let messages = self

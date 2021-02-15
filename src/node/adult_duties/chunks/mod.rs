@@ -11,7 +11,7 @@ mod reading;
 mod writing;
 
 use crate::{
-    node::node_ops::{NodeDuty, NodeMessagingDuty, },
+    node::node_ops::{NetworkDuties, NodeDuty, NodeMessagingDuty},
     AdultState, NodeInfo, Result,
 };
 use chunk_storage::ChunkStorage;
@@ -59,10 +59,10 @@ impl Chunks {
         writing::get_result(write, msg_id, origin, &mut self.chunk_storage).await
     }
 
-    pub async fn check_storage(&self) -> Result<Vec<NetworkDuty>> {
+    pub async fn check_storage(&self) -> Result<NetworkDuties> {
         info!("Checking used storage");
         if self.chunk_storage.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
-            Ok(NodeDuty::StorageFull.into())
+            Ok(NetworkDuties::from(NodeDuty::StorageFull))
         } else {
             Ok(vec![])
         }

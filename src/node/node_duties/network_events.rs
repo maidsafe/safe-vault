@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::ReceivedMsgAnalysis;
-use crate::node::node_ops::{ElderDuty, NodeDuty};
+use crate::node::node_ops::{ElderDuty, NetworkDuties, NetworkDuty, NodeDuty };
 use crate::{Network, Result};
 use hex_fmt::HexFmt;
 use log::{info, trace};
@@ -51,18 +51,17 @@ impl NetworkEvents {
         &mut self,
         event: RoutingEvent,
         network: &Network,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         use ElderDuty::*;
         trace!("Processing Routing Event: {:?}", event);
         match event {
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
                 //self.log_node_counts().await;
-                Ok(ProcessLostMember {
+                Ok(NetworkDuties::from(ProcessLostMember {
                     name: XorName(name.0),
                     age,
-                }
-                .into())
+                }))
             }
             RoutingEvent::MemberJoined {
                 name,
@@ -74,18 +73,18 @@ impl NetworkEvents {
                 //self.log_node_counts().await;
                 if let Some(prev_name) = previous_name {
                     trace!("The new member is a Relocated Node");
-                    let first = ProcessRelocatedMember {
+                    let first = NetworkDuty::from(ProcessRelocatedMember {
                         old_node_id: XorName(prev_name.0),
                         new_node_id: XorName(name.0),
                         age,
-                    };
+                    });
 
                     // Switch joins_allowed off a new adult joining.
-                    let second = SwitchNodeJoin(false).into();
+                    let second = NetworkDuty::from(SwitchNodeJoin(false));
                     Ok(vec![first, second])
                 } else {
                     trace!("New node has just joined the network and is a fresh node.",);
-                    Ok(ProcessNewMember(XorName(name.0)).into())
+                    Ok(NetworkDuties::from(ProcessNewMember(XorName(name.0))))
                 }
             }
             RoutingEvent::ClientMessageReceived { msg, user } => {
@@ -111,22 +110,19 @@ impl NetworkEvents {
                 prefix,
                 self_status_change,
             } => {
-                let initial_op = match self_status_change {
-                    NodeElderChange::Promoted => NodeDuty::AssumeElderDuties.into(),
-                    NodeElderChange::Demoted => NodeDuty::AssumeAdultDuties.into(),
+                let mut duties: NetworkDuties = match self_status_change {
+                    NodeElderChange::Promoted => NetworkDuties::from(NodeDuty::AssumeElderDuties),
+                    NodeElderChange::Demoted => NetworkDuties::from(NodeDuty::AssumeAdultDuties),
                     NodeElderChange::None => vec![],
                 };
-                let ops = vec![
-                    initial_op,
-                    NodeDuty::InitiateElderChange {
-                        prefix,
-                        key: PublicKey::Bls(key),
-                        elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
-                    }
-                    .into(),
-                ];
 
-                Ok(ops.into())
+                duties.push(NetworkDuty::from(NodeDuty::InitiateElderChange {
+                    prefix,
+                    key: PublicKey::Bls(key),
+                    elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+                }));
+
+                Ok(duties)
             }
             RoutingEvent::Relocated { .. } => {
                 // Check our current status
@@ -134,7 +130,7 @@ impl NetworkEvents {
                 if age > MIN_AGE {
                     info!("Node promoted to Adult");
                     info!("Our Age: {:?}", age);
-                    Ok(NodeDuty::AssumeAdultDuties.into())
+                    Ok(NetworkDuties::from(NodeDuty::AssumeAdultDuties))
                 } else {
                     info!("Our AGE: {:?}", age);
                     Ok(vec![])

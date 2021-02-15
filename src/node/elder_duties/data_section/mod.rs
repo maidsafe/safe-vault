@@ -15,7 +15,7 @@ use self::{
 };
 use crate::{
     capacity::ChunkHolderDbs,
-    node::node_ops::{DataSectionDuty, RewardCmd, RewardDuty},
+    node::node_ops::{DataSectionDuty, NetworkDuties, NetworkDuty, RewardCmd, RewardDuty},
     node::NodeInfo,
     ElderState, Result,
 };
@@ -127,7 +127,7 @@ impl DataSection {
     pub async fn process_data_section_duty(
         &mut self,
         duty: DataSectionDuty,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         use DataSectionDuty::*;
         match duty {
             RunAsMetadata(duty) => self.metadata.process_metadata_duty(duty).await,
@@ -138,7 +138,7 @@ impl DataSection {
 
     /// Issues query to Elders of the section
     /// as to catch up with the current state of the replicas.
-    pub async fn catchup_with_section(&mut self) -> Result<Vec<NetworkDuty>> {
+    pub async fn catchup_with_section(&mut self) -> Result<NetworkDuties> {
         self.rewards
             .get_section_wallet_history(self.elder_state.prefix().name())
             .await
@@ -148,7 +148,7 @@ impl DataSection {
     pub async fn initiate_elder_change(
         &mut self,
         elder_state: ElderState,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         info!("Processing Elder change in data section");
         // TODO: Query sn_routing for info for [new_section_key]
         // specifically (regardless of how far back that was) - i.e. not the current info!
@@ -161,7 +161,7 @@ impl DataSection {
     }
 
     /// At section split, all Elders get their reward payout.
-    pub async fn split_section(&mut self, prefix: Prefix) -> Result<Vec<NetworkDuty>> {
+    pub async fn split_section(&mut self, prefix: Prefix) -> Result<NetworkDuties> {
         // First remove nodes that are no longer in our section.
         let to_remove = self
             .rewards
@@ -177,7 +177,7 @@ impl DataSection {
     }
 
     /// When a new node joins, it is registered for receiving rewards.
-    pub async fn new_node_joined(&mut self, id: XorName) -> Result<Vec<NetworkDuty>> {
+    pub async fn new_node_joined(&mut self, id: XorName) -> Result<NetworkDuties> {
         self.rewards
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddNewNode(id),
@@ -195,7 +195,7 @@ impl DataSection {
         old_node_id: XorName,
         new_node_id: XorName,
         age: u8,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         // Adds the relocated account.
         self.rewards
             .process_reward_duty(RewardDuty::ProcessCmd {
@@ -212,16 +212,16 @@ impl DataSection {
 
     /// Name of the node
     /// Age of the node
-    pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Result<Vec<NetworkDuty>> {
-        let first = self
+    pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Result<NetworkDuties> {
+        let mut duties = self
             .rewards
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::DeactivateNode(node_id),
                 msg_id: MessageId::new(),
                 origin: SrcLocation::Node(self.elder_state.node_name()),
             })
-            .await;
-        let second = self.metadata.trigger_chunk_replication(node_id).await;
-        Ok(vec![first, second].into())
+            .await?;
+        duties.extend(self.metadata.trigger_chunk_replication(node_id).await?);
+        Ok(duties)
     }
 }

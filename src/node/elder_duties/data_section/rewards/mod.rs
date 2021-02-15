@@ -14,8 +14,7 @@ use self::section_funds::{Payout, SectionFunds};
 pub use self::{reward_calc::RewardCalc, validator::Validator};
 use crate::{
     node::node_ops::{
-        IntoNodeOp, NodeMessagingDuty,  OutgoingMsg, RewardCmd, RewardDuty,
-        RewardQuery,
+        NetworkDuties, NodeMessagingDuty, OutgoingMsg, RewardCmd, RewardDuty, RewardQuery,
     },
     ElderState,
 };
@@ -92,7 +91,7 @@ impl Rewards {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub async fn get_section_wallet_history(&self, section: XorName) -> Result<Vec<NetworkDuty>> {
+    pub async fn get_section_wallet_history(&self, section: XorName) -> Result<NetworkDuties> {
         info!("Rewards: Catching up with our section wallet history!");
         // prepare actor init
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
@@ -108,14 +107,13 @@ impl Rewards {
 
     /// After Elder change, we transition to a new
     /// transfer actor, as there is now a new keypair for it.
-    pub async fn init_transition(&mut self, elder_state: ElderState) -> Result<Vec<NetworkDuty>> {
-        self.section_funds
-            .init_transition(elder_state)
-            .await
-            .convert()
+    pub async fn init_transition(&mut self, elder_state: ElderState) -> Result<NetworkDuties> {
+        Ok(NetworkDuties::from(
+            self.section_funds.init_transition(elder_state).await?,
+        ))
     }
 
-    pub async fn process_reward_duty(&mut self, duty: RewardDuty) -> Result<Vec<NetworkDuty>> {
+    pub async fn process_reward_duty(&mut self, duty: RewardDuty) -> Result<NetworkDuties> {
         use RewardDuty::*;
         match duty {
             ProcessCmd {
@@ -137,7 +135,7 @@ impl Rewards {
         cmd: RewardCmd,
         _msg_id: MessageId,
         _origin: SrcLocation,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         use RewardCmd::*;
         let result = match cmd {
             InitiateSectionWallet(info) => {
@@ -178,7 +176,7 @@ impl Rewards {
         query: RewardQuery,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         use RewardQuery::*;
         let result = match query {
             GetNodeWalletId {
@@ -195,8 +193,8 @@ impl Rewards {
     }
 
     /// On section splits, we are paying out to Elders.
-    pub async fn payout_rewards(&mut self, node_ids: BTreeSet<&XorName>) -> Result<Vec<NetworkDuty>> {
-        let mut payouts: Vec<Vec<NetworkDuty>> = vec![];
+    pub async fn payout_rewards(&mut self, node_ids: BTreeSet<&XorName>) -> Result<NetworkDuties> {
+        let mut payouts: NetworkDuties = vec![];
         for node_id in node_ids {
             // Try get the wallet..
             let (wallet, age) = match self.node_rewards.get(node_id) {
@@ -232,7 +230,7 @@ impl Rewards {
             payouts.push(payout.into());
         }
 
-        Ok(payouts.into())
+        Ok(payouts)
     }
 
     ///

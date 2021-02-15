@@ -18,7 +18,7 @@ use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
     node::node_ops::{
-        IntoNodeOp, NodeMessagingDuty,  OutgoingMsg, TransferCmd, TransferDuty,
+        NetworkDuties, NetworkDuty, NodeMessagingDuty, OutgoingMsg, TransferCmd, TransferDuty,
         TransferQuery,
     },
     utils, Error, Result,
@@ -94,19 +94,18 @@ impl Transfers {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub async fn catchup_with_replicas(&self) -> Result<Vec<NetworkDuty>> {
+    pub async fn catchup_with_replicas(&self) -> Result<NetworkDuties> {
         info!("Transfers: Catching up with transfer Replicas!");
         // prepare replica init
         let pub_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+        Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
                 id: MessageId::new(),
             },
             dst: DstLocation::Section(pub_key.into()),
             to_be_aggregated: false,
-        })
-        .into())
+        })))
     }
 
     /// When section splits, the Replicas in either resulting section
@@ -125,7 +124,7 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<Vec<NetworkDuty>> {
+    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NetworkDuties> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
         match duty {
@@ -148,27 +147,29 @@ impl Transfers {
         query: &TransferQuery,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         use TransferQuery::*;
-        let result = match query {
+        let duty = match query {
             GetNewSectionWallet(wallet_id) => {
                 self.get_new_section_wallet(*wallet_id, msg_id, origin)
-                    .await
+                    .await?
             }
-            GetReplicaEvents => self.all_events(msg_id, origin).await,
-            GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await,
-            GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await,
+            GetReplicaEvents => self.all_events(msg_id, origin).await?,
+            GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await?,
+            GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await?,
             GetHistory { at, since_version } => {
-                self.history(at, *since_version, msg_id, origin).await
+                self.history(at, *since_version, msg_id, origin).await?
             }
             GetStoreCost { bytes, .. } => {
                 let mut ops = vec![];
-                ops.push(self.get_store_cost(*bytes, msg_id, origin).await.convert());
+                ops.push(NetworkDuty::from(
+                    self.get_store_cost(*bytes, msg_id, origin).await?,
+                ));
                 //ops.push(Ok(ElderDuty::SwitchNodeJoin(self.rate_limit.check_network_storage().await).into()));
-                return Ok(ops.into());
+                return Ok(ops);
             }
         };
-        result.convert()
+        Ok(NetworkDuties::from(duty))
     }
 
     async fn process_cmd(
@@ -176,23 +177,26 @@ impl Transfers {
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         use TransferCmd::*;
         debug!("Processing cmd in Transfers mod");
-        let result = match cmd {
-            InitiateReplica(events) => self.initiate_replica(events).await,
-            ProcessPayment(msg) => self.process_payment(msg, origin).await,
+        let duty = match cmd {
+            InitiateReplica(events) => self.initiate_replica(events).await?,
+            ProcessPayment(msg) => self.process_payment(msg, origin).await?,
             #[cfg(feature = "simulated-payouts")]
             // Cmd to simulate a farming payout
-            SimulatePayout(transfer) => self.replicas.credit_without_proof(transfer.clone()).await,
+            SimulatePayout(transfer) => {
+                self.replicas.credit_without_proof(transfer.clone()).await?
+            }
             ValidateTransfer(signed_transfer) => {
-                self.validate(signed_transfer.clone(), msg_id, origin).await
+                self.validate(signed_transfer.clone(), msg_id, origin)
+                    .await?
             }
             ValidateSectionPayout(signed_transfer) => {
                 self.validate_section_payout(signed_transfer.clone(), msg_id, origin)
-                    .await
+                    .await?
             }
-            RegisterTransfer(debit_agreement) => self.register(&debit_agreement, msg_id).await,
+            RegisterTransfer(debit_agreement) => self.register(&debit_agreement, msg_id).await?,
             RegisterSectionPayout(debit_agreement) => {
                 return self
                     .register_section_payout(&debit_agreement, msg_id, origin)
@@ -200,10 +204,10 @@ impl Transfers {
             }
             PropagateTransfer(debit_agreement) => {
                 self.receive_propagated(&debit_agreement, msg_id, origin)
-                    .await
+                    .await?
             }
         };
-        result.convert()
+        Ok(NetworkDuties::from(duty))
     }
 
     ///
@@ -634,13 +638,13 @@ impl Transfers {
         proof: &TransferAgreementProof,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         use NodeCmd::*;
         use NodeEvent::*;
         use NodeTransferCmd::*;
         match self.replicas.register(proof).await {
             Ok(event) => {
-                let mut ops: Vec<Vec<NetworkDuty>> = vec![];
+                let mut ops: NetworkDuties = vec![];
                 // notify sending section
                 let location = event.transfer_proof.sender().into();
                 ops.push(
@@ -671,11 +675,11 @@ impl Transfers {
                     })
                     .into(),
                 );
-                Ok(ops.into())
+                Ok(ops)
             }
             Err(e) => {
                 let message_error = convert_to_error_message(e)?;
-                Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmdError {
                         error: NodeCmdError::Transfers(
                             NodeTransferError::SectionPayoutRegistration(message_error),
@@ -686,8 +690,7 @@ impl Transfers {
                     },
                     dst: origin.to_dst(),
                     to_be_aggregated: false, // TODO: to_be_aggregated: true,
-                })
-                .into())
+                })))
             }
         }
     }

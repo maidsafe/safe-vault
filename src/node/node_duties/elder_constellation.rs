@@ -9,7 +9,7 @@
 use super::ElderDuties;
 use crate::{ElderState, Network, NodeInfo, Result};
 
-use crate::{node::node_ops:: Error};
+use crate::{node::node_ops::NetworkDuties, Error};
 use log::{debug, info};
 use sn_data_types::PublicKey;
 use sn_routing::Prefix;
@@ -55,7 +55,7 @@ impl ElderConstellation {
         &mut self,
         prefix: Prefix,
         new_section_key: PublicKey,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         let elder_state = self.duties.state();
 
         if new_section_key == elder_state.section_public_key()
@@ -92,7 +92,7 @@ impl ElderConstellation {
         node_info: &NodeInfo,
         previous_key: PublicKey,
         new_key: PublicKey,
-    ) -> Result<Vec<NetworkDuty>> {
+    ) -> Result<NetworkDuties> {
         if new_key == previous_key {
             return Err(Error::InvalidOperation(
                 "new_key == previous_key".to_string(),
@@ -108,7 +108,7 @@ impl ElderConstellation {
             return Ok(vec![]);
         }
 
-        let mut ops = Vec::new();
+        let mut ops: NetworkDuties = Vec::new();
         // pop the pending change..
         let change = self.pending_changes.remove(0);
 
@@ -129,21 +129,21 @@ impl ElderConstellation {
         if &change.prefix != old_elder_state.prefix() {
             info!("Split occurred");
             info!("New prefix is: {:?}", change.prefix);
-            match self.duties.split_section(change.prefix).await? {
-                vec![] => (),
-                op => ops.push(op),
+            let duties = self.duties.split_section(change.prefix).await?;
+            if duties.len() > 0 {
+                ops.extend(duties)
             };
         }
 
         // if changes have queued up, make sure the queue is worked down
         if !self.pending_changes.is_empty() {
             let change = self.pending_changes.remove(0);
-            ops.push(
+            ops.extend(
                 self.initiate_elder_change(change.prefix, change.section_key)
                     .await?,
             );
         }
 
-        Ok(ops.into())
+        Ok(ops)
     }
 }

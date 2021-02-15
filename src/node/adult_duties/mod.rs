@@ -12,7 +12,7 @@ use self::chunks::Chunks;
 use crate::{
     node::node_ops::{
         AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
-        ChunkStoreDuty, IntoNodeOp,
+        ChunkStoreDuty, NetworkDuties, NetworkDuty,
     },
     AdultState, NodeInfo, Result,
 };
@@ -36,25 +36,29 @@ impl AdultDuties {
         &self.state
     }
 
-    pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<Vec<NetworkDuty>> {
+    pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<NetworkDuties> {
         use AdultDuty::*;
         use ChunkReplicationCmd::*;
         use ChunkReplicationDuty::*;
         use ChunkReplicationQuery::*;
         use ChunkStoreDuty::*;
-        let result: Result<Vec<NetworkDuty>> = match duty {
+        let result: Result<NetworkDuties> = match duty {
             RunAsChunkStore(chunk_duty) => match chunk_duty {
                 ReadChunk { read, id, origin } => {
-                    let mut ops = vec![];
-                    ops.push(self.chunks.read(&read, id, origin).await.convert());
-                    ops.push(self.chunks.check_storage().await);
-                    Ok(ops.into())
+                    let mut ops: NetworkDuties = vec![];
+                    ops.push(NetworkDuty::from(
+                        self.chunks.read(&read, id, origin).await?,
+                    ));
+                    ops.extend(self.chunks.check_storage().await?);
+                    Ok(ops)
                 }
                 WriteChunk { write, id, origin } => {
-                    let mut ops = vec![];
-                    ops.push(self.chunks.write(&write, id, origin).await.convert());
-                    ops.push(self.chunks.check_storage().await);
-                    Ok(ops.into())
+                    let mut ops: NetworkDuties = vec![];
+                    ops.push(NetworkDuty::from(
+                        self.chunks.write(&write, id, origin).await?,
+                    ));
+                    ops.extend(self.chunks.check_storage().await?);
+                    Ok(ops)
                 }
                 ChunkStoreDuty::NoOp => return Ok(vec![]),
             },
@@ -63,20 +67,20 @@ impl AdultDuties {
                     query: GetChunk(address),
                     msg_id,
                     origin,
-                } => self
-                    .chunks
-                    .get_chunk_for_replication(address, msg_id, origin)
-                    .await
-                    .convert(),
+                } => Ok(NetworkDuties::from(
+                    self.chunks
+                        .get_chunk_for_replication(address, msg_id, origin)
+                        .await?,
+                )),
                 ProcessCmd { cmd, msg_id, .. } => match cmd {
-                    StoreReplicatedBlob(blob) => {
-                        self.chunks.store_replicated_chunk(blob).await.convert()
-                    }
+                    StoreReplicatedBlob(blob) => Ok(NetworkDuties::from(
+                        self.chunks.store_replicated_chunk(blob).await?,
+                    )),
                     ReplicateChunk {
                         //section_authority,
                         address,
                         current_holders,
-                    } => self
+                    } => Ok(NetworkDuties::from(self
                         .chunks
                         .replicate_chunk(
                             address,
@@ -86,7 +90,7 @@ impl AdultDuties {
                             //origin,
                         )
                         .await
-                        .convert(),
+                        ?),
                 },
                 ChunkReplicationDuty::NoOp => return Ok(vec![]),
             },

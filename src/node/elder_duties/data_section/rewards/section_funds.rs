@@ -10,7 +10,7 @@ use super::validator::Validator;
 use crate::{
     node::{
         elder_duties::data_section::ElderSigning,
-        node_ops::{NodeMessagingDuty,  OutgoingMsg},
+        node_ops::{NetworkDuties, NodeMessagingDuty, OutgoingMsg},
     },
     ElderState, Error, Result,
 };
@@ -249,7 +249,7 @@ impl SectionFunds {
     /// As all Replicas have accumulated the distributed
     /// actor cmds and applied them, they'll send out the
     /// result, which each actor instance accumulates locally.
-    pub async fn receive(&mut self, validation: TransferValidated) -> Result<Vec<NetworkDuty>> {
+    pub async fn receive(&mut self, validation: TransferValidated) -> Result<NetworkDuties> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
         if let Some(event) = self.actor.receive(validation)? {
@@ -278,25 +278,25 @@ impl SectionFunds {
             // If there are queued payouts,
             // the first in queue will be executed.
             // (NB: If we were transitioning, we cannot do this until Transfers has transitioned as well!)
-            let mut queued_op = vec![];
+            let mut queued_ops = vec![];
             if !transitioned {
-                queued_op = self.try_pop_queue().await?;
+                queued_ops = self.try_pop_queue().await?;
             }
 
             // We ask of our Replicas to register this transfer.
-            let reg_op = NodeMessagingDuty::Send(OutgoingMsg {
+            let reg_op = NetworkDuties::from( NodeMessagingDuty::Send(OutgoingMsg {
                 msg: Message::NodeCmd {
                     cmd: Transfers(RegisterSectionPayout(proof)),
                     id: MessageId::new(),
                 },
                 dst: DstLocation::Section(self.actor.id().into()),
                 to_be_aggregated: false, // TODO: aggregate here (not needed, but makes sn_node logs less chatty..)
-            })
-            .into();
+            }));
 
             // First register the transfer, then
             // carry out the first queued payout.
-            Ok(vec![reg_op, queued_op].into())
+            register_op.extend(queued_ops);
+            Ok(register_op)
         } else {
             Ok(vec![])
         }
@@ -304,7 +304,7 @@ impl SectionFunds {
 
     // Can safely be called without overwriting any
     // payout in flight, since validations for that are made.
-    async fn try_pop_queue(&mut self) -> Result<Vec<NetworkDuty>> {
+    async fn try_pop_queue(&mut self) -> Result<NetworkDuties> {
         if let Some(payout) = self.state.queued_payouts.pop_front() {
             // Validation logic when inititating rewards prevents enqueueing a payout that is already
             // in the finished set. Therefore, calling initiate here cannot return None because of
@@ -321,7 +321,7 @@ impl SectionFunds {
                         self.state.queued_payouts.insert(0, payout);
                     }
                 }
-                op => return Ok(op.into()),
+                op => return Ok(NetworkDuties::from(op)),
             }
         }
 

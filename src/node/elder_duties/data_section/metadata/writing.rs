@@ -10,7 +10,7 @@ use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::node::node_ops::{IntoNodeOp, NodeMessagingDuty, };
+use crate::node::node_ops::{NetworkDuties, NetworkDuty, NodeMessagingDuty};
 use crate::Result;
 use log::info;
 use sn_messaging::{
@@ -23,24 +23,25 @@ pub(super) async fn get_result(
     msg_id: MessageId,
     origin: EndUser,
     stores: &mut ElderStores,
-) -> Result<Vec<NetworkDuty>> {
+) -> Result<NetworkDuties> {
     use DataCmd::*;
     info!("Writing Data");
-    match cmd {
+    let duty = match cmd {
         Blob(write) => {
             info!("Writing Blob");
-            blob(write, stores.blob_register_mut(), msg_id, origin).await
+            blob(write, stores.blob_register_mut(), msg_id, origin).await?
         }
         Map(write) => {
             info!("Writing Map");
-            map(write, stores.map_storage_mut(), msg_id, origin).await
+            map(write, stores.map_storage_mut(), msg_id, origin).await?
         }
         Sequence(write) => {
             info!("Writing Sequence");
-            sequence(write, stores.sequence_storage_mut(), msg_id, origin).await
+            sequence(write, stores.sequence_storage_mut(), msg_id, origin).await?
         }
-    }
-    .convert()
+    };
+
+    Ok(NetworkDuties::from(duty))
 }
 
 async fn blob(

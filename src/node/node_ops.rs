@@ -9,7 +9,7 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
-use crate::Result;
+use crate::{Network, Result};
 use sn_data_types::{
     Blob, BlobAddress, Credit, CreditAgreementProof, PublicKey, ReplicaEvent, SignatureShare,
     SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
@@ -22,19 +22,6 @@ use sn_routing::{Event as RoutingEvent, Prefix};
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use xor_name::XorName;
-
-pub trait IntoNodeOp {
-    fn convert(self) -> Result<Vec<NetworkDuty>>;
-}
-
-impl IntoNodeOp for Result<NodeMessagingDuty> {
-    fn convert(self) -> Result<Vec<NetworkDuty>> {
-        match self? {
-            NodeMessagingDuty::NoOp => Ok(vec![]),
-            op => Ok(op.into()),
-        }
-    }
-}
 
 /// Internal messages are what is passed along
 /// within a node, between the entry point and
@@ -49,6 +36,8 @@ impl IntoNodeOp for Result<NodeMessagingDuty> {
 /// module, by which it leaves the process boundary of this node
 /// and is sent on the wire to some other destination(s) on the network.
 
+/// Vec of NetworkDuty
+pub type NetworkDuties = Vec<NetworkDuty>;
 
 /// All duties carried out by
 /// a node in the network.
@@ -116,10 +105,21 @@ pub enum NodeDuty {
     StorageFull,
 }
 
-impl Into<Vec<NetworkDuty>> for NodeDuty {
-    fn into(self) -> Vec<NetworkDuty> {
+impl From<NodeDuty> for NetworkDuties {
+    fn from(duty: NodeDuty) -> Self {
         use NetworkDuty::*;
-        Single(RunAsNode(self))
+        if matches!(duty, NodeDuty::NoOp) {
+            vec![]
+        } else {
+            vec![RunAsNode(duty)]
+        }
+    }
+}
+
+impl From<NodeDuty> for NetworkDuty {
+    fn from(duty: NodeDuty) -> Self {
+        use NetworkDuty::*;
+        RunAsNode(duty)
     }
 }
 
@@ -173,6 +173,26 @@ pub enum NodeMessagingDuty {
     NoOp,
 }
 
+impl From<NodeMessagingDuty> for NetworkDuties {
+    fn from(duty: NodeMessagingDuty) -> Self {
+        use NetworkDuty::*;
+        use NodeDuty::*;
+        if matches!(duty, NodeMessagingDuty::NoOp) {
+            vec![]
+        } else {
+            vec![RunAsNode(ProcessMessaging(duty))]
+        }
+    }
+}
+
+impl From<NodeMessagingDuty> for NetworkDuty {
+    fn from(duty: NodeMessagingDuty) -> Self {
+        use NetworkDuty::*;
+        use NodeDuty::*;
+        RunAsNode(ProcessMessaging(duty))
+    }
+}
+
 impl Debug for NodeMessagingDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -221,13 +241,21 @@ pub enum ElderDuty {
     SwitchNodeJoin(bool),
 }
 
-impl Into<Vec<NetworkDuty>> for ElderDuty {
-    fn into(self) -> Vec<NetworkDuty> {
-        if matches!(self, ElderDuty::NoOp) {
+impl From<ElderDuty> for NetworkDuties {
+    fn from(duty: ElderDuty) -> Self {
+        use NetworkDuty::*;
+        if matches!(duty, ElderDuty::NoOp) {
             vec![]
         } else {
-            Single(RunAsElder(self))
+            vec![RunAsElder(duty)]
         }
+    }
+}
+
+impl From<ElderDuty> for NetworkDuty {
+    fn from(duty: ElderDuty) -> Self {
+        use NetworkDuty::*;
+        RunAsElder(duty)
     }
 }
 
@@ -243,14 +271,21 @@ pub enum AdultDuty {
     NoOp,
 }
 
-impl Into<Vec<NetworkDuty>> for AdultDuty {
-    fn into(self) -> Vec<NetworkDuty> {
+impl From<AdultDuty> for NetworkDuties {
+    fn from(duty: AdultDuty) -> Self {
         use NetworkDuty::*;
-        if matches!(self, AdultDuty::NoOp) {
+        if matches!(duty, AdultDuty::NoOp) {
             vec![]
         } else {
-            Single(RunAsAdult(self))
+            vec![RunAsAdult(duty)]
         }
+    }
+}
+
+impl From<AdultDuty> for NetworkDuty {
+    fn from(duty: AdultDuty) -> Self {
+        use NetworkDuty::*;
+        RunAsAdult(duty)
     }
 }
 
@@ -264,14 +299,14 @@ pub enum KeySectionDuty {
     NoOp,
 }
 
-impl Into<Vec<NetworkDuty>> for KeySectionDuty {
-    fn into(self) -> Vec<NetworkDuty> {
+impl From<KeySectionDuty> for NetworkDuties {
+    fn from(duty: KeySectionDuty) -> Self {
         use ElderDuty::*;
         use NetworkDuty::*;
-        if matches!(self, KeySectionDuty::NoOp) {
+        if matches!(duty, KeySectionDuty::NoOp) {
             vec![]
         } else {
-            Single(RunAsElder(RunAsKeySection(self)))
+            vec![RunAsElder(RunAsKeySection(duty))]
         }
     }
 }
@@ -320,15 +355,15 @@ pub enum MetadataDuty {
     NoOp,
 }
 
-impl Into<Vec<NetworkDuty>> for MetadataDuty {
-    fn into(self) -> Vec<NetworkDuty> {
+impl From<MetadataDuty> for NetworkDuties {
+    fn from(duty: MetadataDuty) -> Self {
         use DataSectionDuty::*;
         use ElderDuty::*;
         use NetworkDuty::*;
-        if matches!(self, MetadataDuty::NoOp) {
+        if matches!(duty, MetadataDuty::NoOp) {
             vec![]
         } else {
-            Single(RunAsElder(RunAsDataSection(RunAsMetadata(self))))
+            vec![RunAsElder(RunAsDataSection(RunAsMetadata(duty)))]
         }
     }
 }
@@ -492,16 +527,25 @@ pub enum RewardQuery {
     GetSectionWalletHistory,
 }
 
-impl Into<Vec<NetworkDuty>> for RewardDuty {
-    fn into(self) -> Vec<NetworkDuty> {
+impl From<RewardDuty> for NetworkDuties {
+    fn from(duty: RewardDuty) -> Self {
         use DataSectionDuty::*;
         use ElderDuty::*;
         use NetworkDuty::*;
-        if matches!(self, RewardDuty::NoOp) {
+        if matches!(duty, RewardDuty::NoOp) {
             vec![]
         } else {
-            Single(RunAsElder(RunAsDataSection(RunAsRewards(self))))
+            vec![RunAsElder(RunAsDataSection(RunAsRewards(duty)))]
         }
+    }
+}
+
+impl From<RewardDuty> for NetworkDuty {
+    fn from(duty: RewardDuty) -> Self {
+        use DataSectionDuty::*;
+        use ElderDuty::*;
+        use NetworkDuty::*;
+        RunAsElder(RunAsDataSection(RunAsRewards(duty)))
     }
 }
 
@@ -531,15 +575,15 @@ pub enum TransferDuty {
     NoOp,
 }
 
-impl Into<Vec<NetworkDuty>> for TransferDuty {
-    fn into(self) -> Vec<NetworkDuty> {
+impl From<TransferDuty> for NetworkDuties {
+    fn from(duty: TransferDuty) -> Self {
         use ElderDuty::*;
         use KeySectionDuty::*;
         use NetworkDuty::*;
-        if matches!(self, TransferDuty::NoOp) {
+        if matches!(duty, TransferDuty::NoOp) {
             vec![]
         } else {
-            Single(RunAsElder(RunAsKeySection(RunAsTransfers(self))))
+            vec![RunAsElder(RunAsKeySection(RunAsTransfers(duty)))]
         }
     }
 }
