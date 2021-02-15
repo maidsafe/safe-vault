@@ -12,7 +12,7 @@ use self::chunks::Chunks;
 use crate::{
     node::node_ops::{
         AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
-        ChunkStoreDuty, IntoNodeOp, NodeOperation,
+        ChunkStoreDuty, IntoNodeOp,
     },
     AdultState, NodeInfo, Result,
 };
@@ -36,13 +36,13 @@ impl AdultDuties {
         &self.state
     }
 
-    pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<NodeOperation> {
+    pub async fn process_adult_duty(&mut self, duty: AdultDuty) -> Result<Vec<NetworkDuty>> {
         use AdultDuty::*;
         use ChunkReplicationCmd::*;
         use ChunkReplicationDuty::*;
         use ChunkReplicationQuery::*;
         use ChunkStoreDuty::*;
-        let result: Result<NodeOperation> = match duty {
+        let result: Result<Vec<NetworkDuty>> = match duty {
             RunAsChunkStore(chunk_duty) => match chunk_duty {
                 ReadChunk { read, id, origin } => {
                     let mut ops = vec![];
@@ -56,7 +56,7 @@ impl AdultDuties {
                     ops.push(self.chunks.check_storage().await);
                     Ok(ops.into())
                 }
-                ChunkStoreDuty::NoOp => return Ok(NodeOperation::NoOp),
+                ChunkStoreDuty::NoOp => return Ok(vec![]),
             },
             RunAsChunkReplication(replication_duty) => match replication_duty {
                 ProcessQuery {
@@ -88,9 +88,9 @@ impl AdultDuties {
                         .await
                         .convert(),
                 },
-                ChunkReplicationDuty::NoOp => return Ok(NodeOperation::NoOp),
+                ChunkReplicationDuty::NoOp => return Ok(vec![]),
             },
-            _ => return Ok(NodeOperation::NoOp),
+            _ => return Ok(vec![]),
         };
 
         result

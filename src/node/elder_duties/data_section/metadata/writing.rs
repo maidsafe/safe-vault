@@ -10,7 +10,7 @@ use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::node::node_ops::{IntoNodeOp, NodeMessagingDuty, NodeOperation};
+use crate::node::node_ops::{IntoNodeOp, NodeMessagingDuty, };
 use crate::Result;
 use log::info;
 use sn_messaging::{
@@ -23,7 +23,7 @@ pub(super) async fn get_result(
     msg_id: MessageId,
     origin: EndUser,
     stores: &mut ElderStores,
-) -> Result<NodeOperation> {
+) -> Result<Vec<NetworkDuty>> {
     use DataCmd::*;
     info!("Writing Data");
     match cmd {

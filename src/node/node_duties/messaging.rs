@@ -9,7 +9,7 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    node::node_ops::{NodeMessagingDuty, NodeOperation, OutgoingMsg},
+    node::node_ops::{NodeMessagingDuty,  OutgoingMsg},
     Error,
 };
 use crate::{Network, Result};
@@ -31,16 +31,16 @@ impl Messaging {
     pub async fn process_messaging_duty(
         &mut self,
         duty: NodeMessagingDuty,
-    ) -> Result<NodeOperation> {
+    ) -> Result<Vec<NetworkDuty>> {
         use NodeMessagingDuty::*;
         match duty {
             Send(msg) => self.send(msg).await,
             SendToAdults { targets, msg } => self.send_to_nodes(targets, &msg).await,
-            NoOp => Ok(NodeOperation::NoOp),
+            NoOp => Ok(vec![]),
         }
     }
 
-    async fn send(&mut self, msg: OutgoingMsg) -> Result<NodeOperation> {
+    async fn send(&mut self, msg: OutgoingMsg) -> Result<Vec<NetworkDuty>> {
         let src = if msg.to_be_aggregated {
             SrcLocation::Section(self.network.our_prefix().await)
         } else {
@@ -56,7 +56,7 @@ impl Messaging {
                 error!("Unable to send msg: {:?}", err);
                 Err(Error::Logic(format!("Unable to send msg: {:?}", msg.id())))
             },
-            |()| Ok(NodeOperation::NoOp),
+            |()| Ok(vec![]),
         )
     }
 
@@ -64,7 +64,7 @@ impl Messaging {
         &mut self,
         targets: BTreeSet<XorName>,
         msg: &Message,
-    ) -> Result<NodeOperation> {
+    ) -> Result<Vec<NetworkDuty>> {
         let name = self.network.our_name().await;
         let bytes = &msg.serialize()?;
         for target in targets {
@@ -82,6 +82,6 @@ impl Messaging {
                     |()| {},
                 );
         }
-        Ok(NodeOperation::NoOp)
+        Ok(vec![])
     }
 }

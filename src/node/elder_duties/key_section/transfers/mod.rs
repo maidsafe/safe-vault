@@ -18,7 +18,7 @@ use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
     node::node_ops::{
-        IntoNodeOp, NodeMessagingDuty, NodeOperation, OutgoingMsg, TransferCmd, TransferDuty,
+        IntoNodeOp, NodeMessagingDuty,  OutgoingMsg, TransferCmd, TransferDuty,
         TransferQuery,
     },
     utils, Error, Result,
@@ -94,7 +94,7 @@ impl Transfers {
     /// Issues a query to existing Replicas
     /// asking for their events, as to catch up and
     /// start working properly in the group.
-    pub async fn catchup_with_replicas(&self) -> Result<NodeOperation> {
+    pub async fn catchup_with_replicas(&self) -> Result<Vec<NetworkDuty>> {
         info!("Transfers: Catching up with transfer Replicas!");
         // prepare replica init
         let pub_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
@@ -125,7 +125,7 @@ impl Transfers {
 
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
-    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NodeOperation> {
+    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<Vec<NetworkDuty>> {
         trace!("Processing transfer duty");
         use TransferDuty::*;
         match duty {
@@ -139,7 +139,7 @@ impl Transfers {
                 msg_id,
                 origin,
             } => self.process_cmd(cmd, *msg_id, *origin).await,
-            NoOp => Ok(NodeOperation::NoOp),
+            NoOp => Ok(vec![]),
         }
     }
 
@@ -148,7 +148,7 @@ impl Transfers {
         query: &TransferQuery,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<NodeOperation> {
+    ) -> Result<Vec<NetworkDuty>> {
         use TransferQuery::*;
         let result = match query {
             GetNewSectionWallet(wallet_id) => {
@@ -176,7 +176,7 @@ impl Transfers {
         cmd: &TransferCmd,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<NodeOperation> {
+    ) -> Result<Vec<NetworkDuty>> {
         use TransferCmd::*;
         debug!("Processing cmd in Transfers mod");
         let result = match cmd {
@@ -634,13 +634,13 @@ impl Transfers {
         proof: &TransferAgreementProof,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<NodeOperation> {
+    ) -> Result<Vec<NetworkDuty>> {
         use NodeCmd::*;
         use NodeEvent::*;
         use NodeTransferCmd::*;
         match self.replicas.register(proof).await {
             Ok(event) => {
-                let mut ops: Vec<NodeOperation> = vec![];
+                let mut ops: Vec<Vec<NetworkDuty>> = vec![];
                 // notify sending section
                 let location = event.transfer_proof.sender().into();
                 ops.push(

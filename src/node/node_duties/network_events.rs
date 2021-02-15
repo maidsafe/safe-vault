@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::ReceivedMsgAnalysis;
-use crate::node::node_ops::{ElderDuty, NodeDuty, NodeOperation};
+use crate::node::node_ops::{ElderDuty, NodeDuty};
 use crate::{Network, Result};
 use hex_fmt::HexFmt;
 use log::{info, trace};
@@ -51,7 +51,7 @@ impl NetworkEvents {
         &mut self,
         event: RoutingEvent,
         network: &Network,
-    ) -> Result<NodeOperation> {
+    ) -> Result<Vec<NetworkDuty>> {
         use ElderDuty::*;
         trace!("Processing Routing Event: {:?}", event);
         match event {
@@ -74,16 +74,15 @@ impl NetworkEvents {
                 //self.log_node_counts().await;
                 if let Some(prev_name) = previous_name {
                     trace!("The new member is a Relocated Node");
-                    let first: NodeOperation = ProcessRelocatedMember {
+                    let first = ProcessRelocatedMember {
                         old_node_id: XorName(prev_name.0),
                         new_node_id: XorName(name.0),
                         age,
-                    }
-                    .into();
+                    };
 
                     // Switch joins_allowed off a new adult joining.
-                    let second: NodeOperation = SwitchNodeJoin(false).into();
-                    Ok(vec![first, second].into())
+                    let second = SwitchNodeJoin(false).into();
+                    Ok(vec![first, second])
                 } else {
                     trace!("New node has just joined the network and is a fresh node.",);
                     Ok(ProcessNewMember(XorName(name.0)).into())
@@ -115,7 +114,7 @@ impl NetworkEvents {
                 let initial_op = match self_status_change {
                     NodeElderChange::Promoted => NodeDuty::AssumeElderDuties.into(),
                     NodeElderChange::Demoted => NodeDuty::AssumeAdultDuties.into(),
-                    NodeElderChange::None => NodeOperation::NoOp,
+                    NodeElderChange::None => vec![],
                 };
                 let ops = vec![
                     initial_op,
@@ -138,11 +137,11 @@ impl NetworkEvents {
                     Ok(NodeDuty::AssumeAdultDuties.into())
                 } else {
                     info!("Our AGE: {:?}", age);
-                    Ok(NodeOperation::NoOp)
+                    Ok(vec![])
                 }
             }
             // Ignore all other events
-            _ => Ok(NodeOperation::NoOp),
+            _ => Ok(vec![]),
         }
     }
 }

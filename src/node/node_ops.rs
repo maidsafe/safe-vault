@@ -24,13 +24,13 @@ use std::fmt::Debug;
 use xor_name::XorName;
 
 pub trait IntoNodeOp {
-    fn convert(self) -> Result<NodeOperation>;
+    fn convert(self) -> Result<Vec<NetworkDuty>>;
 }
 
 impl IntoNodeOp for Result<NodeMessagingDuty> {
-    fn convert(self) -> Result<NodeOperation> {
+    fn convert(self) -> Result<Vec<NetworkDuty>> {
         match self? {
-            NodeMessagingDuty::NoOp => Ok(NodeOperation::NoOp),
+            NodeMessagingDuty::NoOp => Ok(vec![]),
             op => Ok(op.into()),
         }
     }
@@ -49,55 +49,6 @@ impl IntoNodeOp for Result<NodeMessagingDuty> {
 /// module, by which it leaves the process boundary of this node
 /// and is sent on the wire to some other destination(s) on the network.
 
-/// The main operation type
-/// which encompasses all duties
-/// carried out by the node in the network.
-#[derive(Debug)]
-pub enum NodeOperation {
-    /// A single operation.
-    Single(NetworkDuty),
-    /// Multiple operations, that will
-    /// be carried out sequentially.
-    Multiple(Vec<NetworkDuty>),
-    // No op.
-    NoOp,
-}
-
-impl NodeOperation {
-    fn from_many(ops: Vec<NodeOperation>) -> NodeOperation {
-        use NodeOperation::*;
-        if ops.is_empty() {
-            return NoOp;
-        }
-        if ops.len() == 1 {
-            let mut ops = ops;
-            return ops.remove(0);
-        }
-        let multiple = ops
-            .into_iter()
-            .map(|c| match c {
-                Single(duty) => vec![duty],
-                Multiple(duties) => duties,
-                NoOp => vec![],
-            })
-            .flatten()
-            .collect();
-        Multiple(multiple)
-    }
-}
-
-impl Into<NodeOperation> for Vec<NodeOperation> {
-    fn into(self) -> NodeOperation {
-        NodeOperation::from_many(self.into_iter().collect())
-    }
-}
-
-impl Into<NodeOperation> for Vec<Result<NodeOperation>> {
-    /// NB: This drops errors!
-    fn into(self) -> NodeOperation {
-        NodeOperation::from_many(self.into_iter().flatten().collect())
-    }
-}
 
 /// All duties carried out by
 /// a node in the network.
@@ -165,10 +116,9 @@ pub enum NodeDuty {
     StorageFull,
 }
 
-impl Into<NodeOperation> for NodeDuty {
-    fn into(self) -> NodeOperation {
+impl Into<Vec<NetworkDuty>> for NodeDuty {
+    fn into(self) -> Vec<NetworkDuty> {
         use NetworkDuty::*;
-        use NodeOperation::*;
         Single(RunAsNode(self))
     }
 }
@@ -223,19 +173,6 @@ pub enum NodeMessagingDuty {
     NoOp,
 }
 
-impl From<NodeMessagingDuty> for NodeOperation {
-    fn from(duty: NodeMessagingDuty) -> Self {
-        use NetworkDuty::*;
-        use NodeDuty::*;
-        use NodeOperation::*;
-        if matches!(duty, NodeMessagingDuty::NoOp) {
-            NodeOperation::NoOp
-        } else {
-            Single(RunAsNode(ProcessMessaging(duty)))
-        }
-    }
-}
-
 impl Debug for NodeMessagingDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -284,12 +221,10 @@ pub enum ElderDuty {
     SwitchNodeJoin(bool),
 }
 
-impl Into<NodeOperation> for ElderDuty {
-    fn into(self) -> NodeOperation {
-        use NetworkDuty::*;
-        use NodeOperation::*;
+impl Into<Vec<NetworkDuty>> for ElderDuty {
+    fn into(self) -> Vec<NetworkDuty> {
         if matches!(self, ElderDuty::NoOp) {
-            NodeOperation::NoOp
+            vec![]
         } else {
             Single(RunAsElder(self))
         }
@@ -308,12 +243,11 @@ pub enum AdultDuty {
     NoOp,
 }
 
-impl Into<NodeOperation> for AdultDuty {
-    fn into(self) -> NodeOperation {
+impl Into<Vec<NetworkDuty>> for AdultDuty {
+    fn into(self) -> Vec<NetworkDuty> {
         use NetworkDuty::*;
-        use NodeOperation::*;
         if matches!(self, AdultDuty::NoOp) {
-            NodeOperation::NoOp
+            vec![]
         } else {
             Single(RunAsAdult(self))
         }
@@ -330,13 +264,12 @@ pub enum KeySectionDuty {
     NoOp,
 }
 
-impl Into<NodeOperation> for KeySectionDuty {
-    fn into(self) -> NodeOperation {
+impl Into<Vec<NetworkDuty>> for KeySectionDuty {
+    fn into(self) -> Vec<NetworkDuty> {
         use ElderDuty::*;
         use NetworkDuty::*;
-        use NodeOperation::*;
         if matches!(self, KeySectionDuty::NoOp) {
-            NodeOperation::NoOp
+            vec![]
         } else {
             Single(RunAsElder(RunAsKeySection(self)))
         }
@@ -387,14 +320,13 @@ pub enum MetadataDuty {
     NoOp,
 }
 
-impl Into<NodeOperation> for MetadataDuty {
-    fn into(self) -> NodeOperation {
+impl Into<Vec<NetworkDuty>> for MetadataDuty {
+    fn into(self) -> Vec<NetworkDuty> {
         use DataSectionDuty::*;
         use ElderDuty::*;
         use NetworkDuty::*;
-        use NodeOperation::*;
         if matches!(self, MetadataDuty::NoOp) {
-            NodeOperation::NoOp
+            vec![]
         } else {
             Single(RunAsElder(RunAsDataSection(RunAsMetadata(self))))
         }
@@ -560,14 +492,13 @@ pub enum RewardQuery {
     GetSectionWalletHistory,
 }
 
-impl Into<NodeOperation> for RewardDuty {
-    fn into(self) -> NodeOperation {
+impl Into<Vec<NetworkDuty>> for RewardDuty {
+    fn into(self) -> Vec<NetworkDuty> {
         use DataSectionDuty::*;
         use ElderDuty::*;
         use NetworkDuty::*;
-        use NodeOperation::*;
         if matches!(self, RewardDuty::NoOp) {
-            NodeOperation::NoOp
+            vec![]
         } else {
             Single(RunAsElder(RunAsDataSection(RunAsRewards(self))))
         }
@@ -600,14 +531,13 @@ pub enum TransferDuty {
     NoOp,
 }
 
-impl Into<NodeOperation> for TransferDuty {
-    fn into(self) -> NodeOperation {
+impl Into<Vec<NetworkDuty>> for TransferDuty {
+    fn into(self) -> Vec<NetworkDuty> {
         use ElderDuty::*;
         use KeySectionDuty::*;
         use NetworkDuty::*;
-        use NodeOperation::*;
         if matches!(self, TransferDuty::NoOp) {
-            NodeOperation::NoOp
+            vec![]
         } else {
             Single(RunAsElder(RunAsKeySection(RunAsTransfers(self))))
         }

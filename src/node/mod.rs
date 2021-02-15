@@ -16,7 +16,7 @@ use crate::{
     chunk_store::UsedSpace,
     node::{
         node_duties::NodeDuties,
-        node_ops::{NetworkDuty, NodeDuty, NodeOperation},
+        node_ops::{NetworkDuty, NodeDuty},
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup},
     },
     Config, Error, Network, NodeInfo, Result,
@@ -84,6 +84,7 @@ impl Node {
         use AgeGroup::*;
         let age = network_api.age().await;
         info!("Our Age: {:?}", age);
+        info!("Is genesis: {:?}", node_info.genesis);
 
         info!("Fetching Age bracket");
         let age_group = if !network_api.is_elder().await && age > MIN_AGE {
@@ -96,7 +97,7 @@ impl Node {
 
         let mut duties = NodeDuties::new(node_info, network_api.clone()).await?;
         let next_duty = match age_group {
-            Infant => Ok(NodeOperation::NoOp),
+            Infant => Ok(vec![]),
             Adult => {
                 info!("Starting as Adult");
                 duties
@@ -140,7 +141,7 @@ impl Node {
         info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             info!("New event received from the Network: {:?}", event);
-            self.process_while_any(Ok(NodeDuty::ProcessNetworkEvent(event).into()))
+            self.process_while_any(Ok(vec![NodeDuty::ProcessNetworkEvent(event)]))
                 .await;
         }
 
@@ -148,35 +149,27 @@ impl Node {
     }
 
     /// Keeps processing resulting node operations.
-    async fn process_while_any(&mut self, op: Result<NodeOperation>) {
-        use NodeOperation::*;
-        let mut next_op = op;
-        while let Ok(op) = next_op {
-            next_op = match op {
-                Single(operation) => match self.process(operation).await {
-                    Err(e) => {
-                        self.handle_error(&e);
-                        Ok(NoOp)
-                    }
-                    result => result,
-                },
-                Multiple(ops) => {
-                    let mut node_ops = Vec::new();
-                    for c in ops.into_iter() {
-                        match self.process(c).await {
-                            Ok(NoOp) => (),
-                            Ok(op) => node_ops.push(op),
-                            Err(e) => self.handle_error(&e),
-                        };
-                    }
-                    Ok(node_ops.into())
+    async fn process_while_any(&mut self, ops_vec: Result<Vec<NetworkDuty>>) {
+        let mut next_ops = ops_vec;
+
+        while let Ok(ops) = next_ops {
+            let mut pending_node_ops = Vec::new();
+
+            if ops.len() > 0 {
+                for duty in ops {
+                    match self.process(duty).await {
+                        Ok(new_ops) => pending_node_ops.extend(new_ops),
+                        Err(e) => self.handle_error(&e),
+                    };
                 }
-                NoOp => break,
+                next_ops = Ok(pending_node_ops);
+            } else {
+                break;
             }
         }
     }
 
-    async fn process(&mut self, duty: NetworkDuty) -> Result<NodeOperation> {
+    async fn process(&mut self, duty: NetworkDuty) -> Result<Vec<NetworkDuty>> {
         use NetworkDuty::*;
         match duty {
             RunAsAdult(duty) => {
@@ -192,14 +185,14 @@ impl Node {
                     duties.process_elder_duty(duty).await
                 } else if self.duties.try_enqueue_elder_duty(duty) {
                     info!("Enqueued Elder duty");
-                    Ok(NodeOperation::NoOp)
+                    Ok(vec![])
                 } else {
                     error!("Currently not an Elder!");
                     Err(Error::Logic("Currently not an Elder".to_string()))
                 }
             }
             RunAsNode(duty) => self.duties.process_node_duty(duty).await,
-            NoOp => Ok(NodeOperation::NoOp),
+            NoOp => Ok(vec![]),
         }
     }
 

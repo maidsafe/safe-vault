@@ -9,7 +9,7 @@
 use super::ElderDuties;
 use crate::{ElderState, Network, NodeInfo, Result};
 
-use crate::{node::node_ops::NodeOperation, Error};
+use crate::{node::node_ops:: Error};
 use log::{debug, info};
 use sn_data_types::PublicKey;
 use sn_routing::Prefix;
@@ -55,7 +55,7 @@ impl ElderConstellation {
         &mut self,
         prefix: Prefix,
         new_section_key: PublicKey,
-    ) -> Result<NodeOperation> {
+    ) -> Result<Vec<NetworkDuty>> {
         let elder_state = self.duties.state();
 
         if new_section_key == elder_state.section_public_key()
@@ -64,7 +64,7 @@ impl ElderConstellation {
                 .iter()
                 .any(|c| c.section_key == new_section_key)
         {
-            return Ok(NodeOperation::NoOp);
+            return Ok(vec![]);
         }
 
         info!("Elder change updates initiated");
@@ -76,7 +76,7 @@ impl ElderConstellation {
 
         // handle changes sequentially
         if self.pending_changes.len() > 1 {
-            return Ok(NodeOperation::NoOp);
+            return Ok(vec![]);
         }
 
         // 1. First we must update data section..
@@ -92,20 +92,20 @@ impl ElderConstellation {
         node_info: &NodeInfo,
         previous_key: PublicKey,
         new_key: PublicKey,
-    ) -> Result<NodeOperation> {
+    ) -> Result<Vec<NetworkDuty>> {
         if new_key == previous_key {
             return Err(Error::InvalidOperation(
                 "new_key == previous_key".to_string(),
             ));
         }
         if self.pending_changes.is_empty() {
-            return Ok(NodeOperation::NoOp);
+            return Ok(vec![]);
         }
         let old_elder_state = self.duties.state().clone();
         if old_elder_state.section_public_key() != previous_key
             || new_key != self.pending_changes[0].section_key
         {
-            return Ok(NodeOperation::NoOp);
+            return Ok(vec![]);
         }
 
         let mut ops = Vec::new();
@@ -130,7 +130,7 @@ impl ElderConstellation {
             info!("Split occurred");
             info!("New prefix is: {:?}", change.prefix);
             match self.duties.split_section(change.prefix).await? {
-                NodeOperation::NoOp => (),
+                vec![] => (),
                 op => ops.push(op),
             };
         }

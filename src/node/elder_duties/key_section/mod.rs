@@ -73,16 +73,16 @@ impl KeySection {
     /// Issues queries to Elders of the section
     /// as to catch up with shares state and
     /// start working properly in the group.
-    pub async fn catchup_with_section(&mut self) -> Result<NodeOperation> {
+    pub async fn catchup_with_section(&mut self) -> Result<Vec<NetworkDuty>> {
         // currently only at2 replicas need to catch up
         self.transfers.catchup_with_replicas().await
     }
 
-    pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<NodeOperation> {
+    pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<Vec<NetworkDuty>> {
         match self.elder_state.set_joins_allowed(joins_allowed).await {
             Ok(()) => {
                 info!("Successfully set joins_allowed to true");
-                Ok(NodeOperation::NoOp)
+                Ok(vec![])
             }
             Err(e) => Err(e),
         }
@@ -113,12 +113,12 @@ impl KeySection {
         self.transfers.split_section(prefix).await
     }
 
-    pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Result<NodeOperation> {
+    pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Result<Vec<NetworkDuty>> {
         trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
             RunAsTransfers(duty) => self.transfers.process_transfer_duty(&duty).await,
-            NoOp => Ok(NodeOperation::NoOp),
+            NoOp => Ok(vec![]),
         }
     }
 

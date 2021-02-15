@@ -8,9 +8,19 @@
 
 use crate::{
     node::node_ops::{
-        AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
-        ChunkStoreDuty, ElderDuty, MetadataDuty, NodeDuty, NodeOperation, RewardCmd, RewardDuty,
-        RewardQuery, TransferCmd, TransferDuty, TransferQuery,
+        AdultDuty,
+        ChunkReplicationCmd,
+        ChunkReplicationDuty,
+        ChunkReplicationQuery,
+        ElderDuty,
+        MetadataDuty,
+        NodeDuty,
+        RewardCmd,
+        RewardDuty, // ChunkStoreDuty
+        RewardQuery,
+        TransferCmd,
+        TransferDuty,
+        TransferQuery,
     },
     AdultState, Error, NodeState, Result,
 };
@@ -45,7 +55,7 @@ impl ReceivedMsgAnalysis {
         msg: Message,
         src: SrcLocation,
         dst: DstLocation,
-    ) -> Result<NodeOperation> {
+    ) -> Result<Vec<NetworkDuty>> {
         debug!("Evaluating received msg..");
         let msg_id = msg.id();
         if let SrcLocation::EndUser(origin) = src {
@@ -72,7 +82,7 @@ impl ReceivedMsgAnalysis {
         }
     }
 
-    fn match_user_sent_msg(&self, msg: Message, origin: EndUser) -> NodeOperation {
+    fn match_user_sent_msg(&self, msg: Message, origin: EndUser) -> Vec<NetworkDuty> {
         match msg {
             Message::Query {
                 query: Query::Data(query),
@@ -114,7 +124,7 @@ impl ReceivedMsgAnalysis {
     }
 
     /// (NB: No accumulation happening yet) Accumulated messages (i.e. src == section)
-    fn match_section_msg(&self, msg: Message, origin: SrcLocation) -> Result<NodeOperation> {
+    fn match_section_msg(&self, msg: Message, origin: SrcLocation) -> Result<Vec<NetworkDuty>> {
         debug!("Evaluating received msg for Section: {:?}", msg);
 
         let res = match &msg {
@@ -340,7 +350,7 @@ impl ReceivedMsgAnalysis {
         Ok(res)
     }
 
-    fn match_node_msg(&self, msg: Message, origin: SrcLocation) -> Result<NodeOperation> {
+    fn match_node_msg(&self, msg: Message, origin: SrcLocation) -> Result<Vec<NetworkDuty>> {
         debug!("Evaluating received msg for Node: {:?}", msg);
 
         let res = match &msg {
