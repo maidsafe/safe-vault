@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.13](https://github.com/maidsafe/sn_node/compare/v0.26.12...v0.26.13) (2021-02-15)
+
 ### [0.26.12](https://github.com/maidsafe/sn_node/compare/v0.26.11...v0.26.12) (2021-02-15)
 
 ### [0.26.11](https://github.com/maidsafe/sn_node/compare/v0.26.10...v0.26.11) (2021-02-11)
