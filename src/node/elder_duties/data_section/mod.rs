@@ -15,7 +15,7 @@ use self::{
 };
 use crate::{
     capacity::ChunkHolderDbs,
-    node::node_ops::{DataSectionDuty, NetworkDuties, NetworkDuty, RewardCmd, RewardDuty},
+    node::node_ops::{DataSectionDuty, NetworkDuties, RewardCmd, RewardDuty},
     node::NodeInfo,
     ElderState, Result,
 };

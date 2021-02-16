@@ -10,7 +10,7 @@ use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::node::node_ops::{NetworkDuties, NetworkDuty, NodeMessagingDuty};
+use crate::node::node_ops::{NetworkDuties, NodeMessagingDuty};
 use crate::Result;
 use log::info;
 use sn_messaging::{

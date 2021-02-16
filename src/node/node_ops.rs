@@ -9,7 +9,6 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
-use crate::{Network, Result};
 use sn_data_types::{
     Blob, BlobAddress, Credit, CreditAgreementProof, PublicKey, ReplicaEvent, SignatureShare,
     SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,

@@ -157,7 +157,7 @@ impl Node {
         while let Ok(ops) = next_ops {
             let mut pending_node_ops = Vec::new();
 
-            if ops.len() > 0 {
+            if !ops.is_empty() {
                 for duty in ops {
                     match self.process(duty).await {
                         Ok(new_ops) => pending_node_ops.extend(new_ops),

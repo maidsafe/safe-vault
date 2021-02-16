@@ -9,7 +9,7 @@
 use crate::{
     capacity::ChunkHolderDbs,
     error::convert_to_error_message,
-    node::node_ops::{NetworkDuties, NetworkDuty, NodeMessagingDuty, OutgoingMsg},
+    node::node_ops::{NetworkDuties, NodeMessagingDuty, OutgoingMsg},
     ElderState, Error, Result, ToDbKey,
 };
 use log::{info, trace, warn};

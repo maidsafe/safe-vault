@@ -130,7 +130,7 @@ impl ElderConstellation {
             info!("Split occurred");
             info!("New prefix is: {:?}", change.prefix);
             let duties = self.duties.split_section(change.prefix).await?;
-            if duties.len() > 0 {
+            if !duties.is_empty() {
                 ops.extend(duties)
             };
         }

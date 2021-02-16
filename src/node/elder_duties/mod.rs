@@ -12,7 +12,7 @@ mod key_section;
 use self::{data_section::DataSection, key_section::KeySection};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
-    node::node_ops::{ElderDuty, NetworkDuties, NetworkDuty},
+    node::node_ops::{ElderDuty, NetworkDuties},
     ElderState, NodeInfo, Result,
 };
 use log::trace;
