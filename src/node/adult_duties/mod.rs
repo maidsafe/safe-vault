@@ -80,17 +80,17 @@ impl AdultDuties {
                         //section_authority,
                         address,
                         current_holders,
-                    } => Ok(NetworkDuties::from(self
-                        .chunks
-                        .replicate_chunk(
-                            address,
-                            current_holders,
-                            //section_authority,
-                            msg_id,
-                            //origin,
-                        )
-                        .await
-                        ?),
+                    } => Ok(NetworkDuties::from(
+                        self.chunks
+                            .replicate_chunk(
+                                address,
+                                current_holders,
+                                //section_authority,
+                                msg_id,
+                                //origin,
+                            )
+                            .await?,
+                    )),
                 },
                 ChunkReplicationDuty::NoOp => return Ok(vec![]),
             },

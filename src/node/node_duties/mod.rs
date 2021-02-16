@@ -441,7 +441,7 @@ impl NodeDuties {
                     });
 
                     let cmd = NodeMessagingDuty::Send(OutgoingMsg {
-                        msg: NodeMessage::NodeCmd {
+                        msg: Message::NodeCmd {
                             cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
                                 signed_credit: signed_credit.clone(),
                                 sig: credit_sig_share,

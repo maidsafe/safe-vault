@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::msg_analysis::ReceivedMsgAnalysis;
-use crate::node::node_ops::{ElderDuty, NetworkDuties, NetworkDuty, NodeDuty };
+use crate::node::node_ops::{ElderDuty, NetworkDuties, NetworkDuty, NodeDuty};
 use crate::{Network, Result};
 use hex_fmt::HexFmt;
 use log::{info, trace};

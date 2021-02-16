@@ -284,7 +284,7 @@ impl SectionFunds {
             }
 
             // We ask of our Replicas to register this transfer.
-            let reg_op = NetworkDuties::from( NodeMessagingDuty::Send(OutgoingMsg {
+            let mut register_op = NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
                 msg: Message::NodeCmd {
                     cmd: Transfers(RegisterSectionPayout(proof)),
                     id: MessageId::new(),

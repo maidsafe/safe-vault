@@ -12,6 +12,7 @@ use crate::{
         ChunkReplicationCmd,
         ChunkReplicationDuty,
         ChunkReplicationQuery,
+        ChunkStoreDuty,
         ElderDuty,
         MetadataDuty,
         NetworkDuties,
@@ -61,7 +62,7 @@ impl ReceivedMsgAnalysis {
         let msg_id = msg.id();
         if let SrcLocation::EndUser(origin) = src {
             let res = self.match_user_sent_msg(msg.clone(), origin);
-            if let NodeOperation::NoOp = res {
+            if res.is_empty() {
                 return Err(Error::InvalidMessage(
                     msg_id,
                     format!("No match for user msg: {:?}", msg),
@@ -83,53 +84,46 @@ impl ReceivedMsgAnalysis {
         }
     }
 
-    fn match_user_sent_msg(&self, msg: Message, origin: EndUser) -> Vec<NetworkDuty> {
+    fn match_user_sent_msg(&self, msg: Message, origin: EndUser) -> NetworkDuties {
         match msg {
             Message::Query {
                 query: Query::Data(query),
                 id,
                 ..
-            } => Ok(NetworkDuties::from(MetadataDuty::ProcessRead {
-                query,
-                id,
-                origin,
-            })), // TODO: Fix these for type safety
+            } => NetworkDuties::from(MetadataDuty::ProcessRead { query, id, origin }), // TODO: Fix these for type safety
             Message::Cmd {
                 cmd: Cmd::Data { .. },
                 id,
                 ..
-            } => Ok(NetworkDuties::from(TransferDuty::ProcessCmd {
+            } => NetworkDuties::from(TransferDuty::ProcessCmd {
                 cmd: TransferCmd::ProcessPayment(msg.clone()),
                 msg_id: id,
                 origin: SrcLocation::EndUser(origin),
-            })),
+            }),
             Message::Cmd {
                 cmd: Cmd::Transfer(cmd),
                 id,
                 ..
-            } => Ok(NetworkDuties::from(TransferDuty::ProcessCmd {
+            } => NetworkDuties::from(TransferDuty::ProcessCmd {
                 cmd: cmd.into(),
                 msg_id: id,
                 origin: SrcLocation::EndUser(origin),
-            })),
+            }),
             Message::Query {
                 query: Query::Transfer(query),
                 id,
                 ..
-            } => Ok(NetworkDuties::from(TransferDuty::ProcessQuery {
+            } => NetworkDuties::from(TransferDuty::ProcessQuery {
                 query: query.into(),
                 msg_id: id,
                 origin: SrcLocation::EndUser(origin),
-            })),
-            _ => Err(Error::Logic(format!(
-                "Could not evaluate Client Msg {:?}",
-                msg
-            ))),
+            }),
+            _ => vec![],
         }
     }
 
     /// Accumulated messages (i.e. src == section)
-    fn match_section_msg(&self, msg: NodeMessage, origin: SrcLocation) -> Result<NetworkDuties> {
+    fn match_section_msg(&self, msg: Message, origin: SrcLocation) -> Result<NetworkDuties> {
         debug!("Evaluating received msg for Section: {:?}", msg);
 
         let res = match &msg {
