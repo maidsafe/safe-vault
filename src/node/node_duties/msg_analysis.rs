@@ -8,21 +8,9 @@
 
 use crate::{
     node::node_ops::{
-        AdultDuty,
-        ChunkReplicationCmd,
-        ChunkReplicationDuty,
-        ChunkReplicationQuery,
-        ChunkStoreDuty,
-        ElderDuty,
-        MetadataDuty,
-        NetworkDuties,
-        NodeDuty,
-        RewardCmd,
-        RewardDuty, // ChunkStoreDuty
-        RewardQuery,
-        TransferCmd,
-        TransferDuty,
-        TransferQuery,
+        AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
+        ChunkStoreDuty, ElderDuty, MetadataDuty, NetworkDuties, NodeDuty, RewardCmd, RewardDuty,
+        RewardQuery, TransferCmd, TransferDuty, TransferQuery,
     },
     AdultState, Error, NodeState, Result,
 };
@@ -75,8 +63,22 @@ impl ReceivedMsgAnalysis {
         }
 
         match &dst {
-            DstLocation::Section(_name) => self.match_section_msg(msg, src),
-            DstLocation::Node(_name) => self.match_node_msg(msg, src),
+            DstLocation::Section(_name) => {
+                let res = self.match_section_msg(msg.clone(), src)?;
+                if res.is_empty() {
+                    self.match_node_msg(msg, src)
+                } else {
+                    Ok(res)
+                }
+            }
+            DstLocation::Node(_name) => {
+                let res = self.match_node_msg(msg.clone(), src)?;
+                if res.is_empty() {
+                    self.match_section_msg(msg, src)
+                } else {
+                    Ok(res)
+                }
+            }
             _ => Err(Error::InvalidMessage(
                 msg_id,
                 format!("Invalid dst: {:?}", msg),
@@ -90,7 +92,7 @@ impl ReceivedMsgAnalysis {
                 query: Query::Data(query),
                 id,
                 ..
-            } => NetworkDuties::from(MetadataDuty::ProcessRead { query, id, origin }), // TODO: Fix these for type safety
+            } => NetworkDuties::from(MetadataDuty::ProcessRead { query, id, origin }),
             Message::Cmd {
                 cmd: Cmd::Data { .. },
                 id,
@@ -122,7 +124,7 @@ impl ReceivedMsgAnalysis {
         }
     }
 
-    /// Accumulated messages (i.e. src == section)
+    /// (NB: No accumulation happening yet) Accumulated messages (i.e. src == section)
     fn match_section_msg(&self, msg: Message, origin: SrcLocation) -> Result<NetworkDuties> {
         debug!("Evaluating received msg for Section: {:?}", msg);
 
@@ -338,12 +340,7 @@ impl ReceivedMsgAnalysis {
                 new_key: *to,
             }
             .into(),
-            _ => {
-                return Err(Error::Logic(format!(
-                    "Could not evaluate accumulated msg: {:?}",
-                    msg
-                )))
-            }
+            _ => vec![],
         };
 
         Ok(res)
