@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{Error, Result};
+use log::warn;
 use std::{path::Path, sync::Arc};
 use tokio::sync::Mutex;
 
@@ -132,7 +133,14 @@ mod inner {
         pub async fn reset(used_space: Arc<Mutex<UsedSpace>>) {
             let mut used_space_lock = used_space.lock().await;
             used_space_lock.total_value = 0;
-            used_space_lock.local_stores.clear();
+            for (_id, local_used_space) in used_space_lock.local_stores.iter_mut() {
+                local_used_space.local_value = 0;
+                if let Err(err) =
+                    Self::write_local_to_file(&mut local_used_space.local_record, 0).await
+                {
+                    warn!("Error updating used_space file on disk: {}", err);
+                }
+            }
         }
 
         /// Returns the maximum capacity (e.g. the maximum
