@@ -58,6 +58,7 @@ impl ChunkStorage {
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     cmd_origin: SrcLocation::EndUser(origin),
+                    target_section_pk: None,
                 },
                 dst: DstLocation::EndUser(origin),
                 to_be_aggregated: false, // TODO: to_be_aggregated: true,
@@ -109,6 +110,7 @@ impl ChunkStorage {
                 response: QueryResponse::GetBlob(result),
                 correlation_id: msg_id,
                 query_origin: SrcLocation::EndUser(origin),
+                target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
             to_be_aggregated: false, // TODO: to_be_aggregated: true,
@@ -130,6 +132,7 @@ impl ChunkStorage {
                 current_holders: current_holders.clone(),
             }),
             id: MessageId::new(),
+            target_section_pk: None,
         };
         info!("Sending NodeSystemQuery::GetChunk to existing holders");
 
@@ -157,6 +160,7 @@ impl ChunkStorage {
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
+                target_section_pk: None,
             },
             dst: origin.to_dst(),
             to_be_aggregated: false, // TODO: to_be_aggregated: true,
@@ -222,6 +226,7 @@ impl ChunkStorage {
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     cmd_origin: SrcLocation::EndUser(origin),
+                    target_section_pk: None,
                 },
                 dst: DstLocation::EndUser(origin),
                 to_be_aggregated: false, // TODO: to_be_aggregated: true,

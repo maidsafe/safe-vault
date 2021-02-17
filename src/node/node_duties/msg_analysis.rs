@@ -199,6 +199,7 @@ impl ReceivedMsgAnalysis {
                         current_holders: current_holders.clone(),
                     }),
                     id: msg_id,
+                    target_section_pk: None,
                 };
 
                 info!("Internal ChunkReplicationQuery ProcessQuery");
@@ -237,6 +238,7 @@ impl ReceivedMsgAnalysis {
                         new_node_id,
                     }),
                 id,
+                ..
             } => RewardDuty::ProcessQuery {
                 query: RewardQuery::GetNodeWalletId {
                     old_node_id: *old_node_id,
@@ -294,6 +296,7 @@ impl ReceivedMsgAnalysis {
             Message::NodeCmd {
                 cmd: NodeCmd::Transfers(NodeTransferCmd::PropagateTransfer(proof)),
                 id,
+                ..
             } => TransferDuty::ProcessCmd {
                 cmd: TransferCmd::PropagateTransfer(proof.credit_proof()),
                 msg_id: *id,
@@ -316,6 +319,7 @@ impl ReceivedMsgAnalysis {
             Message::NodeCmd {
                 cmd: NodeCmd::Transfers(NodeTransferCmd::RegisterSectionPayout(debit_agreement)),
                 id,
+                ..
             } => TransferDuty::ProcessCmd {
                 cmd: TransferCmd::RegisterSectionPayout(debit_agreement.clone()),
                 msg_id: *id,
@@ -326,6 +330,7 @@ impl ReceivedMsgAnalysis {
             Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetNewSectionWallet(public_key)),
                 id,
+                ..
             } => TransferDuty::ProcessQuery {
                 query: TransferQuery::GetNewSectionWallet(*public_key),
                 msg_id: *id,
@@ -433,6 +438,7 @@ impl ReceivedMsgAnalysis {
             Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
                 id,
+                ..
             } => TransferDuty::ProcessQuery {
                 query: TransferQuery::GetReplicaEvents,
                 msg_id: *id,
@@ -443,6 +449,7 @@ impl ReceivedMsgAnalysis {
             Message::NodeCmd {
                 cmd: NodeCmd::Transfers(NodeTransferCmd::ValidateSectionPayout(signed_transfer)),
                 id,
+                ..
             } => TransferDuty::ProcessCmd {
                 cmd: TransferCmd::ValidateSectionPayout(signed_transfer.clone()),
                 msg_id: *id,
@@ -453,6 +460,7 @@ impl ReceivedMsgAnalysis {
             Message::NodeQuery {
                 query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
                 id,
+                ..
             } => RewardDuty::ProcessQuery {
                 query: RewardQuery::GetSectionWalletHistory,
                 msg_id: *id,

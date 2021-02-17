@@ -118,6 +118,7 @@ impl SectionFunds {
             msg: Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetNewSectionWallet(new_wallet)),
                 id: MessageId::new(),
+                target_section_pk: None,
             },
             dst: DstLocation::Section(new_wallet.into()),
             to_be_aggregated: false, // TODO aggregate this
@@ -190,6 +191,7 @@ impl SectionFunds {
                                 self.actor.owner().public_key_set()?,
                             )?)),
                             id: MessageId::new(),
+                            target_section_pk: None,
                         },
                         dst: DstLocation::Section(self.actor.id().into()),
                         to_be_aggregated: false,
@@ -237,6 +239,7 @@ impl SectionFunds {
                             self.actor.owner().public_key_set()?,
                         )?)),
                         id: MessageId::new(),
+                        target_section_pk: None,
                     },
                     dst: DstLocation::Section(self.actor.id().into()),
                     to_be_aggregated: false,
@@ -288,6 +291,7 @@ impl SectionFunds {
                 msg: Message::NodeCmd {
                     cmd: Transfers(RegisterSectionPayout(proof)),
                     id: MessageId::new(),
+                    target_section_pk: None,
                 },
                 dst: DstLocation::Section(self.actor.id().into()),
                 to_be_aggregated: false, // TODO: aggregate here (not needed, but makes sn_node logs less chatty..)

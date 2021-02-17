@@ -84,9 +84,10 @@ impl BlobRegister {
                     return Ok(NodeMessagingDuty::Send(OutgoingMsg {
                         msg: Message::CmdError {
                             error: CmdError::Data(ErrorMessage::DataExists),
-                            id: MessageId::new(),
+                            id: MessageId::in_response_to(&msg_id),
                             cmd_origin: SrcLocation::EndUser(origin),
                             correlation_id: msg_id,
+                            target_section_pk: None,
                         },
                         dst: DstLocation::EndUser(origin),
                         to_be_aggregated: false,
@@ -134,6 +135,7 @@ impl BlobRegister {
                 origin,
             },
             id: msg_id,
+            target_section_pk: None,
         };
         Ok(NodeMessagingDuty::SendToAdults {
             targets: target_holders,
@@ -151,9 +153,10 @@ impl BlobRegister {
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::CmdError {
                 error: CmdError::Data(message_error),
-                id: MessageId::new(),
+                id: MessageId::in_response_to(&msg_id),
                 cmd_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
+                target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
             to_be_aggregated: false,
@@ -196,6 +199,7 @@ impl BlobRegister {
                 origin,
             },
             id: msg_id,
+            target_section_pk: None,
         };
         Ok(NodeMessagingDuty::SendToAdults {
             targets: metadata.holders,
@@ -333,6 +337,7 @@ impl BlobRegister {
                             current_holders: current_holders.clone(),
                         }),
                         id: message_id,
+                        target_section_pk: None,
                     },
                     new_holder,
                 )
@@ -376,6 +381,7 @@ impl BlobRegister {
                 id: MessageId::in_response_to(&msg_id),
                 query_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
+                target_section_pk: None,
             };
             Ok(NodeMessagingDuty::Send(OutgoingMsg {
                 msg: err_msg,
@@ -397,6 +403,7 @@ impl BlobRegister {
         let msg = Message::Query {
             query: Query::Data(DataQuery::Blob(BlobRead::Get(address))),
             id: msg_id,
+            target_section_pk: None,
         };
         Ok(NodeMessagingDuty::SendToAdults {
             targets: metadata.holders,

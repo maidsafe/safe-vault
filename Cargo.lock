@@ -1693,8 +1693,7 @@ dependencies = [
 [[package]]
 name = "qp2p"
 version = "0.9.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bad444bf88addd3368e5b4ccec6a06b6b616e6f49a5d295bc350bada9d6bc80a"
+source = "git+https://github.com/maidsafe/qp2p?rev=2fd0bd1#2fd0bd12590ea1a0b9f91947d1764a56ad142d19"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2364,8 +2363,8 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "3.0.2"
-source = "git+https://github.com/oetyng/sn_messaging?branch=all-accumulation-in-routing#34c6a5c215bfcf9df1c63a4c4f4348841f91d4cd"
+version = "4.0.2"
+source = "git+https://github.com/oetyng/sn_messaging?branch=all-acc-in-routing#61e7377bad7aad5c0f87d798ea7fda8549f38171"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2380,7 +2379,6 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_bytes",
- "sha3",
  "signature",
  "sn_data_types",
  "thiserror",
@@ -2437,7 +2435,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.43.1"
-source = "git+https://github.com/oetyng/sn_routing?branch=all-accumulation-in-routing#cc9cd223c8643756f700a43b8d9a6629320521d4"
+source = "git+https://github.com/oetyng/sn_routing?branch=all-acc-in-routing#5ae591b6cb2273ac2c994a8400c80f4581a39b0e"
 dependencies = [
  "bincode",
  "bls_dkg",
