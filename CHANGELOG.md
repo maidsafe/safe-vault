@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.16](https://github.com/maidsafe/sn_node/compare/v0.26.15...v0.26.16) (2021-02-17)
+
+
+### Bug Fixes
+
+* **used_space:** set the local used_space to zero instead of clearing ([1594b86](https://github.com/maidsafe/sn_node/commit/1594b8624228249862a6d70089298b3d49d1859a))
+
 ### [0.26.15](https://github.com/maidsafe/sn_node/compare/v0.26.14...v0.26.15) (2021-02-16)
 
 ### [0.26.14](https://github.com/maidsafe/sn_node/compare/v0.26.13...v0.26.14) (2021-02-15)
