@@ -53,7 +53,7 @@ impl ClientGateway {
         if let Address::Client(xorname) = &msg.destination()? {
             if self.elder_state.prefix().matches(xorname) {
                 trace!("Message matches gateway prefix");
-                let _ = self.client_msg_handling.match_outgoing(msg).await;
+                self.client_msg_handling.match_outgoing(msg).await?;
                 return Ok(NodeOperation::NoOp);
             }
         }

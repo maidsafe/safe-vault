@@ -14,7 +14,7 @@ const USED_SPACE_FILENAME: &str = "used_space";
 
 /// This holds a record (in-memory and on-disk) of the space used by a single `ChunkStore`, and also
 /// an in-memory record of the total space used by all `ChunkStore`s.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UsedSpace {
     inner: Arc<Mutex<inner::UsedSpace>>,
 }
@@ -22,14 +22,6 @@ pub struct UsedSpace {
 /// Identifies a `ChunkStore` within the larger
 /// used space tracking
 pub type StoreId = u64;
-
-impl Clone for UsedSpace {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
-    }
-}
 
 impl UsedSpace {
     /// construct a new used space instance

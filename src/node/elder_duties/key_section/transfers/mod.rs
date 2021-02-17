@@ -234,7 +234,7 @@ impl Transfers {
     /// state of existing Replicas in the group.
     async fn initiate_replica(&self, events: &[ReplicaEvent]) -> Result<NodeMessagingDuty> {
         // We must be able to initiate the replica, otherwise this node cannot function.
-        let _ = self.replicas.initiate(events).await?;
+        self.replicas.initiate(events).await?;
         Ok(NodeMessagingDuty::NoOp)
     }
 

@@ -175,7 +175,7 @@ impl SectionFunds {
             )? {
                 None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
                 Some(event) => {
-                    let _ = self.apply(TransferInitiated(event.clone()))?;
+                    self.apply(TransferInitiated(event.clone()))?;
                     info!("Section actor transition transfer is being requested of the replicas..");
                     // We ask of our Replicas to validate this transfer.
                     self.wrapping
@@ -222,7 +222,7 @@ impl SectionFunds {
         )? {
             None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
             Some(event) => {
-                let _ = self.apply(TransferInitiated(event.clone()))?;
+                self.apply(TransferInitiated(event.clone()))?;
                 // We now have a payout in flight.
                 self.state.payout_in_flight = Some(payout);
                 // We ask of our Replicas to validate this transfer.
@@ -251,7 +251,7 @@ impl SectionFunds {
         use NodeCmd::*;
         use NodeTransferCmd::*;
         if let Some(event) = self.actor.receive(validation)? {
-            let _ = self.apply(TransferValidationReceived(event.clone()))?;
+            self.apply(TransferValidationReceived(event.clone()))?;
             // If we have an accumulated proof, we'll continue with registering the proof.
             let proof = if let Some(proof) = event.proof {
                 proof
@@ -260,7 +260,7 @@ impl SectionFunds {
             };
 
             if let Some(event) = self.actor.register(proof.clone())? {
-                let _ = self.apply(TransferRegistrationSent(event))?;
+                self.apply(TransferRegistrationSent(event))?;
             };
 
             // The payout flow is completed,

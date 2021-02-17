@@ -58,7 +58,7 @@ impl ElderDuties {
         if let Some(genesis) = genesis {
             // if we are genesis
             // does local init, with no roundrip via network messaging
-            let _ = self.key_section.init_genesis_node(genesis).await?;
+            self.key_section.init_genesis_node(genesis).await?;
         } else {
             ops.push(self.key_section.catchup_with_section().await?);
             ops.push(self.data_section.catchup_with_section().await?);
@@ -149,7 +149,7 @@ impl ElderDuties {
 
     ///
     pub async fn split_section(&mut self, prefix: Prefix) -> Result<NodeOperation> {
-        let _ = self.key_section.split_section(prefix).await?;
+        self.key_section.split_section(prefix).await?;
         self.data_section.split_section(prefix).await
     }
 }

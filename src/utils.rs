@@ -31,10 +31,10 @@ pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
         Ok(db) => Ok(db),
         Err(_) => {
             debug!("Database not found, creating it..");
-            let _ = fs::create_dir_all(db_dir)?;
+            fs::create_dir_all(db_dir)?;
             let mut _db = PickleDb::new_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
             // dump is needed to actually write the db to disk.
-            let _ = _db.dump()?;
+            _db.dump()?;
             debug!("Created database");
             PickleDb::load_bin(db_path, PickleDbDumpPolicy::AutoDump).map_err(Error::PickleDb)
         }

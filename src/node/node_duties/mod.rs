@@ -450,7 +450,7 @@ impl NodeDuties {
             }
             Stage::ProposingGenesis(ref mut bootstrap) => {
                 debug!("Adding incoming genesis proposal.");
-                let _ = bootstrap.add(sig)?;
+                bootstrap.add(sig)?;
                 if let Some(signed_credit) = &bootstrap.pending_agreement {
                     // replicas signatures over > signed_credit <
                     let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
@@ -527,7 +527,7 @@ impl NodeDuties {
                 Ok(NodeOperation::NoOp)
             }
             Stage::AccumulatingGenesis(ref mut bootstrap) => {
-                let _ = bootstrap.add(sig)?;
+                bootstrap.add(sig)?;
                 if let Some(genesis) = bootstrap.pending_agreement.take() {
                     // TODO: do not take this? (in case of fail further blow)
                     let credit_sig_share = bootstrap.elder_state.sign_as_elder(&genesis).await?;

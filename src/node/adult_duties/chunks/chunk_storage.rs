@@ -195,7 +195,7 @@ impl ChunkStorage {
             return Ok(NodeMessagingDuty::NoOp);
         }
 
-        let _ = self.chunks.put(&blob).await?;
+        self.chunks.put(&blob).await?;
 
         Ok(NodeMessagingDuty::NoOp)
     }

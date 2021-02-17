@@ -75,7 +75,7 @@ impl ElderConstellation {
 
         info!("Elder change updates initiated");
 
-        let _ = self.pending_changes.push(ConstellationChange {
+        self.pending_changes.push(ConstellationChange {
             section_key: new_section_key,
             prefix,
         });
@@ -121,8 +121,7 @@ impl ElderConstellation {
         // Otherwise there is no guarantee of not getting more recent info than expected!
         let new_elder_state = ElderState::new(self.network.clone()).await?;
         // 3. And update key section with it.
-        let _ = self
-            .duties
+        self.duties
             .finish_elder_change(node_info, new_elder_state.clone())
             .await?;
 

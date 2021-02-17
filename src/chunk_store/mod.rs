@@ -109,7 +109,7 @@ impl<T: Chunk> ChunkStore<T> {
         info!("use space total : {:?}", self.used_space.total().await);
 
         let file_path = self.file_path(chunk.id())?;
-        let _ = self.do_delete(&file_path).await;
+        self.do_delete(&file_path).await?;
 
         // pre-reserve space
         self.used_space.increase(self.id, consumed_space).await?;

@@ -211,9 +211,8 @@ impl<T: ReplicaSigning> Replicas<T> {
         let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
 
         debug!("Wallet loaded");
-        let result = wallet.validate(&signed_transfer.debit, &signed_transfer.credit);
+        let _ = wallet.validate(&signed_transfer.debit, &signed_transfer.credit)?;
 
-        let _ = result?;
         debug!("wallet valid");
         // signing will be serialised
         let (replica_debit_sig, replica_credit_sig) =
@@ -607,7 +606,7 @@ mod test {
         let (mut section, peer_replicas) = get_section(1);
 
         let (genesis_replicas, mut genesis_actor) = section.remove(0);
-        let _ = run(genesis_replicas.initiate(&[]))?;
+        run(genesis_replicas.initiate(&[]))?;
 
         let section_key = PublicKey::Bls(genesis_replicas.replicas_pk_set().public_key());
 
@@ -644,7 +643,7 @@ mod test {
             }
         };
         // the new elder will not partake in this operation (hence only one doing it here)
-        let _ = genesis_actor.apply(ActorEvent::TransferInitiated(init.clone()))?;
+        genesis_actor.apply(ActorEvent::TransferInitiated(init.clone()))?;
 
         let signed_transfer = SignedTransferShare::new(
             init.signed_debit.as_share()?,
@@ -697,7 +696,7 @@ mod test {
         let replica_events = run(genesis_replicas.all_events())?;
 
         for (elder_replicas, mut next_section_actor_share) in section {
-            let _ = run(elder_replicas.initiate(&replica_events))?;
+            run(elder_replicas.initiate(&replica_events))?;
             let history = run(elder_replicas.history(next_section_actor_share.id()))?;
             match next_section_actor_share.from_history(history.clone())? {
                 Some(event) => {

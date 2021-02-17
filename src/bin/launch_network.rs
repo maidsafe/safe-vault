@@ -70,7 +70,7 @@ async fn main() -> Result<(), String> {
 
     println!("sn_node built successfully");
 
-    let _ = run_network().await?;
+    run_network().await?;
 
     Ok(())
 }

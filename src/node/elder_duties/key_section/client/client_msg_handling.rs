@@ -58,7 +58,7 @@ impl ClientMsgHandling {
                 "Tracking incoming: Prior group decision on msg {:?} found.",
                 msg_id
             );
-            let _ = self.match_outgoing(&msg).await;
+            self.match_outgoing(&msg).await?;
         }
 
         // Keep track of messags to find client target via correlation id
