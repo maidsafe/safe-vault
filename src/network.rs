@@ -109,6 +109,10 @@ impl Network {
         self.routing.lock().await.our_prefix().await
     }
 
+    pub async fn section_chain(&self) -> SectionProofChain {
+        self.routing.lock().await.section_chain().await
+    }
+
     pub async fn matches_our_prefix(&self, name: XorName) -> bool {
         self.routing
             .lock()

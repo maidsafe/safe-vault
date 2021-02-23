@@ -656,11 +656,14 @@ impl Transfers {
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NetworkDuties> {
+
+        debug!(">>> registering section payout");
         use NodeCmd::*;
         use NodeEvent::*;
         use NodeTransferCmd::*;
         match self.replicas.register(proof).await {
             Ok(event) => {
+                debug!(">>> in match ok");
                 let mut ops: NetworkDuties = vec![];
                 // notify sending section
                 let location = event.transfer_proof.sender().into();
@@ -697,6 +700,7 @@ impl Transfers {
                 Ok(ops)
             }
             Err(e) => {
+                debug!(">>> Error in match payout");
                 let message_error = convert_to_error_message(e)?;
                 Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmdError {

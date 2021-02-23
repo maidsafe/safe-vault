@@ -28,6 +28,7 @@ use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
 };
+use log::debug;
 use xor_name::{Prefix, XorName};
 
 // we want a consistent view of the elder constellation
@@ -140,6 +141,11 @@ impl ElderState {
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
     #[allow(clippy::eval_order_dependence)]
     pub async fn new(network: Network) -> Result<Self> {
+        debug!(
+            ">> setting up elderstate, PK from routing is: {:?}",
+            PublicKey::Bls(network.public_key_set().await?.public_key())
+        );
+
         Ok(Self {
             prefix: network.our_prefix().await,
             node_name: network.our_name().await,

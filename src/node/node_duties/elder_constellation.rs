@@ -70,14 +70,16 @@ impl ElderConstellation {
         }
 
         info!(">>Elder change updates initiated");
-
+        info!(">>Pending changes len before {:?}", self.pending_changes.len());
         self.pending_changes.push(ConstellationChange {
             section_key: new_section_key,
             prefix,
         });
+        info!(">>Pending changes len after {:?}", self.pending_changes.len());
 
         // handle changes sequentially
         if self.pending_changes.len() > 1 {
+            debug!(">> more changes so we return a vec?");
             return Ok(vec![]);
         }
 
