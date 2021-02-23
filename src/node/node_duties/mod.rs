@@ -310,13 +310,15 @@ impl NodeDuties {
 
         let is_genesis_section = self.network_api.our_prefix().await.is_empty();
         let elder_count = self.network_api.our_elder_names().await.len();
+        let section_chain_len = self.network_api.section_chain().await.len();
         debug!(
-            "begin_transition_to_elder. is_genesis_section: {}, elder_count: {}",
-            is_genesis_section, elder_count
+            "begin_transition_to_elder. is_genesis_section: {}, elder_count: {}, section_chain_len: {}",
+            is_genesis_section, elder_count, section_chain_len
         );
         if is_genesis_section
             && elder_count == GENESIS_ELDER_COUNT
             && matches!(self.stage, Stage::Adult(_))
+            && section_chain_len <= 5
         {
             // this is the case when we are the GENESIS_ELDER_COUNT-th Elder!
             debug!("threshold reached; proposing genesis!");
@@ -354,7 +356,7 @@ impl NodeDuties {
                 dst,
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             })));
-        } else if is_genesis_section && elder_count < GENESIS_ELDER_COUNT {
+        } else if is_genesis_section && elder_count < GENESIS_ELDER_COUNT && section_chain_len <= 5 {
             debug!("AwaitingGenesisThreshold!");
             self.stage = Stage::AwaitingGenesisThreshold(VecDeque::new());
             return Ok(vec![]);
