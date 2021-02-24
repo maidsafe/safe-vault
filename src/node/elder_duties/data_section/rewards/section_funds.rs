@@ -118,6 +118,8 @@ impl SectionFunds {
         let new_wallet = elder_state.section_public_key();
 
         self.state.pending_actor = Some(elder_state);
+
+        info!(">>>sending transfer setup query");
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::SetupNewSectionWallets((
