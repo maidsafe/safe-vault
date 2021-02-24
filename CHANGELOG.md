@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.27.0](https://github.com/maidsafe/sn_node/compare/v0.26.16...v0.27.0) (2021-02-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** New bootstrap flows and modified messaging types.
+
+### Bug Fixes
+
+* **config_file:** remove remaining occurrences of clear and fresh ([124ed70](https://github.com/maidsafe/sn_node/commit/124ed70f98cab343455348eb894f64df356bfc5c))
+* **msg_analysis:** try all match methods for a msg ([fcadb77](https://github.com/maidsafe/sn_node/commit/fcadb773d879200c313c224471e073436cbe3334))
+* logic errors, logging ([5b205c4](https://github.com/maidsafe/sn_node/commit/5b205c46a906edb2d2229416ae1a33a1a66bd0cd))
+
+
+* **deps:** update sn_routing, sn_messaging, sn_transfers ([2916764](https://github.com/maidsafe/sn_node/commit/291676482aa2f33b85732183438a13a6acec224a))
+
 ### [0.26.16](https://github.com/maidsafe/sn_node/compare/v0.26.15...v0.26.16) (2021-02-17)
 
 
