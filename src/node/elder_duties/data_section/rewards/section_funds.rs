@@ -140,7 +140,7 @@ impl SectionFunds {
         &mut self,
         new_wallet: WalletInfo,
         sibling_key: Option<PublicKey>,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NetworkDuties> {
         info!(">>>Transitioning section transfer actor...");
         if self.is_transitioning() {
             info!("is_transitioning");
@@ -169,7 +169,7 @@ impl SectionFunds {
                 return match self.state.next_actor.take() {
                     Some(actor) => {
                         self.actor = actor;
-                        Ok(NodeMessagingDuty::NoOp)
+                        Ok(vec![])
                     }
                     None => {
                         error!("Tried to take next actor while non existed!");
@@ -180,44 +180,75 @@ impl SectionFunds {
                 };
             }
 
-            // Transfer the tokens from
-            // previous actor to new actor.
-            use NodeCmd::*;
-            use NodeTransferCmd::*;
-
-            if sibling_key.is_some() {
+            let mut transfers: NetworkDuties = vec![];
+            if let Some(sibling_key) = sibling_key {
                 debug!(">>> Split happening, we need to transfer to TWO wallets, for each sibling");
-                debug!(">>> TODO: THAT")
-            }
-            match self.actor.transfer(
-                amount,
-                wallet_id,
-                format!("Section Actor transition to new wallet: {}", wallet_id),
-            )? {
-                None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
-                Some(event) => {
-                    self.apply(TransferInitiated(event.clone()))?;
-                    info!("Section actor transition transfer is being requested of the replicas..");
-                    // We ask of our Replicas to validate this transfer.
-                    Ok(NodeMessagingDuty::Send(OutgoingMsg {
-                        msg: Message::NodeCmd {
-                            cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
-                                event.signed_debit.as_share()?,
-                                event.signed_credit.as_share()?,
-                                self.actor.owner().public_key_set()?,
-                            )?)),
-                            id: MessageId::new(),
-                            target_section_pk: None,
-                        },
-                        dst: DstLocation::Section(self.actor.id().into()),
-                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                    }))
+
+                let amount = Token::from_nano(amount.as_nano() / 2);
+                debug!("Creating two transfers to each child section");
+                // create two transfers to each sibling wallet
+
+                // TODO:is order important here?
+                // Determine which transfer is first
+                if wallet_id > sibling_key {
+                    let t1 = self.generate_transfer_duties(amount, wallet_id).await?;
+                    let t2 = self.generate_transfer_duties(amount, sibling_key).await?;
+                    transfers.push(NetworkDuty::from(t1));
+                    transfers.push(NetworkDuty::from(t2));
+                } else {
+                    let t1 = self.generate_transfer_duties(amount, sibling_key).await?;
+                    let t2 = self.generate_transfer_duties(amount, wallet_id).await?;
+                    transfers.push(NetworkDuty::from(t1));
+                    transfers.push(NetworkDuty::from(t2));
                 }
+            } else {
+                let duty = self.generate_transfer_duties(amount, wallet_id).await?;
+                transfers.push(NetworkDuty::from(duty));
             }
+
+            Ok(transfers)
         } else {
             Err(Error::Logic(
                 "eeeeh.. had not initiated transition !?!?!".to_string(),
             ))
+        }
+    }
+
+    /// generate transfer duties from our current actor
+    pub async fn generate_transfer_duties(
+        &mut self,
+        amount: Token,
+        wallet_id: PublicKey,
+    ) -> Result<NodeMessagingDuty> {
+        // Transfer the tokens from
+        // previous actor to new actor.
+        use NodeCmd::*;
+        use NodeTransferCmd::*;
+
+        match self.actor.transfer(
+            amount,
+            wallet_id,
+            format!("Section Actor transition to new wallet: {}", wallet_id),
+        )? {
+            None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
+            Some(event) => {
+                self.apply(TransferInitiated(event.clone()))?;
+                info!("Section actor transition transfer is being requested of the replicas..");
+                // We ask of our Replicas to validate this transfer.
+                Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                    msg: Message::NodeCmd {
+                        cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
+                            event.signed_debit.as_share()?,
+                            event.signed_credit.as_share()?,
+                            self.actor.owner().public_key_set()?,
+                        )?)),
+                        id: MessageId::new(),
+                        target_section_pk: None,
+                    },
+                    dst: DstLocation::Section(self.actor.id().into()),
+                    to_be_aggregated: false,
+                }))
+            }
         }
     }
 

@@ -283,12 +283,15 @@ impl ReceivedMsgAnalysis {
                     }),
                 id,
                 ..
-            } => RewardDuty::ProcessCmd {
-                cmd: RewardCmd::InitiateSectionWallet((result.clone()?, *sibling_key)),
-                msg_id: *id,
-                origin,
+            } => {
+                debug!(">>>>> Should be handling iniitate section wallet");
+                RewardDuty::ProcessCmd {
+                    cmd: RewardCmd::InitiateSectionWallet((result.clone()?, *sibling_key)),
+                    msg_id: *id,
+                    origin,
+                }
+                .into()
             }
-            .into(),
             // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
             Message::NodeQueryResponse {
                 response:
