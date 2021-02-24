@@ -10,7 +10,6 @@ use super::ElderDuties;
 use crate::{ElderState, Network, NodeInfo, Result};
 
 use crate::{node::node_ops::NetworkDuties, Error};
-use bls::PublicKey as BlsPublicKey;
 use log::{debug, info};
 use sn_data_types::PublicKey;
 use sn_routing::Prefix;

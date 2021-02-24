@@ -147,23 +147,17 @@ impl Rewards {
 
         debug!(">>>> Process reward cmd {:?}", cmd);
         let result = match cmd {
-            InitiateSectionWallet((info, sibling_key)) => {
-                debug!(">>>> and that's in init section wallet handling");
-                if self.section_funds.has_initiated_transition() {
-                    debug!(">>>> we have initiated transition so....");
-                    self.section_funds
-                        .complete_transition(info, sibling_key)
-                        .await?
-                        .into()
-                } else if self.section_funds.replicas()
-                    != PublicKey::Bls(info.replicas.public_key())
-                {
+            SynchHistory(info) => {
+                if self.section_funds.replicas() != PublicKey::Bls(info.replicas.public_key()) {
                     error!("Section funds keys dont match");
                     return Err(Error::Logic("crap..".to_string()));
-                } else {
-                    debug!(">>>> syncing....");
-                    self.section_funds.synch(info.history).await?.into()
                 }
+                debug!(">>>> syncing....");
+                self.section_funds.synch(info.history).await?.into()
+            }
+            CompleteTransition(pk_set) => {
+                debug!(">>>> we have initiated transition so....");
+                self.section_funds.complete_transition(pk_set).await?.into()
             }
             AddNewNode(node_id) => self.add_new_node(node_id).into(),
             SetNodeWallet { node_id, wallet_id } => {

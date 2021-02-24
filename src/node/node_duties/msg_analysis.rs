@@ -274,37 +274,6 @@ impl ReceivedMsgAnalysis {
                 origin,
             }
             .into(),
-            
-            // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
-            Message::NodeQueryResponse {
-                response:
-                    NodeQueryResponse::Transfers(NodeTransferQueryResponse::SetupNewSectionWallets {
-                        our_wallet: result,
-                        sibling_key,
-                    }),
-                id,
-                ..
-            } => {
-                debug!(">>>>> Should be handling iniitate section wallet. WHY DO WE NOT SEE THIS");
-                RewardDuty::ProcessCmd {
-                    cmd: RewardCmd::InitiateSectionWallet((result.clone()?, *sibling_key)),
-                    msg_id: *id,
-                    origin,
-                }
-                .into()
-            }
-            // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
-            Message::NodeQueryResponse {
-                response:
-                    NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetSectionWalletHistory(result)),
-                id,
-                ..
-            } => RewardDuty::ProcessCmd {
-                cmd: RewardCmd::InitiateSectionWallet((result.clone(), None)),
-                msg_id: *id,
-                origin,
-            }
-            .into(),
             //
             // ------ transfers --------
             // doesn't need to be accumulated, but makes it a bit slimmer..
@@ -343,12 +312,11 @@ impl ReceivedMsgAnalysis {
             .into(),
             // Accumulates at remote section, for security
             Message::NodeQuery {
-                query:
-                    NodeQuery::Transfers(NodeTransferQuery::SetupNewSectionWallets(sections_info)),
+                query: NodeQuery::Transfers(NodeTransferQuery::GetWalletReplicas(sections_info)),
                 id,
                 ..
             } => TransferDuty::ProcessQuery {
-                query: TransferQuery::SetupNewSectionWallets(*sections_info),
+                query: TransferQuery::GetWalletReplicas(*sections_info),
                 msg_id: *id,
                 origin,
             }
@@ -504,38 +472,35 @@ impl ReceivedMsgAnalysis {
                 origin: *origin,
             })
             .into(),
-             // Accumulates at remote section, for security
-             Message::NodeQuery {
-                query:
-                    NodeQuery::Transfers(NodeTransferQuery::SetupNewSectionWallets(sections_info)),
-                id,
-                ..
-            } => {
-                debug!(">>>> transfer query innn");
-                    TransferDuty::ProcessQuery {
-                    query: TransferQuery::SetupNewSectionWallets(*sections_info),
-                    msg_id: *id,
-                    origin,
-                }.into()
-            },
             // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
             Message::NodeQueryResponse {
-            response:
-                NodeQueryResponse::Transfers(NodeTransferQueryResponse::SetupNewSectionWallets {
-                    our_wallet: result,
-                    sibling_key,
-                }),
-            id,
+                response:
+                    NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetWalletReplicas(replicas)),
+                id,
                 ..
             } => {
                 debug!(">>>>> Should be handling iniitate section wallet. WHY DO WE NOT SEE THIS");
                 RewardDuty::ProcessCmd {
-                    cmd: RewardCmd::InitiateSectionWallet((result.clone()?, *sibling_key)),
+                    cmd: RewardCmd::CompleteTransition(replicas.to_owned()),
                     msg_id: *id,
                     origin,
                 }
                 .into()
-            },
+            }
+            // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
+            Message::NodeQueryResponse {
+                response:
+                    NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetSectionWalletHistory(
+                        wallet_info,
+                    )),
+                id,
+                ..
+            } => RewardDuty::ProcessCmd {
+                cmd: RewardCmd::SynchHistory(wallet_info.to_owned()),
+                msg_id: *id,
+                origin,
+            }
+            .into(),
             _ => {
                 return Err(Error::Logic(format!(
                     "Could not evaluate single src node msg: {:?}",

@@ -30,7 +30,7 @@ use sn_data_types::Transfer;
 
 use sn_data_types::{
     CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare,
-    TransferAgreementProof, TransferPropagated, WalletInfo,
+    TransferAgreementProof, TransferPropagated,
 };
 use sn_messaging::{
     client::{
@@ -151,8 +151,8 @@ impl Transfers {
     ) -> Result<NetworkDuties> {
         use TransferQuery::*;
         let duty = match query {
-            SetupNewSectionWallets((wallet_id, sibling_key)) => {
-                self.setup_new_section_wallets(*wallet_id, msg_id, origin, *sibling_key)
+            GetWalletReplicas(wallet_key) => {
+                self.get_wallet_replicas(*wallet_key, msg_id, origin)
                     .await?
             }
             GetReplicaEvents => self.all_events(msg_id, origin).await?,
@@ -466,35 +466,19 @@ impl Transfers {
         }))
     }
 
-    async fn setup_new_section_wallets(
+    async fn get_wallet_replicas(
         &self,
-        wallet_id: PublicKey,
+        _wallet_key: PublicKey,
         msg_id: MessageId,
         origin: SrcLocation,
-        sibling_key: Option<PublicKey>,
     ) -> Result<NodeMessagingDuty> {
-        info!(">>> Handling SetupNewSectionWallets query");
-        info!(">>> sibgling key is here for setup? {:?}", sibling_key);
+        info!(">>> Handling GetSectionWalletReplicas query");
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         // todo: validate signature
-        let result = match self.replicas.history(wallet_id).await {
-            Ok(history) => Ok(WalletInfo {
-                // (Only in first section of network:
-                // if we haven't transitioned yet, then this will be wrong!
-                // it will still be the previous keyset..)
-                replicas: self.replicas.replicas_pk_set(),
-                history,
-            }),
-            Err(e) => Err(convert_to_error_message(e)?),
-        };
-
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQueryResponse {
-                response: Transfers(SetupNewSectionWallets {
-                    our_wallet: result,
-                    sibling_key,
-                }),
+                response: Transfers(GetWalletReplicas(self.replicas.replicas_pk_set())),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,

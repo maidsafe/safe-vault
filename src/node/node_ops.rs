@@ -6,21 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use bls::{PublicKey as BlsPublicKey, PublicKeySet};
+use bls::PublicKeySet;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
-
 use sn_data_types::{
     Blob, BlobAddress, Credit, CreditAgreementProof, PublicKey, ReplicaEvent, SignatureShare,
     SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
     WalletInfo,
 };
 use sn_messaging::{client::Message, Aggregation, DstLocation, EndUser, MessageId, SrcLocation};
-use std::fmt::Formatter;
-
 use sn_routing::{Event as RoutingEvent, Prefix};
-use std::collections::BTreeSet;
-use std::fmt::Debug;
+use std::{
+    collections::BTreeSet,
+    fmt::{Debug, Formatter},
+};
 use xor_name::XorName;
 
 /// Internal messages are what is passed along
@@ -470,9 +469,15 @@ pub enum RewardDuty {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum RewardCmd {
+    // /// Initiates a new SectionActor with the
+    // /// state of existing Replicas in the group.
+    // InitiateSectionWallet(WalletInfo),
     /// Initiates a new SectionActor with the
     /// state of existing Replicas in the group.
-    InitiateSectionWallet((WalletInfo, Option<PublicKey>)),
+    SynchHistory(WalletInfo),
+    /// Completes transition to a new SectionActor,
+    /// and sets it up with its replicas' public key set.
+    CompleteTransition(PublicKeySet),
     /// With the node id.
     AddNewNode(XorName),
     /// Set the account for a node.
@@ -595,8 +600,7 @@ impl From<TransferDuty> for NetworkDuties {
 #[derive(Debug)]
 pub enum TransferQuery {
     /// Get section actor transfers.
-    /// Optionally pass a sibling section pk if one has been created due to a split.
-    SetupNewSectionWallets((PublicKey, Option<PublicKey>)),
+    GetWalletReplicas(PublicKey),
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(PublicKey),
     /// Get key balance.

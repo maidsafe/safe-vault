@@ -15,7 +15,6 @@ use crate::{
     node::node_ops::{ElderDuty, NetworkDuties},
     ElderState, NodeInfo, Result,
 };
-use bls::PublicKey as BlsPublicKey;
 use log::trace;
 use sn_data_types::{PublicKey, TransferPropagated, WalletInfo};
 use sn_routing::Prefix;
