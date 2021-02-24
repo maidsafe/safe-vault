@@ -580,7 +580,7 @@ impl Transfers {
                     dst: origin.to_dst(),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 }))
-            },
+            }
             Err(e) => {
                 let message_error = convert_to_error_message(e)?;
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {

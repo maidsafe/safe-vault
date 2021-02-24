@@ -128,7 +128,10 @@ impl SectionFunds {
             sibling_key,
         });
 
-        info!(">>>> ??? sending transfer setup query!, pending state has been set? {:?}", self.state.pending_transition.is_some());
+        info!(
+            ">>>> ??? sending transfer setup query!, pending state has been set? {:?}",
+            self.state.pending_transition.is_some()
+        );
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetWalletReplicas(new_wallet)),
@@ -145,12 +148,16 @@ impl SectionFunds {
     /// the new wallet, we can complete the transition by starting
     /// transfers to the new wallets.
     pub async fn complete_transition(&mut self, replicas: PublicKeySet) -> Result<NetworkDuties> {
+        info!(">>>>--------------------------");
+        info!(">>>>--------------------------");
+        info!(">>>>--------------------------");
         info!(">>>>Completing transition of section transfer actor...");
         if self.is_transitioning() {
             info!(">>>>is_transitioning");
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
         if let Some(pending_transition) = self.state.pending_transition.take() {
+            debug!(">>>> got a pending transition!!!!!!!!");
             let signing = ElderSigning::new(pending_transition.next_actor_state);
             let actor = TransferActor::from_info(
                 signing,
@@ -170,6 +177,9 @@ impl SectionFunds {
 
             // Get all the tokens of current actor.
             let current_balance = self.actor.balance();
+
+            debug!(">>>> current actor balance: {:?}", current_balance);
+
             if current_balance == Token::zero() {
                 info!(">>>>No tokens to transfer in this section.");
                 // if zero, then there is nothing to transfer..
@@ -190,7 +200,9 @@ impl SectionFunds {
 
             let mut transfers: NetworkDuties = vec![];
             if let Some(sibling_key) = pending_transition.sibling_key {
-                debug!(">>>> Split happening, we need to transfer to TWO wallets, for each sibling");
+                debug!(
+                    ">>>> Split happening, we need to transfer to TWO wallets, for each sibling"
+                );
 
                 let half_balance = current_balance.as_nano() / 2;
                 let remainder = current_balance.as_nano() % 2;
@@ -231,6 +243,7 @@ impl SectionFunds {
             debug!(">>>> Section transfer generated");
             Ok(transfers)
         } else {
+            error!(">>>> HAVENT STARTED TRANSITION");
             Err(Error::Logic(
                 "eeeeh.. had not initiated transition !?!?!".to_string(),
             ))
@@ -256,7 +269,9 @@ impl SectionFunds {
             None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
             Some(event) => {
                 self.apply(TransferInitiated(event.clone()))?;
-                info!(">>>> Section actor transition transfer is being requested of the replicas..");
+                info!(
+                    ">>>> Section actor transition transfer is being requested of the replicas.."
+                );
                 // We ask of our Replicas to validate this transfer.
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmd {

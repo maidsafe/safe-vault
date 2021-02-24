@@ -479,7 +479,7 @@ impl ReceivedMsgAnalysis {
                 id,
                 ..
             } => {
-                debug!(">>>>> Should be handling iniitate section wallet. WHY DO WE NOT SEE THIS");
+                debug!(">>>>> Should be handling CompleteTransition, after GetWalletReplicas query response");
                 RewardDuty::ProcessCmd {
                     cmd: RewardCmd::CompleteTransition(replicas.to_owned()),
                     msg_id: *id,
