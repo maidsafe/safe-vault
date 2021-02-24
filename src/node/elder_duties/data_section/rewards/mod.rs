@@ -157,7 +157,7 @@ impl Rewards {
             }
             CompleteTransition(pk_set) => {
                 debug!(">>>> we have initiated transition so....");
-                self.section_funds.complete_transition(pk_set).await?.into()
+                self.section_funds.complete_transition(pk_set).await?
             }
             AddNewNode(node_id) => self.add_new_node(node_id).into(),
             SetNodeWallet { node_id, wallet_id } => {

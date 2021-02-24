@@ -132,11 +132,9 @@ impl ElderDuties {
         sibling_key: Option<PublicKey>,
     ) -> Result<NetworkDuties> {
         // 1. First we must update data section..
-        Ok(NetworkDuties::from(
-            self.data_section
-                .initiate_elder_change(elder_state, sibling_key)
-                .await?,
-        ))
+        self.data_section
+            .initiate_elder_change(elder_state, sibling_key)
+            .await
     }
 
     ///
