@@ -37,7 +37,7 @@ sha2 = "0.8.1"
 # sn_routing = { git = "https://github.com/oetyng/sn_routing", branch = "all-acc-in-routing" }
 sn_routing = { path = "../sn_routing" }
 sn_transfers = "~0.4.0"
-sn_messaging = "5.0.0"
+sn_messaging = {path="../sn_messaging"}
 sn_data_types = "~0.15.0"
 ed25519 = "1.0.1"
 signature = "1.1.10"

@@ -10,6 +10,7 @@ use super::ElderDuties;
 use crate::{ElderState, Network, NodeInfo, Result};
 
 use crate::{node::node_ops::NetworkDuties, Error};
+use bls::PublicKey as BlsPublicKey;
 use log::{debug, info};
 use sn_data_types::PublicKey;
 use sn_routing::Prefix;
@@ -55,10 +56,12 @@ impl ElderConstellation {
         &mut self,
         prefix: Prefix,
         new_section_key: PublicKey,
+        sibling_key: Option<PublicKey>,
     ) -> Result<NetworkDuties> {
         let elder_state = self.duties.state();
         debug!(">> Prefix we have w/ elder change: {:?}", prefix);
         debug!(">> New section key w/ change {:?}", new_section_key);
+        debug!(">> IS THERE A SIBLING KEY??? {:?}", sibling_key);
 
         if new_section_key == elder_state.section_public_key()
             || self
@@ -70,12 +73,18 @@ impl ElderConstellation {
         }
 
         info!(">>Elder change updates initiated");
-        info!(">>Pending changes len before {:?}", self.pending_changes.len());
+        info!(
+            ">>Pending changes len before {:?}",
+            self.pending_changes.len()
+        );
         self.pending_changes.push(ConstellationChange {
             section_key: new_section_key,
             prefix,
         });
-        info!(">>Pending changes len after {:?}", self.pending_changes.len());
+        info!(
+            ">>Pending changes len after {:?}",
+            self.pending_changes.len()
+        );
 
         // handle changes sequentially
         if self.pending_changes.len() > 1 {
@@ -87,7 +96,9 @@ impl ElderConstellation {
         // TODO: Query network for data corresponding to provided "new_section_key"!!!!
         // Otherwise there is no guarantee of not getting more recent info than expected!
         let new_elder_state = ElderState::new(self.network.clone()).await?;
-        self.duties.initiate_elder_change(new_elder_state).await
+        self.duties
+            .initiate_elder_change(new_elder_state, sibling_key)
+            .await
     }
 
     ///
@@ -112,13 +123,19 @@ impl ElderConstellation {
             return Ok(vec![]);
         }
 
-
         let old_elder_state = self.duties.state().clone();
         if old_elder_state.section_public_key() != previous_key
             || new_key != self.pending_changes[0].section_key
         {
-            debug!(">> old state key is not same as prev. ??  {:?}, {:?}", old_elder_state.section_public_key(),previous_key );
-            debug!(">> OR  new key isnt pending change {:?}, {:?}", self.pending_changes[0].section_key ,new_key );
+            debug!(
+                ">> old state key is not same as prev. ??  {:?}, {:?}",
+                old_elder_state.section_public_key(),
+                previous_key
+            );
+            debug!(
+                ">> OR  new key isnt pending change {:?}, {:?}",
+                self.pending_changes[0].section_key, new_key
+            );
 
             return Ok(vec![]);
         }
@@ -154,8 +171,9 @@ impl ElderConstellation {
         // if changes have queued up, make sure the queue is worked down
         if !self.pending_changes.is_empty() {
             let change = self.pending_changes.remove(0);
+            debug!(">>Extending ops, NO sibling pk here... should there be?");
             ops.extend(
-                self.initiate_elder_change(change.prefix, change.section_key)
+                self.initiate_elder_change(change.prefix, change.section_key, None)
                     .await?,
             );
         }

@@ -108,9 +108,15 @@ impl Rewards {
 
     /// After Elder change, we transition to a new
     /// transfer actor, as there is now a new keypair for it.
-    pub async fn init_transition(&mut self, elder_state: ElderState) -> Result<NetworkDuties> {
+    pub async fn init_transition(
+        &mut self,
+        elder_state: ElderState,
+        sibling_key: Option<PublicKey>,
+    ) -> Result<NetworkDuties> {
         Ok(NetworkDuties::from(
-            self.section_funds.init_transition(elder_state).await?,
+            self.section_funds
+                .init_transition(elder_state, sibling_key)
+                .await?,
         ))
     }
 
@@ -139,9 +145,12 @@ impl Rewards {
     ) -> Result<NetworkDuties> {
         use RewardCmd::*;
         let result = match cmd {
-            InitiateSectionWallet(info) => {
+            InitiateSectionWallet((info, sibling_key)) => {
                 if self.section_funds.has_initiated_transition() {
-                    self.section_funds.complete_transition(info).await?.into()
+                    self.section_funds
+                        .complete_transition(info, sibling_key)
+                        .await?
+                        .into()
                 } else if self.section_funds.replicas()
                     != PublicKey::Bls(info.replicas.public_key())
                 {
