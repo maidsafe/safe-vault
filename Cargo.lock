@@ -2345,6 +2345,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "5.0.0"
+source = "git+https://github.com/joshuef/sn_messaging?branch=UpdateForSettingUpSections#98bbdaf0afa5634a347ea3414bdb8ea5508c7ca8"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2414,6 +2415,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.44.0"
+source = "git+https://github.com/joshuef/sn_routing?branch=FixesForMultiSection#6b9ba3333a1ce760940796bfce301b813f572fb6"
 dependencies = [
  "bincode",
  "bls_dkg",
