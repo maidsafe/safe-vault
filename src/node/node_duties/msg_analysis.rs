@@ -266,6 +266,7 @@ impl ReceivedMsgAnalysis {
                 origin,
             }
             .into(),
+            
             // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
             Message::NodeQueryResponse {
                 response:
@@ -276,7 +277,7 @@ impl ReceivedMsgAnalysis {
                 id,
                 ..
             } => {
-                debug!(">>>>> Should be handling iniitate section wallet");
+                debug!(">>>>> Should be handling iniitate section wallet. WHY DO WE NOT SEE THIS");
                 RewardDuty::ProcessCmd {
                     cmd: RewardCmd::InitiateSectionWallet((result.clone()?, *sibling_key)),
                     msg_id: *id,
@@ -474,9 +475,41 @@ impl ReceivedMsgAnalysis {
                 origin,
             }
             .into(),
+             // Accumulates at remote section, for security
+             Message::NodeQuery {
+                query:
+                    NodeQuery::Transfers(NodeTransferQuery::SetupNewSectionWallets(sections_info)),
+                id,
+                ..
+            } => {
+                debug!(">>>> transfer query innn");
+                    TransferDuty::ProcessQuery {
+                    query: TransferQuery::SetupNewSectionWallets(*sections_info),
+                    msg_id: *id,
+                    origin,
+                }.into()
+            },
+            // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
+            Message::NodeQueryResponse {
+            response:
+                NodeQueryResponse::Transfers(NodeTransferQueryResponse::SetupNewSectionWallets {
+                    our_wallet: result,
+                    sibling_key,
+                }),
+            id,
+                ..
+            } => {
+                debug!(">>>>> Should be handling iniitate section wallet. WHY DO WE NOT SEE THIS");
+                RewardDuty::ProcessCmd {
+                    cmd: RewardCmd::InitiateSectionWallet((result.clone()?, *sibling_key)),
+                    msg_id: *id,
+                    origin,
+                }
+                .into()
+            },
             _ => {
                 return Err(Error::Logic(format!(
-                    "Could not evaluate single src msg: {:?}",
+                    "Could not evaluate single src node msg: {:?}",
                     msg
                 )))
             }

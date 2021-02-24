@@ -473,7 +473,8 @@ impl Transfers {
         origin: SrcLocation,
         sibling_key: Option<PublicKey>,
     ) -> Result<NodeMessagingDuty> {
-        info!(">>> Handling SetupNewSectionWalletss query");
+        info!(">>> Handling SetupNewSectionWallets query");
+        info!(">>> sibgling key is here for setup? {:?}", sibling_key);
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         // todo: validate signature
