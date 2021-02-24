@@ -145,11 +145,12 @@ impl Rewards {
     ) -> Result<NetworkDuties> {
         use RewardCmd::*;
 
-        debug!(">>> Process reward cmd {:?}", cmd);
+        debug!(">>>> Process reward cmd {:?}", cmd);
         let result = match cmd {
             InitiateSectionWallet((info, sibling_key)) => {
                 debug!(">>>> and that's in init section wallet handling");
                 if self.section_funds.has_initiated_transition() {
+                    debug!(">>>> we have initiated transition so....");
                     self.section_funds
                         .complete_transition(info, sibling_key)
                         .await?
@@ -157,8 +158,10 @@ impl Rewards {
                 } else if self.section_funds.replicas()
                     != PublicKey::Bls(info.replicas.public_key())
                 {
+                    error!("Section funds keys dont match");
                     return Err(Error::Logic("crap..".to_string()));
                 } else {
+                    debug!(">>>> syncing....");
                     self.section_funds.synch(info.history).await?.into()
                 }
             }
