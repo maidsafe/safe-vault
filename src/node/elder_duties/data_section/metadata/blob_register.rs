@@ -17,8 +17,8 @@ use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey, Result as NdResult};
 use sn_messaging::{
     client::{
-        BlobRead, BlobWrite, CmdError, DataQuery, Error as ErrorMessage, Message, NodeCmd,
-        NodeSystemCmd, Query, QueryResponse,
+        BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd, NodeQuery,
+        NodeSystemCmd, QueryResponse,
     },
     DstLocation, EndUser, MessageId, SrcLocation,
 };
@@ -400,8 +400,11 @@ impl BlobRegister {
                 return query_error(Error::NetworkData(DtError::AccessDenied(*origin.id()))).await;
             }
         };
-        let msg = Message::Query {
-            query: Query::Data(DataQuery::Blob(BlobRead::Get(address))),
+        let msg = Message::NodeQuery {
+            query: NodeQuery::Chunks {
+                query: BlobRead::Get(address),
+                origin,
+            },
             id: msg_id,
             target_section_pk: None,
         };

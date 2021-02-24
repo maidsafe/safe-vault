@@ -2271,12 +2271,13 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
-version = "0.15.2"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa9cd49d26b0981cf2d822c1865a63506b082b902bab2c82b33d2943b15548fb"
+checksum = "07a2bc7416afcca09b04b434eace1f29ac5cbf30c00b66696398da7d2e53f927"
 dependencies = [
  "bincode",
  "crdts",
+ "ed25519",
  "ed25519-dalek",
  "hex_fmt",
  "multibase",
@@ -2305,9 +2306,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "5.0.0"
+version = "6.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6802c41867ea2bc0dde87309c5e204a86bc4e65ec604eb20aa87d4467a6f619b"
+checksum = "639ec9bf6175a0a68a559a6e8f3ff8b4d4b155a4df124051c3fafb18b5a1bdde"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2331,7 +2332,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.27.1"
+version = "0.27.2"
 dependencies = [
  "async-log",
  "async-trait",
@@ -2375,9 +2376,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.44.0"
+version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84c5dd580ca42c5ab1d5b71a5d766879bfd98de4ac16c4e8480465a52c97f76e"
+checksum = "5480bad2f6aebf5ea245022fc705e240d96b2749775e69971d8180c4c4a650ef"
 dependencies = [
  "bincode",
  "bls_dkg",

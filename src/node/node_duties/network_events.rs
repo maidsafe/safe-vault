@@ -109,6 +109,7 @@ impl NetworkEvents {
                 elders,
                 prefix,
                 self_status_change,
+                ..
             } => {
                 let mut duties: NetworkDuties = match self_status_change {
                     NodeElderChange::Promoted => NetworkDuties::from(NodeDuty::AssumeElderDuties),

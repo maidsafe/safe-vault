@@ -71,7 +71,7 @@ impl Messaging {
             self.network
                 .send_message(
                     SrcLocation::Node(name),
-                    DstLocation::Node(XorName(target.0)),
+                    DstLocation::AccumulatingNode(XorName(target.0)),
                     bytes.clone(),
                 )
                 .await
