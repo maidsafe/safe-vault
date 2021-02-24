@@ -224,9 +224,12 @@ impl NodeDuties {
             ReceiveGenesisAccumulation { signed_credit, sig } => {
                 self.receive_genesis_accumulation(signed_credit, sig).await
             }
-            InitiateElderChange { prefix, key, .. } => {
-                self.initiate_elder_change(prefix, key).await
-            }
+            InitiateElderChange {
+                prefix,
+                key,
+                sibling_key,
+                ..
+            } => self.initiate_elder_change(prefix, key, sibling_key).await,
             FinishElderChange {
                 previous_key,
                 new_key,
@@ -356,7 +359,8 @@ impl NodeDuties {
                 dst,
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             })));
-        } else if is_genesis_section && elder_count < GENESIS_ELDER_COUNT && section_chain_len <= 5 {
+        } else if is_genesis_section && elder_count < GENESIS_ELDER_COUNT && section_chain_len <= 5
+        {
             debug!("AwaitingGenesisThreshold!");
             self.stage = Stage::AwaitingGenesisThreshold(VecDeque::new());
             return Ok(vec![]);
@@ -520,6 +524,8 @@ impl NodeDuties {
                         //crediting_replica_sig: credit_sig_share,
                         //crediting_replica_keys: bootstrap.elder_state.section_public_key(),
                     };
+
+                    debug!(">>> GENSIS AGREEMENT PROOFED");
                     return self
                         .finish_transition_to_elder(
                             WalletInfo {
@@ -546,6 +552,7 @@ impl NodeDuties {
         wallet_info: WalletInfo,
         genesis: Option<TransferPropagated>,
     ) -> Result<NetworkDuties> {
+        debug!(">>>Finishing transition to elder");
         let queued_duties = &mut VecDeque::new();
         let queued_duties = match self.stage {
             Stage::Elder(_) => return Ok(vec![]),
@@ -617,6 +624,7 @@ impl NodeDuties {
         &mut self,
         prefix: sn_routing::Prefix,
         new_section_key: PublicKey,
+        sibling_key: Option<PublicKey>,
     ) -> Result<NetworkDuties> {
         match &mut self.stage {
             Stage::Infant => Ok(vec![]),
@@ -630,7 +638,11 @@ impl NodeDuties {
                 self.stage = Stage::Adult(duties);
                 Ok(vec![])
             }
-            Stage::Elder(elder) => elder.initiate_elder_change(prefix, new_section_key).await,
+            Stage::Elder(elder) => {
+                elder
+                    .initiate_elder_change(prefix, new_section_key, sibling_key)
+                    .await
+            }
         }
     }
 

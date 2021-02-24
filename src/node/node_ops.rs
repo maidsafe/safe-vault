@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use bls::{PublicKey as BlsPublicKey, PublicKeySet};
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 
@@ -84,6 +85,8 @@ pub enum NodeDuty {
         key: PublicKey,
         /// The set of elders of our section.
         elders: BTreeSet<XorName>,
+        /// Sibling section PK if a split is underway
+        sibling_key: Option<PublicKey>,
     },
     /// Finishes the multi-step process
     /// of transitioning to a new elder constellation.
@@ -469,7 +472,7 @@ pub enum RewardDuty {
 pub enum RewardCmd {
     /// Initiates a new SectionActor with the
     /// state of existing Replicas in the group.
-    InitiateSectionWallet(WalletInfo),
+    InitiateSectionWallet((WalletInfo, Option<PublicKey>)),
     /// With the node id.
     AddNewNode(XorName),
     /// Set the account for a node.
@@ -592,7 +595,8 @@ impl From<TransferDuty> for NetworkDuties {
 #[derive(Debug)]
 pub enum TransferQuery {
     /// Get section actor transfers.
-    GetNewSectionWallet(PublicKey),
+    /// Optionally pass a sibling section pk if one has been created due to a split.
+    SetupNewSectionWallets((PublicKey, Option<PublicKey>)),
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(PublicKey),
     /// Get key balance.

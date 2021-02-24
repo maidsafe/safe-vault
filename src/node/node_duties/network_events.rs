@@ -109,7 +109,7 @@ impl NetworkEvents {
                 elders,
                 prefix,
                 self_status_change,
-                ..
+                sibling_key,
             } => {
                 let mut duties: NetworkDuties = match self_status_change {
                     NodeElderChange::Promoted => NetworkDuties::from(NodeDuty::AssumeElderDuties),
@@ -117,10 +117,16 @@ impl NetworkEvents {
                     NodeElderChange::None => vec![],
                 };
 
+                let mut sibling_pk = None;
+                if let Some(pk) = sibling_key {
+                    sibling_pk = Some(PublicKey::Bls(pk));
+                }
+
                 duties.push(NetworkDuty::from(NodeDuty::InitiateElderChange {
                     prefix,
                     key: PublicKey::Bls(key),
                     elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+                    sibling_key: sibling_pk,
                 }));
 
                 Ok(duties)

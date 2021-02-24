@@ -19,6 +19,7 @@ use crate::{chunk_store::UsedSpace, Network, Result};
 use bls::{PublicKeySet, PublicKeyShare};
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use itertools::Itertools;
+use log::debug;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
 use sn_messaging::client::TransientElderKey;
@@ -28,7 +29,6 @@ use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
 };
-use log::debug;
 use xor_name::{Prefix, XorName};
 
 // we want a consistent view of the elder constellation

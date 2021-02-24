@@ -151,8 +151,8 @@ impl Transfers {
     ) -> Result<NetworkDuties> {
         use TransferQuery::*;
         let duty = match query {
-            GetNewSectionWallet(wallet_id) => {
-                self.get_new_section_wallet(*wallet_id, msg_id, origin)
+            SetupNewSectionWallets((wallet_id, sibling_key)) => {
+                self.setup_new_section_wallets(*wallet_id, msg_id, origin, *sibling_key)
                     .await?
             }
             GetReplicaEvents => self.all_events(msg_id, origin).await?,
@@ -466,13 +466,14 @@ impl Transfers {
         }))
     }
 
-    async fn get_new_section_wallet(
+    async fn setup_new_section_wallets(
         &self,
         wallet_id: PublicKey,
         msg_id: MessageId,
         origin: SrcLocation,
+        sibling_key: Option<PublicKey>,
     ) -> Result<NodeMessagingDuty> {
-        info!("Handling GetNewSectionWallet query");
+        info!(">>> Handling SetupNewSectionWalletss query");
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         // todo: validate signature
@@ -489,7 +490,10 @@ impl Transfers {
 
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQueryResponse {
-                response: Transfers(GetNewSectionWallet(result)),
+                response: Transfers(SetupNewSectionWallets {
+                    our_wallet: result,
+                    sibling_key,
+                }),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
                 query_origin: origin,
@@ -656,7 +660,6 @@ impl Transfers {
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NetworkDuties> {
-
         debug!(">>> registering section payout");
         use NodeCmd::*;
         use NodeEvent::*;
@@ -742,9 +745,12 @@ impl Transfers {
                     cmd_origin: origin,
                     target_section_pk: None,
                 }
-            },
+            }
             Err(Error::InvalidPropagatedTransfer(error)) => {
-                error!(">> Error now being handled w/ fake Nosuchkeymsg at receive_propagated, {:?}", error);
+                error!(
+                    ">> Error now being handled w/ fake Nosuchkeymsg at receive_propagated, {:?}",
+                    error
+                );
 
                 // Nonsense error just not to crash node for now. Should be converted properly to be handled at client.
                 Message::NodeCmdError {
@@ -752,7 +758,7 @@ impl Transfers {
                     id: MessageId::new(),
                     correlation_id: msg_id,
                     cmd_origin: origin,
-                    target_section_pk: None
+                    target_section_pk: None,
                 }
             }
             Err(_e) => unimplemented!("receive_propagated"),

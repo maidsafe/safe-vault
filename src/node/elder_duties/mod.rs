@@ -15,6 +15,7 @@ use crate::{
     node::node_ops::{ElderDuty, NetworkDuties},
     ElderState, NodeInfo, Result,
 };
+use bls::PublicKey as BlsPublicKey;
 use log::trace;
 use sn_data_types::{PublicKey, TransferPropagated, WalletInfo};
 use sn_routing::Prefix;
@@ -129,9 +130,14 @@ impl ElderDuties {
     pub async fn initiate_elder_change(
         &mut self,
         elder_state: ElderState,
+        sibling_key: Option<PublicKey>,
     ) -> Result<NetworkDuties> {
         // 1. First we must update data section..
-        self.data_section.initiate_elder_change(elder_state).await
+        Ok(NetworkDuties::from(
+            self.data_section
+                .initiate_elder_change(elder_state, sibling_key)
+                .await?,
+        ))
     }
 
     ///

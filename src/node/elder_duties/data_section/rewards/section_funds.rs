@@ -10,11 +10,11 @@ use super::validator::Validator;
 use crate::{
     node::{
         elder_duties::data_section::ElderSigning,
-        node_ops::{NetworkDuties, NodeMessagingDuty, OutgoingMsg},
+        node_ops::{ElderDuty, NetworkDuties, NetworkDuty, NodeMessagingDuty, OutgoingMsg},
     },
     ElderState, Error, Result,
 };
-use log::{error, info};
+use log::{debug, error, info};
 use sn_data_types::{
     ActorHistory, CreditAgreementProof, PublicKey, SignedTransferShare, Token, TransferValidated,
     WalletInfo,
@@ -95,28 +95,35 @@ impl SectionFunds {
     /// Wallet transition, step 1.
     /// At Elder churn, we must transition to a new wallet.
     /// We start by querying network for the Replicas of this new wallet.
-    pub async fn init_transition(&mut self, elder_state: ElderState) -> Result<NodeMessagingDuty> {
-        info!("Initiating transition to new section wallet...");
+    pub async fn init_transition(
+        &mut self,
+        elder_state: ElderState,
+        sibling_key: Option<PublicKey>,
+    ) -> Result<NodeMessagingDuty> {
+        info!(">>> Initiating transition to new section wallet...");
         if self.has_initiated_transition() {
-            info!("has_initiated_transition");
+            info!(">>>has_initiated_transition");
             return Err(Error::Logic("Already initiated transition".to_string()));
         } else if self.is_transitioning() {
-            info!("is_transitioning");
+            info!(">>>is_transitioning");
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
 
         // When we have a payout in flight, we defer the transition.
         if self.has_payout_in_flight() {
-            info!("has_payout_in_flight");
+            info!(">>>has_payout_in_flight");
             return Err(Error::Logic("Has payout in flight".to_string()));
         }
 
         let new_wallet = elder_state.section_public_key();
-        self.state.pending_actor = Some(elder_state);
 
+        self.state.pending_actor = Some(elder_state);
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetNewSectionWallet(new_wallet)),
+                query: NodeQuery::Transfers(NodeTransferQuery::SetupNewSectionWallets((
+                    new_wallet,
+                    sibling_key,
+                ))),
                 id: MessageId::new(),
                 target_section_pk: None,
             },
@@ -128,16 +135,20 @@ impl SectionFunds {
     /// Wallet transition, step 2.
     /// When receiving the wallet info, containing the Replicas of
     /// the new wallet, we can complete the transition by starting
-    /// a transfer to the new wallet.
+    /// transfers to the new wallets.
     pub async fn complete_transition(
         &mut self,
         new_wallet: WalletInfo,
+        sibling_key: Option<PublicKey>,
     ) -> Result<NodeMessagingDuty> {
-        info!("Transitioning section transfer actor...");
+        info!(">>>Transitioning section transfer actor...");
         if self.is_transitioning() {
             info!("is_transitioning");
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
+
+        // TODO: Create a transfer to the other wallet toooooo.
+
         if let Some(elder_state) = self.state.pending_actor.take() {
             let signing = ElderSigning::new(elder_state);
             let actor = TransferActor::from_info(signing, new_wallet, Validator {})?;
@@ -173,6 +184,11 @@ impl SectionFunds {
             // previous actor to new actor.
             use NodeCmd::*;
             use NodeTransferCmd::*;
+
+            if sibling_key.is_some() {
+                debug!(">>> Split happening, we need to transfer to TWO wallets, for each sibling");
+                debug!(">>> TODO: THAT")
+            }
             match self.actor.transfer(
                 amount,
                 wallet_id,
@@ -255,6 +271,8 @@ impl SectionFunds {
     pub async fn receive(&mut self, validation: TransferValidated) -> Result<NetworkDuties> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
+
+        debug!(">>> Receiving section funds");
         if let Some(event) = self.actor.receive(validation)? {
             self.apply(TransferValidationReceived(event.clone()))?;
             // If we have an accumulated proof, we'll continue with registering the proof.
@@ -300,6 +318,8 @@ impl SectionFunds {
             // First register the transfer, then
             // carry out the first queued payout.
             register_op.extend(queued_ops);
+
+            debug!(">>> registering");
             Ok(register_op)
         } else {
             Ok(vec![])

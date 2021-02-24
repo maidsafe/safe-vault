@@ -277,11 +277,14 @@ impl ReceivedMsgAnalysis {
             // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
             Message::NodeQueryResponse {
                 response:
-                    NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetNewSectionWallet(result)),
+                    NodeQueryResponse::Transfers(NodeTransferQueryResponse::SetupNewSectionWallets {
+                        our_wallet: result,
+                        sibling_key,
+                    }),
                 id,
                 ..
             } => RewardDuty::ProcessCmd {
-                cmd: RewardCmd::InitiateSectionWallet(result.clone()?),
+                cmd: RewardCmd::InitiateSectionWallet((result.clone()?, *sibling_key)),
                 msg_id: *id,
                 origin,
             }
@@ -293,7 +296,7 @@ impl ReceivedMsgAnalysis {
                 id,
                 ..
             } => RewardDuty::ProcessCmd {
-                cmd: RewardCmd::InitiateSectionWallet(result.clone()),
+                cmd: RewardCmd::InitiateSectionWallet((result.clone(), None)),
                 msg_id: *id,
                 origin,
             }
@@ -336,11 +339,12 @@ impl ReceivedMsgAnalysis {
             .into(),
             // Accumulates at remote section, for security
             Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetNewSectionWallet(public_key)),
+                query:
+                    NodeQuery::Transfers(NodeTransferQuery::SetupNewSectionWallets(sections_info)),
                 id,
                 ..
             } => TransferDuty::ProcessQuery {
-                query: TransferQuery::GetNewSectionWallet(*public_key),
+                query: TransferQuery::SetupNewSectionWallets(*sections_info),
                 msg_id: *id,
                 origin,
             }
