@@ -277,7 +277,7 @@ impl ReceivedMsgAnalysis {
                 id,
                 ..
             } => {
-                debug!(">>>>> Should be handling iniitate section wallet. WHY DO WE NOT SEE THIS");
+                debug!(">>>>> Should be handling iniitate section wallet. after query response");
                 RewardDuty::ProcessCmd {
                     cmd: RewardCmd::InitiateSectionWallet((result.clone()?, *sibling_key)),
                     msg_id: *id,
@@ -499,7 +499,7 @@ impl ReceivedMsgAnalysis {
             id,
                 ..
             } => {
-                debug!(">>>>> Should be handling iniitate section wallet. WHY DO WE NOT SEE THIS");
+                debug!(">>>>> iniitate section wallet.");
                 RewardDuty::ProcessCmd {
                     cmd: RewardCmd::InitiateSectionWallet((result.clone()?, *sibling_key)),
                     msg_id: *id,

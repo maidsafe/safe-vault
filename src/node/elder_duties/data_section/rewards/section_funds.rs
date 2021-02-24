@@ -144,6 +144,9 @@ impl SectionFunds {
         new_wallet: WalletInfo,
         sibling_key: Option<PublicKey>,
     ) -> Result<NetworkDuties> {
+        info!(">>>>--------------------------");
+        info!(">>>>--------------------------");
+        info!(">>>>--------------------------");
         info!(">>>>Completing transition of section transfer actor...");
         if self.is_transitioning() {
             info!(">>>>is_transitioning");
@@ -151,6 +154,8 @@ impl SectionFunds {
         }
 
         if let Some(elder_state) = self.state.pending_actor.take() {
+
+            debug!(">>>> got an elder state!!!!!!!!");
             let signing = ElderSigning::new(elder_state);
             let actor = TransferActor::from_info(signing, new_wallet, Validator {})?;
             let our_new_key = actor.id();
@@ -163,6 +168,9 @@ impl SectionFunds {
 
             // Get all the tokens of current actor.
             let current_balance = self.actor.balance();
+
+            debug!(">>>> current actor balance: {:?}", current_balance);
+
             if current_balance == Token::zero() {
                 info!(">>>>No tokens to transfer in this section.");
                 // if zero, then there is nothing to transfer..
@@ -224,6 +232,7 @@ impl SectionFunds {
             debug!(">>>> Section transfer generated");
             Ok(transfers)
         } else {
+            error!(">>>> HAVENT STARTED TRANSITION");
             Err(Error::Logic(
                 "eeeeh.. had not initiated transition !?!?!".to_string(),
             ))
