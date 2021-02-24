@@ -106,18 +106,18 @@ impl SectionFunds {
         next_actor_state: ElderState,
         sibling_key: Option<PublicKey>,
     ) -> Result<NodeMessagingDuty> {
-        info!(">>> Initiating transition to new section wallet...");
+        info!(">>> ??? Initiating transition to new section wallet...");
         if self.has_initiated_transition() {
-            info!(">>>has_initiated_transition");
+            info!(">>> ??? has_initiated_transition");
             return Err(Error::Logic("Already initiated transition".to_string()));
         } else if self.is_transitioning() {
-            info!(">>>is_transitioning");
+            info!(">>> ??? is_transitioning");
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
 
         // When we have a payout in flight, we defer the transition.
         if self.has_payout_in_flight() {
-            info!(">>>has_payout_in_flight");
+            info!(">>> ???? has_payout_in_flight");
             return Err(Error::Logic("Has payout in flight".to_string()));
         }
 
@@ -128,7 +128,7 @@ impl SectionFunds {
             sibling_key,
         });
 
-        info!(">>>> sending transfer setup query!, pending state has been set? {:?}", self.state.pending_actor.is_some());
+        info!(">>>> ??? sending transfer setup query!, pending state has been set? {:?}", self.state.pending_transition.is_some());
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetWalletReplicas(new_wallet)),
@@ -145,9 +145,9 @@ impl SectionFunds {
     /// the new wallet, we can complete the transition by starting
     /// transfers to the new wallets.
     pub async fn complete_transition(&mut self, replicas: PublicKeySet) -> Result<NetworkDuties> {
-        info!(">>>Transitioning section transfer actor...");
+        info!(">>>>Completing transition of section transfer actor...");
         if self.is_transitioning() {
-            info!("is_transitioning");
+            info!(">>>>is_transitioning");
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
         if let Some(pending_transition) = self.state.pending_transition.take() {
@@ -164,14 +164,14 @@ impl SectionFunds {
             self.state.next_actor = Some(actor);
             // When we have a payout in flight, we defer the transition.
             if self.has_payout_in_flight() {
-                info!("has_payout_in_flight");
+                info!(">>>> has_payout_in_flight");
                 return Err(Error::Logic("Has payout in flight".to_string()));
             }
 
             // Get all the tokens of current actor.
             let current_balance = self.actor.balance();
             if current_balance == Token::zero() {
-                info!("No tokens to transfer in this section.");
+                info!(">>>>No tokens to transfer in this section.");
                 // if zero, then there is nothing to transfer..
                 // so just go ahead and become the new actor.
                 return match self.state.next_actor.take() {
@@ -190,11 +190,11 @@ impl SectionFunds {
 
             let mut transfers: NetworkDuties = vec![];
             if let Some(sibling_key) = pending_transition.sibling_key {
-                debug!(">>> Split happening, we need to transfer to TWO wallets, for each sibling");
+                debug!(">>>> Split happening, we need to transfer to TWO wallets, for each sibling");
 
                 let half_balance = current_balance.as_nano() / 2;
                 let remainder = current_balance.as_nano() % 2;
-                debug!("Creating two transfers to each child section");
+                debug!(">>>>Creating two transfers to each child section");
                 // create two transfers to each sibling wallet
 
                 let t1_amount = Token::from_nano(half_balance + remainder);
@@ -228,6 +228,7 @@ impl SectionFunds {
                 transfers.push(NetworkDuty::from(duty));
             }
 
+            debug!(">>>> Section transfer generated");
             Ok(transfers)
         } else {
             Err(Error::Logic(
@@ -255,7 +256,7 @@ impl SectionFunds {
             None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
             Some(event) => {
                 self.apply(TransferInitiated(event.clone()))?;
-                info!("Section actor transition transfer is being requested of the replicas..");
+                info!(">>>> Section actor transition transfer is being requested of the replicas..");
                 // We ask of our Replicas to validate this transfer.
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmd {

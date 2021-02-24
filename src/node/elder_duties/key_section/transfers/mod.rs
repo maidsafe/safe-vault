@@ -194,6 +194,7 @@ impl Transfers {
                     .await?
             }
             ValidateSectionPayout(signed_transfer) => {
+                debug!(">>>> ?? Validating sectin payout");
                 self.validate_section_payout(signed_transfer.clone(), msg_id, origin)
                     .await?
             }
@@ -564,18 +565,22 @@ impl Transfers {
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
+        debug!(">>>>> validatin....");
         match self.replicas.propose_validation(&transfer).await {
             Ok(None) => return Ok(NodeMessagingDuty::NoOp),
-            Ok(Some(event)) => Ok(NodeMessagingDuty::Send(OutgoingMsg {
-                msg: Message::NodeEvent {
-                    event: NodeEvent::SectionPayoutValidated(event),
-                    id: MessageId::new(),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                dst: origin.to_dst(),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })),
+            Ok(Some(event)) => {
+                debug!(">>>>> is valid!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                    msg: Message::NodeEvent {
+                        event: NodeEvent::SectionPayoutValidated(event),
+                        id: MessageId::new(),
+                        correlation_id: msg_id,
+                        target_section_pk: None,
+                    },
+                    dst: origin.to_dst(),
+                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                }))
+            },
             Err(e) => {
                 let message_error = convert_to_error_message(e)?;
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {

@@ -145,7 +145,7 @@ impl Rewards {
     ) -> Result<NetworkDuties> {
         use RewardCmd::*;
 
-        debug!(">>>> Process reward cmd {:?}", cmd);
+        debug!("Process reward cmd {:?}", cmd);
         let result = match cmd {
             SynchHistory(info) => {
                 if self.section_funds.replicas() != PublicKey::Bls(info.replicas.public_key()) {
