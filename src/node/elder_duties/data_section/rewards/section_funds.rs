@@ -149,12 +149,10 @@ impl SectionFunds {
             return Err(Error::Logic("Undergoing transition already".to_string()));
         }
 
-        // TODO: Create a transfer to the other wallet toooooo.
-
         if let Some(elder_state) = self.state.pending_actor.take() {
             let signing = ElderSigning::new(elder_state);
             let actor = TransferActor::from_info(signing, new_wallet, Validator {})?;
-            let wallet_id = actor.id();
+            let our_new_key = actor.id();
             self.state.next_actor = Some(actor);
             // When we have a payout in flight, we defer the transition.
             if self.has_payout_in_flight() {
@@ -163,8 +161,8 @@ impl SectionFunds {
             }
 
             // Get all the tokens of current actor.
-            let amount = self.actor.balance();
-            if amount == Token::zero() {
+            let current_balance = self.actor.balance();
+            if current_balance == Token::zero() {
                 info!("No tokens to transfer in this section.");
                 // if zero, then there is nothing to transfer..
                 // so just go ahead and become the new actor.
@@ -186,25 +184,39 @@ impl SectionFunds {
             if let Some(sibling_key) = sibling_key {
                 debug!(">>> Split happening, we need to transfer to TWO wallets, for each sibling");
 
-                let amount = Token::from_nano(amount.as_nano() / 2);
+                let half_balance = current_balance.as_nano() / 2;
+                let remainder = current_balance.as_nano() % 2;
                 debug!("Creating two transfers to each child section");
                 // create two transfers to each sibling wallet
 
+                let t1_amount = Token::from_nano(half_balance + remainder);
+                let t2_amount = Token::from_nano(half_balance);
+
                 // TODO:is order important here?
                 // Determine which transfer is first
-                if wallet_id > sibling_key {
-                    let t1 = self.generate_transfer_duties(amount, wallet_id).await?;
-                    let t2 = self.generate_transfer_duties(amount, sibling_key).await?;
+                if our_new_key > sibling_key {
+                    let t1 = self
+                        .generate_transfer_duties(t1_amount, our_new_key)
+                        .await?;
+                    let t2 = self
+                        .generate_transfer_duties(t2_amount, sibling_key)
+                        .await?;
                     transfers.push(NetworkDuty::from(t1));
                     transfers.push(NetworkDuty::from(t2));
                 } else {
-                    let t1 = self.generate_transfer_duties(amount, sibling_key).await?;
-                    let t2 = self.generate_transfer_duties(amount, wallet_id).await?;
+                    let t1 = self
+                        .generate_transfer_duties(t1_amount, sibling_key)
+                        .await?;
+                    let t2 = self
+                        .generate_transfer_duties(t2_amount, our_new_key)
+                        .await?;
                     transfers.push(NetworkDuty::from(t1));
                     transfers.push(NetworkDuty::from(t2));
                 }
             } else {
-                let duty = self.generate_transfer_duties(amount, wallet_id).await?;
+                let duty = self
+                    .generate_transfer_duties(current_balance, our_new_key)
+                    .await?;
                 transfers.push(NetworkDuty::from(duty));
             }
 
