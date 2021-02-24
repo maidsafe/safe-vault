@@ -148,7 +148,7 @@ impl Rewards {
         debug!(">>>> Process reward cmd {:?}", cmd);
         let result = match cmd {
             InitiateSectionWallet((info, sibling_key)) => {
-                debug!(">>>> and that's in init section wallet handling");
+                debug!(">>>> and that's in init section wallet handling mhmmmmmm");
                 if self.section_funds.has_initiated_transition() {
                     debug!(">>>> we have initiated transition so....");
                     self.section_funds

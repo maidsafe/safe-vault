@@ -120,7 +120,7 @@ impl SectionFunds {
 
         self.state.pending_actor = Some(elder_state);
 
-        info!(">>>sending transfer setup query");
+        info!(">>>> sending transfer setup query!, pending state has been set? {:?}", self.state.pending_actor.is_some());
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::SetupNewSectionWallets((
