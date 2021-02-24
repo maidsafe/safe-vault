@@ -144,8 +144,11 @@ impl Rewards {
         _origin: SrcLocation,
     ) -> Result<NetworkDuties> {
         use RewardCmd::*;
+
+        debug!(">>> Process reward cmd {:?}", cmd);
         let result = match cmd {
             InitiateSectionWallet((info, sibling_key)) => {
+                debug!(">>>> and that's in init section wallet handling");
                 if self.section_funds.has_initiated_transition() {
                     self.section_funds
                         .complete_transition(info, sibling_key)
