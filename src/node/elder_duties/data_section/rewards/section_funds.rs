@@ -59,6 +59,12 @@ struct State {
     pending_transition: Option<PendingTransition>,
     /// While awaiting payout completion
     next_actor: Option<SectionActor>, // we could do a queue here, and when starting transition skip all but the last one, but that is also prone to edge case problems..
+    split_state: Option<SplitState>,
+}
+
+struct SplitState {
+    amount: Token,
+    recipient: PublicKey,
 }
 
 impl SectionFunds {
@@ -71,6 +77,7 @@ impl SectionFunds {
                 finished: Default::default(),
                 pending_transition: None,
                 next_actor: None,
+                split_state: None,
             },
         }
     }
@@ -201,7 +208,7 @@ impl SectionFunds {
             }
 
             let mut transfers: NetworkDuties = vec![];
-            if let Some(sibling_key) = pending_transition.sibling_key {
+            self.state.split_state = if let Some(sibling_key) = pending_transition.sibling_key {
                 debug!(
                     ">>>> Split happening, we need to transfer to TWO wallets, for each sibling"
                 );
@@ -214,33 +221,34 @@ impl SectionFunds {
                 let t1_amount = Token::from_nano(half_balance + remainder);
                 let t2_amount = Token::from_nano(half_balance);
 
-                // TODO:is order important here?
                 // Determine which transfer is first
+                // (deterministic order is important for reaching consensus)
                 if our_new_key > sibling_key {
                     let t1 = self
                         .generate_transfer_duties(t1_amount, our_new_key)
                         .await?;
-                    let t2 = self
-                        .generate_transfer_duties(t2_amount, sibling_key)
-                        .await?;
                     transfers.push(NetworkDuty::from(t1));
-                    transfers.push(NetworkDuty::from(t2));
+                    Some(SplitState {
+                        amount: t2_amount,
+                        recipient: sibling_key,
+                    })
                 } else {
                     let t1 = self
                         .generate_transfer_duties(t1_amount, sibling_key)
                         .await?;
-                    let t2 = self
-                        .generate_transfer_duties(t2_amount, our_new_key)
-                        .await?;
                     transfers.push(NetworkDuty::from(t1));
-                    transfers.push(NetworkDuty::from(t2));
+                    Some(SplitState {
+                        amount: t2_amount,
+                        recipient: our_new_key,
+                    })
                 }
             } else {
                 let duty = self
                     .generate_transfer_duties(current_balance, our_new_key)
                     .await?;
                 transfers.push(NetworkDuty::from(duty));
-            }
+                None
+            };
 
             debug!(">>>> Section transfer generated");
             Ok(transfers)
@@ -363,16 +371,25 @@ impl SectionFunds {
                 let _ = self.state.finished.insert(payout.node_id);
             }
 
-            // If we are transitioning to a new actor,
-            // we replace the old with the new.
-            let transitioned = self.try_transition(proof.credit_proof())?;
-
-            // If there are queued payouts,
-            // the first in queue will be executed.
-            // (NB: If we were transitioning, we cannot do this until Transfers has transitioned as well!)
             let mut queued_ops = vec![];
-            if !transitioned {
-                queued_ops = self.try_pop_queue().await?;
+
+            // if this was a split, there will be a second transfer to execute
+            if let Some(split_state) = self.state.split_state.take() {
+                let t2 = self
+                    .generate_transfer_duties(split_state.amount, split_state.recipient)
+                    .await?;
+                queued_ops.push(NetworkDuty::from(t2));
+            } else {
+                // If we are transitioning to a new actor,
+                // we replace the old with the new.
+                let transitioned = self.try_transition(proof.credit_proof())?;
+
+                // If there are queued payouts,
+                // the first in queue will be executed.
+                // (NB: If we were transitioning, we cannot do this until Transfers has transitioned as well!)
+                if !transitioned {
+                    queued_ops = self.try_pop_queue().await?;
+                }
             }
 
             // We ask of our Replicas to register this transfer.
