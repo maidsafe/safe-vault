@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.28.0](https://github.com/maidsafe/sn_node/compare/v0.27.2...v0.28.0) (2021-02-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **accumulation:** this changes uses a new version of sn_messaging with a
+breaking change
+
+### Features
+
+* **accumulation:** accumulate elder to adult messages at destination ([a91e3d3](https://github.com/maidsafe/sn_node/commit/a91e3d3603330c21a46a61f0bd076c8e7fe9de37))
+
 ### [0.27.2](https://github.com/maidsafe/sn_node/compare/v0.27.1...v0.27.2) (2021-02-25)
 
 ### [0.27.1](https://github.com/maidsafe/sn_node/compare/v0.27.0...v0.27.1) (2021-02-24)
