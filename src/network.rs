@@ -245,17 +245,27 @@ impl Network {
 
     async fn our_duties(&self) -> AgeGroup {
         let our_name = self.our_name().await;
-        if self.routing.lock().await.is_elder().await {
-            AgeGroup::Elder
-        } else if self
-            .routing
-            .lock()
-            .await
-            .our_adults()
-            .await
-            .iter()
-            .any(|adult| *adult.name() == our_name)
+
+        let is_elder;
         {
+            is_elder = self.routing.lock().await.is_elder().await;
+        }
+
+        let is_adult;
+        {
+            is_adult = self
+                .routing
+                .lock()
+                .await
+                .our_adults()
+                .await
+                .iter()
+                .any(|adult| *adult.name() == our_name)
+        }
+
+        if is_elder {
+            AgeGroup::Elder
+        } else if is_adult {
             AgeGroup::Adult
         } else {
             AgeGroup::Infant
