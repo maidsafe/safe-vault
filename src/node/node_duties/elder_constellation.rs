@@ -112,13 +112,13 @@ impl ElderConstellation {
         debug!(">>previous_key: {:?}", previous_key);
 
         if new_key == previous_key {
-            debug!(">> same keys; IS AN error w/o the key transfer op.");
+            debug!(">> !! same keys; IS AN error w/o the key transfer op.");
             return Err(Error::InvalidOperation(
                 "new_key == previous_key".to_string(),
             ));
         }
         if self.pending_changes.is_empty() {
-            debug!(">> no changes, so return here empty vec");
+            debug!(">>  !! no changes, so return here empty vec");
             return Ok(vec![]);
         }
 
@@ -127,12 +127,12 @@ impl ElderConstellation {
             || new_key != self.pending_changes[0].section_key
         {
             debug!(
-                ">> old state key is not same as prev. ??  {:?}, {:?}",
+                ">> !!old state key is not same as prev. ??  {:?}, {:?}",
                 old_elder_state.section_public_key(),
                 previous_key
             );
             debug!(
-                ">> OR  new key isnt pending change {:?}, {:?}",
+                ">> !! OR  new key isnt pending change {:?}, {:?}",
                 self.pending_changes[0].section_key, new_key
             );
 

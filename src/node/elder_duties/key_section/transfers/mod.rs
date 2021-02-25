@@ -180,7 +180,7 @@ impl Transfers {
         origin: SrcLocation,
     ) -> Result<NetworkDuties> {
         use TransferCmd::*;
-        debug!("Processing cmd in Transfers mod");
+        debug!(">>>Processing cmd in Transfers mod");
         let duty = match cmd {
             InitiateReplica(events) => self.initiate_replica(events).await?,
             ProcessPayment(msg) => self.process_payment(msg, origin).await?,
@@ -238,6 +238,7 @@ impl Transfers {
         msg: &Message,
         origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
+        debug!(">>>> processing payment");
         let origin = match origin {
             SrcLocation::EndUser(enduser) => enduser,
             _ => {

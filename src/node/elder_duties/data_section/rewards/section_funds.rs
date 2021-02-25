@@ -112,7 +112,7 @@ impl SectionFunds {
             return Err(Error::Logic("Already initiated transition".to_string()));
         } else if self.is_transitioning() {
             info!(">>> ??? is_transitioning");
-            return Err(Error::Logic("Undergoing transition already".to_string()));
+            return Err(Error::Logic("Cannot init transition, undergoing one already".to_string()));
         }
 
         // When we have a payout in flight, we defer the transition.

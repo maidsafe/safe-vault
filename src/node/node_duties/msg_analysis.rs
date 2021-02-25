@@ -434,12 +434,15 @@ impl ReceivedMsgAnalysis {
                 cmd: NodeCmd::Transfers(NodeTransferCmd::ValidateSectionPayout(signed_transfer)),
                 id,
                 ..
-            } => TransferDuty::ProcessCmd {
+            } => {
+                debug!(">>>> validating section payout");
+                TransferDuty::ProcessCmd {
                 cmd: TransferCmd::ValidateSectionPayout(signed_transfer.clone()),
                 msg_id: *id,
                 origin,
             }
-            .into(),
+            .into()
+        },
             // from a single src, so cannot be accumulated
             Message::NodeQuery {
                 query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
