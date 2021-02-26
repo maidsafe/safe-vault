@@ -16,13 +16,13 @@ use crate::{
     chunk_store::UsedSpace,
     node::{
         node_duties::NodeDuties,
-        node_ops::{NetworkDuties, NetworkDuty, NodeDuty},
+        node_ops::{NetworkDuties, NodeDuty},
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup},
     },
     Config, Error, Network, NodeInfo, Result,
 };
 use bls::SecretKey;
-use log::{error, info};
+use log::info;
 use sn_data_types::PublicKey;
 use sn_routing::{EventStream, MIN_AGE};
 use std::{
@@ -95,30 +95,19 @@ impl Node {
             Infant
         };
 
-        let mut duties = NodeDuties::new(node_info, network_api.clone()).await?;
-        let next_duty = match age_group {
+        let init_ops = match age_group {
             Infant => Ok(vec![]),
-            Adult => {
-                info!("Starting as Adult");
-                duties
-                    .process_node_duty(node_ops::NodeDuty::AssumeAdultDuties)
-                    .await
-            }
-            Elder => {
-                info!("Starting as Elder");
-                duties
-                    .process_node_duty(node_ops::NodeDuty::AssumeElderDuties)
-                    .await
-            }
+            Adult => Ok(NetworkDuties::from(node_ops::NodeDuty::AssumeAdultDuties)),
+            Elder => Ok(NetworkDuties::from(node_ops::NodeDuty::AssumeElderDuties)),
         };
 
         let mut node = Self {
-            duties,
+            duties: NodeDuties::new(node_info, network_api.clone()).await?,
             network_api,
             network_events,
         };
 
-        node.process_while_any(next_duty).await;
+        node.process_while_any(init_ops).await;
 
         Ok(node)
     }
@@ -159,7 +148,7 @@ impl Node {
 
             if !ops.is_empty() {
                 for duty in ops {
-                    match self.process(duty).await {
+                    match self.duties.process(duty).await {
                         Ok(new_ops) => pending_node_ops.extend(new_ops),
                         Err(e) => self.handle_error(&e),
                     };
@@ -168,33 +157,6 @@ impl Node {
             } else {
                 break;
             }
-        }
-    }
-
-    async fn process(&mut self, duty: NetworkDuty) -> Result<NetworkDuties> {
-        use NetworkDuty::*;
-        match duty {
-            RunAsAdult(duty) => {
-                if let Some(duties) = self.duties.adult_duties() {
-                    duties.process_adult_duty(duty).await
-                } else {
-                    error!("Currently not an Adult!");
-                    Err(Error::Logic("Currently not an Adult".to_string()))
-                }
-            }
-            RunAsElder(duty) => {
-                if let Some(duties) = self.duties.elder_duties() {
-                    duties.process_elder_duty(duty).await
-                } else if self.duties.try_enqueue_elder_duty(duty) {
-                    info!("Enqueued Elder duty");
-                    Ok(vec![])
-                } else {
-                    error!("Currently not an Elder!");
-                    Err(Error::Logic("Currently not an Elder".to_string()))
-                }
-            }
-            RunAsNode(duty) => self.duties.process_node_duty(duty).await,
-            NoOp => Ok(vec![]),
         }
     }
 

@@ -97,6 +97,31 @@ impl NodeDuties {
         })
     }
 
+    pub async fn process(&mut self, duty: NetworkDuty) -> Result<NetworkDuties> {
+        use NetworkDuty::*;
+        match duty {
+            RunAsAdult(duty) => {
+                if let Some(duties) = self.adult_duties() {
+                    duties.process_adult_duty(duty).await
+                } else {
+                    Err(Error::Logic("Currently not an Adult".to_string()))
+                }
+            }
+            RunAsElder(duty) => {
+                if let Some(duties) = self.elder_duties() {
+                    duties.process_elder_duty(duty).await
+                } else if self.try_enqueue_elder_duty(duty) {
+                    info!("Enqueued Elder duty");
+                    Ok(vec![])
+                } else {
+                    Err(Error::Logic("Currently not an Elder".to_string()))
+                }
+            }
+            RunAsNode(duty) => self.process_node_duty(duty).await,
+            NoOp => Ok(vec![]),
+        }
+    }
+
     pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
         use Stage::*;
         match &mut self.stage {
@@ -145,7 +170,7 @@ impl NodeDuties {
         })
     }
 
-    pub async fn process_node_duty(&mut self, duty: NodeDuty) -> Result<NetworkDuties> {
+    async fn process_node_duty(&mut self, duty: NodeDuty) -> Result<NetworkDuties> {
         use NodeDuty::*;
         info!("Processing Node duty: {:?}", duty);
         match duty {
