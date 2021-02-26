@@ -109,7 +109,7 @@ impl Network {
         self.routing.lock().await.our_prefix().await
     }
 
-    pub async fn section_chain(&self) -> SectionProofChain {
+    pub async fn section_chain(&self) -> SectionChain {
         self.routing.lock().await.section_chain().await
     }
 

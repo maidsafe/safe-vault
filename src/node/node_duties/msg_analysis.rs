@@ -79,14 +79,6 @@ impl ReceivedMsgAnalysis {
                     Ok(res)
                 }
             }
-            DstLocation::AccumulatingNode(_name) => {
-                let res = self.match_node_msg(msg.clone(), src)?;
-                if res.is_empty() {
-                    self.match_section_msg(msg, src)
-                } else {
-                    Ok(res)
-                }
-            }
             _ => Err(Error::InvalidMessage(
                 msg_id,
                 format!("Invalid dst: {:?}", msg),

@@ -199,7 +199,12 @@ impl Node {
     }
 
     fn handle_error(&self, err: &Error) {
-        info!("unimplemented: Handle errors.. {}", err)
+        use std::error::Error;
+        info!(
+            "unimplemented: Handle errors.. {}, has source of: {:?}",
+            err,
+            err.source()
+        )
     }
 }
 
