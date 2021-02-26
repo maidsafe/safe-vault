@@ -20,7 +20,7 @@ use sn_messaging::{
         BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd, NodeQuery,
         NodeSystemCmd, QueryResponse,
     },
-    DstLocation, EndUser, MessageId, SrcLocation,
+    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 
 use std::{
@@ -90,7 +90,7 @@ impl BlobRegister {
                             target_section_pk: None,
                         },
                         dst: DstLocation::EndUser(origin),
-                        to_be_aggregated: false,
+                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                     }));
                 }
             } else {
@@ -159,7 +159,7 @@ impl BlobRegister {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -348,7 +348,7 @@ impl BlobRegister {
                 NodeMessagingDuty::Send(OutgoingMsg {
                     msg,
                     dst: DstLocation::Node(dst),
-                    to_be_aggregated: false,
+                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 })
                 .into(),
             );
@@ -386,7 +386,7 @@ impl BlobRegister {
             Ok(NodeMessagingDuty::Send(OutgoingMsg {
                 msg: err_msg,
                 dst: DstLocation::EndUser(origin),
-                to_be_aggregated: false, // TODO: to_be_aggregated: true,
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }))
         };
 

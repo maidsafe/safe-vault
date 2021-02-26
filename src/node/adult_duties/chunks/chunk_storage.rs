@@ -22,7 +22,7 @@ use sn_messaging::{
         CmdError, Error as ErrorMessage, Message, NodeDataQueryResponse, NodeQuery,
         NodeQueryResponse, NodeSystemQuery, QueryResponse,
     },
-    DstLocation, EndUser, MessageId, SrcLocation,
+    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use std::{
     collections::BTreeSet,
@@ -61,7 +61,7 @@ impl ChunkStorage {
                     target_section_pk: None,
                 },
                 dst: DstLocation::EndUser(origin),
-                to_be_aggregated: false, // TODO: to_be_aggregated: true,
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }))
         } else {
             Ok(NodeMessagingDuty::NoOp)
@@ -113,7 +113,7 @@ impl ChunkStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false, // TODO: to_be_aggregated: true,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -163,7 +163,7 @@ impl ChunkStorage {
                 target_section_pk: None,
             },
             dst: origin.to_dst(),
-            to_be_aggregated: false, // TODO: to_be_aggregated: true,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -229,7 +229,7 @@ impl ChunkStorage {
                     target_section_pk: None,
                 },
                 dst: DstLocation::EndUser(origin),
-                to_be_aggregated: false, // TODO: to_be_aggregated: true,
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }));
         }
         Ok(NodeMessagingDuty::NoOp)

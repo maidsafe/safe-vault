@@ -14,7 +14,7 @@ use sn_data_types::{
     SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
     WalletInfo,
 };
-use sn_messaging::{client::Message, DstLocation, EndUser, MessageId, SrcLocation};
+use sn_messaging::{client::Message, Aggregation, DstLocation, EndUser, MessageId, SrcLocation};
 use std::fmt::Formatter;
 
 use sn_routing::{Event as RoutingEvent, Prefix};
@@ -147,7 +147,7 @@ impl Debug for NodeDuty {
 pub struct OutgoingMsg {
     pub msg: Message,
     pub dst: DstLocation,
-    pub to_be_aggregated: bool,
+    pub aggregation: Aggregation,
 }
 
 impl OutgoingMsg {

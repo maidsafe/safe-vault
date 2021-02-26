@@ -21,7 +21,7 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{Message, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery},
-    DstLocation, MessageId,
+    Aggregation, DstLocation, MessageId,
 };
 use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
@@ -121,7 +121,7 @@ impl SectionFunds {
                 target_section_pk: None,
             },
             dst: DstLocation::Section(new_wallet.into()),
-            to_be_aggregated: false, // TODO aggregate this
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -194,7 +194,7 @@ impl SectionFunds {
                             target_section_pk: None,
                         },
                         dst: DstLocation::Section(self.actor.id().into()),
-                        to_be_aggregated: false,
+                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                     }))
                 }
             }
@@ -242,7 +242,7 @@ impl SectionFunds {
                         target_section_pk: None,
                     },
                     dst: DstLocation::Section(self.actor.id().into()),
-                    to_be_aggregated: false,
+                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 }))
             }
         }
@@ -294,7 +294,7 @@ impl SectionFunds {
                     target_section_pk: None,
                 },
                 dst: DstLocation::Section(self.actor.id().into()),
-                to_be_aggregated: false, // TODO: aggregate here (not needed, but makes sn_node logs less chatty..)
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination, // TODO: aggregate here (not needed, but makes sn_node logs less chatty..)
             }));
 
             // First register the transfer, then
