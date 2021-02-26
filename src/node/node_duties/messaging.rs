@@ -66,11 +66,14 @@ impl Messaging {
         let bytes = &msg.serialize()?;
         for target in targets {
             self.network
-                .send_message(Itinerary {
-                    src: SrcLocation::Node(name),
-                    dst: DstLocation::Node(XorName(target.0)),
-                    aggregation: Aggregation::AtDestination,
-                }, bytes.clone())
+                .send_message(
+                    Itinerary {
+                        src: SrcLocation::Node(name),
+                        dst: DstLocation::Node(XorName(target.0)),
+                        aggregation: Aggregation::AtDestination,
+                    },
+                    bytes.clone(),
+                )
                 .await
                 .map_or_else(
                     |err| {
