@@ -41,18 +41,24 @@ use sn_messaging::{
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use std::collections::{BTreeMap, VecDeque};
+use GenesisStage::*;
 
 const GENESIS_ELDER_COUNT: usize = 5;
 
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum Stage {
+enum Stage {
     Infant,
     Adult(AdultDuties),
+    Genesis(GenesisStage),
     AssumingElderDuties(VecDeque<ElderDuty>),
+    Elder(ElderConstellation),
+}
+
+#[allow(clippy::large_enum_variant)]
+enum GenesisStage {
     AwaitingGenesisThreshold(VecDeque<ElderDuty>),
     ProposingGenesis(GenesisProposal),
     AccumulatingGenesis(GenesisAccumulation),
-    Elder(ElderConstellation),
 }
 
 /// Node duties are those that all nodes
@@ -139,19 +145,24 @@ impl NodeDuties {
 
     pub fn try_enqueue_elder_duty(&mut self, duty: ElderDuty) -> bool {
         match self.stage {
-            Stage::AssumingElderDuties(ref mut queue)
-            | Stage::AwaitingGenesisThreshold(ref mut queue) => {
+            Stage::AssumingElderDuties(ref mut queue) => {
                 queue.push_back(duty);
                 true
             }
-            Stage::ProposingGenesis(ref mut bootstrap) => {
-                bootstrap.queued_ops.push_back(duty);
-                true
-            }
-            Stage::AccumulatingGenesis(ref mut bootstrap) => {
-                bootstrap.queued_ops.push_back(duty);
-                true
-            }
+            Stage::Genesis(ref mut stage) => match stage {
+                AwaitingGenesisThreshold(ref mut queue) => {
+                    queue.push_back(duty);
+                    true
+                }
+                ProposingGenesis(ref mut bootstrap) => {
+                    bootstrap.queued_ops.push_back(duty);
+                    true
+                }
+                AccumulatingGenesis(ref mut bootstrap) => {
+                    bootstrap.queued_ops.push_back(duty);
+                    true
+                }
+            },
             _ => false,
         }
     }
@@ -261,7 +272,10 @@ impl NodeDuties {
     async fn begin_transition_to_elder(&mut self) -> Result<NetworkDuties> {
         if matches!(self.stage, Stage::Elder(_))
             || matches!(self.stage, Stage::AssumingElderDuties(_))
-            || matches!(self.stage, Stage::AwaitingGenesisThreshold(_))
+            || matches!(
+                self.stage,
+                Stage::Genesis(AwaitingGenesisThreshold(_))
+            )
         {
             return Ok(vec![]);
         } else if !self.node_info.genesis && matches!(self.stage, Stage::Infant) {
@@ -297,13 +311,13 @@ impl NodeDuties {
             let credit_sig_share = elder_state.sign_as_elder(&credit).await?;
             let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
 
-            self.stage = Stage::ProposingGenesis(GenesisProposal {
+            self.stage = Stage::Genesis(ProposingGenesis(GenesisProposal {
                 elder_state: elder_state.clone(),
                 proposal: credit.clone(),
                 signatures,
                 pending_agreement: None,
                 queued_ops: VecDeque::new(),
-            });
+            }));
 
             let dst = DstLocation::Section(credit.recipient.into());
             return Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
@@ -321,7 +335,7 @@ impl NodeDuties {
         } else if is_genesis_section && elder_count < GENESIS_ELDER_COUNT && section_chain_len <= 5
         {
             debug!("AwaitingGenesisThreshold!");
-            self.stage = Stage::AwaitingGenesisThreshold(VecDeque::new());
+            self.stage = Stage::Genesis(AwaitingGenesisThreshold(VecDeque::new()));
             return Ok(vec![]);
         }
 
@@ -352,14 +366,16 @@ impl NodeDuties {
         credit: Credit,
         sig: SignatureShare,
     ) -> Result<NetworkDuties> {
-        if matches!(self.stage, Stage::AccumulatingGenesis(_))
-            || matches!(self.stage, Stage::Elder(_))
+        if matches!(
+            self.stage,
+            Stage::Genesis(AccumulatingGenesis(_))
+        ) || matches!(self.stage, Stage::Elder(_))
         {
             return Ok(vec![]);
         }
 
         let (stage, cmd) = match self.stage {
-            Stage::AwaitingGenesisThreshold(ref mut queued_ops) => {
+            Stage::Genesis(AwaitingGenesisThreshold(ref mut queued_ops)) => {
                 let elder_state = ElderState::new(self.network_api.clone()).await?;
 
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
@@ -369,13 +385,13 @@ impl NodeDuties {
                 let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
 
                 let dst = DstLocation::Section(elder_state.section_public_key().into());
-                let stage = Stage::ProposingGenesis(GenesisProposal {
+                let stage = Stage::Genesis(ProposingGenesis(GenesisProposal {
                     elder_state,
                     proposal: credit.clone(),
                     signatures,
                     pending_agreement: None,
                     queued_ops: queued_ops.drain(..).collect(),
-                });
+                }));
                 let cmd = NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmd {
                         cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
@@ -391,7 +407,7 @@ impl NodeDuties {
 
                 (stage, cmd)
             }
-            Stage::ProposingGenesis(ref mut bootstrap) => {
+            Stage::Genesis(ProposingGenesis(ref mut bootstrap)) => {
                 debug!("Adding incoming genesis proposal.");
                 bootstrap.add(sig)?;
                 if let Some(signed_credit) = &bootstrap.pending_agreement {
@@ -402,13 +418,14 @@ impl NodeDuties {
                     let _ =
                         signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
 
-                    let stage = Stage::AccumulatingGenesis(GenesisAccumulation {
-                        elder_state: bootstrap.elder_state.clone(),
-                        agreed_proposal: signed_credit.clone(),
-                        signatures,
-                        pending_agreement: None,
-                        queued_ops: bootstrap.queued_ops.drain(..).collect(),
-                    });
+                    let stage =
+                        Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
+                            elder_state: bootstrap.elder_state.clone(),
+                            agreed_proposal: signed_credit.clone(),
+                            signatures,
+                            pending_agreement: None,
+                            queued_ops: bootstrap.queued_ops.drain(..).collect(),
+                        }));
 
                     let cmd = NodeMessagingDuty::Send(OutgoingMsg {
                         msg: Message::NodeCmd {
@@ -452,7 +469,7 @@ impl NodeDuties {
         }
 
         match self.stage {
-            Stage::ProposingGenesis(ref mut bootstrap) => {
+            Stage::Genesis(ProposingGenesis(ref mut bootstrap)) => {
                 // replicas signatures over > signed_credit <
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
                 let _ = signatures.insert(sig.index, sig.share);
@@ -460,16 +477,17 @@ impl NodeDuties {
                 let credit_sig_share = bootstrap.elder_state.sign_as_elder(&signed_credit).await?;
                 let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share);
 
-                self.stage = Stage::AccumulatingGenesis(GenesisAccumulation {
-                    elder_state: bootstrap.elder_state.clone(),
-                    agreed_proposal: signed_credit,
-                    signatures,
-                    pending_agreement: None,
-                    queued_ops: bootstrap.queued_ops.drain(..).collect(),
-                });
+                self.stage =
+                    Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
+                        elder_state: bootstrap.elder_state.clone(),
+                        agreed_proposal: signed_credit,
+                        signatures,
+                        pending_agreement: None,
+                        queued_ops: bootstrap.queued_ops.drain(..).collect(),
+                    }));
                 Ok(vec![])
             }
-            Stage::AccumulatingGenesis(ref mut bootstrap) => {
+            Stage::Genesis(AccumulatingGenesis(ref mut bootstrap)) => {
                 bootstrap.add(sig)?;
                 if let Some(genesis) = bootstrap.pending_agreement.take() {
                     // TODO: do not take this? (in case of fail further blow)
@@ -480,8 +498,6 @@ impl NodeDuties {
 
                     let genesis = TransferPropagated {
                         credit_proof: genesis.clone(),
-                        //crediting_replica_sig: credit_sig_share,
-                        //crediting_replica_keys: bootstrap.elder_state.section_public_key(),
                     };
 
                     debug!(">>> GENSIS AGREEMENT PROOFED");
@@ -522,10 +538,10 @@ impl NodeDuties {
                     return Err(Error::InvalidOperation("cannot finish_transition_to_elder as Infant".to_string()));
                 }
             }
-            Stage::Adult(_) | Stage::AwaitingGenesisThreshold(_) | Stage::ProposingGenesis(_) => {
+            Stage::Adult(_) | Stage::Genesis(AwaitingGenesisThreshold(_)) | Stage::Genesis(ProposingGenesis(_)) => {
                 return Err(Error::InvalidOperation("cannot finish_transition_to_elder as Adult | AwaitingGenesisThreshold | ProposingGenesis".to_string()))
             }
-            Stage::AccumulatingGenesis(ref mut bootstrap) => &mut bootstrap.queued_ops,
+            Stage::Genesis(AccumulatingGenesis(ref mut bootstrap)) => &mut bootstrap.queued_ops,
             Stage::AssumingElderDuties(ref mut queue) => queue,
         };
 
@@ -586,11 +602,8 @@ impl NodeDuties {
         sibling_key: Option<PublicKey>,
     ) -> Result<NetworkDuties> {
         match &mut self.stage {
-            Stage::Infant => Ok(vec![]),
+            Stage::Infant | Stage::Genesis(_) => Ok(vec![]),
             Stage::AssumingElderDuties(_) => Ok(vec![]), // TODO: Queue up (or something?)!!
-            Stage::AwaitingGenesisThreshold(_) => Ok(vec![]),
-            Stage::ProposingGenesis(_) => Ok(vec![]), // TODO: Queue up (or something?)!!
-            Stage::AccumulatingGenesis(_) => Ok(vec![]), // TODO: Queue up (or something?)!!
             Stage::Adult(_old_state) => {
                 let state = AdultState::new(self.network_api.clone()).await?;
                 let duties = AdultDuties::new(&self.node_info, state).await?;
@@ -606,17 +619,15 @@ impl NodeDuties {
     }
 
     ///
-    pub async fn finish_elder_change(
+    async fn finish_elder_change(
         &mut self,
         previous_key: PublicKey,
         new_key: PublicKey,
     ) -> Result<NetworkDuties> {
         match &mut self.stage {
-            Stage::AwaitingGenesisThreshold(_) => Ok(vec![]),
-            Stage::ProposingGenesis(_) => Ok(vec![]),
-            Stage::AccumulatingGenesis(_) => Ok(vec![]),
-            Stage::AssumingElderDuties(_) => Ok(vec![]), // Should be unreachable?
-            Stage::Infant | Stage::Adult(_) => Ok(vec![]),
+            Stage::Infant | Stage::Adult(_) | Stage::Genesis(_) | Stage::AssumingElderDuties(_) => {
+                Ok(vec![])
+            } // Should be unreachable
             Stage::Elder(elder) => {
                 elder
                     .finish_elder_change(&self.node_info, previous_key, new_key)
