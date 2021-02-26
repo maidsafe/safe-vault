@@ -7,18 +7,23 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod elder_constellation;
+mod genesis;
 pub mod messaging;
 mod msg_analysis;
 mod network_events;
 
-use self::elder_constellation::ElderConstellation;
+use self::{
+    elder_constellation::ElderConstellation,
+    genesis::{GenesisAccumulation, GenesisProposal},
+};
 use crate::{
     node::{
         adult_duties::AdultDuties,
         elder_duties::ElderDuties,
         node_duties::messaging::Messaging,
         node_ops::{
-            ElderDuty, NetworkDuties, NetworkDuty, NodeDuty, OutgoingMsg, RewardCmd, RewardDuty,
+            ElderDuty, NetworkDuties, NetworkDuty, NodeDuty, NodeMessagingDuty, OutgoingMsg,
+            RewardCmd, RewardDuty,
         },
         NodeInfo,
     },
@@ -28,8 +33,8 @@ use log::{debug, info, trace};
 use msg_analysis::ReceivedMsgAnalysis;
 use network_events::NetworkEvents;
 use sn_data_types::{
-    ActorHistory, Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, Token,
-    TransferPropagated, WalletInfo,
+    ActorHistory, Credit, PublicKey, SignatureShare, SignedCredit, Token, TransferPropagated,
+    WalletInfo,
 };
 use sn_messaging::{
     client::{Message, NodeCmd, NodeQuery, NodeRewardQuery, NodeSystemCmd},
@@ -37,12 +42,10 @@ use sn_messaging::{
 };
 use std::collections::{BTreeMap, VecDeque};
 
-use super::node_ops::NodeMessagingDuty;
-
 const GENESIS_ELDER_COUNT: usize = 5;
 
 #[allow(clippy::large_enum_variant)]
-pub enum Stage {
+pub(crate) enum Stage {
     Infant,
     Adult(AdultDuties),
     AssumingElderDuties(VecDeque<ElderDuty>),
@@ -50,74 +53,6 @@ pub enum Stage {
     ProposingGenesis(GenesisProposal),
     AccumulatingGenesis(GenesisAccumulation),
     Elder(ElderConstellation),
-}
-
-pub struct GenesisProposal {
-    elder_state: ElderState,
-    proposal: Credit,
-    signatures: BTreeMap<usize, bls::SignatureShare>,
-    pending_agreement: Option<SignedCredit>,
-    queued_ops: VecDeque<ElderDuty>,
-}
-
-pub struct GenesisAccumulation {
-    elder_state: ElderState,
-    agreed_proposal: SignedCredit,
-    signatures: BTreeMap<usize, bls::SignatureShare>,
-    pending_agreement: Option<CreditAgreementProof>,
-    queued_ops: VecDeque<ElderDuty>,
-}
-
-impl GenesisProposal {
-    fn add(&mut self, sig: SignatureShare) -> Result<()> {
-        let _ = self.signatures.insert(sig.index, sig.share);
-        let min_count = 1 + self.elder_state.public_key_set().threshold();
-        if self.signatures.len() >= min_count {
-            info!("Aggregating actor signature..");
-
-            // Combine shares to produce the main signature.
-            let actor_signature = sn_data_types::Signature::Bls(
-                self.elder_state
-                    .public_key_set()
-                    .combine_signatures(&self.signatures)
-                    .map_err(|_| Error::CouldNotCombineSignatures)?,
-            );
-
-            let signed_credit = SignedCredit {
-                credit: self.proposal.clone(),
-                actor_signature,
-            };
-
-            self.pending_agreement = Some(signed_credit);
-        }
-
-        Ok(())
-    }
-}
-
-impl GenesisAccumulation {
-    fn add(&mut self, sig: SignatureShare) -> Result<()> {
-        let _ = self.signatures.insert(sig.index, sig.share);
-        let min_count = 1 + self.elder_state.public_key_set().threshold();
-        if self.signatures.len() >= min_count {
-            info!("Aggregating replica signature..");
-            // Combine shares to produce the main signature.
-            let debiting_replicas_sig = sn_data_types::Signature::Bls(
-                self.elder_state
-                    .public_key_set()
-                    .combine_signatures(&self.signatures)
-                    .map_err(|_| Error::CouldNotCombineSignatures)?,
-            );
-
-            self.pending_agreement = Some(CreditAgreementProof {
-                signed_credit: self.agreed_proposal.clone(),
-                debiting_replicas_sig,
-                debiting_replicas_keys: self.elder_state.public_key_set().clone(),
-            });
-        }
-
-        Ok(())
-    }
 }
 
 /// Node duties are those that all nodes
@@ -147,7 +82,6 @@ pub struct NodeDuties {
 /// -> 1. Instantiate ElderDuties.
 /// -> 2. Add own node id to rewards.
 /// -> 3. Add own wallet to rewards.
-
 impl NodeDuties {
     pub async fn new(node_info: NodeInfo, network_api: Network) -> Result<Self> {
         let state = NodeState::Infant(network_api.public_key().await);
