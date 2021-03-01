@@ -578,7 +578,7 @@ impl Transfers {
                         correlation_id: msg_id,
                         target_section_pk: None,
                     },
-                    dst: origin.to_dst(),
+                    dst: DstLocation::Section(origin.name()),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 }))
             }
