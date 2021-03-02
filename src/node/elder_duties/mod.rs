@@ -147,6 +147,7 @@ impl ElderDuties {
         let dbs = ChunkHolderDbs::new(node_info.path())?;
         let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs));
         self.key_section.elders_changed(state, rate_limit);
+        // TODO: self.data_section.update_elder_state
         Ok(())
     }
 

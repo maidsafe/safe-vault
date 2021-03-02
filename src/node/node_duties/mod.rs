@@ -272,10 +272,7 @@ impl NodeDuties {
     async fn begin_transition_to_elder(&mut self) -> Result<NetworkDuties> {
         if matches!(self.stage, Stage::Elder(_))
             || matches!(self.stage, Stage::AssumingElderDuties(_))
-            || matches!(
-                self.stage,
-                Stage::Genesis(AwaitingGenesisThreshold(_))
-            )
+            || matches!(self.stage, Stage::Genesis(AwaitingGenesisThreshold(_)))
         {
             return Ok(vec![]);
         } else if !self.node_info.genesis && matches!(self.stage, Stage::Infant) {
@@ -366,10 +363,8 @@ impl NodeDuties {
         credit: Credit,
         sig: SignatureShare,
     ) -> Result<NetworkDuties> {
-        if matches!(
-            self.stage,
-            Stage::Genesis(AccumulatingGenesis(_))
-        ) || matches!(self.stage, Stage::Elder(_))
+        if matches!(self.stage, Stage::Genesis(AccumulatingGenesis(_)))
+            || matches!(self.stage, Stage::Elder(_))
         {
             return Ok(vec![]);
         }
@@ -418,14 +413,13 @@ impl NodeDuties {
                     let _ =
                         signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
 
-                    let stage =
-                        Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
-                            elder_state: bootstrap.elder_state.clone(),
-                            agreed_proposal: signed_credit.clone(),
-                            signatures,
-                            pending_agreement: None,
-                            queued_ops: bootstrap.queued_ops.drain(..).collect(),
-                        }));
+                    let stage = Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
+                        elder_state: bootstrap.elder_state.clone(),
+                        agreed_proposal: signed_credit.clone(),
+                        signatures,
+                        pending_agreement: None,
+                        queued_ops: bootstrap.queued_ops.drain(..).collect(),
+                    }));
 
                     let cmd = NodeMessagingDuty::Send(OutgoingMsg {
                         msg: Message::NodeCmd {
@@ -477,14 +471,13 @@ impl NodeDuties {
                 let credit_sig_share = bootstrap.elder_state.sign_as_elder(&signed_credit).await?;
                 let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share);
 
-                self.stage =
-                    Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
-                        elder_state: bootstrap.elder_state.clone(),
-                        agreed_proposal: signed_credit,
-                        signatures,
-                        pending_agreement: None,
-                        queued_ops: bootstrap.queued_ops.drain(..).collect(),
-                    }));
+                self.stage = Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
+                    elder_state: bootstrap.elder_state.clone(),
+                    agreed_proposal: signed_credit,
+                    signatures,
+                    pending_agreement: None,
+                    queued_ops: bootstrap.queued_ops.drain(..).collect(),
+                }));
                 Ok(vec![])
             }
             Stage::Genesis(AccumulatingGenesis(ref mut bootstrap)) => {

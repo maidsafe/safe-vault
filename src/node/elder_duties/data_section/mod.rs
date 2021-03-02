@@ -172,9 +172,10 @@ impl DataSection {
             .collect();
         self.rewards.remove(to_remove);
 
-        // Then payout rewards to all the Elders.
-        let elders = self.elder_state.elder_names();
-        self.rewards.payout_rewards(elders).await
+        Ok(vec![])
+        // // Then payout rewards to all the Elders.
+        // let elders = self.elder_state.elder_names();
+        // self.rewards.payout_rewards(elders).await
     }
 
     /// When a new node joins, it is registered for receiving rewards.
