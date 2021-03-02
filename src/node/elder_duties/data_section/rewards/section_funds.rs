@@ -286,10 +286,12 @@ impl SectionFunds {
         )? {
             None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
             Some(event) => {
-                self.apply(TransferInitiated(event.clone()))?;
                 info!(
                     ">>>> Section actor transition transfer is being requested of the replicas.."
                 );
+                self.apply(TransferInitiated(event.clone()))?;
+
+                info!(">>>> !!!!!! TRANSFER APPLIED TO SELF, event {:?}", event);
                 // We ask of our Replicas to validate this transfer.
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmd {
@@ -409,6 +411,8 @@ impl SectionFunds {
                     queued_ops = self.try_pop_queue().await?;
                 }
                 Transition::Split(SplitStage::FinishingT1 { next_actor, ref t2 }) => {
+                    debug!(">>>> ************************* finishing t1!");
+
                     let was_t1_ours = if t2.recipient != next_actor.id() {
                         Some(proof.credit_proof())
                     } else {
@@ -425,6 +429,7 @@ impl SectionFunds {
                     next_actor,
                     ref was_t1_ours,
                 }) => {
+                    debug!(">>>> ********************** finishing t2!");
                     if let Some(credit) = was_t1_ours {
                         // t1 was the credit to our next actor
                         self.move_to_next(next_actor.clone(), credit.clone())?

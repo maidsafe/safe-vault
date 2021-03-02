@@ -23,8 +23,8 @@ pub enum Error {
     #[error("Not enough space")]
     NotEnoughSpace,
     /// Node not found for rewarding
-    #[error("Node not found")]
-    NodeNotFound,
+    #[error("Node not found for rewards")]
+    NodeNotFoundForReward,
     /// Key, Value pair not found in `ChunkStore`.
     #[error("No such chunk")]
     NoSuchChunk,

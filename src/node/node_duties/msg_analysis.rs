@@ -427,7 +427,7 @@ impl ReceivedMsgAnalysis {
                 id,
                 ..
             } => {
-                debug!(">>>> validating section payout");
+                debug!(">>>> validating section payout to {:?}",signed_transfer );
                 TransferDuty::ProcessCmd {
                     cmd: TransferCmd::ValidateSectionPayout(signed_transfer.clone()),
                     msg_id: *id,

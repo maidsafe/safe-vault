@@ -12,13 +12,9 @@ use bls::PublicKeySet;
 use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::info;
-use sn_data_types::{
-    ActorHistory, CreditAgreementProof, OwnerType, PublicKey, ReplicaEvent, SignedTransfer,
-    SignedTransferShare, Token, TransferAgreementProof, TransferPropagated, TransferRegistered,
-    TransferValidated,
-};
+use sn_data_types::{ActorHistory, CreditAgreementProof, DebitId, OwnerType, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare, Token, TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated};
 use sn_transfers::{Error as TransfersError, WalletReplica};
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 use std::sync::Arc;
 use xor_name::Prefix;
 
@@ -42,6 +38,7 @@ where
     info: ReplicaInfo<T>,
     locks: WalletLocks,
     self_lock: Arc<Mutex<usize>>,
+    recently_validated_transfers : HashSet<DebitId>
 }
 
 impl<T: ReplicaSigning> Replicas<T> {
@@ -51,6 +48,7 @@ impl<T: ReplicaSigning> Replicas<T> {
             info,
             locks: Default::default(),
             self_lock: Arc::new(Mutex::new(0)),
+            recently_validated_transfers: Default::default(),
         }
     }
 
@@ -534,18 +532,23 @@ impl<T: ReplicaSigning> Replicas<T> {
         &self,
         signed_transfer: &SignedTransferShare,
     ) -> Result<Option<TransferValidated>> {
-        debug!("MultisigReplica validating transfer: {:?}", signed_transfer);
+        debug!(">>>> MultisigReplica validating transfer from: {:?}, w/ credit id: {:?}", signed_transfer.sender(), signed_transfer.credit_id());
         let id = signed_transfer.sender();
         let actors = OwnerType::Multi(signed_transfer.actors().clone());
         // Acquire lock of the wallet.
         let key_lock = self.load_key_lock(id).await?;
         let mut store = key_lock.lock().await;
 
+        if let Some(id) =  self.recently_validated_transfers.get(signed_transfer.debit.id()) {
+            // we've done this before so we can safely just return No op
+            return Ok(None);
+        }
+
         // Access to the specific wallet is now serialised!
         let mut wallet = self.load_wallet(&store, actors.clone()).await?;
-        debug!("MultisigReplica wallet loaded: {:?}", id);
+        debug!(">>>> MultisigReplica wallet loaded: {:?}", id);
         if let Some(proposal) = wallet.propose_validation(signed_transfer)? {
-            debug!("TransferValidationProposed!");
+            debug!(">>>> TransferValidationProposed!");
             // apply the event
             let event = ReplicaEvent::TransferValidationProposed(proposal.clone());
             wallet.apply(event.clone())?;

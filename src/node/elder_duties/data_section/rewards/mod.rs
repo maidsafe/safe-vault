@@ -344,8 +344,8 @@ impl Rewards {
         // Try get the wallet..
         let age = match self.node_rewards.get_mut(&node_id) {
             None => {
-                warn!("Invalid operation: Node not found {}.", node_id);
-                return Err(Error::NodeNotFound);
+                warn!(">>>activate_node_rewards Invalid operation: Node not found {}.", node_id);
+                return Err(Error::NodeNotFoundForReward);
             }
             Some(state) => {
                 match *state {
@@ -384,7 +384,10 @@ impl Rewards {
         debug!("Rewards: trying to deactivate {}", node_id);
         let entry = match self.node_rewards.get(&node_id) {
             Some(entry) => entry.clone(),
-            None => return Err(Error::NodeNotFound),
+            None => {
+                warn!("Could not deactivate, node not found");
+                return Err(Error::NodeNotFoundForReward)
+            },
         };
         debug!(
             "Rewards: node {} found as {:?}, deactivating..",

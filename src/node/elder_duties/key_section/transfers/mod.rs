@@ -27,6 +27,7 @@ use log::{debug, error, info, trace, warn};
 use replica_signing::ReplicaSigningImpl;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
+use std::collections::HashSet;
 
 use sn_data_types::{
     CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare,
@@ -74,6 +75,8 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 pub struct Transfers {
     replicas: Replicas<ReplicaSigningImpl>,
     rate_limit: RateLimit,
+    recently_validated_transfers : HashSet<DebitId>
+
 }
 
 impl Transfers {
@@ -81,6 +84,7 @@ impl Transfers {
         Self {
             replicas,
             rate_limit,
+            recently_validated_transfers: Default::default()
         }
     }
 
@@ -561,7 +565,7 @@ impl Transfers {
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
     async fn validate_section_payout(
-        &self,
+        &mut self,
         transfer: SignedTransferShare,
         msg_id: MessageId,
         origin: SrcLocation,
@@ -583,6 +587,7 @@ impl Transfers {
                 }))
             }
             Err(e) => {
+                error!(">>>> transfer is not valid! {:?}", e);
                 let message_error = convert_to_error_message(e)?;
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmdError {
@@ -694,7 +699,7 @@ impl Transfers {
                 Ok(ops)
             }
             Err(e) => {
-                debug!(">>> Error in match payout");
+                debug!(">>> Error in match payout, {:?}", e);
                 let message_error = convert_to_error_message(e)?;
                 Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmdError {
