@@ -22,7 +22,7 @@ use crate::{
     Config, Error, Network, NodeInfo, Result,
 };
 use bls::SecretKey;
-use log::info;
+use log::{info, error};
 use sn_data_types::PublicKey;
 use sn_routing::{EventStream, MIN_AGE};
 use std::{
@@ -163,10 +163,13 @@ impl Node {
     fn handle_error(&self, err: &Error) {
         use std::error::Error;
         info!(
-            "unimplemented: Handle errors.. {}, has source of: {:?}",
-            err,
-            err.source()
-        )
+            "unimplemented: Handle errors.. {}",
+            err
+        );
+
+        if let Some(source) = err.source() {
+            error!("Source of error: {:?}", source);
+        }
     }
 }
 

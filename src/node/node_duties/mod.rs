@@ -117,7 +117,7 @@ impl NodeDuties {
                 if let Some(duties) = self.elder_duties() {
                     duties.process_elder_duty(duty).await
                 } else if self.try_enqueue_elder_duty(duty) {
-                    info!("Enqueued Elder duty");
+                    info!("> ???? Enqueued Elder duty");
                     Ok(vec![])
                 } else {
                     Err(Error::Logic("Currently not an Elder".to_string()))
@@ -538,7 +538,7 @@ impl NodeDuties {
             Stage::AssumingElderDuties(ref mut queue) => queue,
         };
 
-        trace!("Finishing transition to Elder..");
+        trace!(">>>Finishing transition to Elder..");
 
         let mut ops: NetworkDuties = vec![];
         let state = ElderState::new(self.network_api.clone()).await?;
@@ -549,7 +549,7 @@ impl NodeDuties {
 
         // 2. Process all enqueued duties.
         for duty in queued_duties.drain(..) {
-            debug!("queued duty: {:?}", duty);
+            debug!(">>>>> DEALING WITH QUEUE queued duty: {:?}", duty);
             ops.extend(duties.process_elder_duty(duty).await?);
         }
 

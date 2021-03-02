@@ -85,8 +85,8 @@ pub enum Error {
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwners(PublicKey),
-    /// Data operation is invalid, eg private operation on public data
-    #[error("Invalid operation")]
+    /// Operation is invalid, eg signing validation
+    #[error("Invalid operation: {0}")]
     InvalidOperation(String),
     /// No mapping to sn_messages::Error could be found. Either we need a new error there, or we need to handle or convert this error before sending it as a message
     #[error("No mapping to sn_messages error is set up for this NodeError {0}")]

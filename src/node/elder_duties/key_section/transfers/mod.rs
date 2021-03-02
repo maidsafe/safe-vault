@@ -31,7 +31,7 @@ use std::collections::HashSet;
 
 use sn_data_types::{
     CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare,
-    TransferAgreementProof, TransferPropagated,
+    TransferAgreementProof, TransferPropagated, DebitId
 };
 use sn_messaging::{
     client::{
@@ -43,6 +43,8 @@ use sn_messaging::{
 };
 use std::fmt::{self, Display, Formatter};
 use xor_name::Prefix;
+use std::sync::Arc;
+use futures::lock::Mutex;
 
 /*
 Transfers is the layer that manages
@@ -75,7 +77,8 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 pub struct Transfers {
     replicas: Replicas<ReplicaSigningImpl>,
     rate_limit: RateLimit,
-    recently_validated_transfers : HashSet<DebitId>
+    // TODO: limit this? where do we store it
+    recently_validated_transfers : Arc<Mutex<HashSet<DebitId>>>
 
 }
 
@@ -565,16 +568,27 @@ impl Transfers {
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
     async fn validate_section_payout(
-        &mut self,
+        &self,
         transfer: SignedTransferShare,
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
         debug!(">>>>> validatin....");
+
+
+        if let Some(id) =  self.recently_validated_transfers.lock().await.get(&transfer.id()) {
+
+            debug!(">>>>>>>>> seen this transfer as valid already {:?} ", transfer.id());
+            // we've done this before so we can safely just return No op
+            return Ok(NodeMessagingDuty::NoOp);
+        }
+
+
         match self.replicas.propose_validation(&transfer).await {
             Ok(None) => return Ok(NodeMessagingDuty::NoOp),
             Ok(Some(event)) => {
                 debug!(">>>>> is valid!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                let _ = self.recently_validated_transfers.lock().await.insert(transfer.id());
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeEvent {
                         event: NodeEvent::SectionPayoutValidated(event),

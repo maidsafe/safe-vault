@@ -207,8 +207,11 @@ impl SectionFunds {
             info!(">>>> has_payout_in_flight");
             return Err(Error::Logic("Has payout in flight".to_string()));
         }
+        info!(">>>> no payout in flight");
+
         match self.state.transition.clone() {
             Transition::Regular(TransitionStage::Pending(next_actor_state)) => {
+                debug!(">>>>> in pending stage");
                 let next_actor = Self::get_actor(replicas, next_actor_state.to_owned())?;
                 let our_new_key = next_actor.id();
                 // Get all the tokens of current actor.
@@ -223,11 +226,11 @@ impl SectionFunds {
                 next_actor_state,
                 sibling_key,
             }) => {
-                let next_actor = Self::get_actor(replicas, next_actor_state.to_owned())?;
-                let our_new_key = next_actor.id();
                 debug!(
                     ">>>> Split happening, we need to transfer to TWO wallets; one for each sibling"
                 );
+                let next_actor = Self::get_actor(replicas, next_actor_state.to_owned())?;
+                let our_new_key = next_actor.id();
 
                 // Get all the tokens of current actor.
                 let current_balance = self.actor.balance();
@@ -262,9 +265,13 @@ impl SectionFunds {
             Transition::Regular(TransitionStage::InTransition(_))
             | Transition::Split(SplitStage::FinishingT1 { .. })
             | Transition::Split(SplitStage::FinishingT2 { .. }) => {
+                debug!(">>>>> SOME OTHER STAGE");
                 Err(Error::Logic("Undergoing transition already".to_string()))
             }
-            Transition::None => Err(Error::Logic("No transition initiated!".to_string())),
+            Transition::None => {
+                debug!(">>>>>>>>> no transition");
+                Err(Error::Logic("No transition initiated!".to_string()))
+            },
         }
     }
 
@@ -389,7 +396,7 @@ impl SectionFunds {
         use NodeCmd::*;
         use NodeTransferCmd::*;
 
-        debug!(">>> Receiving section funds");
+        debug!(">>>>>>>>>>>>>> Receiving section funds");
         if let Some(event) = self.actor.receive(validation)? {
             self.apply(TransferValidationReceived(event.clone()))?;
             let proof = if let Some(proof) = event.proof {
@@ -402,11 +409,19 @@ impl SectionFunds {
                 self.apply(TransferRegistrationSent(event))?;
             };
 
+            debug!(">>>>>>>> further in receive");
             let mut queued_ops = vec![];
 
             match self.state.transition.clone() {
-                Transition::None => (),
+                Transition::None => {
+
+                    debug!(">>>> NO TRANSITION");
+                    ()
+                },
                 Transition::Regular(TransitionStage::InTransition(next_actor)) => {
+
+                    debug!(">>>> REGULAR TRANSITION");
+
                     self.move_to_next(next_actor, proof.credit_proof())?;
                     queued_ops = self.try_pop_queue().await?;
                 }
@@ -440,6 +455,8 @@ impl SectionFunds {
                 }
                 Transition::Split(SplitStage::Pending { .. })
                 | Transition::Regular(TransitionStage::Pending(_)) => {
+                    debug!(">>>> PENDING ERROR FOR TRANSITION");
+
                     return Err(Error::Logic(
                         "Invalid transition stage: Pending".to_string(),
                     ))
