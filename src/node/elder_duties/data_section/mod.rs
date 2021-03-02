@@ -40,6 +40,7 @@ pub struct DataSection {
     elder_state: ElderState,
 }
 
+#[derive(Clone)]
 pub struct ElderSigning {
     id: OwnerType,
     elder_state: ElderState,

@@ -28,6 +28,7 @@ use sn_transfers::{ActorEvent, TransferActor};
 use std::collections::{BTreeSet, VecDeque};
 use xor_name::XorName;
 use ActorEvent::*;
+
 type SectionActor = TransferActor<Validator, ElderSigning>;
 
 /// The management of section funds,
@@ -49,6 +50,7 @@ struct PendingTransition {
     sibling_key: Option<PublicKey>,
 }
 
+#[derive(Clone)]
 struct State {
     /// Incoming payout requests are queued here.
     /// It is queued when we already have a payout in flight,
@@ -62,17 +64,20 @@ struct State {
     // split_state: Option<SplitState>,
 }
 
+#[derive(Clone)]
 enum Transition {
     Regular(TransitionStage),
     Split(SplitStage),
     None,
 }
 
+#[derive(Clone)]
 enum TransitionStage {
     Pending(ElderState),
     InTransition(SectionActor),
 }
 
+#[derive(Clone)]
 enum SplitStage {
     Pending {
         next_actor_state: ElderState,
@@ -88,6 +93,7 @@ enum SplitStage {
     },
 }
 
+#[derive(Clone)]
 struct T2 {
     amount: Token,
     recipient: PublicKey,
@@ -201,8 +207,8 @@ impl SectionFunds {
             info!(">>>> has_payout_in_flight");
             return Err(Error::Logic("Has payout in flight".to_string()));
         }
-        match &mut self.state.transition {
-            Transition::Regular(TransitionStage::Pending(ref next_actor_state)) => {
+        match self.state.transition.clone() {
+            Transition::Regular(TransitionStage::Pending(next_actor_state)) => {
                 let next_actor = Self::get_actor(replicas, next_actor_state.to_owned())?;
                 let our_new_key = next_actor.id();
                 // Get all the tokens of current actor.
@@ -214,8 +220,8 @@ impl SectionFunds {
                 Ok(NetworkDuties::from(duty))
             }
             Transition::Split(SplitStage::Pending {
-                ref next_actor_state,
-                ref sibling_key,
+                next_actor_state,
+                sibling_key,
             }) => {
                 let next_actor = Self::get_actor(replicas, next_actor_state.to_owned())?;
                 let our_new_key = next_actor.id();
@@ -236,7 +242,7 @@ impl SectionFunds {
 
                 // Determine which transfer is first
                 // (deterministic order is important for reaching consensus)
-                let (t1, t2_recipient) = if &our_new_key > sibling_key {
+                let (t1, t2_recipient) = if &our_new_key > &sibling_key {
                     let t1 = self.generate_validation(t1_amount, our_new_key)?;
                     (t1, sibling_key.to_owned())
                 } else {
@@ -396,16 +402,13 @@ impl SectionFunds {
 
             let mut queued_ops = vec![];
 
-            match self.state.transition {
+            match self.state.transition.clone() {
                 Transition::None => (),
                 Transition::Regular(TransitionStage::InTransition(next_actor)) => {
                     self.move_to_next(next_actor, proof.credit_proof())?;
                     queued_ops = self.try_pop_queue().await?;
                 }
-                Transition::Split(SplitStage::FinishingT1 {
-                    ref next_actor,
-                    ref t2,
-                }) => {
+                Transition::Split(SplitStage::FinishingT1 { next_actor, ref t2 }) => {
                     let was_t1_ours = if t2.recipient != next_actor.id() {
                         Some(proof.credit_proof())
                     } else {
@@ -414,20 +417,20 @@ impl SectionFunds {
                     let t2 = self.generate_validation(t2.amount, t2.recipient)?;
                     queued_ops.push(NetworkDuty::from(t2));
                     self.state.transition = Transition::Split(SplitStage::FinishingT2 {
-                        next_actor: *next_actor,
+                        next_actor: next_actor.clone(),
                         was_t1_ours,
                     });
                 }
                 Transition::Split(SplitStage::FinishingT2 {
-                    ref next_actor,
+                    next_actor,
                     ref was_t1_ours,
                 }) => {
                     if let Some(credit) = was_t1_ours {
                         // t1 was the credit to our next actor
-                        self.move_to_next(*next_actor, *credit)?
+                        self.move_to_next(next_actor.clone(), credit.clone())?
                     } else {
                         // t2 is the credit to our next actor
-                        self.move_to_next(*next_actor, proof.credit_proof())?
+                        self.move_to_next(next_actor.clone(), proof.credit_proof())?
                     }
                 }
                 Transition::Split(SplitStage::Pending { .. })

@@ -14,6 +14,7 @@ use sn_transfers::ReplicaValidator;
 /// make sure they are run at Elders
 /// of sections we know of.
 /// TBD.
+#[derive(Clone)]
 pub struct Validator {}
 
 impl ReplicaValidator for Validator {
