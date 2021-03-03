@@ -58,6 +58,7 @@ async fn main() -> Result<(), String> {
     let _child = Command::new("cargo")
         .args(args.clone())
         .env("RUST_LOG", "debug")
+        .env("RUST_BACKTRACE", "1")
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .output()
@@ -125,7 +126,7 @@ pub async fn run_network() -> Result<(), String> {
         &INTERVAL,
         "--local",
         "--num-nodes",
-        "11",
+        "21",
     ];
 
     // If RUST_LOG was set we pass it down to the launch tool

@@ -269,6 +269,7 @@ pub enum AdultDuty {
     /// storage and retrieval of data chunks.
     RunAsChunkStore(ChunkStoreDuty),
     RunAsChunkReplication(ChunkReplicationDuty),
+    ElderPrep(RewardDuty),
     NoOp,
 }
 
@@ -536,11 +537,23 @@ pub enum RewardQuery {
 
 impl From<RewardDuty> for NetworkDuties {
     fn from(duty: RewardDuty) -> Self {
+        use AdultDuty::*;
         use DataSectionDuty::*;
         use ElderDuty::*;
         use NetworkDuty::*;
         if matches!(duty, RewardDuty::NoOp) {
             vec![]
+        } else if let RewardDuty::ProcessCmd {
+            cmd: RewardCmd::SynchHistory(history),
+            msg_id,
+            origin,
+        } = duty
+        {
+            vec![RunAsAdult(ElderPrep(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::SynchHistory(history),
+                msg_id,
+                origin,
+            }))]
         } else {
             vec![RunAsElder(RunAsDataSection(RunAsRewards(duty)))]
         }
@@ -549,9 +562,24 @@ impl From<RewardDuty> for NetworkDuties {
 
 impl From<RewardDuty> for NetworkDuty {
     fn from(duty: RewardDuty) -> Self {
+        use AdultDuty::*;
         use DataSectionDuty::*;
         use ElderDuty::*;
+
         use NetworkDuty::*;
+
+        if let RewardDuty::ProcessCmd {
+            cmd: RewardCmd::SynchHistory(history),
+            msg_id,
+            origin,
+        } = duty
+        {
+            return RunAsAdult(ElderPrep(RewardDuty::ProcessCmd {
+                cmd: RewardCmd::SynchHistory(history),
+                msg_id,
+                origin,
+            }));
+        }
         RunAsElder(RunAsDataSection(RunAsRewards(duty)))
     }
 }

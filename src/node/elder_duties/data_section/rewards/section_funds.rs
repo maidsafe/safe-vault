@@ -271,7 +271,7 @@ impl SectionFunds {
             Transition::None => {
                 debug!(">>>>>>>>> no transition");
                 Err(Error::Logic("No transition initiated!".to_string()))
-            },
+            }
         }
     }
 
@@ -414,12 +414,10 @@ impl SectionFunds {
 
             match self.state.transition.clone() {
                 Transition::None => {
-
                     debug!(">>>> NO TRANSITION");
                     ()
-                },
+                }
                 Transition::Regular(TransitionStage::InTransition(next_actor)) => {
-
                     debug!(">>>> REGULAR TRANSITION");
 
                     self.move_to_next(next_actor, proof.credit_proof())?;
@@ -459,7 +457,7 @@ impl SectionFunds {
 
                     return Err(Error::Logic(
                         "Invalid transition stage: Pending".to_string(),
-                    ))
+                    ));
                 }
             }
 

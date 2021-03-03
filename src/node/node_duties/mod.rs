@@ -495,7 +495,7 @@ impl NodeDuties {
                         credit_proof: genesis.clone(),
                     };
 
-                    debug!(">>> GENSIS AGREEMENT PROOFED");
+                    debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENSIS AGREEMENT PROOFED");
                     return self
                         .finish_transition_to_elder(
                             WalletInfo {
@@ -522,7 +522,7 @@ impl NodeDuties {
         wallet_info: WalletInfo,
         genesis: Option<TransferPropagated>,
     ) -> Result<NetworkDuties> {
-        debug!(">>>Finishing transition to elder");
+        debug!(">>>>>>>>>>> Finishing transition to elder");
         let queued_duties = &mut VecDeque::new();
         let queued_duties = match self.stage {
             Stage::Elder(_) => return Ok(vec![]),

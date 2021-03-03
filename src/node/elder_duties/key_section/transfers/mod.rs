@@ -29,9 +29,10 @@ use replica_signing::ReplicaSigningImpl;
 use sn_data_types::Transfer;
 use std::collections::HashSet;
 
+use futures::lock::Mutex;
 use sn_data_types::{
-    CreditAgreementProof, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare,
-    TransferAgreementProof, TransferPropagated, DebitId
+    CreditAgreementProof, DebitId, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare,
+    TransferAgreementProof, TransferPropagated,
 };
 use sn_messaging::{
     client::{
@@ -42,9 +43,8 @@ use sn_messaging::{
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use std::fmt::{self, Display, Formatter};
-use xor_name::Prefix;
 use std::sync::Arc;
-use futures::lock::Mutex;
+use xor_name::Prefix;
 
 /*
 Transfers is the layer that manages
@@ -78,8 +78,7 @@ pub struct Transfers {
     replicas: Replicas<ReplicaSigningImpl>,
     rate_limit: RateLimit,
     // TODO: limit this? where do we store it
-    recently_validated_transfers : Arc<Mutex<HashSet<DebitId>>>
-
+    recently_validated_transfers: Arc<Mutex<HashSet<DebitId>>>,
 }
 
 impl Transfers {
@@ -87,7 +86,7 @@ impl Transfers {
         Self {
             replicas,
             rate_limit,
-            recently_validated_transfers: Default::default()
+            recently_validated_transfers: Default::default(),
         }
     }
 
@@ -575,20 +574,29 @@ impl Transfers {
     ) -> Result<NodeMessagingDuty> {
         debug!(">>>>> validatin....");
 
-
-        if let Some(id) =  self.recently_validated_transfers.lock().await.get(&transfer.id()) {
-
-            debug!(">>>>>>>>> seen this transfer as valid already {:?} ", transfer.id());
+        if let Some(id) = self
+            .recently_validated_transfers
+            .lock()
+            .await
+            .get(&transfer.id())
+        {
+            debug!(
+                ">>>>>>>>> seen this transfer as valid already {:?} ",
+                transfer.id()
+            );
             // we've done this before so we can safely just return No op
             return Ok(NodeMessagingDuty::NoOp);
         }
-
 
         match self.replicas.propose_validation(&transfer).await {
             Ok(None) => return Ok(NodeMessagingDuty::NoOp),
             Ok(Some(event)) => {
                 debug!(">>>>> is valid!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                let _ = self.recently_validated_transfers.lock().await.insert(transfer.id());
+                let _ = self
+                    .recently_validated_transfers
+                    .lock()
+                    .await
+                    .insert(transfer.id());
                 Ok(NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeEvent {
                         event: NodeEvent::SectionPayoutValidated(event),

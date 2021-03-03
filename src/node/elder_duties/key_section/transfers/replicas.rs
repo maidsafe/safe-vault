@@ -534,7 +534,11 @@ impl<T: ReplicaSigning> Replicas<T> {
         &self,
         signed_transfer: &SignedTransferShare,
     ) -> Result<Option<TransferValidated>> {
-        debug!(">>>> MultisigReplica validating transfer from: {:?}, w/: {:?}", signed_transfer.sender(), signed_transfer.credit_id());
+        debug!(
+            ">>>> MultisigReplica validating transfer from: {:?}, w/: {:?}",
+            signed_transfer.sender(),
+            signed_transfer.credit_id()
+        );
         let id = signed_transfer.sender();
         let actors = OwnerType::Multi(signed_transfer.actors().clone());
         // Acquire lock of the wallet.

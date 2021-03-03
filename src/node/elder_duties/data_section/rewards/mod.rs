@@ -175,7 +175,10 @@ impl Rewards {
                 self.activate_node_rewards(id, node_id).await?.into()
             }
             DeactivateNode(node_id) => self.deactivate(node_id)?.into(),
-            ReceivePayoutValidation(validation) => self.section_funds.receive(validation).await?,
+            ReceivePayoutValidation(validation) => {
+                debug!(">>>>>>>>>>>>> processing receive payout validation");
+                self.section_funds.receive(validation).await?
+            }
         };
 
         Ok(result)
@@ -344,7 +347,10 @@ impl Rewards {
         // Try get the wallet..
         let age = match self.node_rewards.get_mut(&node_id) {
             None => {
-                warn!(">>>activate_node_rewards Invalid operation: Node not found {}.", node_id);
+                warn!(
+                    ">>>activate_node_rewards Invalid operation: Node not found {}.",
+                    node_id
+                );
                 return Err(Error::NodeNotFoundForReward);
             }
             Some(state) => {
@@ -386,8 +392,8 @@ impl Rewards {
             Some(entry) => entry.clone(),
             None => {
                 warn!("Could not deactivate, node not found");
-                return Err(Error::NodeNotFoundForReward)
-            },
+                return Err(Error::NodeNotFoundForReward);
+            }
         };
         debug!(
             "Rewards: node {} found as {:?}, deactivating..",

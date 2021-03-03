@@ -266,6 +266,22 @@ impl ReceivedMsgAnalysis {
                 origin,
             }
             .into(),
+
+            // Message::NodeQueryResponse {
+            //     response:
+            //         NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetSectionWalletHistory(Ok(wallet)),
+            //     id,
+            //     ..
+            // } => AdultDuty::ElderPrep( RewardDuty::ProcessCmd {
+            //     cmd: RewardCmd::ActivateNodeRewards {
+            //         id: *wallet_id,
+            //         node_id: *new_node_id,
+            //     },
+            //     msg_id: *id,
+            //     origin,
+            // })
+            // ,
+
             //
             // ------ transfers --------
             // doesn't need to be accumulated, but makes it a bit slimmer..
@@ -427,7 +443,7 @@ impl ReceivedMsgAnalysis {
                 id,
                 ..
             } => {
-                debug!(">>>> validating section payout to {:?}",signed_transfer );
+                debug!(">>>> validating section payout to {:?}", signed_transfer);
                 TransferDuty::ProcessCmd {
                     cmd: TransferCmd::ValidateSectionPayout(signed_transfer.clone()),
                     msg_id: *id,
