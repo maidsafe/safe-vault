@@ -275,13 +275,25 @@ impl Rewards {
         NodeMessagingDuty::NoOp
     }
 
+    // /// Add or set the ndoe, if we've had a split the node may appear new to this elder, even if previously it had some rewards being registered.
+    // fn add_or_set_node(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeMessagingDuty> {
+    //     match self.set_node_wallet(node_id, wallet) {
+    //         Ok(duty) => Ok(duty), 
+    //         Err(error) => {
+    //             if error = Error::NetworkData(DtError::NoSuchKey) {
+    //                 self.add_new_node
+    //             }
+    //         }
+    //     }
+    // }
+
     /// 1. A new node registers a wallet id for future reward payout.
     /// ... or, an active node updates its wallet.
     fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeMessagingDuty> {
         // Try get the info..
         let state = match self.node_rewards.get_mut(&node_id) {
             None => {
-                error!("Cannot set node wallet unless active or new.");
+                warn!("Cannot see node wallet in the node reward register.");
                 return Err(Error::NetworkData(DtError::NoSuchKey));
             }
             Some(state) => {

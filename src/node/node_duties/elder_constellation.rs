@@ -107,65 +107,71 @@ impl ElderConstellation {
         previous_key: PublicKey,
         new_key: PublicKey,
     ) -> Result<NetworkDuties> {
-        debug!(">> Finishing elder change!!");
-        debug!(">>new key: {:?}", new_key);
-        debug!(">>previous_key: {:?}", previous_key);
+        debug!(">>>> Finishing elder change!!");
+        debug!(">>>>new key: {:?}", new_key);
+        debug!(">>>> previous_key: {:?}", previous_key);
 
         if new_key == previous_key {
-            debug!(">> !! same keys; IS AN error w/o the key transfer op.");
+            debug!(">>>> !! same keys; IS AN error w/o the key transfer op.");
             return Err(Error::InvalidOperation(
                 "new_key == previous_key".to_string(),
             ));
         }
-        if self.pending_changes.is_empty() {
-            debug!(">>  !! no changes, so return here empty vec");
-            return Ok(vec![]);
+        
+                debug!(">>>> past the noops");
+        
+                let mut ops: NetworkDuties = Vec::new();
+                // pop the pending change..
+                // 2. We must load _current_ elder state..
+                // TODO: Query network for data corresponding to provided "new_section_key"!!!!
+                // Otherwise there is no guarantee of not getting more recent info than expected!
+                let new_elder_state = ElderState::new(self.network.clone()).await?;
+                // 3. And update key section with it.
+                self.duties
+                    .finish_elder_change(node_info, new_elder_state.clone())
+                    .await?;
+                
+                    debug!(">>>>Key section completed elder change update.");
+                    debug!(">>>>Elder change update completed.");
+        
+                    
+        if !self.pending_changes.is_empty() {
+            // debug!(">>>>  !! no changes, so return here empty vec");
+            // return Ok(vec![]);
+            let old_elder_state = self.duties.state().clone();
+            if  old_elder_state.section_public_key() != previous_key
+                || new_key != self.pending_changes[0].section_key
+            {
+                debug!(
+                    ">>>> !!old state key is not same as prev. ??  {:?}, {:?}",
+                    old_elder_state.section_public_key(),
+                    previous_key
+                );
+                debug!(
+                    ">>>> !! OR  new key isnt pending change {:?}, {:?}",
+                    self.pending_changes[0].section_key, new_key
+                );
+    
+                return Ok(vec![]);
+            }
+            // if ! self.pending_changes.is_empty() {
+                let change = self.pending_changes.remove(0);
+    
+                // split section _after_ transition to new constellation
+                if &change.prefix != old_elder_state.prefix() {
+                    info!(">>>>Split occurred");
+                    info!(">>>>New prefix is: {:?}", change.prefix);
+                    let duties = self.duties.split_section(change.prefix).await?;
+                    if !duties.is_empty() {
+                        ops.extend(duties)
+                    };
+                }
+            // }
         }
 
-        let old_elder_state = self.duties.state().clone();
-        if old_elder_state.section_public_key() != previous_key
-            || new_key != self.pending_changes[0].section_key
-        {
-            debug!(
-                ">> !!old state key is not same as prev. ??  {:?}, {:?}",
-                old_elder_state.section_public_key(),
-                previous_key
-            );
-            debug!(
-                ">> !! OR  new key isnt pending change {:?}, {:?}",
-                self.pending_changes[0].section_key, new_key
-            );
 
-            return Ok(vec![]);
-        }
 
-        debug!(">> past the noops");
 
-        let mut ops: NetworkDuties = Vec::new();
-        // pop the pending change..
-        let change = self.pending_changes.remove(0);
-
-        // 2. We must load _current_ elder state..
-        // TODO: Query network for data corresponding to provided "new_section_key"!!!!
-        // Otherwise there is no guarantee of not getting more recent info than expected!
-        let new_elder_state = ElderState::new(self.network.clone()).await?;
-        // 3. And update key section with it.
-        self.duties
-            .finish_elder_change(node_info, new_elder_state.clone())
-            .await?;
-
-        debug!(">>Key section completed elder change update.");
-        debug!(">>Elder change update completed.");
-
-        // split section _after_ transition to new constellation
-        if &change.prefix != old_elder_state.prefix() {
-            info!(">>Split occurred");
-            info!(">>New prefix is: {:?}", change.prefix);
-            let duties = self.duties.split_section(change.prefix).await?;
-            if !duties.is_empty() {
-                ops.extend(duties)
-            };
-        }
 
         // if changes have queued up, make sure the queue is worked down
         if !self.pending_changes.is_empty() {

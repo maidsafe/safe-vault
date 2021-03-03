@@ -595,6 +595,10 @@ impl NodeDuties {
             origin: SrcLocation::Node(node_id),
         }));
 
+        debug!(">>>>>>>> ALLLLLLLMOST THERE");
+        /// lets ignore rewards just now....
+
+
         // 5. Add own wallet to rewards.
         ops.push(NetworkDuty::from(RewardDuty::ProcessCmd {
             cmd: RewardCmd::SetNodeWallet {
