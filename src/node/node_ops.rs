@@ -291,6 +291,17 @@ impl From<AdultDuty> for NetworkDuty {
     }
 }
 
+impl AdultDuty {
+    pub fn try_elder_duty(self) -> Option<ElderDuty> {
+        match self {
+            Self::ElderPrep(rewards) => Some(ElderDuty::RunAsDataSection(
+                DataSectionDuty::RunAsRewards(rewards),
+            )),
+            _ => None,
+        }
+    }
+}
+
 // --------------- KeySection ---------------
 
 /// Duties only run as a Key section.

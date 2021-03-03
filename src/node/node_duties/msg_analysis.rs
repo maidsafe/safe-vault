@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::node_duties::NodeDuties;
 use crate::{
     node::node_ops::{
         AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
@@ -506,12 +507,7 @@ impl ReceivedMsgAnalysis {
                     )),
                 id,
                 ..
-            } => RewardDuty::ProcessCmd {
-                cmd: RewardCmd::SynchHistory(wallet_info.to_owned()),
-                msg_id: *id,
-                origin,
-            }
-            .into(),
+            } => NodeDuty::InitSectionWallet(wallet_info.clone()).into(),
             _ => {
                 return Err(Error::Logic(format!(
                     "Could not evaluate single src node msg: {:?}",

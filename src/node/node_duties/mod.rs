@@ -16,6 +16,7 @@ use self::{
     elder_constellation::ElderConstellation,
     genesis::{GenesisAccumulation, GenesisProposal},
 };
+use crate::node::node_ops::NodeDuty::InitSectionWallet;
 use crate::{
     node::{
         adult_duties::AdultDuties,
@@ -109,6 +110,16 @@ impl NodeDuties {
             RunAsAdult(duty) => {
                 if let Some(duties) = self.adult_duties() {
                     duties.process_adult_duty(duty).await
+                } else if let Some(vec) = self.under_transition() {
+                    let elder_duty = if let Some(elder_duty) = duty.try_elder_duty() {
+                        elder_duty
+                    } else {
+                        return Err(Error::Logic(
+                            "Currently not undergoing transition".to_string(),
+                        ));
+                    };
+                    vec.push_back(elder_duty);
+                    Ok(vec![])
                 } else {
                     Err(Error::Logic("Currently not an Adult".to_string()))
                 }
@@ -132,6 +143,14 @@ impl NodeDuties {
         use Stage::*;
         match &mut self.stage {
             Adult(ref mut duties) => Some(duties),
+            _ => None,
+        }
+    }
+
+    pub fn under_transition(&mut self) -> Option<&mut VecDeque<ElderDuty>> {
+        use Stage::*;
+        match &mut self.stage {
+            Stage::AssumingElderDuties(duty_list) => Some(duty_list),
             _ => None,
         }
     }
