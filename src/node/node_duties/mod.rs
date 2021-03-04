@@ -541,10 +541,15 @@ impl NodeDuties {
         wallet_info: WalletInfo,
         genesis: Option<TransferPropagated>,
     ) -> Result<NetworkDuties> {
-        debug!(">>>>>>>>>>> Finishing transition to elder");
+        debug!(">>>>>>>>>>> Finishing transition to elder!!!");
         let queued_duties = &mut VecDeque::new();
+
+        debug!("????");
         let queued_duties = match self.stage {
-            Stage::Elder(_) => return Ok(vec![]),
+            Stage::Elder(_) => {
+                debug!("was already elder");
+                return Ok(vec![])
+            },
             Stage::Infant => {
                 if self.node_info.genesis {
                     queued_duties
@@ -556,7 +561,11 @@ impl NodeDuties {
                 return Err(Error::InvalidOperation("cannot finish_transition_to_elder as Adult | AwaitingGenesisThreshold | ProposingGenesis".to_string()))
             }
             Stage::Genesis(AccumulatingGenesis(ref mut bootstrap)) => &mut bootstrap.queued_ops,
-            Stage::AssumingElderDuties(ref mut queue) => queue,
+            Stage::AssumingElderDuties(ref mut queue) => {
+                debug!("assuming elder");
+
+                queue
+            }
         };
 
         trace!(">>>Finishing transition to Elder and dealing with queue..");
@@ -597,8 +606,6 @@ impl NodeDuties {
 
         debug!(">>>>>>>> ALLLLLLLMOST THERE");
         /// lets ignore rewards just now....
-
-
         // 5. Add own wallet to rewards.
         ops.push(NetworkDuty::from(RewardDuty::ProcessCmd {
             cmd: RewardCmd::SetNodeWallet {

@@ -275,14 +275,13 @@ impl Rewards {
         NodeMessagingDuty::NoOp
     }
 
-
     /// 1. A new node registers a wallet id for future reward payout.
     /// ... or, an active node updates its wallet.
     fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeMessagingDuty> {
         // Try get the info..
         let state = match self.node_rewards.get_mut(&node_id) {
             None => {
-                warn!("Cannot see node wallet in the node reward register.");
+                warn!("Cannot see node wallet in the node reward register. (Add new node command may still be pending....)");
                 return Err(Error::NetworkData(DtError::NoSuchKey));
             }
             Some(state) => {

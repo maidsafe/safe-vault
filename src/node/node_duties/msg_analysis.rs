@@ -508,6 +508,17 @@ impl ReceivedMsgAnalysis {
                 id,
                 ..
             } => NodeDuty::InitSectionWallet(wallet_info.clone()).into(),
+            Message::NodeQueryResponse {
+                response:
+                    NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetReplicaEvents(events)),
+                id,
+                ..
+            } => TransferDuty::ProcessCmd {
+                cmd: TransferCmd::InitiateReplica(events.clone()?),
+                msg_id: *id,
+                origin,
+            }
+            .into(),
             _ => {
                 return Err(Error::Logic(format!(
                     "Could not evaluate single src node msg: {:?}",
