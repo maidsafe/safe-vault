@@ -559,7 +559,7 @@ impl NodeDuties {
             Stage::AssumingElderDuties(ref mut queue) => queue,
         };
 
-        trace!(">>>Finishing transition to Elder..");
+        trace!(">>>Finishing transition to Elder and dealing with queue..");
 
         let mut ops: NetworkDuties = vec![];
         let state = ElderState::new(self.network_api.clone()).await?;

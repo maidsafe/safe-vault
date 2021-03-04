@@ -130,7 +130,22 @@ impl SectionFunds {
     /// Replica history are synched to section actor instances.
     pub async fn synch(&mut self, history: ActorHistory) -> Result<NodeMessagingDuty> {
         info!("Synching replica events to section transfer actor...");
-        if let Some(event) = self.actor.from_history(history).map_err(Error::Transfer)? {
+        let event = match self.actor.from_history(history){
+            Ok(event) => Ok(event),
+            Err(error) => {
+                if let sn_transfers::Error::NothingToSync = error {
+                    debug!(">>>>>>>NOTHING TO SYNC ERRO.> is this an error??");
+
+                    Ok(None)
+                }
+                else {
+                    Err(Error::Transfer(error))
+                }
+            }
+        }?;
+
+        if let Some(event) = event
+        {
             self.actor.apply(TransfersSynched(event.clone()))?;
             info!("Synched: {:?}", event);
         }
@@ -372,10 +387,27 @@ impl SectionFunds {
         self.actor = next_actor;
 
         // Credit the transfer to the new actor.
-        if let Some(event) = self.actor.from_history(ActorHistory {
+        let history = ActorHistory {
             credits: vec![proof],
             debits: vec![],
-        })? {
+        };
+        
+        let event = match self.actor.from_history(history){
+            Ok(event) => Ok(event),
+            Err(error) => {
+                if let sn_transfers::Error::NothingToSync = error {
+                    debug!(">>>>>>>NOTHING TO SYNC ERROR> is this an error??");
+
+                    Ok(None)
+                }
+                else {
+                    Err(Error::Transfer(error))
+                }
+            }
+        }?;
+
+        if let Some(event) = event
+        {
             self.apply(TransfersSynched(event))?
         }
 
