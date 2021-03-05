@@ -41,12 +41,15 @@ impl Messaging {
     }
 
     async fn send(&mut self, msg: OutgoingMsg) -> Result<NetworkDuties> {
-        let itry = Itinerary {
+        let itinerary = Itinerary {
             src: SrcLocation::Node(self.network.our_name().await),
             dst: msg.dst,
             aggregation: msg.aggregation,
         };
-        let result = self.network.send_message(itry, msg.msg.serialize()?).await;
+        let result = self
+            .network
+            .send_message(itinerary, msg.msg.serialize()?)
+            .await;
 
         result.map_or_else(
             |err| {
