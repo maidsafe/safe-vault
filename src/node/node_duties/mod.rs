@@ -419,7 +419,7 @@ impl NodeDuties {
             }
         };
 
-        trace!(">>>Completing transition to Elder and dealing with queue..");
+        trace!(">>>Completing transition to Elder..");
 
         let mut ops: NetworkDuties = vec![];
         let mut elder_duties = elder_duties.enable(wallet_info).await?;

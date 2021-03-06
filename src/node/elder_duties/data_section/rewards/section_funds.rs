@@ -404,7 +404,7 @@ impl SectionFunds {
         use NodeCmd::*;
         use NodeTransferCmd::*;
 
-        debug!(">>>>>>>>>>>>>> Receiving section funds");
+        debug!(">>>>>>>>>>>>>> Receiving transfer validation");
         if let Some(event) = self.actor.receive(validation)? {
             self.apply(TransferValidationReceived(event.clone()))?;
             let proof = if let Some(proof) = event.proof {

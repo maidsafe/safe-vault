@@ -199,7 +199,7 @@ impl Transfers {
                     .await?
             }
             ValidateSectionPayout(signed_transfer) => {
-                debug!(">>>> ?? Validating sectin payout");
+                debug!(">>>> ?? Validating section payout");
                 self.validate_section_payout(signed_transfer.clone(), msg_id, origin)
                     .await?
             }
@@ -582,7 +582,7 @@ impl Transfers {
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
-        debug!(">>>>> validatin....");
+        debug!(">>>>> validating....");
 
         if let Some(_id) = self
             .recently_validated_transfers
