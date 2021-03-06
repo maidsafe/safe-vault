@@ -250,8 +250,9 @@ impl NodeDuties {
                 id: MessageId::new(),
                 target_section_pk: None,
             },
+            section_source: false, // sent as single node
             dst: DstLocation::Section(node_id.into()),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::None,
         })))
     }
 
@@ -267,8 +268,9 @@ impl NodeDuties {
                 id: MessageId::new(),
                 target_section_pk: None,
             },
+            section_source: false, // sent as single node
             dst: DstLocation::Section(wallet.into()),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::None,
         })))
     }
 
@@ -348,7 +350,8 @@ impl NodeDuties {
                     target_section_pk: None,
                 },
                 dst,
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                section_source: false, // sent as single node
+                aggregation: Aggregation::None,
             })));
         } else if is_genesis_section
             && elder_count < GENESIS_ELDER_COUNT
@@ -374,170 +377,13 @@ impl NodeDuties {
                     id: MessageId::new(),
                     target_section_pk: None,
                 },
+                section_source: false, // sent as single node
                 dst: DstLocation::Section(wallet_id.into()),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                aggregation: Aggregation::None,
             })));
         }
 
         Ok(vec![])
-    }
-
-    // TODO: validate the credit...
-    async fn receive_genesis_proposal(
-        &mut self,
-        credit: Credit,
-        sig: SignatureShare,
-    ) -> Result<NetworkDuties> {
-        if matches!(self.stage, Stage::Genesis(AccumulatingGenesis(_)))
-            || matches!(self.stage, Stage::Elder(_))
-        {
-            return Ok(vec![]);
-        }
-
-        let (stage, cmd) = match self.stage {
-            Stage::Genesis(AwaitingGenesisThreshold(ref mut queued_ops)) => {
-                let elder_state = ElderState::new(self.network_api.clone()).await?;
-
-                let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-                let _ = signatures.insert(sig.index, sig.share);
-
-                let credit_sig_share = elder_state.sign_as_elder(&credit).await?;
-                let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
-
-                let dst = DstLocation::Section(elder_state.section_public_key().into());
-                let stage = Stage::Genesis(ProposingGenesis(GenesisProposal {
-                    elder_state,
-                    proposal: credit.clone(),
-                    signatures,
-                    pending_agreement: None,
-                    queued_ops: queued_ops.drain(..).collect(),
-                }));
-                let cmd = NodeMessagingDuty::Send(OutgoingMsg {
-                    msg: Message::NodeCmd {
-                        cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
-                            credit,
-                            sig: credit_sig_share,
-                        }),
-                        id: MessageId::new(),
-                        target_section_pk: None,
-                    },
-                    dst,
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                });
-
-                (stage, cmd)
-            }
-            Stage::Genesis(ProposingGenesis(ref mut bootstrap)) => {
-                debug!("Adding incoming genesis proposal.");
-                bootstrap.add(sig)?;
-                if let Some(signed_credit) = &bootstrap.pending_agreement {
-                    // replicas signatures over > signed_credit <
-                    let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-                    let credit_sig_share =
-                        bootstrap.elder_state.sign_as_elder(&signed_credit).await?;
-                    let _ =
-                        signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
-
-                    let stage = Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
-                        elder_state: bootstrap.elder_state.clone(),
-                        agreed_proposal: signed_credit.clone(),
-                        signatures,
-                        pending_agreement: None,
-                        queued_ops: bootstrap.queued_ops.drain(..).collect(),
-                    }));
-
-                    let cmd = NodeMessagingDuty::Send(OutgoingMsg {
-                        msg: Message::NodeCmd {
-                            cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
-                                signed_credit: signed_credit.clone(),
-                                sig: credit_sig_share,
-                            }),
-                            id: MessageId::new(),
-                            target_section_pk: None,
-                        },
-                        dst: DstLocation::Section(
-                            bootstrap.elder_state.section_public_key().into(),
-                        ),
-                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                    });
-
-                    (stage, cmd)
-                } else {
-                    return Ok(vec![]);
-                }
-            }
-            _ => {
-                return Err(Error::InvalidOperation(
-                    "invalid self.stage at fn receive_genesis_proposal".to_string(),
-                ))
-            }
-        };
-
-        self.stage = stage;
-
-        Ok(NetworkDuties::from(cmd))
-    }
-
-    async fn receive_genesis_accumulation(
-        &mut self,
-        signed_credit: SignedCredit,
-        sig: SignatureShare,
-    ) -> Result<NetworkDuties> {
-        if matches!(self.stage, Stage::Elder(_)) {
-            return Ok(vec![]);
-        }
-
-        match self.stage {
-            Stage::Genesis(ProposingGenesis(ref mut bootstrap)) => {
-                // replicas signatures over > signed_credit <
-                let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-                let _ = signatures.insert(sig.index, sig.share);
-
-                let credit_sig_share = bootstrap.elder_state.sign_as_elder(&signed_credit).await?;
-                let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share);
-
-                self.stage = Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
-                    elder_state: bootstrap.elder_state.clone(),
-                    agreed_proposal: signed_credit,
-                    signatures,
-                    pending_agreement: None,
-                    queued_ops: bootstrap.queued_ops.drain(..).collect(),
-                }));
-                Ok(vec![])
-            }
-            Stage::Genesis(AccumulatingGenesis(ref mut bootstrap)) => {
-                bootstrap.add(sig)?;
-                if let Some(genesis) = bootstrap.pending_agreement.take() {
-                    // TODO: do not take this? (in case of fail further blow)
-                    let credit_sig_share = bootstrap.elder_state.sign_as_elder(&genesis).await?;
-                    let _ = bootstrap
-                        .signatures
-                        .insert(credit_sig_share.index, credit_sig_share.share.clone());
-
-                    let genesis = TransferPropagated {
-                        credit_proof: genesis.clone(),
-                    };
-
-                    debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENSIS AGREEMENT PROOFED");
-                    return self
-                        .finish_transition_to_elder(
-                            WalletInfo {
-                                replicas: genesis.credit_proof.debiting_replicas_keys.clone(),
-                                history: ActorHistory {
-                                    credits: vec![genesis.credit_proof.clone()],
-                                    debits: vec![],
-                                },
-                            },
-                            Some(genesis),
-                        )
-                        .await;
-                }
-                Ok(vec![])
-            }
-            _ => Err(Error::InvalidOperation(
-                "invalid self.stage at fn receive_genesis_accumulation".to_string(),
-            )),
-        }
     }
 
     async fn finish_transition_to_elder(
@@ -661,6 +507,166 @@ impl NodeDuties {
                     .finish_elder_change(&self.node_info, previous_key, new_key)
                     .await
             }
+        }
+    }
+
+    // TODO: validate the credit...
+    async fn receive_genesis_proposal(
+        &mut self,
+        credit: Credit,
+        sig: SignatureShare,
+    ) -> Result<NetworkDuties> {
+        if matches!(self.stage, Stage::Genesis(AccumulatingGenesis(_)))
+            || matches!(self.stage, Stage::Elder(_))
+        {
+            return Ok(vec![]);
+        }
+
+        let (stage, cmd) = match self.stage {
+            Stage::Genesis(AwaitingGenesisThreshold(ref mut queued_ops)) => {
+                let elder_state = ElderState::new(self.network_api.clone()).await?;
+
+                let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
+                let _ = signatures.insert(sig.index, sig.share);
+
+                let credit_sig_share = elder_state.sign_as_elder(&credit).await?;
+                let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
+
+                let dst = DstLocation::Section(elder_state.section_public_key().into());
+                let stage = Stage::Genesis(ProposingGenesis(GenesisProposal {
+                    elder_state,
+                    proposal: credit.clone(),
+                    signatures,
+                    pending_agreement: None,
+                    queued_ops: queued_ops.drain(..).collect(),
+                }));
+                let cmd = NodeMessagingDuty::Send(OutgoingMsg {
+                    msg: Message::NodeCmd {
+                        cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
+                            credit,
+                            sig: credit_sig_share,
+                        }),
+                        id: MessageId::new(),
+                        target_section_pk: None,
+                    },
+                    section_source: false, // sent as single node
+                    dst,
+                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                });
+
+                (stage, cmd)
+            }
+            Stage::Genesis(ProposingGenesis(ref mut bootstrap)) => {
+                debug!("Adding incoming genesis proposal.");
+                bootstrap.add(sig)?;
+                if let Some(signed_credit) = &bootstrap.pending_agreement {
+                    // replicas signatures over > signed_credit <
+                    let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
+                    let credit_sig_share =
+                        bootstrap.elder_state.sign_as_elder(&signed_credit).await?;
+                    let _ =
+                        signatures.insert(credit_sig_share.index, credit_sig_share.share.clone());
+
+                    let stage = Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
+                        elder_state: bootstrap.elder_state.clone(),
+                        agreed_proposal: signed_credit.clone(),
+                        signatures,
+                        pending_agreement: None,
+                        queued_ops: bootstrap.queued_ops.drain(..).collect(),
+                    }));
+
+                    let cmd = NodeMessagingDuty::Send(OutgoingMsg {
+                        msg: Message::NodeCmd {
+                            cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
+                                signed_credit: signed_credit.clone(),
+                                sig: credit_sig_share,
+                            }),
+                            id: MessageId::new(),
+                            target_section_pk: None,
+                        },
+                        section_source: false, // sent as single node
+                        dst: DstLocation::Section(
+                            bootstrap.elder_state.section_public_key().into(),
+                        ),
+                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                    });
+
+                    (stage, cmd)
+                } else {
+                    return Ok(vec![]);
+                }
+            }
+            _ => {
+                return Err(Error::InvalidOperation(
+                    "invalid self.stage at fn receive_genesis_proposal".to_string(),
+                ))
+            }
+        };
+
+        self.stage = stage;
+
+        Ok(NetworkDuties::from(cmd))
+    }
+
+    async fn receive_genesis_accumulation(
+        &mut self,
+        signed_credit: SignedCredit,
+        sig: SignatureShare,
+    ) -> Result<NetworkDuties> {
+        if matches!(self.stage, Stage::Elder(_)) {
+            return Ok(vec![]);
+        }
+
+        match self.stage {
+            Stage::Genesis(ProposingGenesis(ref mut bootstrap)) => {
+                // replicas signatures over > signed_credit <
+                let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
+                let _ = signatures.insert(sig.index, sig.share);
+
+                let credit_sig_share = bootstrap.elder_state.sign_as_elder(&signed_credit).await?;
+                let _ = signatures.insert(credit_sig_share.index, credit_sig_share.share);
+
+                self.stage = Stage::Genesis(AccumulatingGenesis(GenesisAccumulation {
+                    elder_state: bootstrap.elder_state.clone(),
+                    agreed_proposal: signed_credit,
+                    signatures,
+                    pending_agreement: None,
+                    queued_ops: bootstrap.queued_ops.drain(..).collect(),
+                }));
+                Ok(vec![])
+            }
+            Stage::Genesis(AccumulatingGenesis(ref mut bootstrap)) => {
+                bootstrap.add(sig)?;
+                if let Some(genesis) = bootstrap.pending_agreement.take() {
+                    // TODO: do not take this? (in case of fail further blow)
+                    let credit_sig_share = bootstrap.elder_state.sign_as_elder(&genesis).await?;
+                    let _ = bootstrap
+                        .signatures
+                        .insert(credit_sig_share.index, credit_sig_share.share.clone());
+
+                    let genesis = TransferPropagated {
+                        credit_proof: genesis.clone(),
+                    };
+
+                    debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENSIS AGREEMENT PROOFED");
+                    return self
+                        .finish_transition_to_elder(
+                            WalletInfo {
+                                replicas: genesis.credit_proof.debiting_replicas_keys.clone(),
+                                history: ActorHistory {
+                                    credits: vec![genesis.credit_proof.clone()],
+                                    debits: vec![],
+                                },
+                            },
+                            Some(genesis),
+                        )
+                        .await;
+                }
+                Ok(vec![])
+            }
+            _ => Err(Error::InvalidOperation(
+                "invalid self.stage at fn receive_genesis_accumulation".to_string(),
+            )),
         }
     }
 }

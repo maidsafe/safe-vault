@@ -123,14 +123,14 @@ impl DataSection {
         }
     }
 
-    /// Issues query to Elders of the section
-    /// as to catch up with the current state of the replicas.
-    pub async fn catchup_with_section(&mut self) -> Result<NetworkDuties> {
-        let prefix_name = self.elder_state().prefix().name();
-        self.rewards()?
-            .get_section_wallet_history(prefix_name)
-            .await
-    }
+    // /// Issues query to Elders of the section
+    // /// as to catch up with the current state of the replicas.
+    // pub async fn catchup_with_section(&mut self) -> Result<NetworkDuties> {
+    //     let prefix_name = self.elder_state().prefix().name();
+    //     self.rewards()?
+    //         .get_section_wallet_history(prefix_name)
+    //         .await
+    // }
 
     /// Transition the section funds account to the new key.
     pub async fn initiate_elder_change(

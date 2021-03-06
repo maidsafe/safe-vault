@@ -60,6 +60,7 @@ impl ChunkStorage {
                     cmd_origin: SrcLocation::EndUser(origin),
                     target_section_pk: None,
                 },
+                section_source: false, // sent as single node
                 dst: DstLocation::EndUser(origin),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }))
@@ -112,6 +113,7 @@ impl ChunkStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // sent as single node
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -162,6 +164,7 @@ impl ChunkStorage {
                 query_origin: origin,
                 target_section_pk: None,
             },
+            section_source: false, // sent as single node
             dst: origin.to_dst(),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -228,6 +231,7 @@ impl ChunkStorage {
                     cmd_origin: SrcLocation::EndUser(origin),
                     target_section_pk: None,
                 },
+                section_source: false, // sent as single node
                 dst: DstLocation::EndUser(origin),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }));

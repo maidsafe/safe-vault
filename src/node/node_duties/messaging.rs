@@ -41,8 +41,13 @@ impl Messaging {
     }
 
     async fn send(&mut self, msg: OutgoingMsg) -> Result<NetworkDuties> {
+        let src = if msg.section_source {
+            SrcLocation::Section(self.network.our_prefix().await.name())
+        } else {
+            SrcLocation::Node(self.network.our_name().await)
+        };
         let itry = Itinerary {
-            src: SrcLocation::Node(self.network.our_name().await),
+            src,
             dst: msg.dst,
             aggregation: msg.aggregation,
         };

@@ -125,7 +125,7 @@ impl SectionFunds {
         let event = match self.actor.from_history(history) {
             Ok(event) => Ok(event),
             Err(error) => match error {
-                sn_transfers::Error::NothingToSync => Ok(None),
+                sn_transfers::Error::InvalidActorHistory => Ok(None),
                 _ => Err(Error::Transfer(error)),
             },
         }?;
@@ -173,11 +173,12 @@ impl SectionFunds {
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetWalletReplicas(new_wallet)),
-                id: MessageId::new(),
+                id: MessageId::combine(vec![self.replicas().into(), new_wallet.into()]),
                 target_section_pk: None,
             },
+            section_source: true, // i.e. responses go to our section
             dst: DstLocation::Section(new_wallet.into()),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::AtDestination,
         }))
     }
 
@@ -310,6 +311,7 @@ impl SectionFunds {
                         id: MessageId::new(),
                         target_section_pk: None,
                     },
+                    section_source: false,
                     dst: DstLocation::Section(self.actor.id().into()),
                     aggregation: Aggregation::None,
                 }))
@@ -353,8 +355,9 @@ impl SectionFunds {
                         id: MessageId::new(),
                         target_section_pk: None,
                     },
+                    section_source: false,
                     dst: DstLocation::Section(self.actor.id().into()),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                    aggregation: Aggregation::None,
                 }))
             }
         }
@@ -464,15 +467,18 @@ impl SectionFunds {
                 }
             }
 
+            let msg_id = XorName::from_content(&[&bincode::serialize(&proof.credit_sig)?]);
+
             // We ask of our Replicas to register this transfer.
             let mut register_op = NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
                 msg: Message::NodeCmd {
                     cmd: Transfers(RegisterSectionPayout(proof)),
-                    id: MessageId::new(),
+                    id: MessageId(msg_id),
                     target_section_pk: None,
                 },
+                section_source: true, // i.e. responses go to our section
                 dst: DstLocation::Section(self.actor.id().into()),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination, // TODO: aggregate here (not needed, but makes sn_node logs less chatty..)
+                aggregation: Aggregation::AtDestination, // (not needed, but makes sn_node logs less chatty..)
             }));
 
             // First register the transfer, then

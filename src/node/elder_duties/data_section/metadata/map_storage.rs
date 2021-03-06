@@ -232,6 +232,7 @@ impl MapStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -260,6 +261,7 @@ impl MapStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -288,6 +290,7 @@ impl MapStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -326,6 +329,7 @@ impl MapStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -354,6 +358,7 @@ impl MapStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -383,6 +388,7 @@ impl MapStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -412,6 +418,7 @@ impl MapStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -440,6 +447,7 @@ impl MapStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -472,6 +480,7 @@ impl MapStorage {
                 query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -495,8 +504,9 @@ impl MapStorage {
                     cmd_origin: SrcLocation::EndUser(origin),
                     target_section_pk: None,
                 },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                 dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,  // this needs more consideration...
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }))
         } else {
             info!("MapStorage: Writing chunk PASSED!");

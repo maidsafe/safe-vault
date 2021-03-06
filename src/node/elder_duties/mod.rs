@@ -69,7 +69,7 @@ impl ElderDuties {
             self.wallet_section.init_genesis_node(genesis).await?;
         } else {
             ops.append(&mut self.wallet_section.catchup_with_section().await?);
-            ops.append(&mut self.data_section.catchup_with_section().await?);
+            //ops.append(&mut self.data_section.catchup_with_section().await?);
         }
 
         Ok(ops)

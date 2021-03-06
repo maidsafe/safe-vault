@@ -89,6 +89,7 @@ impl BlobRegister {
                             correlation_id: msg_id,
                             target_section_pk: None,
                         },
+                        section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                         dst: DstLocation::EndUser(origin),
                         aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                     }));
@@ -158,6 +159,7 @@ impl BlobRegister {
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -347,6 +349,7 @@ impl BlobRegister {
             node_ops.push(
                 NodeMessagingDuty::Send(OutgoingMsg {
                     msg,
+                    section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Node(dst),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 })
@@ -385,6 +388,7 @@ impl BlobRegister {
             };
             Ok(NodeMessagingDuty::Send(OutgoingMsg {
                 msg: err_msg,
+                section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                 dst: DstLocation::EndUser(origin),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }))

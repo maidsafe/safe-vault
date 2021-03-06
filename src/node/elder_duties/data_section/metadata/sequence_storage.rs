@@ -108,6 +108,7 @@ impl SequenceStorage {
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -180,6 +181,7 @@ impl SequenceStorage {
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -208,6 +210,7 @@ impl SequenceStorage {
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -241,6 +244,7 @@ impl SequenceStorage {
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -271,6 +275,7 @@ impl SequenceStorage {
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -304,6 +309,7 @@ impl SequenceStorage {
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -337,6 +343,7 @@ impl SequenceStorage {
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::EndUser(origin),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -407,6 +414,7 @@ impl SequenceStorage {
                 cmd_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: DstLocation::Section(origin.name()),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))

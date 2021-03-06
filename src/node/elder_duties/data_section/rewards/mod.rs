@@ -88,23 +88,23 @@ impl Rewards {
         }
     }
 
-    /// Issues a query to existing Replicas
-    /// asking for their events, as to catch up and
-    /// start working properly in the group.
-    pub async fn get_section_wallet_history(&self, section: XorName) -> Result<NetworkDuties> {
-        info!("Rewards: Catching up with our section wallet history!");
-        // prepare actor init
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::NodeQuery {
-                query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
-                id: MessageId::new(),
-                target_section_pk: None,
-            },
-            dst: DstLocation::Section(section),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        })
-        .into())
-    }
+    // /// Issues a query to existing Replicas
+    // /// asking for their events, as to catch up and
+    // /// start working properly in the group.
+    // pub async fn get_section_wallet_history(&self, section: XorName) -> Result<NetworkDuties> {
+    //     info!("Rewards: Catching up with our section wallet history!");
+    //     // prepare actor init
+    //     Ok(NodeMessagingDuty::Send(OutgoingMsg {
+    //         msg: Message::NodeQuery {
+    //             query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
+    //             id: MessageId::new(),
+    //             target_section_pk: None,
+    //         },
+    //         dst: DstLocation::Section(section),
+    //         aggregation: Aggregation::None,
+    //     })
+    //     .into())
+    // }
 
     /// After Elder change, we transition to a new
     /// transfer actor, as there is now a new keypair for it.
@@ -259,8 +259,9 @@ impl Rewards {
                 query_origin: origin,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::AtDestination,
         })
     }
 
@@ -315,7 +316,6 @@ impl Rewards {
 
         let state = AwaitingActivation(age);
         let _ = self.node_rewards.insert(new_node_id, state);
-
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
                 query: Rewards(GetNodeWalletId {
@@ -325,8 +325,9 @@ impl Rewards {
                 id: MessageId::combine(vec![old_node_id, new_node_id]),
                 target_section_pk: None,
             },
+            section_source: true, // i.e. responses go to our section
             dst: DstLocation::Section(old_node_id),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::AtDestination,
         }))
     }
 
@@ -456,8 +457,9 @@ impl Rewards {
                         query_origin: origin,
                         target_section_pk: None,
                     },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                     dst: origin.to_dst(),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                    aggregation: Aggregation::AtDestination,
                 }));
             }
         };
@@ -479,8 +481,9 @@ impl Rewards {
                 query_origin: origin,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::Section(new_node_id),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::AtDestination,
         }))
     }
 }

@@ -110,8 +110,9 @@ impl Transfers {
                 id: MessageId::new(),
                 target_section_pk: None,
             },
+            section_source: false, // sent as a single node, when catching up
             dst: DstLocation::Section(pub_key.into()),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::None,
         })))
     }
 
@@ -164,9 +165,7 @@ impl Transfers {
             GetReplicaEvents => self.all_events(msg_id, origin).await?,
             GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await?,
             GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await?,
-            GetHistory { at, since_version } => {
-                self.history(at, *since_version, msg_id, origin).await?
-            }
+            GetHistory { at, .. } => self.history(at, msg_id, origin).await?,
             GetStoreCost { bytes, .. } => {
                 let mut ops = vec![];
                 ops.push(NetworkDuty::from(
@@ -285,6 +284,7 @@ impl Transfers {
                     cmd_origin: origin,
                     target_section_pk: None,
                 },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                 dst: origin.to_dst(),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }));
@@ -329,6 +329,7 @@ impl Transfers {
                             cmd_origin: origin,
                             target_section_pk: None,
                         },
+                        section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                         dst: origin.to_dst(),
                         aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                     }));
@@ -345,8 +346,9 @@ impl Transfers {
                         id: MessageId::in_response_to(&msg.id()),
                         target_section_pk: None,
                     },
+                    section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Section(dst_address),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                    aggregation: Aggregation::AtDestination,
                 }))
             }
             Err(e) => {
@@ -362,6 +364,7 @@ impl Transfers {
                         cmd_origin: origin,
                         target_section_pk: None,
                     },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: origin.to_dst(),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 }))
@@ -394,8 +397,9 @@ impl Transfers {
                 query_origin,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: query_origin.to_dst(),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::AtDestination,
         }))
     }
 
@@ -420,6 +424,7 @@ impl Transfers {
                 query_origin: origin,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -442,6 +447,7 @@ impl Transfers {
                 query_origin: origin,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -469,6 +475,7 @@ impl Transfers {
                 query_origin: origin,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
@@ -492,15 +499,15 @@ impl Transfers {
                 query_origin: origin,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination, // this has to be sorted out by recipient..
+            aggregation: Aggregation::AtDestination,
         }))
     }
 
     async fn history(
         &self,
         wallet_id: &PublicKey,
-        _since_version: usize,
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
@@ -520,6 +527,7 @@ impl Transfers {
                 query_origin: origin,
                 target_section_pk: None,
             },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination, // this has to be sorted out by recipient..
         }))
@@ -543,6 +551,7 @@ impl Transfers {
                     correlation_id: msg_id,
                     target_section_pk: None,
                 },
+                section_source: false, // strictly this is not correct, but we don't expect responses to an event..
                 dst: origin.to_dst(),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             })),
@@ -556,6 +565,7 @@ impl Transfers {
                         cmd_origin: origin,
                         target_section_pk: None,
                     },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: origin.to_dst(),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 }))
@@ -604,6 +614,7 @@ impl Transfers {
                         correlation_id: msg_id,
                         target_section_pk: None,
                     },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an event..
                     dst: DstLocation::Section(origin.name()),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 }))
@@ -621,8 +632,9 @@ impl Transfers {
                         cmd_origin: origin,
                         target_section_pk: None,
                     },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: origin.to_dst(),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                    aggregation: Aggregation::AtDestination,
                 }))
             }
         }
@@ -647,8 +659,9 @@ impl Transfers {
                         id: MessageId::in_response_to(&msg_id),
                         target_section_pk: None,
                     },
+                    section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Section(location),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,  // not necessary, but will be slimmer
+                    aggregation: Aggregation::AtDestination,
                 }))
             }
             Err(e) => {
@@ -663,8 +676,9 @@ impl Transfers {
                         cmd_origin: SrcLocation::EndUser(EndUser::AllClients(proof.sender())),
                         target_section_pk: None,
                     },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: DstLocation::EndUser(EndUser::AllClients(proof.sender())),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                    aggregation: Aggregation::AtDestination,
                 }))
             }
         }
@@ -699,8 +713,9 @@ impl Transfers {
                             correlation_id: msg_id,
                             target_section_pk: None,
                         },
+                        section_source: false, // strictly this is not correct, but we don't expect responses to an event..
                         dst: DstLocation::Section(location),
-                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                        aggregation: Aggregation::AtDestination,
                     })
                     .into(),
                 );
@@ -710,11 +725,12 @@ impl Transfers {
                     NodeMessagingDuty::Send(OutgoingMsg {
                         msg: Message::NodeCmd {
                             cmd: Transfers(PropagateTransfer(event.transfer_proof)),
-                            id: MessageId::new(),
+                            id: MessageId::in_response_to(&msg_id),
                             target_section_pk: None,
                         },
+                        section_source: true, // i.e. errors go to our section
                         dst: DstLocation::Section(location),
-                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,  // not necessary, but will be slimmer
+                        aggregation: Aggregation::AtDestination, // not necessary, but will be slimmer
                     })
                     .into(),
                 );
@@ -733,8 +749,9 @@ impl Transfers {
                         cmd_origin: origin,
                         target_section_pk: None,
                     },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: origin.to_dst(),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                    aggregation: Aggregation::AtDestination,
                 })))
             }
         }
@@ -773,7 +790,7 @@ impl Transfers {
                 // Nonsense error just not to crash node for now. Should be converted properly to be handled at client.
                 Message::NodeCmdError {
                     error: NodeCmdError::Transfers(TransferPropagation(ErrorMessage::NoSuchKey)),
-                    id: MessageId::new(),
+                    id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     cmd_origin: origin,
                     target_section_pk: None,
@@ -783,8 +800,9 @@ impl Transfers {
         };
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg,
+            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: origin.to_dst(),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::AtDestination,
         }))
     }
 

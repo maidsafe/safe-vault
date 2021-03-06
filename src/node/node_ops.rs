@@ -149,6 +149,7 @@ impl Debug for NodeDuty {
 pub struct OutgoingMsg {
     pub msg: Message,
     pub dst: DstLocation,
+    pub section_source: bool,
     pub aggregation: Aggregation,
 }
 
