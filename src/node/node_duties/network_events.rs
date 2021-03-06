@@ -53,7 +53,7 @@ impl NetworkEvents {
         network: &Network,
     ) -> Result<NetworkDuties> {
         use ElderDuty::*;
-        trace!("Processing Routing Event: {:?}", event);
+        //trace!("Processing Routing Event: {:?}", event);
         match event {
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
@@ -69,7 +69,7 @@ impl NetworkEvents {
                 age,
                 ..
             } => {
-                info!("New member has joined the section");
+                //info!("New member has joined the section");
                 //self.log_node_counts().await;
                 if let Some(prev_name) = previous_name {
                     trace!("The new member is a Relocated Node");
@@ -83,7 +83,7 @@ impl NetworkEvents {
                     let second = NetworkDuty::from(SwitchNodeJoin(false));
                     Ok(vec![first, second])
                 } else {
-                    trace!("New node has just joined the network and is a fresh node.",);
+                    //trace!("New node has just joined the network and is a fresh node.",);
                     Ok(NetworkDuties::from(ProcessNewMember(XorName(name.0))))
                 }
             }
@@ -96,12 +96,12 @@ impl NetworkEvents {
                 )
             }
             RoutingEvent::MessageReceived { content, src, dst } => {
-                info!(
-                    "Received network message: {:8?}\n Sent from {:?} to {:?}",
-                    HexFmt(&content),
-                    src,
-                    dst
-                );
+                // info!(
+                //     "Received network message: {:8?}\n Sent from {:?} to {:?}",
+                //     HexFmt(&content),
+                //     src,
+                //     dst
+                // );
                 self.analysis.evaluate(Message::from(content)?, src, dst)
             }
             RoutingEvent::EldersChanged {

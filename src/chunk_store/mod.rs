@@ -65,7 +65,7 @@ where
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 
         if fs::read(&dir).is_ok() {
-            trace!("Loading ChunkStore at {}", dir.display());
+            // trace!("Loading ChunkStore at {}", dir.display());
         } else {
             Self::create_new_root(&dir)?
         }
@@ -82,7 +82,7 @@ where
 
 impl<T: Chunk> ChunkStore<T> {
     fn create_new_root(root: &Path) -> Result<()> {
-        trace!("Creating ChunkStore at {}", root.display());
+        //trace!("Creating ChunkStore at {}", root.display());
         fs::create_dir_all(root)?;
 
         // Verify that chunk files can be created.

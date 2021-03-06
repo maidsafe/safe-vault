@@ -46,7 +46,7 @@ impl ReceivedMsgAnalysis {
         src: SrcLocation,
         dst: DstLocation,
     ) -> Result<NetworkDuties> {
-        debug!("Evaluating received msg..");
+        //debug!("Evaluating received msg..");
         let msg_id = msg.id();
         if let SrcLocation::EndUser(origin) = src {
             let res = self.match_user_sent_msg(msg.clone(), origin);
@@ -124,9 +124,8 @@ impl ReceivedMsgAnalysis {
         }
     }
 
-    /// (NB: No accumulation happening yet) Accumulated messages (i.e. src == section)
     fn match_section_msg(&self, msg: Message, origin: SrcLocation) -> Result<NetworkDuties> {
-        debug!("Evaluating received msg for Section: {:?}", msg);
+        //debug!("Evaluating received msg for Section: {:?}", msg);
 
         let res = match &msg {
             //
@@ -328,7 +327,7 @@ impl ReceivedMsgAnalysis {
     }
 
     fn match_node_msg(&self, msg: Message, origin: SrcLocation) -> Result<NetworkDuties> {
-        debug!("Evaluating received msg for Node: {:?}", msg);
+        //debug!("Evaluating received msg for Node: {:?}", msg);
 
         let res = match &msg {
             //

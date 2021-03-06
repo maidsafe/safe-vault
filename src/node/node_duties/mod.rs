@@ -204,7 +204,7 @@ impl NodeDuties {
 
     async fn process_node_duty(&mut self, duty: NodeDuty) -> Result<NetworkDuties> {
         use NodeDuty::*;
-        info!("Processing Node duty: {:?}", duty);
+        //info!("Processing Node duty: {:?}", duty);
         match duty {
             RegisterWallet(wallet) => self.register_wallet(wallet).await,
             AssumeAdultDuties => self.assume_adult_duties().await,
@@ -307,10 +307,10 @@ impl NodeDuties {
         let is_genesis_section = self.network_api.our_prefix().await.is_empty();
         let elder_count = self.network_api.our_elder_names().await.len();
         let section_chain_len = self.network_api.section_chain().await.len();
-        debug!(
-            "begin_transition_to_elder. is_genesis_section: {}, elder_count: {}, section_chain_len: {}",
-            is_genesis_section, elder_count, section_chain_len
-        );
+        // debug!(
+        //     "begin_transition_to_elder. is_genesis_section: {}, elder_count: {}, section_chain_len: {}",
+        //     is_genesis_section, elder_count, section_chain_len
+        // );
         if is_genesis_section
             && elder_count == GENESIS_ELDER_COUNT
             && matches!(self.stage, Stage::Adult(_))
@@ -361,8 +361,6 @@ impl NodeDuties {
             self.stage = Stage::Genesis(AwaitingGenesisThreshold(VecDeque::new()));
             return Ok(vec![]);
         }
-
-        debug!("Beginning normal transition to Elder.");
 
         if let Some(wallet_id) = self.network_api.section_public_key().await {
             trace!("Beginning transition to Elder duties.");

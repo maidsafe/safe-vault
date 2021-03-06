@@ -77,7 +77,7 @@ impl ElderDuties {
 
     /// Processing of any Elder duty.
     pub async fn process_elder_duty(&mut self, duty: ElderDuty) -> Result<NetworkDuties> {
-        trace!("Processing elder duty: {:?}", duty);
+        //trace!("Processing elder duty: {:?}", duty);
         use ElderDuty::*;
         match duty {
             ProcessNewMember(name) => self.new_node_joined(name).await,

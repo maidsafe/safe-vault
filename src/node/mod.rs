@@ -83,15 +83,9 @@ impl Node {
 
         use AgeGroup::*;
         let age = network_api.age().await;
-        info!("Our Age: {:?}", age);
-        info!("Is genesis: {:?}", node_info.genesis);
-
-        info!("Fetching Age bracket");
         let age_group = if !network_api.is_elder().await && age > MIN_AGE {
-            info!("We are Adult");
             Adult
         } else {
-            info!("We are Infant");
             Infant
         };
 
@@ -126,8 +120,8 @@ impl Node {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
-        let info = self.network_api.our_connection_info().await;
-        info!("Listening for routing events at: {}", info);
+        //let info = self.network_api.our_connection_info().await;
+        //info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             info!("New event received from the Network: {:?}", event);
             self.process_while_any(Ok(NetworkDuties::from(NodeDuty::ProcessNetworkEvent(

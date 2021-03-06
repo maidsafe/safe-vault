@@ -133,7 +133,7 @@ impl Transfers {
     /// When handled by Elders in the dst
     /// section, the actual business logic is executed.
     pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NetworkDuties> {
-        trace!("Processing transfer duty");
+        //trace!("Processing transfer duty");
         use TransferDuty::*;
         match duty {
             ProcessQuery {

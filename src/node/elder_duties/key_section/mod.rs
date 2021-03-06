@@ -154,7 +154,7 @@ impl WalletSection {
     }
 
     pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Result<NetworkDuties> {
-        trace!("Processing as Elder KeySection");
+        //trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
             RunAsTransfers(duty) => self.transfers().process_transfer_duty(&duty).await,

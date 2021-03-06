@@ -26,16 +26,16 @@ pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_name: N,
 ) -> Result<PickleDb> {
     let db_path = db_dir.as_ref().join(db_name);
-    debug!("Trying to load Database at {}", db_path.display(),);
+    //debug!("Trying to load Database at {}", db_path.display(),);
     match PickleDb::load_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump) {
         Ok(db) => Ok(db),
         Err(_) => {
-            debug!("Database not found, creating it..");
+            //debug!("Database not found, creating it..");
             fs::create_dir_all(db_dir)?;
             let mut _db = PickleDb::new_bin(db_path.clone(), PickleDbDumpPolicy::AutoDump);
             // dump is needed to actually write the db to disk.
             _db.dump()?;
-            debug!("Created database");
+            //debug!("Created database");
             PickleDb::load_bin(db_path, PickleDbDumpPolicy::AutoDump).map_err(Error::PickleDb)
         }
     }
