@@ -142,10 +142,6 @@ impl Network {
             .map_err(Error::Routing)
     }
 
-    pub async fn section_chain(&self) -> SectionChain {
-        self.routing.lock().await.our_history().await
-    }
-
     pub async fn our_index(&self) -> Result<usize> {
         self.routing
             .lock()
