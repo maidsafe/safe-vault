@@ -46,7 +46,7 @@ use std::{
 };
 use GenesisStage::*;
 
-const GENESIS_ELDER_COUNT: usize = 3;
+const GENESIS_ELDER_COUNT: usize = 5;
 
 #[allow(clippy::large_enum_variant)]
 enum Stage {
