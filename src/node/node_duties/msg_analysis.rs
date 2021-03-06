@@ -316,7 +316,7 @@ impl ReceivedMsgAnalysis {
             Message::NodeEvent {
                 event: NodeEvent::SectionPayoutRegistered { from, to },
                 ..
-            } => NodeDuty::FinishElderChange {
+            } => NodeDuty::CompleteElderChange {
                 previous_key: *from,
                 new_key: *to,
             }

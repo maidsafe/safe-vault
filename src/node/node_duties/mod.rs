@@ -221,12 +221,12 @@ impl NodeDuties {
                 sibling_key,
                 ..
             } => self.initiate_elder_change(prefix, key, sibling_key).await,
-            FinishElderChange {
+            CompleteElderChange {
                 previous_key,
                 new_key,
-            } => self.finish_elder_change(previous_key, new_key).await,
+            } => self.complete_elder_change(previous_key, new_key).await,
             InitSectionWallet(wallet_info) => {
-                self.finish_transition_to_elder(wallet_info, None).await
+                self.complete_transition_to_elder(wallet_info, None).await
             }
             ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
             ProcessNetworkEvent(event) => {
@@ -386,12 +386,12 @@ impl NodeDuties {
         Ok(vec![])
     }
 
-    async fn finish_transition_to_elder(
+    async fn complete_transition_to_elder(
         &mut self,
         wallet_info: WalletInfo,
         genesis: Option<TransferPropagated>,
     ) -> Result<NetworkDuties> {
-        debug!(">>>>>>>>>>> Finishing transition to elder!!!");
+        debug!(">>>>>>>>>>> Completing transition to elder!!!");
         debug!("????");
         let state = ElderState::new(self.network_api.clone()).await?;
         let pre_elder = ElderDuties::pre_elder(&self.node_info, state).await?;
@@ -404,11 +404,11 @@ impl NodeDuties {
                 if self.node_info.genesis {
                     pre_elder
                 } else {
-                    return Err(Error::InvalidOperation("cannot finish_transition_to_elder as Infant".to_string()));
+                    return Err(Error::InvalidOperation("cannot complete_transition_to_elder as Infant".to_string()));
                 }
             }
             Stage::Adult(_) | Stage::Genesis(AwaitingGenesisThreshold(_)) | Stage::Genesis(ProposingGenesis(_)) => {
-                return Err(Error::InvalidOperation("cannot finish_transition_to_elder as Adult | AwaitingGenesisThreshold | ProposingGenesis".to_string()))
+                return Err(Error::InvalidOperation("cannot complete_transition_to_elder as Adult | AwaitingGenesisThreshold | ProposingGenesis".to_string()))
             }
             Stage::Genesis(AccumulatingGenesis(_)) => {
                 pre_elder
@@ -419,7 +419,7 @@ impl NodeDuties {
             }
         };
 
-        trace!(">>>Finishing transition to Elder and dealing with queue..");
+        trace!(">>>Completing transition to Elder and dealing with queue..");
 
         let mut ops: NetworkDuties = vec![];
         let mut elder_duties = elder_duties.enable(wallet_info).await?;
@@ -493,7 +493,7 @@ impl NodeDuties {
     }
 
     ///
-    async fn finish_elder_change(
+    async fn complete_elder_change(
         &mut self,
         previous_key: PublicKey,
         new_key: PublicKey,
@@ -504,7 +504,7 @@ impl NodeDuties {
             } // Should be unreachable
             Stage::Elder(elder) => {
                 elder
-                    .finish_elder_change(&self.node_info, previous_key, new_key)
+                    .complete_elder_change(&self.node_info, previous_key, new_key)
                     .await
             }
         }
@@ -650,7 +650,7 @@ impl NodeDuties {
 
                     debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENSIS AGREEMENT PROOFED");
                     return self
-                        .finish_transition_to_elder(
+                        .complete_transition_to_elder(
                             WalletInfo {
                                 replicas: genesis.credit_proof.debiting_replicas_keys.clone(),
                                 history: ActorHistory {

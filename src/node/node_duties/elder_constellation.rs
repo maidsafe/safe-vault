@@ -101,13 +101,13 @@ impl ElderConstellation {
     }
 
     ///
-    pub async fn finish_elder_change(
+    pub async fn complete_elder_change(
         &mut self,
         node_info: &NodeInfo,
         previous_key: PublicKey,
         new_key: PublicKey,
     ) -> Result<NetworkDuties> {
-        debug!(">>>> Finishing elder change!!");
+        debug!(">>>> Completing elder change!!");
         debug!(">>>>new key: {:?}", new_key);
         debug!(">>>> previous_key: {:?}", previous_key);
 
@@ -128,7 +128,7 @@ impl ElderConstellation {
         let new_elder_state = ElderState::new(self.network.clone()).await?;
         // 3. And update key section with it.
         self.duties
-            .finish_elder_change(node_info, new_elder_state.clone())
+            .complete_elder_change(node_info, new_elder_state.clone())
             .await?;
 
         debug!(">>>>Key section completed elder change update.");

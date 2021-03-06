@@ -52,7 +52,7 @@ struct State {
     /// or when we are transitioning to a new Actor.
     queued_payouts: VecDeque<Payout>,
     payout_in_flight: Option<Payout>,
-    finished: BTreeSet<XorName>, // this set grows within acceptable bounds, since transitions do not happen that often, and at every section split, the set is cleared..
+    completed: BTreeSet<XorName>, // this set grows within acceptable bounds, since transitions do not happen that often, and at every section split, the set is cleared..
     transition: Transition,
 }
 
@@ -78,11 +78,11 @@ enum SplitStage {
         next_actor_state: ElderState,
         sibling_key: PublicKey,
     },
-    FinishingT1 {
+    CompletingT1 {
         next_actor: SectionActor,
         t2: T2,
     },
-    FinishingT2 {
+    CompletingT2 {
         next_actor: SectionActor,
         if_t1_was_ours: Option<CreditAgreementProof>,
     },
@@ -101,7 +101,7 @@ impl SectionFunds {
             state: State {
                 queued_payouts: Default::default(),
                 payout_in_flight: None,
-                finished: Default::default(),
+                completed: Default::default(),
                 transition: Transition::None,
             },
         }
@@ -254,7 +254,7 @@ impl SectionFunds {
                     (t1, our_new_key)
                 };
                 // set next stage of the transition process
-                self.state.transition = Transition::Split(SplitStage::FinishingT1 {
+                self.state.transition = Transition::Split(SplitStage::CompletingT1 {
                     next_actor,
                     t2: T2 {
                         amount: t2_amount,
@@ -264,8 +264,8 @@ impl SectionFunds {
                 Ok(NetworkDuties::from(t1))
             }
             Transition::Regular(TransitionStage::InTransition(_))
-            | Transition::Split(SplitStage::FinishingT1 { .. })
-            | Transition::Split(SplitStage::FinishingT2 { .. }) => {
+            | Transition::Split(SplitStage::CompletingT1 { .. })
+            | Transition::Split(SplitStage::CompletingT2 { .. }) => {
                 debug!(">>>>> SOME OTHER STAGE");
                 Err(Error::Logic("Undergoing transition already".to_string()))
             }
@@ -322,7 +322,7 @@ impl SectionFunds {
     /// Will validate and sign the payout, and ask of the replicas to
     /// do the same, and await their responses as to accumulate the result.
     pub async fn initiate_reward_payout(&mut self, payout: Payout) -> Result<NodeMessagingDuty> {
-        if self.state.finished.contains(&payout.node_id) {
+        if self.state.completed.contains(&payout.node_id) {
             return Ok(NodeMessagingDuty::NoOp);
         }
         // if we are transitioning, or having payout in flight, the payout is deferred.
@@ -386,13 +386,14 @@ impl SectionFunds {
             self.apply(TransfersSynched(event))?
         }
 
-        // cleanup of previous state: clear finished reward payouts
-        self.state.finished.clear();
+        // cleanup of previous state: clear completed reward payouts
+        self.state.completed.clear();
 
         // Wallet transition is completed!
         info!("Wallet transition is completed!");
         Ok(())
     }
+
     /// (potentially leading to Wallet transition, step 3.)
     /// As all Replicas have accumulated the distributed
     /// actor cmds and applied them, they'll send out the
@@ -429,8 +430,8 @@ impl SectionFunds {
                     self.move_to_next(next_actor, proof.credit_proof())?;
                     queued_ops = self.try_pop_queue().await?;
                 }
-                Transition::Split(SplitStage::FinishingT1 { next_actor, ref t2 }) => {
-                    debug!(">>>> ************************* finishing t1!");
+                Transition::Split(SplitStage::CompletingT1 { next_actor, ref t2 }) => {
+                    debug!(">>>> ************************* Completing t1!");
 
                     let if_t1_was_ours = if t2.recipient != next_actor.id() {
                         Some(proof.credit_proof())
@@ -439,16 +440,16 @@ impl SectionFunds {
                     };
                     let t2 = self.generate_validation(t2.amount, t2.recipient)?;
                     queued_ops.push(NetworkDuty::from(t2));
-                    self.state.transition = Transition::Split(SplitStage::FinishingT2 {
+                    self.state.transition = Transition::Split(SplitStage::CompletingT2 {
                         next_actor,
                         if_t1_was_ours,
                     });
                 }
-                Transition::Split(SplitStage::FinishingT2 {
+                Transition::Split(SplitStage::CompletingT2 {
                     next_actor,
                     ref if_t1_was_ours,
                 }) => {
-                    debug!(">>>> ********************** finishing t2!");
+                    debug!(">>>> ********************** Completing t2!");
                     if let Some(credit) = if_t1_was_ours {
                         // t1 was the credit to our next actor
                         self.move_to_next(next_actor, credit.clone())?
@@ -497,13 +498,13 @@ impl SectionFunds {
     async fn try_pop_queue(&mut self) -> Result<NetworkDuties> {
         if let Some(payout) = self.state.queued_payouts.pop_front() {
             // Validation logic when inititating rewards prevents enqueueing a payout that is already
-            // in the finished set. Therefore, calling initiate here cannot return None because of
-            // the payout already being finished.
+            // in the completed set. Therefore, calling initiate here cannot return None because of
+            // the payout already being completed.
             // For that reason it is safe to enqueue it again, if this call returns None.
             // (we will not loop on that payout)
             match self.initiate_reward_payout(payout.clone()).await? {
                 NodeMessagingDuty::NoOp => {
-                    if !self.state.finished.contains(&payout.node_id) {
+                    if !self.state.completed.contains(&payout.node_id) {
                         // buut.. just to prevent any future changes to
                         // enable such a loop, we do the check above anyway :)
                         // (NB: We put it at the front of the queue again,

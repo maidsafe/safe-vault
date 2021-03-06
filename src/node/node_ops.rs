@@ -89,7 +89,7 @@ pub enum NodeDuty {
     },
     /// Finishes the multi-step process
     /// of transitioning to a new elder constellation.
-    FinishElderChange {
+    CompleteElderChange {
         /// The previous section key.
         previous_key: PublicKey,
         /// The new section key.
@@ -138,7 +138,7 @@ impl Debug for NodeDuty {
             Self::NoOp => write!(f, "No op."),
             Self::StorageFull => write!(f, "StorageFull"),
             Self::InitiateElderChange { .. } => write!(f, "InitiateElderChange"),
-            Self::FinishElderChange { .. } => write!(f, "FinishElderChange"),
+            Self::CompleteElderChange { .. } => write!(f, "CompleteElderChange"),
         }
     }
 }

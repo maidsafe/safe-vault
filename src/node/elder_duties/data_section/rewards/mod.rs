@@ -88,24 +88,6 @@ impl Rewards {
         }
     }
 
-    // /// Issues a query to existing Replicas
-    // /// asking for their events, as to catch up and
-    // /// start working properly in the group.
-    // pub async fn get_section_wallet_history(&self, section: XorName) -> Result<NetworkDuties> {
-    //     info!("Rewards: Catching up with our section wallet history!");
-    //     // prepare actor init
-    //     Ok(NodeMessagingDuty::Send(OutgoingMsg {
-    //         msg: Message::NodeQuery {
-    //             query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
-    //             id: MessageId::new(),
-    //             target_section_pk: None,
-    //         },
-    //         dst: DstLocation::Section(section),
-    //         aggregation: Aggregation::None,
-    //     })
-    //     .into())
-    // }
-
     /// After Elder change, we transition to a new
     /// transfer actor, as there is now a new keypair for it.
     pub async fn init_transition(

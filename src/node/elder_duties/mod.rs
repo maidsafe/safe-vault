@@ -146,7 +146,7 @@ impl ElderDuties {
     }
 
     ///
-    pub async fn finish_elder_change(
+    pub async fn complete_elder_change(
         &mut self,
         node_info: &NodeInfo,
         state: ElderState,
