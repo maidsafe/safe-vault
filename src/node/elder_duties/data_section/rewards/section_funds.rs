@@ -45,11 +45,6 @@ pub struct Payout {
     pub node_id: XorName,
 }
 
-struct PendingTransition {
-    next_actor_state: ElderState,
-    sibling_key: Option<PublicKey>,
-}
-
 #[derive(Clone)]
 struct State {
     /// Incoming payout requests are queued here.
@@ -59,12 +54,10 @@ struct State {
     payout_in_flight: Option<Payout>,
     finished: BTreeSet<XorName>, // this set grows within acceptable bounds, since transitions do not happen that often, and at every section split, the set is cleared..
     transition: Transition,
-    // pending_transition: Option<PendingTransition>,
-    // next_actor: Option<SectionActor>, // we could do a queue here, and when starting transition skip all but the last one, but that is also prone to edge case problems..
-    // split_state: Option<SplitState>,
 }
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 enum Transition {
     Regular(TransitionStage),
     Split(SplitStage),
@@ -72,12 +65,14 @@ enum Transition {
 }
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 enum TransitionStage {
     Pending(ElderState),
     InTransition(SectionActor),
 }
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 enum SplitStage {
     Pending {
         next_actor_state: ElderState,
@@ -89,7 +84,7 @@ enum SplitStage {
     },
     FinishingT2 {
         next_actor: SectionActor,
-        was_t1_ours: Option<CreditAgreementProof>,
+        if_t1_was_ours: Option<CreditAgreementProof>,
     },
 }
 
@@ -107,9 +102,6 @@ impl SectionFunds {
                 queued_payouts: Default::default(),
                 payout_in_flight: None,
                 finished: Default::default(),
-                // pending_transition: None,
-                // next_actor: None,
-                // split_state: None,
                 transition: Transition::None,
             },
         }
@@ -220,7 +212,7 @@ impl SectionFunds {
         match self.state.transition.clone() {
             Transition::Regular(TransitionStage::Pending(next_actor_state)) => {
                 debug!(">>>>> in pending stage");
-                let next_actor = Self::get_actor(replicas, next_actor_state.to_owned())?;
+                let next_actor = Self::get_actor(replicas, next_actor_state)?;
                 let our_new_key = next_actor.id();
                 // Get all the tokens of current actor.
                 let current_balance = self.actor.balance();
@@ -237,7 +229,7 @@ impl SectionFunds {
                 debug!(
                     ">>>> Split happening, we need to transfer to TWO wallets; one for each sibling"
                 );
-                let next_actor = Self::get_actor(replicas, next_actor_state.to_owned())?;
+                let next_actor = Self::get_actor(replicas, next_actor_state)?;
                 let our_new_key = next_actor.id();
 
                 // Get all the tokens of current actor.
@@ -253,7 +245,7 @@ impl SectionFunds {
 
                 // Determine which transfer is first
                 // (deterministic order is important for reaching consensus)
-                let (t1, t2_recipient) = if &our_new_key > &sibling_key {
+                let (t1, t2_recipient) = if our_new_key > sibling_key {
                     let t1 = self.generate_validation(t1_amount, our_new_key)?;
                     (t1, sibling_key.to_owned())
                 } else {
@@ -385,15 +377,9 @@ impl SectionFunds {
             debits: vec![],
         };
 
-        let event = match self.actor.from_history(history) {
-            Ok(event) => Ok(event),
-            Err(error) => match error {
-                sn_transfers::Error::NothingToSync => Ok(None),
-                _ => Err(Error::Transfer(error)),
-            },
-        }?;
-
-        if let Some(event) = event {
+        // if this errors with nothing to synch, that certainly
+        // _is_ an error (a bug), since the history is populated above
+        if let Some(event) = self.actor.from_history(history).map_err(Error::Transfer)? {
             self.apply(TransfersSynched(event))?
         }
 
@@ -433,7 +419,6 @@ impl SectionFunds {
             match self.state.transition.clone() {
                 Transition::None => {
                     debug!(">>>> NO TRANSITION");
-                    ()
                 }
                 Transition::Regular(TransitionStage::InTransition(next_actor)) => {
                     debug!(">>>> REGULAR TRANSITION");
@@ -444,7 +429,7 @@ impl SectionFunds {
                 Transition::Split(SplitStage::FinishingT1 { next_actor, ref t2 }) => {
                     debug!(">>>> ************************* finishing t1!");
 
-                    let was_t1_ours = if t2.recipient != next_actor.id() {
+                    let if_t1_was_ours = if t2.recipient != next_actor.id() {
                         Some(proof.credit_proof())
                     } else {
                         None
@@ -452,21 +437,21 @@ impl SectionFunds {
                     let t2 = self.generate_validation(t2.amount, t2.recipient)?;
                     queued_ops.push(NetworkDuty::from(t2));
                     self.state.transition = Transition::Split(SplitStage::FinishingT2 {
-                        next_actor: next_actor.clone(),
-                        was_t1_ours,
+                        next_actor,
+                        if_t1_was_ours,
                     });
                 }
                 Transition::Split(SplitStage::FinishingT2 {
                     next_actor,
-                    ref was_t1_ours,
+                    ref if_t1_was_ours,
                 }) => {
                     debug!(">>>> ********************** finishing t2!");
-                    if let Some(credit) = was_t1_ours {
+                    if let Some(credit) = if_t1_was_ours {
                         // t1 was the credit to our next actor
-                        self.move_to_next(next_actor.clone(), credit.clone())?
+                        self.move_to_next(next_actor, credit.clone())?
                     } else {
                         // t2 is the credit to our next actor
-                        self.move_to_next(next_actor.clone(), proof.credit_proof())?
+                        self.move_to_next(next_actor, proof.credit_proof())?
                     }
                 }
                 Transition::Split(SplitStage::Pending { .. })

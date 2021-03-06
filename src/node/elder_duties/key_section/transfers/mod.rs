@@ -574,7 +574,7 @@ impl Transfers {
     ) -> Result<NodeMessagingDuty> {
         debug!(">>>>> validatin....");
 
-        if let Some(id) = self
+        if let Some(_id) = self
             .recently_validated_transfers
             .lock()
             .await

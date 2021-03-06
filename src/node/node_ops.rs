@@ -269,7 +269,6 @@ pub enum AdultDuty {
     /// storage and retrieval of data chunks.
     RunAsChunkStore(ChunkStoreDuty),
     RunAsChunkReplication(ChunkReplicationDuty),
-    ElderPrep(RewardDuty),
     NoOp,
 }
 
@@ -288,17 +287,6 @@ impl From<AdultDuty> for NetworkDuty {
     fn from(duty: AdultDuty) -> Self {
         use NetworkDuty::*;
         RunAsAdult(duty)
-    }
-}
-
-impl AdultDuty {
-    pub fn try_elder_duty(self) -> Option<ElderDuty> {
-        match self {
-            Self::ElderPrep(rewards) => Some(ElderDuty::RunAsDataSection(
-                DataSectionDuty::RunAsRewards(rewards),
-            )),
-            _ => None,
-        }
     }
 }
 
@@ -548,23 +536,11 @@ pub enum RewardQuery {
 
 impl From<RewardDuty> for NetworkDuties {
     fn from(duty: RewardDuty) -> Self {
-        use AdultDuty::*;
         use DataSectionDuty::*;
         use ElderDuty::*;
         use NetworkDuty::*;
         if matches!(duty, RewardDuty::NoOp) {
             vec![]
-        } else if let RewardDuty::ProcessCmd {
-            cmd: RewardCmd::SynchHistory(history),
-            msg_id,
-            origin,
-        } = duty
-        {
-            vec![RunAsAdult(ElderPrep(RewardDuty::ProcessCmd {
-                cmd: RewardCmd::SynchHistory(history),
-                msg_id,
-                origin,
-            }))]
         } else {
             vec![RunAsElder(RunAsDataSection(RunAsRewards(duty)))]
         }
@@ -573,24 +549,9 @@ impl From<RewardDuty> for NetworkDuties {
 
 impl From<RewardDuty> for NetworkDuty {
     fn from(duty: RewardDuty) -> Self {
-        use AdultDuty::*;
         use DataSectionDuty::*;
         use ElderDuty::*;
-
         use NetworkDuty::*;
-
-        if let RewardDuty::ProcessCmd {
-            cmd: RewardCmd::SynchHistory(history),
-            msg_id,
-            origin,
-        } = duty
-        {
-            return RunAsAdult(ElderPrep(RewardDuty::ProcessCmd {
-                cmd: RewardCmd::SynchHistory(history),
-                msg_id,
-                origin,
-            }));
-        }
         RunAsElder(RunAsDataSection(RunAsRewards(duty)))
     }
 }

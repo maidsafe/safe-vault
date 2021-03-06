@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::node_duties::NodeDuties;
 use crate::{
     node::node_ops::{
         AdultDuty, ChunkReplicationCmd, ChunkReplicationDuty, ChunkReplicationQuery,
@@ -267,22 +266,6 @@ impl ReceivedMsgAnalysis {
                 origin,
             }
             .into(),
-
-            // Message::NodeQueryResponse {
-            //     response:
-            //         NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetSectionWalletHistory(Ok(wallet)),
-            //     id,
-            //     ..
-            // } => AdultDuty::ElderPrep( RewardDuty::ProcessCmd {
-            //     cmd: RewardCmd::ActivateNodeRewards {
-            //         id: *wallet_id,
-            //         node_id: *new_node_id,
-            //     },
-            //     msg_id: *id,
-            //     origin,
-            // })
-            // ,
-
             //
             // ------ transfers --------
             // doesn't need to be accumulated, but makes it a bit slimmer..
@@ -505,20 +488,19 @@ impl ReceivedMsgAnalysis {
                     NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetSectionWalletHistory(
                         wallet_info,
                     )),
-                id,
                 ..
             } => NodeDuty::InitSectionWallet(wallet_info.clone()).into(),
-            Message::NodeQueryResponse {
-                response:
-                    NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetReplicaEvents(events)),
-                id,
-                ..
-            } => TransferDuty::ProcessCmd {
-                cmd: TransferCmd::InitiateReplica(events.clone()?),
-                msg_id: *id,
-                origin,
-            }
-            .into(),
+            // Message::NodeQueryResponse {
+            //     response:
+            //         NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetReplicaEvents(events)),
+            //     id,
+            //     ..
+            // } => TransferDuty::ProcessCmd {
+            //     cmd: TransferCmd::InitiateReplica(events.clone()?),
+            //     msg_id: *id,
+            //     origin,
+            // }
+            // .into(),
             _ => {
                 return Err(Error::Logic(format!(
                     "Could not evaluate single src node msg: {:?}",
