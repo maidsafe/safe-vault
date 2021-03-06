@@ -28,7 +28,7 @@ where
     id: bls::PublicKeyShare,
     key_index: usize,
     peer_replicas: bls::PublicKeySet,
-    section_proof_chain: sn_routing::SectionChain,
+    section_chain: sn_routing::SectionChain,
     signing: T,
     initiating: bool,
 }
@@ -100,7 +100,7 @@ impl KeySection {
             id,
             key_index,
             peer_replicas,
-            section_proof_chain: elder_state.section_proof_chain().clone(),
+            section_chain: elder_state.section_chain().clone(),
             signing,
             initiating: false,
         };
@@ -135,7 +135,7 @@ impl KeySection {
             id,
             key_index,
             peer_replicas,
-            section_proof_chain: elder_state.section_proof_chain().clone(),
+            section_chain: elder_state.section_chain().clone(),
             signing,
             initiating: true,
         };

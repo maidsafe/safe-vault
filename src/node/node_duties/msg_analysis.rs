@@ -186,7 +186,7 @@ impl ReceivedMsgAnalysis {
                 ..
             } => {
                 info!("Verifying GetChunk query!");
-                let _proof_chain = self.adult_state()?.section_proof_chain();
+                let _proof_chain = self.adult_state()?.section_chain();
 
                 // Recreate original MessageId from Section
                 let msg_id = MessageId::combine(vec![*address.name(), *new_holder]);

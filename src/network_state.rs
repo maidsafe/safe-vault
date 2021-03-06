@@ -72,7 +72,7 @@ pub struct AdultState {
     prefix: Prefix,
     node_name: XorName,
     node_id: Ed25519PublicKey,
-    section_proof_chain: SectionChain,
+    section_chain: SectionChain,
     elders: Vec<(XorName, SocketAddr)>,
     adult_reader: AdultReader,
     node_signing: NodeSigning,
@@ -87,7 +87,7 @@ impl AdultState {
             prefix: network.our_prefix().await,
             node_name: network.our_name().await,
             node_id: network.public_key().await,
-            section_proof_chain: network.our_history().await,
+            section_chain: network.section_chain().await,
             elders: network.our_elder_addresses().await,
             adult_reader: AdultReader::new(network.clone()),
             node_signing: NodeSigning::new(network),
@@ -109,8 +109,8 @@ impl AdultState {
     }
 
     /// Static state
-    pub fn section_proof_chain(&self) -> &SectionChain {
-        &self.section_proof_chain
+    pub fn section_chain(&self) -> &SectionChain {
+        &self.section_chain
     }
 
     /// "Sort of" static; this is calling into routing layer
@@ -128,7 +128,7 @@ pub struct ElderState {
     node_id: Ed25519PublicKey,
     key_index: usize,
     public_key_set: PublicKeySet,
-    section_proof_chain: SectionChain,
+    section_chain: SectionChain,
     elders: Vec<(XorName, SocketAddr)>,
     adult_reader: AdultReader,
     interaction: NodeInteraction,
@@ -146,7 +146,7 @@ impl ElderState {
             node_id: network.public_key().await,
             key_index: network.our_index().await?,
             public_key_set: network.public_key_set().await?,
-            section_proof_chain: network.our_history().await,
+            section_chain: network.section_chain().await,
             elders: network.our_elder_addresses().await,
             adult_reader: AdultReader::new(network.clone()),
             interaction: NodeInteraction::new(network.clone()),
@@ -215,8 +215,8 @@ impl ElderState {
     }
 
     /// Static state
-    pub fn section_proof_chain(&self) -> &SectionChain {
-        &self.section_proof_chain
+    pub fn section_chain(&self) -> &SectionChain {
+        &self.section_chain
     }
 
     /// Static state

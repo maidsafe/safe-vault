@@ -349,7 +349,7 @@ impl<T: ReplicaSigning> Replicas<T> {
     }
 
     fn find_past_key(&self, keyset: &PublicKeySet) -> Result<PublicKey, TransfersError> {
-        let section_keys = self.info.section_proof_chain.clone();
+        let section_keys = self.info.section_chain.clone();
         let key = section_keys
             .keys()
             .find(|&key_in_chain| key_in_chain == &keyset.public_key());
@@ -737,7 +737,7 @@ mod test {
             id,
             key_index,
             peer_replicas: peer_replicas.clone(),
-            section_proof_chain: SectionChain::new(peer_replicas.public_key()),
+            section_chain: SectionChain::new(peer_replicas.public_key()),
             signing,
             initiating: true,
         };
