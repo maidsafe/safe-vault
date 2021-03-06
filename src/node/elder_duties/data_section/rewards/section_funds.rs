@@ -388,6 +388,7 @@ impl SectionFunds {
 
         // cleanup of previous state: clear completed reward payouts
         self.state.completed.clear();
+        self.state.transition = Transition::None;
 
         // Wallet transition is completed!
         info!("Wallet transition is completed!");
