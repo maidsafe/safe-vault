@@ -33,6 +33,7 @@ pub struct ElderConstellation {
 struct ConstellationChange {
     prefix: Prefix,
     section_key: PublicKey,
+    sibling_key: Option<PublicKey>,
 }
 
 impl ElderConstellation {
@@ -79,6 +80,7 @@ impl ElderConstellation {
         self.pending_changes.push(ConstellationChange {
             section_key: new_section_key,
             prefix,
+            sibling_key,
         });
         info!(
             ">>Pending changes len after {:?}",
@@ -135,8 +137,6 @@ impl ElderConstellation {
         debug!(">>>>Elder change update completed.");
 
         if !self.pending_changes.is_empty() {
-            // debug!(">>>>  !! no changes, so return here empty vec");
-            // return Ok(vec![]);
             let old_elder_state = self.duties.state().clone();
             if old_elder_state.section_public_key() != previous_key
                 || new_key != self.pending_changes[0].section_key
@@ -153,7 +153,7 @@ impl ElderConstellation {
 
                 return Ok(vec![]);
             }
-            // if ! self.pending_changes.is_empty() {
+
             let change = self.pending_changes.remove(0);
 
             // split section _after_ transition to new constellation
@@ -165,15 +165,14 @@ impl ElderConstellation {
                     ops.extend(duties)
                 };
             }
-            // }
         }
 
         // if changes have queued up, make sure the queue is worked down
         if !self.pending_changes.is_empty() {
             let change = self.pending_changes.remove(0);
-            debug!(">>Extending ops, NO sibling pk here... should there be?");
+            debug!(">>Extending ops with pending changes");
             ops.extend(
-                self.initiate_elder_change(change.prefix, change.section_key, None)
+                self.initiate_elder_change(change.prefix, change.section_key, change.sibling_key)
                     .await?,
             );
         }
