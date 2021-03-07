@@ -98,7 +98,10 @@ impl ElderDuties {
             RunAsDataSection(duty) => self.data_section.process_data_section_duty(duty).await,
             StorageFull { node_id } => self.increase_full_node_count(node_id).await,
             SwitchNodeJoin(joins_allowed) => {
-                self.wallet_section.set_node_join_flag(joins_allowed).await
+                self.wallet_section
+                    .set_node_join_flag(joins_allowed)
+                    .await?;
+                Ok(vec![])
             }
             NoOp => Ok(vec![]),
         }

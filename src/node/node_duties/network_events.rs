@@ -80,8 +80,8 @@ impl NetworkEvents {
                     });
 
                     // Switch joins_allowed off a new adult joining.
-                    let second = NetworkDuty::from(SwitchNodeJoin(false));
-                    Ok(vec![first, second])
+                    //let second = NetworkDuty::from(SwitchNodeJoin(false));
+                    Ok(vec![first]) // , second
                 } else {
                     //trace!("New node has just joined the network and is a fresh node.",);
                     Ok(NetworkDuties::from(ProcessNewMember(XorName(name.0))))

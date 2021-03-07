@@ -114,18 +114,10 @@ impl WalletSection {
         self.transfers().catchup_with_replicas().await
     }
 
-    pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<NetworkDuties> {
-        match self
-            .elder_state_mut()
+    pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<()> {
+        self.elder_state_mut()
             .set_joins_allowed(joins_allowed)
             .await
-        {
-            Ok(()) => {
-                info!("Successfully set joins_allowed to true");
-                Ok(vec![])
-            }
-            Err(e) => Err(e),
-        }
     }
 
     // Update our replica with the latest keys
