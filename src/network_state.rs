@@ -129,6 +129,7 @@ pub struct ElderState {
     node_id: Ed25519PublicKey,
     key_index: usize,
     public_key_set: PublicKeySet,
+    sibling_public_key: Option<PublicKey>,
     section_chain: SectionChain,
     elders: Vec<(XorName, SocketAddr)>,
     adult_reader: AdultReader,
@@ -152,6 +153,7 @@ impl ElderState {
             node_id: network.public_key().await,
             key_index: network.our_index().await?,
             public_key_set: network.public_key_set().await?,
+            sibling_public_key: network.sibling_public_key().await,
             section_chain: network.section_chain().await,
             elders: network.our_elder_addresses().await,
             adult_reader: AdultReader::new(network.clone()),
@@ -208,6 +210,11 @@ impl ElderState {
     /// Static state
     pub fn section_public_key(&self) -> PublicKey {
         PublicKey::Bls(self.public_key_set().public_key())
+    }
+
+    /// Static state
+    pub fn sibling_public_key(&self) -> Option<PublicKey> {
+        self.sibling_public_key
     }
 
     /// Static state

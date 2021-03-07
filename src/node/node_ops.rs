@@ -59,7 +59,7 @@ pub enum NodeDuty {
     /// On being promoted, an Infant node becomes an Adult.
     AssumeAdultDuties,
     /// On being promoted, an Adult node becomes an Elder.
-    AssumeElderDuties {
+    BeginElderTransition {
         /// The new SectionKey.
         new_key: PublicKey,
         /// The previous SectionKey.
@@ -101,7 +101,7 @@ pub enum NodeDuty {
         new_key: PublicKey,
     },
     /// Initiates the section wallet.
-    InitSectionWallet(WalletInfo),
+    CompleteElderTransition(WalletInfo),
     /// Sending messages on to the network.
     ProcessMessaging(NodeMessagingDuty),
     /// Receiving and processing events from the network.
@@ -136,8 +136,8 @@ impl Debug for NodeDuty {
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
             Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),
-            Self::AssumeElderDuties { .. } => write!(f, "AssumeElderDuties"),
-            Self::InitSectionWallet { .. } => write!(f, "InitSectionWallet"),
+            Self::BeginElderTransition { .. } => write!(f, "BeginElderTransition"),
+            Self::CompleteElderTransition { .. } => write!(f, "CompleteElderTransition"),
             Self::ProcessMessaging(duty) => write!(f, "ProcessMessaging({:?})", duty),
             Self::ProcessNetworkEvent(event) => write!(f, "ProcessNetworkEvent({:?}", event),
             Self::NoOp => write!(f, "No op."),

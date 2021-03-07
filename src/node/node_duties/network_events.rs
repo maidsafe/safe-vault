@@ -113,7 +113,7 @@ impl NetworkEvents {
                 sibling_key,
             } => {
                 let mut duties: NetworkDuties = match self_status_change {
-                    NodeElderChange::Promoted => NetworkDuties::from(NodeDuty::AssumeElderDuties {
+                    NodeElderChange::Promoted => NetworkDuties::from(NodeDuty::BeginElderTransition {
                         new_key: PublicKey::Bls(key),
                         previous_key: PublicKey::Bls(previous_key),
                     }),

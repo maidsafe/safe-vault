@@ -488,7 +488,7 @@ impl ReceivedMsgAnalysis {
                         wallet_info,
                     )),
                 ..
-            } => NodeDuty::InitSectionWallet(wallet_info.clone()).into(),
+            } => NodeDuty::CompleteElderTransition(wallet_info.clone()).into(),
             _ => vec![],
         };
         Ok(res)

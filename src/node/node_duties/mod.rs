@@ -208,10 +208,13 @@ impl NodeDuties {
         match duty {
             RegisterWallet(wallet) => self.register_wallet(wallet).await,
             AssumeAdultDuties => self.assume_adult_duties().await,
-            AssumeElderDuties {
-                new_key,
+            BeginElderTransition {
                 previous_key,
-            } => self.begin_transition_to_elder(new_key, previous_key).await,
+                ..
+            } => self.begin_transition_to_elder(previous_key).await,
+            CompleteElderTransition(wallet_info) => {
+                self.complete_transition_to_elder(wallet_info, None).await
+            }
             ReceiveGenesisProposal { credit, sig } => {
                 self.receive_genesis_proposal(credit, sig).await
             }
@@ -228,9 +231,6 @@ impl NodeDuties {
                 previous_key,
                 new_key,
             } => self.complete_elder_change(previous_key, new_key).await,
-            InitSectionWallet(wallet_info) => {
-                self.complete_transition_to_elder(wallet_info, None).await
-            }
             ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
             ProcessNetworkEvent(event) => {
                 self.network_events
@@ -297,11 +297,10 @@ impl NodeDuties {
 
     async fn begin_transition_to_elder(
         &mut self,
-        new_key: PublicKey,
         previous_key: PublicKey,
     ) -> Result<NetworkDuties> {
         if matches!(self.stage, Stage::Elder(_))
-            || matches!(self.stage, Stage::AssumingElderDuties(_))
+            || matches!(self.stage, Stage::AssumingElderDuties { .. })
             || matches!(self.stage, Stage::Genesis(AwaitingGenesisThreshold(_)))
         {
             return Ok(vec![]);
@@ -388,9 +387,10 @@ impl NodeDuties {
         })));
     }
 
+    /// Wallet info of previous constellation is supplied here
     async fn complete_transition_to_elder(
         &mut self,
-        wallet_info: WalletInfo,
+        previous_wallet_info: WalletInfo,
         genesis: Option<TransferPropagated>,
     ) -> Result<NetworkDuties> {
         debug!(">>>>>>>>>>> Completing transition to elder!!!");
@@ -424,7 +424,7 @@ impl NodeDuties {
         trace!(">>> Setting stage to Elder..");
 
         let mut ops: NetworkDuties = vec![];
-        let mut elder_duties = elder_duties.enable(wallet_info).await?;
+        let mut elder_duties = elder_duties.enable(previous_wallet_info).await?;
         let state = elder_duties.state().clone();
 
         // 1. Initiate duties.
@@ -466,6 +466,15 @@ impl NodeDuties {
             msg_id: MessageId::new(),
             origin: SrcLocation::Node(node_id),
         }));
+
+        ops.extend(
+            self.initiate_elder_change(
+                *state.prefix(),
+                state.section_public_key(),
+                state.sibling_public_key(),
+            )
+            .await?,
+        );
 
         Ok(ops)
     }

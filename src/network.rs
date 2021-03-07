@@ -88,6 +88,15 @@ impl Network {
         ))
     }
 
+    pub async fn sibling_public_key(&self) -> Option<PublicKey> {
+        let sibling_prefix = self.our_prefix().await.sibling();
+        self.routing
+            .lock()
+            .await
+            .section_key(&sibling_prefix)
+            .await.map(|key| PublicKey::Bls(key))
+    }
+
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         self.routing
             .lock()
