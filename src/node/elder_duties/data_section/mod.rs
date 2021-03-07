@@ -147,7 +147,7 @@ impl DataSection {
         // EldersChanged doesn't lead to calling this method..
 
         self.rewards()?
-            .init_transition(elder_state, sibling_key)
+            .init_wallet_transition(elder_state, sibling_key)
             .await
     }
 

@@ -59,7 +59,7 @@ pub enum NodeDuty {
     /// On being promoted, an Infant node becomes an Adult.
     AssumeAdultDuties,
     /// On being promoted, an Adult node becomes an Elder.
-    BeginElderTransition {
+    BeginTransitionToElder {
         /// The new SectionKey.
         new_key: PublicKey,
         /// The previous SectionKey.
@@ -101,7 +101,7 @@ pub enum NodeDuty {
         new_key: PublicKey,
     },
     /// Initiates the section wallet.
-    CompleteElderTransition(WalletInfo),
+    CompleteTransitionToElder(WalletInfo),
     /// Sending messages on to the network.
     ProcessMessaging(NodeMessagingDuty),
     /// Receiving and processing events from the network.
@@ -136,8 +136,8 @@ impl Debug for NodeDuty {
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
             Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),
-            Self::BeginElderTransition { .. } => write!(f, "BeginElderTransition"),
-            Self::CompleteElderTransition { .. } => write!(f, "CompleteElderTransition"),
+            Self::BeginTransitionToElder { .. } => write!(f, "BeginTransitionToElder"),
+            Self::CompleteTransitionToElder { .. } => write!(f, "CompleteTransitionToElder"),
             Self::ProcessMessaging(duty) => write!(f, "ProcessMessaging({:?})", duty),
             Self::ProcessNetworkEvent(event) => write!(f, "ProcessNetworkEvent({:?}", event),
             Self::NoOp => write!(f, "No op."),
@@ -475,15 +475,12 @@ pub enum RewardDuty {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum RewardCmd {
-    // /// Initiates a new SectionActor with the
-    // /// state of existing Replicas in the group.
-    // InitiateSectionWallet(WalletInfo),
     /// Initiates a new SectionActor with the
     /// state of existing Replicas in the group.
     SynchHistory(WalletInfo),
-    /// Completes transition to a new SectionActor,
+    /// Completes transition to a new SectionActor, i.e. new wallet,
     /// and sets it up with its replicas' public key set.
-    CompleteTransition(PublicKeySet),
+    CompleteWalletTransition(PublicKeySet),
     /// With the node id.
     AddNewNode(XorName),
     /// Set the account for a node.
@@ -605,7 +602,7 @@ impl From<TransferDuty> for NetworkDuties {
 /// handled by AT2 Replicas.
 #[derive(Debug)]
 pub enum TransferQuery {
-    /// Get section actor transfers.
+    /// Get section actor replicas' public key.
     GetWalletReplicas(PublicKey),
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(PublicKey),

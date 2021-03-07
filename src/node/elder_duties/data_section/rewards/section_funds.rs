@@ -141,7 +141,7 @@ impl SectionFunds {
     /// Wallet transition, step 1.
     /// At Elder churn, we must transition to a new wallet.
     /// We start by querying network for the Replicas of this new wallet.
-    pub async fn init_transition(
+    pub async fn init_wallet_transition(
         &mut self,
         next_actor_state: ElderState,
         sibling_key: Option<PublicKey>,
@@ -199,7 +199,10 @@ impl SectionFunds {
     /// When receiving the wallet info, containing the Replicas of
     /// the new wallet, we can complete the transition by starting
     /// transfers to the new wallets.
-    pub async fn complete_transition(&mut self, replicas: PublicKeySet) -> Result<NetworkDuties> {
+    pub async fn complete_wallet_transition(
+        &mut self,
+        replicas: PublicKeySet,
+    ) -> Result<NetworkDuties> {
         info!(">>>>--------------------------");
         info!(">>>>--------------------------");
         info!(">>>>--------------------------");

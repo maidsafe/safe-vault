@@ -473,9 +473,9 @@ impl ReceivedMsgAnalysis {
                 id,
                 ..
             } => {
-                debug!(">>>>> Should be handling CompleteTransition, after GetWalletReplicas query response");
+                debug!(">>>>> Should be handling CompleteWalletTransition, after GetWalletReplicas query response");
                 RewardDuty::ProcessCmd {
-                    cmd: RewardCmd::CompleteTransition(replicas.to_owned()),
+                    cmd: RewardCmd::CompleteWalletTransition(replicas.to_owned()),
                     msg_id: *id,
                     origin,
                 }
@@ -488,7 +488,7 @@ impl ReceivedMsgAnalysis {
                         wallet_info,
                     )),
                 ..
-            } => NodeDuty::CompleteElderTransition(wallet_info.clone()).into(),
+            } => NodeDuty::CompleteTransitionToElder(wallet_info.clone()).into(),
             _ => vec![],
         };
         Ok(res)

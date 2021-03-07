@@ -90,14 +90,14 @@ impl Rewards {
 
     /// After Elder change, we transition to a new
     /// transfer actor, as there is now a new keypair for it.
-    pub async fn init_transition(
+    pub async fn init_wallet_transition(
         &mut self,
         elder_state: ElderState,
         sibling_key: Option<PublicKey>,
     ) -> Result<NetworkDuties> {
         Ok(NetworkDuties::from(
             self.section_funds
-                .init_transition(elder_state, sibling_key)
+                .init_wallet_transition(elder_state, sibling_key)
                 .await?,
         ))
     }
@@ -137,9 +137,11 @@ impl Rewards {
                 debug!(">>>> syncing....");
                 self.section_funds.synch(info.history).await?.into()
             }
-            CompleteTransition(pk_set) => {
+            CompleteWalletTransition(pk_set) => {
                 debug!(">>>> we have initiated transition so....");
-                self.section_funds.complete_transition(pk_set).await?
+                self.section_funds
+                    .complete_wallet_transition(pk_set)
+                    .await?
             }
             AddNewNode(node_id) => self.add_new_node(node_id).into(),
             SetNodeWallet { node_id, wallet_id } => {

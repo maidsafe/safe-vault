@@ -487,7 +487,7 @@ impl Transfers {
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NodeMessagingDuty> {
-        info!(">>> Handling GetSectionWalletReplicas query");
+        info!(">>> Handling GetWalletReplicas query");
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
         // todo: validate signature

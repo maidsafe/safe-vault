@@ -501,14 +501,14 @@ impl BlobRegister {
         {
             Some(metadata) => {
                 if metadata.chunks.is_empty() {
-                    warn!("{}: is not responsible for any chunk", holder);
+                    //warn!("{}: is not responsible for any chunk", holder);
                     Err(Error::NoSuchChunk)
                 } else {
                     Ok(metadata)
                 }
             }
             None => {
-                info!("{}: is not responsible for any chunk", holder);
+                //info!("{}: is not responsible for any chunk", holder);
                 Err(Error::NoSuchChunk)
             }
         }

@@ -94,7 +94,8 @@ impl Network {
             .lock()
             .await
             .section_key(&sibling_prefix)
-            .await.map(|key| PublicKey::Bls(key))
+            .await
+            .map(|key| PublicKey::Bls(key))
     }
 
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {

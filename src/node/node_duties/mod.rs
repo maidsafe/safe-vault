@@ -112,16 +112,6 @@ impl NodeDuties {
             RunAsAdult(duty) => {
                 if let Some(duties) = self.adult_duties() {
                     duties.process_adult_duty(duty).await
-                // } else if let Some(vec) = self.under_transition() {
-                //     let elder_duty = if let Some(elder_duty) = duty.try_elder_duty() {
-                //         elder_duty
-                //     } else {
-                //         return Err(Error::Logic(
-                //             "Currently not undergoing transition".to_string(),
-                //         ));
-                //     };
-                //     vec.push_back(elder_duty);
-                //     Ok(vec![])
                 } else {
                     Err(Error::Logic("Currently not an Adult".to_string()))
                 }
@@ -129,9 +119,6 @@ impl NodeDuties {
             RunAsElder(duty) => {
                 if let Some(duties) = self.elder_duties() {
                     duties.process_elder_duty(duty).await
-                // } else if self.try_enqueue_elder_duty(duty) {
-                //     info!("> ???? Enqueued Elder duty");
-                //     Ok(vec![])
                 } else {
                     Err(Error::Logic("Currently not an Elder".to_string()))
                 }
@@ -149,13 +136,6 @@ impl NodeDuties {
         }
     }
 
-    // pub fn under_transition(&mut self) -> Option<&mut VecDeque<ElderDuty>> {
-    //     match &mut self.stage {
-    //         Stage::AssumingElderDuties(duty_list) => Some(duty_list),
-    //         _ => None,
-    //     }
-    // }
-
     pub fn elder_duties(&mut self) -> Option<&mut ElderDuties> {
         match &mut self.stage {
             Stage::AssumingElderDuties(ref mut duties) => Some(duties),
@@ -163,30 +143,6 @@ impl NodeDuties {
             _ => None,
         }
     }
-
-    // pub fn try_enqueue_elder_duty(&mut self, duty: ElderDuty) -> bool {
-    //     match self.stage {
-    //         Stage::AssumingElderDuties(ref mut queue) => {
-    //             queue.push_back(duty);
-    //             true
-    //         }
-    //         Stage::Genesis(ref mut stage) => match stage {
-    //             AwaitingGenesisThreshold(ref mut queue) => {
-    //                 queue.push_back(duty);
-    //                 true
-    //             }
-    //             ProposingGenesis(ref mut bootstrap) => {
-    //                 bootstrap.queued_ops.push_back(duty);
-    //                 true
-    //             }
-    //             AccumulatingGenesis(ref mut bootstrap) => {
-    //                 bootstrap.queued_ops.push_back(duty);
-    //                 true
-    //             }
-    //         },
-    //         _ => false,
-    //     }
-    // }
 
     fn node_state(&mut self) -> Result<NodeState> {
         Ok(match self.elder_duties() {
@@ -208,11 +164,10 @@ impl NodeDuties {
         match duty {
             RegisterWallet(wallet) => self.register_wallet(wallet).await,
             AssumeAdultDuties => self.assume_adult_duties().await,
-            BeginElderTransition {
-                previous_key,
-                ..
-            } => self.begin_transition_to_elder(previous_key).await,
-            CompleteElderTransition(wallet_info) => {
+            BeginTransitionToElder { previous_key, .. } => {
+                self.begin_transition_to_elder(previous_key).await
+            }
+            CompleteTransitionToElder(wallet_info) => {
                 self.complete_transition_to_elder(wallet_info, None).await
             }
             ReceiveGenesisProposal { credit, sig } => {
