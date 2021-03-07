@@ -59,7 +59,12 @@ pub enum NodeDuty {
     /// On being promoted, an Infant node becomes an Adult.
     AssumeAdultDuties,
     /// On being promoted, an Adult node becomes an Elder.
-    AssumeElderDuties,
+    AssumeElderDuties {
+        /// The new SectionKey.
+        new_key: PublicKey,
+        /// The previous SectionKey.
+        previous_key: PublicKey,
+    },
     /// Bootstrap of genesis section actor.
     ReceiveGenesisProposal {
         /// The genesis credit.
@@ -131,7 +136,7 @@ impl Debug for NodeDuty {
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
             Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),
-            Self::AssumeElderDuties => write!(f, "AssumeElderDuties"),
+            Self::AssumeElderDuties { .. } => write!(f, "AssumeElderDuties"),
             Self::InitSectionWallet { .. } => write!(f, "InitSectionWallet"),
             Self::ProcessMessaging(duty) => write!(f, "ProcessMessaging({:?})", duty),
             Self::ProcessNetworkEvent(event) => write!(f, "ProcessNetworkEvent({:?}", event),

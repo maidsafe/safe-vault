@@ -106,13 +106,17 @@ impl NetworkEvents {
             }
             RoutingEvent::EldersChanged {
                 key,
+                previous_key,
                 elders,
                 prefix,
                 self_status_change,
                 sibling_key,
             } => {
                 let mut duties: NetworkDuties = match self_status_change {
-                    NodeElderChange::Promoted => NetworkDuties::from(NodeDuty::AssumeElderDuties),
+                    NodeElderChange::Promoted => NetworkDuties::from(NodeDuty::AssumeElderDuties {
+                        new_key: PublicKey::Bls(key),
+                        previous_key: PublicKey::Bls(previous_key),
+                    }),
                     NodeElderChange::Demoted => NetworkDuties::from(NodeDuty::AssumeAdultDuties),
                     NodeElderChange::None => vec![],
                 };

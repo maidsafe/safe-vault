@@ -92,7 +92,7 @@ impl Node {
         let init_ops = match age_group {
             Infant => Ok(vec![]),
             Adult => Ok(NetworkDuties::from(node_ops::NodeDuty::AssumeAdultDuties)),
-            Elder => Ok(NetworkDuties::from(node_ops::NodeDuty::AssumeElderDuties)),
+            Elder => Err(Error::Logic("Unimplemented".to_string())),
         };
 
         let mut node = Self {

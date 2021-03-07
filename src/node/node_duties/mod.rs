@@ -208,7 +208,10 @@ impl NodeDuties {
         match duty {
             RegisterWallet(wallet) => self.register_wallet(wallet).await,
             AssumeAdultDuties => self.assume_adult_duties().await,
-            AssumeElderDuties => self.begin_transition_to_elder().await,
+            AssumeElderDuties {
+                new_key,
+                previous_key,
+            } => self.begin_transition_to_elder(new_key, previous_key).await,
             ReceiveGenesisProposal { credit, sig } => {
                 self.receive_genesis_proposal(credit, sig).await
             }
@@ -292,7 +295,11 @@ impl NodeDuties {
         Ok(NodeDuty::RegisterWallet(self.node_info.reward_key).into())
     }
 
-    async fn begin_transition_to_elder(&mut self) -> Result<NetworkDuties> {
+    async fn begin_transition_to_elder(
+        &mut self,
+        new_key: PublicKey,
+        previous_key: PublicKey,
+    ) -> Result<NetworkDuties> {
         if matches!(self.stage, Stage::Elder(_))
             || matches!(self.stage, Stage::AssumingElderDuties(_))
             || matches!(self.stage, Stage::Genesis(AwaitingGenesisThreshold(_)))
@@ -362,26 +369,23 @@ impl NodeDuties {
             return Ok(vec![]);
         }
 
-        if let Some(wallet_id) = self.network_api.section_public_key().await {
-            trace!("Beginning transition to Elder duties.");
-            let state = ElderState::new(self.network_api.clone()).await?;
-            // must get the above wrapping instance before overwriting stage
-            self.stage =
-                Stage::AssumingElderDuties(ElderDuties::pre_elder(&self.node_info, state).await?);
-            // queries the other Elders for the section wallet history
-            return Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
-                msg: Message::NodeQuery {
-                    query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
-                    id: MessageId::new(),
-                    target_section_pk: None,
-                },
-                section_source: false, // sent as single node
-                dst: DstLocation::Section(wallet_id.into()),
-                aggregation: Aggregation::None,
-            })));
-        }
-
-        Ok(vec![])
+        trace!("Beginning transition to Elder duties.");
+        let state = ElderState::new(self.network_api.clone()).await?;
+        // must get the above wrapping instance before overwriting stage
+        self.stage =
+            Stage::AssumingElderDuties(ElderDuties::pre_elder(&self.node_info, state).await?);
+        // queries the other Elders for the section wallet history
+        // NB: we query the wallet of the constellation as it was before we joined
+        return Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::NodeQuery {
+                query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
+                id: MessageId::new(),
+                target_section_pk: None,
+            },
+            section_source: false, // sent as single node
+            dst: DstLocation::Section(previous_key.into()),
+            aggregation: Aggregation::None,
+        })));
     }
 
     async fn complete_transition_to_elder(
@@ -410,14 +414,14 @@ impl NodeDuties {
             }
             Stage::Genesis(AccumulatingGenesis(_)) => {
                 pre_elder
-            } // &mut bootstrap.queued_ops,
+            }
             Stage::AssumingElderDuties(ref mut duties) => {
                 debug!("assuming elder");
                 mem::replace(duties, pre_elder)
             }
         };
 
-        trace!(">>>Completing transition to Elder..");
+        trace!(">>> Setting stage to Elder..");
 
         let mut ops: NetworkDuties = vec![];
         let mut elder_duties = elder_duties.enable(wallet_info).await?;
@@ -452,7 +456,7 @@ impl NodeDuties {
         }));
 
         debug!(">>>>>>>> ALLLLLLLMOST THERE");
-        // lets ignore rewards just now....
+
         // 5. Add own wallet to rewards.
         ops.push(NetworkDuty::from(RewardDuty::ProcessCmd {
             cmd: RewardCmd::SetNodeWallet {
