@@ -31,8 +31,7 @@ serde_json = "1.0.53"
 structopt = "~0.3.17"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0-pre.4"
-# sn_routing = { git = "https://github.com/oetyng/sn_routing", branch = "split-section-funds" }
-sn_routing = { path = "../sn_routing" }
+sn_routing = { git = "https://github.com/oetyng/sn_routing", branch = "split-section-funds" }
 sn_transfers = { git = "https://github.com/oetyng/sn_transfers", branch = "split-section-funds" }
 sn_messaging = { git = "https://github.com/oetyng/sn_messaging", branch = "split-section-funds" }
 sn_data_types = "~0.15.3"
