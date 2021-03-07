@@ -107,6 +107,7 @@ impl NodeDuties {
     }
 
     pub async fn process(&mut self, duty: NetworkDuty) -> Result<NetworkDuties> {
+        info!("Processing op: {:?}", duty);
         use NetworkDuty::*;
         match duty {
             RunAsAdult(duty) => {
@@ -325,11 +326,12 @@ impl NodeDuties {
 
         trace!("Beginning transition to Elder duties.");
         let state = ElderState::new(self.network_api.clone()).await?;
+        let our_section = DstLocation::Section(state.prefix().name());
         // must get the above wrapping instance before overwriting stage
         self.stage =
             Stage::AssumingElderDuties(ElderDuties::pre_elder(&self.node_info, state).await?);
         // queries the other Elders for the section wallet history
-        // NB: we query the wallet of the constellation as it was before we joined
+        // NB: we most likely will get the wallet of the constellation as it was before we joined
         return Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
                 query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
@@ -337,7 +339,7 @@ impl NodeDuties {
                 target_section_pk: None,
             },
             section_source: false, // sent as single node
-            dst: DstLocation::Section(previous_key.into()),
+            dst: our_section,
             aggregation: Aggregation::None,
         })));
     }
