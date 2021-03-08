@@ -11,7 +11,7 @@ use crate::node::node_ops::{ElderDuty, NetworkDuties, NetworkDuty, NodeDuty};
 use crate::{Network, Result};
 use hex_fmt::HexFmt;
 use log::{info, trace};
-use sn_data_types::PublicKey;
+use sn_data_types::{ActorHistory, PublicKey, WalletInfo};
 use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use xor_name::XorName;
@@ -124,9 +124,21 @@ impl NetworkEvents {
                             Ok(NetworkDuties::from(NodeDuty::BeginFormingGenesisSection))
                         } else {
                             // After genesis section formation, any new Elder will be informed
-                            // by its peers when it shall start assuming its Elder duties
-                            // so, we just wait until that message arrives, and do nothing here.
-                            Ok(vec![])
+                            // by its peers of data required. 
+                            // It may also request this if missing.
+                            // For now we start with defaults
+                            
+                            Ok(NetworkDuties::from(NodeDuty::CompleteTransitionToElder{
+                                node_rewards: Default::default(),
+                                section_wallet: WalletInfo { 
+                                    replicas:  network_api.public_key_set().await?,
+                                    history: ActorHistory{
+                                        credits: vec![],
+                                        debits: vec![]
+                                    }
+                                },
+                                user_wallets: Default::default()
+                            }))
                         };
                     }
                     NodeElderChange::Demoted => NetworkDuties::from(NodeDuty::AssumeAdultDuties),
@@ -137,7 +149,7 @@ impl NetworkEvents {
                     sibling_pk = Some(PublicKey::Bls(pk));
                 }
 
-                duties.push(NetworkDuty::from(NodeDuty::InitiateElderChange {
+                duties.push(NetworkDuty::from(NodeDuty::UpdateElderInfo {
                     prefix,
                     key: PublicKey::Bls(key),
                     elders: elders.into_iter().map(|e| XorName(e.0)).collect(),

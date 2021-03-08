@@ -196,12 +196,12 @@ impl NodeDuties {
                 self.complete_transition_to_elder(section_wallet, node_rewards, user_wallets, None)
                     .await
             }
-            InitiateElderChange {
+            UpdateElderInfo {
                 prefix,
                 key,
                 sibling_key,
                 ..
-            } => self.initiate_elder_change(prefix, key, sibling_key).await,
+            } => self.update_elder_info(prefix, key, sibling_key).await,
             CompleteElderChange {
                 previous_key,
                 new_key,
@@ -240,6 +240,7 @@ impl NodeDuties {
     }
 
     async fn inform_new_elders(&mut self) -> Result<NetworkDuties> {
+        debug!("@@@@@@ INFORMING NEW ELDERS");
         let duties = self
             .elder_duties()
             .ok_or_else(|| Error::Logic("Only valid on Elders".to_string()))?;
@@ -492,7 +493,7 @@ impl NodeDuties {
     }
 
     ///
-    async fn initiate_elder_change(
+    async fn update_elder_info(
         &mut self,
         prefix: sn_routing::Prefix,
         new_section_key: PublicKey,
@@ -511,7 +512,7 @@ impl NodeDuties {
             }
             Stage::Elder(elder) => {
                 elder
-                    .initiate_elder_change(prefix, new_section_key, sibling_key)
+                    .update_elder_constellation(prefix, new_section_key, sibling_key)
                     .await
             }
         }

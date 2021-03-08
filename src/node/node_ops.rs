@@ -80,7 +80,7 @@ pub enum NodeDuty {
     /// Elder changes means the section public key
     /// changes as well, which leads to necessary updates
     /// of various places using the multisig of the section.
-    InitiateElderChange {
+    UpdateElderInfo {
         /// The prefix of our section.
         prefix: Prefix,
         /// The BLS public key of our section.
@@ -146,7 +146,7 @@ impl Debug for NodeDuty {
             Self::ProcessNetworkEvent(event) => write!(f, "ProcessNetworkEvent({:?}", event),
             Self::NoOp => write!(f, "No op."),
             Self::StorageFull => write!(f, "StorageFull"),
-            Self::InitiateElderChange { .. } => write!(f, "InitiateElderChange"),
+            Self::UpdateElderInfo { .. } => write!(f, "UpdateElderInfo"),
             Self::CompleteElderChange { .. } => write!(f, "CompleteElderChange"),
         }
     }

@@ -166,7 +166,7 @@ impl ElderDuties {
     }
 
     ///
-    pub async fn initiate_elder_change(
+    pub async fn perform_elder_change_updates(
         &mut self,
         elder_state: ElderState,
         sibling_key: Option<PublicKey>,

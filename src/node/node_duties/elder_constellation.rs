@@ -57,7 +57,7 @@ impl ElderConstellation {
     }
 
     ///
-    pub async fn initiate_elder_change(
+    pub async fn update_elder_constellation(
         &mut self,
         prefix: Prefix,
         new_section_key: PublicKey,
@@ -103,7 +103,7 @@ impl ElderConstellation {
         // Otherwise there is no guarantee of not getting more recent info than expected!
         let new_elder_state = ElderState::new(self.network.clone()).await?;
         self.duties
-            .initiate_elder_change(new_elder_state, sibling_key)
+            .perform_elder_change_updates(new_elder_state, sibling_key)
             .await
     }
 
@@ -179,7 +179,7 @@ impl ElderConstellation {
             let change = self.pending_changes.remove(0);
             debug!(">>Extending ops with pending changes");
             ops.extend(
-                self.initiate_elder_change(change.prefix, change.section_key, change.sibling_key)
+                self.update_elder_constellation(change.prefix, change.section_key, change.sibling_key)
                     .await?,
             );
         }

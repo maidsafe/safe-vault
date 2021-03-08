@@ -455,12 +455,32 @@ impl SectionFunds {
                     debug!(">>>> ************************* Completing t1!");
 
                     let credit_if_t1_was_ours = if t2.recipient != next_actor.id() {
+                        // propagate to all nodes in our new section
+                        // this will only work if we have some of existing elders in the new, or?
+                        queued_ops.push(
+                            NetworkDuty::from( NodeMessagingDuty::Send(OutgoingMsg {
+                                msg: Message::NodeCmd {
+                                    cmd: Transfers(
+                                        PropagateTransfer(proof.clone())
+                                ),
+                                    id: MessageId::new(),
+                                    target_section_pk: None,
+                                },
+                                section_source: false,
+                                dst: DstLocation::Section(next_actor.id().into()),
+                                aggregation: Aggregation::None,
+                            }))
+                        );
                         Some(proof.credit_proof())
                     } else {
                         None
                     };
                     let t2 = self.generate_validation(t2.amount, t2.recipient)?;
                     queued_ops.push(NetworkDuty::from(t2));
+
+                    // TODO: broadcast the op to the new section!
+                    let propagateToNewSection = 
+                    
                     self.state.transition = Transition::Split(SplitStage::CompletingT2 {
                         next_actor,
                         credit_if_t1_was_ours,
@@ -470,11 +490,28 @@ impl SectionFunds {
                     next_actor,
                     ref credit_if_t1_was_ours,
                 }) => {
-                    debug!(">>>> ********************** Completing t2!");
+                    // propagate to all nodes in our new section
+                    queued_ops.push(
+                        NetworkDuty::from( NodeMessagingDuty::Send(OutgoingMsg {
+                            msg: Message::NodeCmd {
+                                cmd: Transfers(
+                                    PropagateTransfer(proof.clone())
+                            ),
+                                id: MessageId::new(),
+                                target_section_pk: None,
+                            },
+                            section_source: false,
+                            dst: DstLocation::Section(next_actor.id().into()),
+                            aggregation: Aggregation::None,
+                        }))
+                    );
+
+                    debug!(">>>> ********************** In Completing t2!");
                     if let Some(credit) = credit_if_t1_was_ours {
                         // t1 was the credit to our next actor
                         queued_ops.extend(self.move_to_next(next_actor, credit.clone())?)
                     } else {
+                        
                         // t2 is the credit to our next actor
                         queued_ops.extend(self.move_to_next(next_actor, proof.credit_proof())?)
                     }
@@ -502,6 +539,7 @@ impl SectionFunds {
                 dst: DstLocation::Section(self.actor.id().into()), // a remote section transfers module will handle this (i.e. our replicas)
                 aggregation: Aggregation::AtDestination, // (not needed, but makes sn_node logs less chatty..)
             }));
+
 
             // First register the transfer, then
             // carry out the first queued payout.
