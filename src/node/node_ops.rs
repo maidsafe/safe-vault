@@ -54,9 +54,8 @@ pub enum NetworkDuty {
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
-    /// Get section actor replicas' public key.
-    GetWalletReplicas {
-        wallet: PublicKey,
+    /// Get section actor replicas'.
+    GetSectionPkSet {
         msg_id: MessageId,
         origin: SrcLocation,
     },
@@ -137,7 +136,7 @@ impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InformNewElders => write!(f, "InformNewElders"),
-            Self::GetWalletReplicas { .. } => write!(f, "GetWalletReplicas"),
+            Self::GetSectionPkSet { .. } => write!(f, "GetSectionPkSet"),
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
             Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),

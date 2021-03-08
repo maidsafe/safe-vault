@@ -18,8 +18,9 @@ use log::{debug, info};
 use sn_messaging::{
     client::{
         Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd,
-        NodeTransferQuery, NodeTransferQueryResponse, Query,
+        NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery,
+        NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse,
+        Query,
     },
     DstLocation, EndUser, MessageId, SrcLocation,
 };
@@ -303,11 +304,10 @@ impl ReceivedMsgAnalysis {
             .into(),
             // Aggregated by us, for security
             Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetWalletReplicas(wallet)),
+                query: NodeQuery::System(NodeSystemQuery::GetSectionPkSet),
                 id,
                 ..
-            } => NodeDuty::GetWalletReplicas {
-                wallet: *wallet,
+            } => NodeDuty::GetSectionPkSet {
                 msg_id: *id,
                 origin,
             }
@@ -485,11 +485,11 @@ impl ReceivedMsgAnalysis {
             // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
             Message::NodeQueryResponse {
                 response:
-                    NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetWalletReplicas(replicas)),
+                    NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionPkSet(replicas)),
                 id,
                 ..
             } => {
-                debug!(">>>>> Should be handling CompleteWalletTransition, after GetWalletReplicas query response");
+                debug!(">>>>> Should be handling CompleteWalletTransition, after GetSectionPkSet query response");
                 RewardDuty::ProcessCmd {
                     cmd: RewardCmd::CompleteWalletTransition(replicas.to_owned()),
                     msg_id: *id,
@@ -497,14 +497,6 @@ impl ReceivedMsgAnalysis {
                 }
                 .into()
             }
-            // // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
-            // Message::NodeQueryResponse {
-            //     response:
-            //         NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetSectionWalletHistory(
-            //             wallet_info,
-            //         )),
-            //     ..
-            // } => NodeDuty::CompleteTransitionToElder(wallet_info.clone()).into(),
             _ => vec![],
         };
         Ok(res)

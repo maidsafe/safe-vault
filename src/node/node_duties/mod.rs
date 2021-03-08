@@ -37,7 +37,7 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{
-        Message, NodeCmd, NodeEvent, NodeQueryResponse, NodeSystemCmd, NodeTransferQueryResponse,
+        Message, NodeCmd, NodeEvent, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -171,11 +171,7 @@ impl NodeDuties {
         use NodeDuty::*;
         //info!("Processing Node duty: {:?}", duty);
         match duty {
-            GetWalletReplicas {
-                wallet,
-                msg_id,
-                origin,
-            } => self.get_wallet_replicas(wallet, msg_id, origin).await,
+            GetSectionPkSet { msg_id, origin } => self.section_pk_set(msg_id, origin).await,
             InformNewElders => self.inform_new_elders().await,
             AssumeAdultDuties => self.assume_adult_duties().await,
             BeginFormingGenesisSection => self.begin_forming_genesis_section().await,
@@ -214,18 +210,17 @@ impl NodeDuties {
         }
     }
 
-    async fn get_wallet_replicas(
+    async fn section_pk_set(
         &self,
-        wallet: PublicKey,
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> Result<NetworkDuties> {
         let replicas = self.network_api.public_key_set().await?;
         Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQueryResponse {
-                response: NodeQueryResponse::Transfers(
-                    NodeTransferQueryResponse::GetWalletReplicas(replicas),
-                ),
+                response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionPkSet(
+                    replicas,
+                )),
                 correlation_id: msg_id,
                 id: MessageId::in_response_to(&msg_id),
                 target_section_pk: None,

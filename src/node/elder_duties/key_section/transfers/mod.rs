@@ -37,8 +37,8 @@ use sn_data_types::{
 use sn_messaging::{
     client::{
         Cmd, CmdError, Error as ErrorMessage, Event, Message, NodeCmd, NodeCmdError, NodeEvent,
-        NodeQuery, NodeQueryResponse, NodeTransferCmd, NodeTransferError, NodeTransferQuery,
-        NodeTransferQueryResponse, QueryResponse, TransferError,
+        NodeQueryResponse, NodeTransferCmd, NodeTransferError, NodeTransferQueryResponse,
+        QueryResponse, TransferError,
     },
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
@@ -163,10 +163,6 @@ impl Transfers {
     ) -> Result<NetworkDuties> {
         use TransferQuery::*;
         let duty = match query {
-            // GetWalletReplicas(wallet_key) => {
-            //     self.get_wallet_replicas(*wallet_key, msg_id, origin)
-            //         .await?
-            // }
             GetReplicaEvents => self.all_events(msg_id, origin).await?,
             GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await?,
             GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await?,
@@ -478,30 +474,6 @@ impl Transfers {
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
-
-    // async fn get_wallet_replicas(
-    //     &self,
-    //     _wallet_key: PublicKey,
-    //     msg_id: MessageId,
-    //     origin: SrcLocation,
-    // ) -> Result<NodeMessagingDuty> {
-    //     info!(">>> Handling GetWalletReplicas query");
-    //     use NodeQueryResponse::*;
-    //     use NodeTransferQueryResponse::*;
-    //     // todo: validate signature
-    //     Ok(NodeMessagingDuty::Send(OutgoingMsg {
-    //         msg: Message::NodeQueryResponse {
-    //             response: Transfers(GetWalletReplicas(self.replicas.replicas_pk_set())),
-    //             id: MessageId::in_response_to(&msg_id),
-    //             correlation_id: msg_id,
-    //             query_origin: origin,
-    //             target_section_pk: None,
-    //         },
-    //         section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-    //         dst: origin.to_dst(),
-    //         aggregation: Aggregation::AtDestination,
-    //     }))
-    // }
 
     async fn history(
         &self,

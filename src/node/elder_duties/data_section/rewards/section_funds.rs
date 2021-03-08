@@ -21,7 +21,7 @@ use sn_data_types::{
     WalletInfo,
 };
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeQuery, NodeTransferCmd, NodeTransferQuery},
+    client::{Message, NodeCmd, NodeQuery, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery},
     Aggregation, DstLocation, MessageId,
 };
 use sn_transfers::{ActorEvent, TransferActor};
@@ -169,11 +169,13 @@ impl SectionFunds {
             self.state.transition = Transition::Regular(TransitionStage::Pending(next_actor_state));
         }
 
-        info!(">>>> ??? sending GetWalletReplicas query!");
+        info!(">>>> ??? sending GetSectionPkSet query!");
+        // deterministic msg id for aggregation
+        let msg_id = MessageId::combine(vec![self.replicas().into(), new_wallet.into()]);
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetWalletReplicas(new_wallet)),
-                id: MessageId::combine(vec![self.replicas().into(), new_wallet.into()]),
+                query: NodeQuery::System(NodeSystemQuery::GetSectionPkSet),
+                id: msg_id,
                 target_section_pk: None,
             },
             section_source: true, // i.e. responses go to our section
@@ -401,7 +403,7 @@ impl SectionFunds {
         // Wallet transition is completed!
         info!("Wallet transition is completed!");
 
-        // inform the new Elder
+        // inform the new Elders
         Ok(NetworkDuties::from(NodeDuty::InformNewElders))
     }
 
