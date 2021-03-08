@@ -2283,7 +2283,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "7.0.1"
-source = "git+https://github.com/oetyng/sn_messaging?branch=new-split-section-funds#09b12e10d17281b90f689803b30c31e31e0564f1"
+source = "git+https://github.com/oetyng/sn_messaging?branch=new-split-section-funds#f69ad28f360de648ea2f29777590f4561d8a0b00"
 dependencies = [
  "bincode",
  "bytes 1.0.1",

@@ -85,7 +85,6 @@ impl BlobRegister {
                         msg: Message::CmdError {
                             error: CmdError::Data(ErrorMessage::DataExists),
                             id: MessageId::in_response_to(&msg_id),
-                            cmd_origin: SrcLocation::EndUser(origin),
                             correlation_id: msg_id,
                             target_section_pk: None,
                         },
@@ -155,7 +154,6 @@ impl BlobRegister {
             msg: Message::CmdError {
                 error: CmdError::Data(message_error),
                 id: MessageId::in_response_to(&msg_id),
-                cmd_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
@@ -382,7 +380,6 @@ impl BlobRegister {
             let err_msg = Message::QueryResponse {
                 response: QueryResponse::GetBlob(Err(message_error)),
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
                 target_section_pk: None,
             };

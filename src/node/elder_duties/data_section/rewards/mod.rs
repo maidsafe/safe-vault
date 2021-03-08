@@ -446,7 +446,6 @@ impl Rewards {
                         response: Rewards(GetNodeWalletId(Err(ErrorMessage::NodeWasNotRelocated))),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
-                        query_origin: origin,
                         target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to a response..
@@ -470,7 +469,6 @@ impl Rewards {
                 response: Rewards(GetNodeWalletId(Ok((wallet, new_node_id)))),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                query_origin: origin,
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..

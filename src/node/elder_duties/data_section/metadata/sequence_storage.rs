@@ -104,7 +104,6 @@ impl SequenceStorage {
             msg: Message::QueryResponse {
                 response: QueryResponse::GetSequence(result),
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
@@ -177,7 +176,6 @@ impl SequenceStorage {
             msg: Message::QueryResponse {
                 response: QueryResponse::GetSequenceRange(result),
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
@@ -206,7 +204,6 @@ impl SequenceStorage {
             msg: Message::QueryResponse {
                 response: QueryResponse::GetSequenceLastEntry(result),
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
@@ -240,7 +237,6 @@ impl SequenceStorage {
             msg: Message::QueryResponse {
                 response: QueryResponse::GetSequenceOwner(result),
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
@@ -271,7 +267,6 @@ impl SequenceStorage {
             msg: Message::QueryResponse {
                 response: QueryResponse::GetSequenceUserPermissions(result),
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
@@ -305,7 +300,6 @@ impl SequenceStorage {
             msg: Message::QueryResponse {
                 response: QueryResponse::GetSequencePublicPolicy(result),
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
@@ -339,7 +333,6 @@ impl SequenceStorage {
             msg: Message::QueryResponse {
                 response: QueryResponse::GetSequencePrivatePolicy(result),
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: SrcLocation::EndUser(origin),
                 correlation_id: msg_id,
                 target_section_pk: None,
             },
@@ -411,7 +404,6 @@ impl SequenceStorage {
                 id: MessageId::in_response_to(&msg_id),
                 error: CmdError::Data(error),
                 correlation_id: msg_id,
-                cmd_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to an error..

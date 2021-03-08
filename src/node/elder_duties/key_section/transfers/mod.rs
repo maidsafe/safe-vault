@@ -286,7 +286,6 @@ impl Transfers {
                     error: CmdError::Transfer(TransferRegistration(ErrorMessage::NoSuchRecipient)),
                     id: MessageId::in_response_to(&msg.id()),
                     correlation_id: msg.id(),
-                    cmd_origin: origin,
                     target_section_pk: None,
                 },
                 section_source: false, // strictly this is not correct, but we don't expect responses to a response..
@@ -331,7 +330,6 @@ impl Transfers {
                             )),
                             id: MessageId::in_response_to(&msg.id()),
                             correlation_id: msg.id(),
-                            cmd_origin: origin,
                             target_section_pk: None,
                         },
                         section_source: false, // strictly this is not correct, but we don't expect responses to a response..
@@ -366,7 +364,6 @@ impl Transfers {
                         )),
                         id: MessageId::in_response_to(&msg.id()),
                         correlation_id: msg.id(),
-                        cmd_origin: origin,
                         target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
@@ -399,7 +396,6 @@ impl Transfers {
                 response: Transfers(GetReplicaEvents(result)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                query_origin,
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
@@ -426,7 +422,6 @@ impl Transfers {
                 response: QueryResponse::GetStoreCost(Ok(result)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                query_origin: origin,
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
@@ -449,7 +444,6 @@ impl Transfers {
                 response: QueryResponse::GetReplicaKeys(Ok(pk_set)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                query_origin: origin,
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
@@ -477,7 +471,6 @@ impl Transfers {
                 response: QueryResponse::GetBalance(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                query_origin: origin,
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
@@ -528,7 +521,6 @@ impl Transfers {
                 response: QueryResponse::GetHistory(result),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                query_origin: origin,
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
@@ -566,7 +558,6 @@ impl Transfers {
                         id: MessageId::in_response_to(&msg_id),
                         error: CmdError::Transfer(TransferError::TransferValidation(message_error)),
                         correlation_id: msg_id,
-                        cmd_origin: origin,
                         target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
@@ -633,7 +624,6 @@ impl Transfers {
                             message_error,
                         )), // TODO: SHOULD BE TRANSFERVALIDATION
                         correlation_id: msg_id,
-                        cmd_origin: origin,
                         target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
@@ -677,7 +667,6 @@ impl Transfers {
                         )),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
-                        cmd_origin: SrcLocation::EndUser(EndUser::AllClients(proof.sender())),
                         target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
@@ -750,7 +739,6 @@ impl Transfers {
                         ),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
-                        cmd_origin: origin,
                         target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
@@ -781,7 +769,6 @@ impl Transfers {
                     error: NodeCmdError::Transfers(TransferPropagation(message_error)),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    cmd_origin: origin,
                     target_section_pk: None,
                 }
             }
@@ -796,7 +783,6 @@ impl Transfers {
                     error: NodeCmdError::Transfers(TransferPropagation(ErrorMessage::NoSuchKey)),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    cmd_origin: origin,
                     target_section_pk: None,
                 }
             }

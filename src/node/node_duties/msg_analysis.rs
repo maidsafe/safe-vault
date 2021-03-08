@@ -301,7 +301,7 @@ impl ReceivedMsgAnalysis {
                 origin,
             }
             .into(),
-            // Accumulates at remote section, for security
+            // Aggregated by us, for security
             Message::NodeQuery {
                 query: NodeQuery::Transfers(NodeTransferQuery::GetWalletReplicas(wallet)),
                 id,

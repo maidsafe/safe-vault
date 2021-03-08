@@ -23,7 +23,6 @@ use crate::{
         node_duties::messaging::Messaging,
         node_ops::{
             ElderDuty, NetworkDuties, NetworkDuty, NodeDuty, NodeMessagingDuty, OutgoingMsg,
-            RewardCmd, RewardDuty,
         },
         NodeInfo,
     },
@@ -38,8 +37,7 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{
-        Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeSystemCmd,
-        NodeTransferQueryResponse,
+        Message, NodeCmd, NodeEvent, NodeQueryResponse, NodeSystemCmd, NodeTransferQueryResponse,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -230,7 +228,6 @@ impl NodeDuties {
                 ),
                 correlation_id: msg_id,
                 id: MessageId::in_response_to(&msg_id),
-                query_origin: origin,
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..

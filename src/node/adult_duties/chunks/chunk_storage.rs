@@ -57,7 +57,6 @@ impl ChunkStorage {
                     error: CmdError::Data(convert_to_error_message(error)?),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    cmd_origin: SrcLocation::EndUser(origin),
                     target_section_pk: None,
                 },
                 section_source: false, // sent as single node
@@ -110,7 +109,6 @@ impl ChunkStorage {
                 id: MessageId::in_response_to(&msg_id),
                 response: QueryResponse::GetBlob(result),
                 correlation_id: msg_id,
-                query_origin: SrcLocation::EndUser(origin),
                 target_section_pk: None,
             },
             section_source: false, // sent as single node
@@ -161,7 +159,6 @@ impl ChunkStorage {
                 response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                query_origin: origin,
                 target_section_pk: None,
             },
             section_source: false, // sent as single node
@@ -228,7 +225,6 @@ impl ChunkStorage {
                     error: CmdError::Data(error),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    cmd_origin: SrcLocation::EndUser(origin),
                     target_section_pk: None,
                 },
                 section_source: false, // sent as single node
