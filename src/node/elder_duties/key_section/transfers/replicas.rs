@@ -18,8 +18,7 @@ use sn_data_types::{
     TransferValidated,
 };
 use sn_transfers::{Error as TransfersError, WalletReplica};
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use xor_name::Prefix;
 
 #[cfg(feature = "simulated-payouts")]
@@ -45,18 +44,73 @@ where
 }
 
 impl<T: ReplicaSigning> Replicas<T> {
-    pub(crate) fn new(root_dir: PathBuf, info: ReplicaInfo<T>) -> Self {
-        Self {
+    pub(crate) async fn new(
+        root_dir: PathBuf,
+        info: ReplicaInfo<T>,
+        user_wallets: BTreeMap<PublicKey, ActorHistory>,
+    ) -> Result<Self> {
+        let instance = Self {
             root_dir,
             info,
             locks: Default::default(),
             self_lock: Arc::new(Mutex::new(0)),
+        };
+        instance.setup(user_wallets).await?;
+        Ok(instance)
+    }
+
+    async fn setup(&self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
+        use ReplicaEvent::*;
+        if user_wallets.is_empty() {
+            return Ok(());
         }
+        // TODO: parallel
+        for (node, wallet) in user_wallets {
+            let valid_owners = wallet.credits.iter().all(|c| node == c.recipient())
+                && wallet.debits.iter().all(|d| node == d.sender());
+            if !valid_owners {
+                return Err(Error::InvalidOperation(
+                    "ActorHistory must contain only transfers of a single actor.".to_string(),
+                ));
+            }
+            for credit_proof in wallet.credits {
+                let id = credit_proof.recipient();
+                let e = TransferPropagated(sn_data_types::TransferPropagated { credit_proof });
+                // Acquire lock of the wallet.
+                let key_lock = self.get_load_or_create_store(id).await?;
+                let mut store = key_lock.lock().await;
+                // Access to the specific wallet is now serialised!
+                store.try_insert(e.to_owned())?;
+            }
+            for transfer_proof in wallet.debits {
+                let id = transfer_proof.sender();
+                let e = TransferRegistered(sn_data_types::TransferRegistered { transfer_proof });
+                // Acquire lock of the wallet.
+                let key_lock = self.get_load_or_create_store(id).await?;
+                let mut store = key_lock.lock().await;
+                // Access to the specific wallet is now serialised!
+                store.try_insert(e.to_owned())?;
+            }
+        }
+        Ok(())
     }
 
     /// -----------------------------------------------------------------
     /// ---------------------- Queries ----------------------------------
     /// -----------------------------------------------------------------
+
+    ///
+    pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
+        let wallets = self
+            .locks
+            .iter()
+            .map(|r| *r.key())
+            .filter_map(|id| self.history(id).ok().map(|history| Some((id, history))))
+            .map(|wallet| wallet)
+            .flatten()
+            .collect();
+        wallets
+    }
 
     /// All keys' histories
     pub async fn all_events(&self) -> Result<Vec<ReplicaEvent>> {
@@ -72,7 +126,7 @@ impl<T: ReplicaSigning> Replicas<T> {
     }
 
     /// History of actor
-    pub async fn history(&self, id: PublicKey) -> Result<ActorHistory> {
+    pub fn history(&self, id: PublicKey) -> Result<ActorHistory> {
         let store = TransferStore::new(id.into(), &self.root_dir);
 
         if let Err(error) = store {
@@ -374,7 +428,6 @@ impl<T: ReplicaSigning> Replicas<T> {
                     // no key lock, so we create one for this payout...
                     Err(_e) => TransferStore::new(id.into(), &self.root_dir)?,
                 };
-                debug!("store retrieved..");
                 let locked_store = Arc::new(Mutex::new(store));
                 let _ = self.locks.insert(id, locked_store.clone());
                 locked_store
@@ -604,7 +657,7 @@ mod test {
         assert_eq!(section_key, PublicKey::Bls(peer_replicas.public_key()));
 
         // we are genesis, we should get the genesis event via this call
-        let events = run(genesis_replicas.history(section_key))?;
+        let events = genesis_replicas.history(section_key)?;
         match genesis_actor.from_history(events)? {
             Some(event) => genesis_actor.apply(ActorEvent::TransfersSynched(event))?,
             None => {
@@ -667,7 +720,7 @@ mod test {
             None => return Err(Error::Logic("We should have a proof here.".to_string())),
         }
 
-        let genesis_history = run(genesis_replicas.history(section_key))?;
+        let genesis_history = genesis_replicas.history(section_key)?;
         match genesis_actor.from_history(genesis_history)? {
             Some(event) => genesis_actor.apply(ActorEvent::TransfersSynched(event))?,
             None => {
@@ -686,7 +739,7 @@ mod test {
 
         for (elder_replicas, mut next_section_actor_share) in section {
             run(elder_replicas.initiate(&replica_events))?;
-            let history = run(elder_replicas.history(next_section_actor_share.id()))?;
+            let history = elder_replicas.history(next_section_actor_share.id())?;
             match next_section_actor_share.from_history(history.clone())? {
                 Some(event) => {
                     next_section_actor_share.apply(ActorEvent::TransfersSynched(event))?
@@ -746,7 +799,11 @@ mod test {
             initiating: true,
         };
         let root_dir = temp_dir()?;
-        let replicas = Replicas::new(root_dir.path().to_path_buf(), info);
+        let replicas = run(Replicas::new(
+            root_dir.path().to_path_buf(),
+            info,
+            Default::default(),
+        ))?;
 
         let keypair =
             Keypair::new_bls_share(0, bls_secret_key.secret_key_share(0), peer_replicas.clone());

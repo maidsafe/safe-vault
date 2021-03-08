@@ -50,11 +50,12 @@ impl NetworkEvents {
     pub async fn process_network_event(
         &mut self,
         event: RoutingEvent,
-        network: &Network,
+        network_api: &Network,
     ) -> Result<NetworkDuties> {
         use ElderDuty::*;
         //trace!("Processing Routing Event: {:?}", event);
         match event {
+            RoutingEvent::Genesis => Ok(NetworkDuties::from(NodeDuty::BeginFormingGenesisSection)),
             RoutingEvent::MemberLeft { name, age } => {
                 trace!("A node has left the section. Node: {:?}", name);
                 //self.log_node_counts().await;
@@ -69,6 +70,11 @@ impl NetworkEvents {
                 age,
                 ..
             } => {
+                if Self::is_forming_genesis(network_api).await {
+                    // during formation of genesis we do not process this event
+                    return Ok(vec![]);
+                }
+
                 //info!("New member has joined the section");
                 //self.log_node_counts().await;
                 if let Some(prev_name) = previous_name {
@@ -106,21 +112,24 @@ impl NetworkEvents {
             }
             RoutingEvent::EldersChanged {
                 key,
-                previous_key,
                 elders,
                 prefix,
                 self_status_change,
                 sibling_key,
             } => {
                 let mut duties: NetworkDuties = match self_status_change {
+                    NodeElderChange::None => vec![],
                     NodeElderChange::Promoted => {
-                        NetworkDuties::from(NodeDuty::BeginTransitionToElder {
-                            new_key: PublicKey::Bls(key),
-                            previous_key: PublicKey::Bls(previous_key),
-                        })
+                        return if Self::is_forming_genesis(network_api).await {
+                            Ok(NetworkDuties::from(NodeDuty::BeginFormingGenesisSection))
+                        } else {
+                            // After genesis section formation, any new Elder will be informed
+                            // by its peers when it shall start assuming its Elder duties
+                            // so, we just wait until that message arrives, and do nothing here.
+                            Ok(vec![])
+                        };
                     }
                     NodeElderChange::Demoted => NetworkDuties::from(NodeDuty::AssumeAdultDuties),
-                    NodeElderChange::None => vec![],
                 };
 
                 let mut sibling_pk = None;
@@ -139,7 +148,7 @@ impl NetworkEvents {
             }
             RoutingEvent::Relocated { .. } => {
                 // Check our current status
-                let age = network.age().await;
+                let age = network_api.age().await;
                 if age > MIN_AGE {
                     info!("Node promoted to Adult");
                     info!("Our Age: {:?}", age);
@@ -152,5 +161,15 @@ impl NetworkEvents {
             // Ignore all other events
             _ => Ok(vec![]),
         }
+    }
+
+    async fn is_forming_genesis(network_api: &Network) -> bool {
+        use sn_routing::ELDER_SIZE as GENESIS_ELDER_COUNT;
+        let is_genesis_section = network_api.our_prefix().await.is_empty();
+        let elder_count = network_api.our_elder_names().await.len();
+        let section_chain_len = network_api.section_chain().await.len();
+        is_genesis_section
+            && elder_count <= GENESIS_ELDER_COUNT
+            && section_chain_len <= GENESIS_ELDER_COUNT
     }
 }

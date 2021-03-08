@@ -10,7 +10,7 @@ use super::validator::Validator;
 use crate::{
     node::{
         elder_duties::data_section::ElderSigning,
-        node_ops::{NetworkDuties, NetworkDuty, NodeMessagingDuty, OutgoingMsg},
+        node_ops::{NetworkDuties, NetworkDuty, NodeDuty, NodeMessagingDuty, OutgoingMsg},
     },
     ElderState, Error, Result,
 };
@@ -370,10 +370,11 @@ impl SectionFunds {
         &mut self,
         next_actor: SectionActor,
         proof: CreditAgreementProof,
-    ) -> Result<()> {
+    ) -> Result<NetworkDuties> {
         if proof.recipient() != next_actor.id() {
             return Err(Error::Logic("Invalid recipient for transition".to_string()));
         }
+
         // Set the next actor to be our current.
         self.actor = next_actor;
 
@@ -385,7 +386,11 @@ impl SectionFunds {
 
         // if this errors with nothing to synch, that certainly
         // _is_ an error (a bug), since the history is populated above
-        if let Some(event) = self.actor.from_history(history).map_err(Error::Transfer)? {
+        if let Some(event) = self
+            .actor
+            .from_history(history.clone())
+            .map_err(Error::Transfer)?
+        {
             self.apply(TransfersSynched(event))?
         }
 
@@ -395,7 +400,9 @@ impl SectionFunds {
 
         // Wallet transition is completed!
         info!("Wallet transition is completed!");
-        Ok(())
+
+        // inform the new Elder
+        Ok(NetworkDuties::from(NodeDuty::InformNewElders))
     }
 
     /// (potentially leading to Wallet transition, step 3.)
@@ -431,8 +438,8 @@ impl SectionFunds {
                 Transition::Regular(TransitionStage::InTransition(next_actor)) => {
                     debug!(">>>> REGULAR TRANSITION");
 
-                    self.move_to_next(next_actor, proof.credit_proof())?;
-                    queued_ops = self.try_pop_queue().await?;
+                    queued_ops.extend(self.move_to_next(next_actor, proof.credit_proof())?);
+                    queued_ops.extend(self.try_pop_queue().await?);
                 }
                 Transition::Split(SplitStage::CompletingT1 { next_actor, ref t2 }) => {
                     debug!(">>>> ************************* Completing t1!");
@@ -456,10 +463,10 @@ impl SectionFunds {
                     debug!(">>>> ********************** Completing t2!");
                     if let Some(credit) = if_t1_was_ours {
                         // t1 was the credit to our next actor
-                        self.move_to_next(next_actor, credit.clone())?
+                        queued_ops.extend(self.move_to_next(next_actor, credit.clone())?)
                     } else {
                         // t2 is the credit to our next actor
-                        self.move_to_next(next_actor, proof.credit_proof())?
+                        queued_ops.extend(self.move_to_next(next_actor, proof.credit_proof())?)
                     }
                 }
                 Transition::Split(SplitStage::Pending { .. })
@@ -482,7 +489,7 @@ impl SectionFunds {
                     target_section_pk: None,
                 },
                 section_source: true, // i.e. responses go to our section
-                dst: DstLocation::Section(self.actor.id().into()),
+                dst: DstLocation::Section(self.actor.id().into()), // a remote section transfers module will handle this (i.e. our replicas)
                 aggregation: Aggregation::AtDestination, // (not needed, but makes sn_node logs less chatty..)
             }));
 

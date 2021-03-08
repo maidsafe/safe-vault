@@ -9,16 +9,22 @@
 mod data_section;
 mod key_section;
 
-use self::{data_section::DataSection, key_section::WalletSection};
+use self::{
+    data_section::{DataSection, RewardData},
+    key_section::WalletSection,
+};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     node::node_ops::{ElderDuty, NetworkDuties},
     ElderState, NodeInfo, Result,
 };
 use log::trace;
-use sn_data_types::{PublicKey, TransferPropagated, WalletInfo};
+use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, TransferPropagated, WalletInfo};
 use sn_routing::Prefix;
-use std::fmt::{self, Display, Formatter};
+use std::{
+    collections::BTreeMap,
+    fmt::{self, Display, Formatter},
+};
 use xor_name::XorName;
 
 /// Duties carried out by an Elder node.
@@ -28,28 +34,43 @@ pub struct ElderDuties {
     data_section: DataSection,
 }
 
+#[derive(Debug)]
+pub struct ElderData {
+    pub section_wallet: WalletInfo,
+    pub node_rewards: BTreeMap<XorName, NodeRewardStage>,
+    pub user_wallets: BTreeMap<PublicKey, ActorHistory>,
+}
+
 impl ElderDuties {
-    pub async fn pre_elder(node_info: &NodeInfo, state: ElderState) -> Result<Self> {
+    pub async fn new(
+        node_info: &NodeInfo,
+        elder_state: ElderState,
+        data: ElderData,
+    ) -> Result<Self> {
+        trace!("Elder data: {:?}", data);
         let dbs = ChunkHolderDbs::new(node_info.path())?;
-        let rate_limit = RateLimit::new(state.clone(), Capacity::new(dbs.clone()));
-        let wallet_section = WalletSection::pre_elder(rate_limit, node_info, state.clone());
-        let data_section = DataSection::pre_elder(node_info, dbs, state.clone()).await?;
+        let rate_limit = RateLimit::new(elder_state.clone(), Capacity::new(dbs.clone()));
+        let wallet_section = WalletSection::new(
+            rate_limit,
+            node_info,
+            elder_state.clone(),
+            data.user_wallets,
+        )
+        .await?;
+        let data_section = DataSection::new(
+            node_info,
+            dbs,
+            elder_state.clone(),
+            RewardData {
+                section_wallet: data.section_wallet,
+                node_rewards: data.node_rewards,
+            },
+        )
+        .await?;
         Ok(Self {
-            state,
+            state: elder_state,
             wallet_section,
             data_section,
-        })
-    }
-
-    /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
-    #[allow(clippy::eval_order_dependence)]
-    /// Only once we have the section wallet info
-    /// can we enable data_section module.
-    pub async fn enable(self, wallet_info: WalletInfo) -> Result<ElderDuties> {
-        Ok(ElderDuties {
-            state: self.state,
-            wallet_section: self.wallet_section.enable().await?,
-            data_section: self.data_section.enable(wallet_info).await?,
         })
     }
 
@@ -58,21 +79,29 @@ impl ElderDuties {
         &self.state
     }
 
-    /// Issues queries to Elders of the section
-    /// as to catch up with shares state and
-    /// start working properly in the group.
-    pub async fn initiate(&mut self, genesis: Option<TransferPropagated>) -> Result<NetworkDuties> {
-        let mut ops = vec![];
+    ///
+    pub fn section_wallet(&self) -> WalletInfo {
+        self.data_section.section_wallet()
+    }
+
+    ///
+    pub fn node_rewards(&self) -> BTreeMap<XorName, NodeRewardStage> {
+        self.data_section.node_rewards()
+    }
+
+    ///
+    pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
+        self.wallet_section.user_wallets()
+    }
+
+    /// Initiates genesis
+    pub async fn initiate(&mut self, genesis: Option<TransferPropagated>) -> Result<()> {
         if let Some(genesis) = genesis {
             // if we are genesis
             // does local init, with no roundrip via network messaging
             self.wallet_section.init_genesis_node(genesis).await?;
-        } else {
-            ops.append(&mut self.wallet_section.catchup_with_section().await?);
-            //ops.append(&mut self.data_section.catchup_with_section().await?);
         }
-
-        Ok(ops)
+        Ok(())
     }
 
     /// Processing of any Elder duty.

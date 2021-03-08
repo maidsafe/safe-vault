@@ -12,11 +12,12 @@ use self::transfers::{replica_signing::ReplicaSigning, replicas::Replicas, Trans
 use crate::{
     capacity::RateLimit,
     node::node_ops::{KeySectionDuty, NetworkDuties},
-    ElderState, Error, NodeInfo, Result,
+    ElderState, NodeInfo, Result,
 };
 use log::{info, trace};
-use sn_data_types::{PublicKey, TransferPropagated};
+use sn_data_types::{ActorHistory, PublicKey, TransferPropagated};
 use sn_routing::Prefix;
+use std::collections::BTreeMap;
 use transfers::replica_signing::ReplicaSigningImpl;
 
 /// A WalletSection interfaces with EndUsers,
@@ -26,15 +27,9 @@ use transfers::replica_signing::ReplicaSigningImpl;
 /// The main module of a WalletSection is Transfers.
 /// Transfers deals with the payment for data writes and
 /// with sending tokens between keys.
-pub enum WalletSection {
-    PreElder {
-        transfers: Transfers,
-        elder_state: ElderState,
-    },
-    Elder {
-        transfers: Transfers,
-        elder_state: ElderState,
-    },
+pub struct WalletSection {
+    transfers: Transfers,
+    elder_state: ElderState,
 }
 
 #[derive(Clone, Debug)]
@@ -52,72 +47,46 @@ where
 }
 
 impl WalletSection {
-    pub fn pre_elder(rate_limit: RateLimit, node_info: &NodeInfo, elder_state: ElderState) -> Self {
-        let replicas = Self::transfer_replicas(&node_info, elder_state.clone());
+    pub async fn new(
+        rate_limit: RateLimit,
+        node_info: &NodeInfo,
+        elder_state: ElderState,
+        user_wallets: BTreeMap<PublicKey, ActorHistory>,
+    ) -> Result<Self> {
+        let replicas =
+            Self::transfer_replicas(&node_info, elder_state.clone(), user_wallets).await?;
         let transfers = Transfers::new(replicas, rate_limit);
-        Self::PreElder {
+        Ok(Self {
             transfers,
             elder_state,
-        }
+        })
     }
 
-    pub async fn enable(self) -> Result<Self> {
-        if let WalletSection::PreElder {
-            transfers,
-            elder_state,
-        } = self
-        {
-            Ok(Self::Elder {
-                transfers,
-                elder_state,
-            })
-        } else {
-            Err(Error::InvalidOperation(
-                "This instance is already enabled.".to_string(),
-            ))
-        }
-    }
-
-    fn transfers(&self) -> &Transfers {
-        match &self {
-            Self::PreElder { transfers, .. } | Self::Elder { transfers, .. } => transfers,
-        }
-    }
-
-    fn transfers_mut(&mut self) -> &mut Transfers {
-        match self {
-            Self::PreElder { transfers, .. } | Self::Elder { transfers, .. } => transfers,
-        }
-    }
-
-    fn elder_state_mut(&mut self) -> &mut ElderState {
-        match self {
-            Self::PreElder { elder_state, .. } | Self::Elder { elder_state, .. } => elder_state,
-        }
+    ///
+    pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
+        self.transfers.user_wallets()
     }
 
     ///
     pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
-        self.transfers_mut().increase_full_node_count(node_id)
+        self.transfers.increase_full_node_count(node_id)
     }
 
     /// Initiates as first node in a network.
     pub async fn init_genesis_node(&mut self, genesis: TransferPropagated) -> Result<()> {
-        self.transfers().genesis(genesis).await
+        self.transfers.genesis(genesis).await
     }
 
-    /// Issues queries to Elders of the section
-    /// as to catch up with shares state and
-    /// start working properly in the group.
-    pub async fn catchup_with_section(&mut self) -> Result<NetworkDuties> {
-        // currently only at2 replicas need to catch up
-        self.transfers().catchup_with_replicas().await
-    }
+    // /// Issues queries to Elders of the section
+    // /// as to catch up with shares state and
+    // /// start working properly in the group.
+    // pub async fn catchup_with_section(&mut self) -> Result<NetworkDuties> {
+    //     // currently only at2 replicas need to catch up
+    //     self.transfers.catchup_with_replicas().await
+    // }
 
     pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<()> {
-        self.elder_state_mut()
-            .set_joins_allowed(joins_allowed)
-            .await
+        self.elder_state.set_joins_allowed(joins_allowed).await
     }
 
     // Update our replica with the latest keys
@@ -136,28 +105,29 @@ impl WalletSection {
             signing,
             initiating: false,
         };
-        self.transfers_mut().update_replica_info(info, rate_limit);
+        self.transfers.update_replica_info(info, rate_limit);
     }
 
     /// When section splits, the Replicas in either resulting section
     /// also split the responsibility of their data.
     pub async fn split_section(&mut self, prefix: Prefix) -> Result<()> {
-        self.transfers().split_section(prefix).await
+        self.transfers.split_section(prefix).await
     }
 
     pub async fn process_key_section_duty(&self, duty: KeySectionDuty) -> Result<NetworkDuties> {
         //trace!("Processing as Elder KeySection");
         use KeySectionDuty::*;
         match duty {
-            RunAsTransfers(duty) => self.transfers().process_transfer_duty(&duty).await,
+            RunAsTransfers(duty) => self.transfers.process_transfer_duty(&duty).await,
             NoOp => Ok(vec![]),
         }
     }
 
-    fn transfer_replicas(
+    async fn transfer_replicas(
         node_info: &NodeInfo,
         elder_state: ElderState,
-    ) -> Replicas<ReplicaSigningImpl> {
+        user_wallets: BTreeMap<PublicKey, ActorHistory>,
+    ) -> Result<Replicas<ReplicaSigningImpl>> {
         let root_dir = node_info.root_dir.clone();
         let id = elder_state.public_key_share();
         let key_index = elder_state.key_index();
@@ -171,6 +141,6 @@ impl WalletSection {
             signing,
             initiating: true,
         };
-        Replicas::new(root_dir, info)
+        Replicas::new(root_dir, info, user_wallets).await
     }
 }

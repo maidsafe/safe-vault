@@ -21,7 +21,7 @@ use crate::{
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
-use sn_data_types::{Error as DtError, PublicKey, Token};
+use sn_data_types::{Error as DtError, NodeRewardStage, PublicKey, Token, WalletInfo};
 use sn_messaging::{
     client::{
         Error as ErrorMessage, Message, NodeQuery, NodeQueryResponse, NodeRewardQuery,
@@ -31,7 +31,7 @@ use sn_messaging::{
 };
 
 use sn_transfers::TransferActor;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 use super::ElderSigning;
@@ -41,7 +41,7 @@ type SectionActor = TransferActor<Validator, ElderSigning>;
 /// out of rewards to nodes for
 /// their work in the network.
 pub struct Rewards {
-    node_rewards: DashMap<XorName, NodeRewards>,
+    node_rewards: DashMap<XorName, NodeRewardStage>,
     section_funds: SectionFunds,
     reward_calc: RewardCalc,
 }
@@ -49,29 +49,33 @@ pub struct Rewards {
 // Node age
 type Age = u8;
 
-#[derive(Debug, Clone)]
-pub enum NodeRewards {
-    /// When a new node joins the network.
-    NewNode,
-    /// When a node has been relocated to us.
-    AwaitingActivation(Age),
-    /// After we have received the wallet id, the
-    /// stage of the NodeRewards is `Active`.
-    Active { wallet: PublicKey, age: Age },
-    /// After a node leaves the section
-    /// the NodeRewards transitions into
-    /// stage `AwaitingRelocation`.
-    AwaitingRelocation(PublicKey),
-}
-
 impl Rewards {
-    pub fn new(actor: SectionActor, reward_calc: RewardCalc) -> Self {
+    pub fn new(
+        actor: SectionActor,
+        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+        reward_calc: RewardCalc,
+    ) -> Self {
         let section_funds = SectionFunds::new(actor);
         Self {
-            node_rewards: Default::default(),
+            node_rewards: node_rewards.into_iter().collect(),
             section_funds,
             reward_calc,
         }
+    }
+
+    ///
+    pub fn section_wallet(&self) -> WalletInfo {
+        self.section_funds.wallet_info()
+    }
+
+    ///
+    pub fn node_rewards(&self) -> BTreeMap<XorName, NodeRewardStage> {
+        self.node_rewards
+            .clone()
+            .into_read_only()
+            .iter()
+            .map(|(node, stage)| (*node, stage.clone()))
+            .collect()
     }
 
     /// Returns the node ids of all nodes.
@@ -183,7 +187,7 @@ impl Rewards {
                 .get_wallet_id(old_node_id, new_node_id, msg_id, origin)
                 .await?
                 .into(),
-            GetSectionWalletHistory => self.history(msg_id, origin).into(),
+            //GetSectionWalletHistory => self.history(msg_id, origin).into(),
         };
 
         Ok(result)
@@ -202,7 +206,7 @@ impl Rewards {
                 Some(state) => {
                     match *state {
                         // ..and validate its state.
-                        NodeRewards::Active { wallet, age } => (wallet, age),
+                        NodeRewardStage::Active { wallet, age } => (wallet, age),
                         _ => {
                             warn!("Invalid operation: Node rewards is not activated.");
                             continue;
@@ -230,24 +234,24 @@ impl Rewards {
         Ok(payouts)
     }
 
-    ///
-    fn history(&self, msg_id: MessageId, origin: SrcLocation) -> NodeMessagingDuty {
-        use NodeQueryResponse::*;
-        use NodeRewardQueryResponse::*;
+    // ///
+    // fn history(&self, msg_id: MessageId, origin: SrcLocation) -> NodeMessagingDuty {
+    //     use NodeQueryResponse::*;
+    //     use NodeRewardQueryResponse::*;
 
-        NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::NodeQueryResponse {
-                response: Rewards(GetSectionWalletHistory(self.section_funds.wallet_info())),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                query_origin: origin,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: origin.to_dst(),
-            aggregation: Aggregation::AtDestination,
-        })
-    }
+    //     NodeMessagingDuty::Send(OutgoingMsg {
+    //         msg: Message::NodeQueryResponse {
+    //             response: Rewards(GetSectionWalletHistory(self.section_funds.wallet_info())),
+    //             id: MessageId::in_response_to(&msg_id),
+    //             correlation_id: msg_id,
+    //             query_origin: origin,
+    //             target_section_pk: None,
+    //         },
+    //         section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+    //         dst: origin.to_dst(),
+    //         aggregation: Aggregation::AtDestination,
+    //     })
+    // }
 
     /// 0. A brand new node has joined our section.
     /// A new node always start at age 4.
@@ -256,7 +260,7 @@ impl Rewards {
     /// At age 5 it gets its first reward payout.
     fn add_new_node(&self, node_id: XorName) -> NodeMessagingDuty {
         info!("Rewards: New node added: {:?}", node_id);
-        let _ = self.node_rewards.insert(node_id, NodeRewards::NewNode);
+        let _ = self.node_rewards.insert(node_id, NodeRewardStage::NewNode);
         NodeMessagingDuty::NoOp
     }
 
@@ -264,21 +268,25 @@ impl Rewards {
     /// ... or, an active node updates its wallet.
     fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeMessagingDuty> {
         // Try get the info..
+        if !self.node_rewards.contains_key(&node_id) {
+            let _ = self.node_rewards.insert(node_id, NodeRewardStage::NewNode);
+        }
         let state = match self.node_rewards.get_mut(&node_id) {
-            None => {
-                warn!("Cannot see node wallet in the node reward register. (Add new node command may still be pending....)");
-                return Err(Error::NetworkData(DtError::NoSuchKey));
-            }
             Some(state) => {
                 match *state {
                     // ..and validate its state.
-                    NodeRewards::NewNode => NodeRewards::AwaitingRelocation(wallet),
-                    NodeRewards::Active { age, .. } => NodeRewards::Active { age, wallet },
+                    NodeRewardStage::NewNode => NodeRewardStage::AwaitingRelocation(wallet),
+                    NodeRewardStage::Active { age, .. } => NodeRewardStage::Active { age, wallet },
                     _ => {
                         warn!("Cannot set node wallet unless active or new.");
                         return Err(Error::NetworkData(DtError::InvalidOperation));
                     }
                 }
+            }
+            None => {
+                // should be unreachable..
+                warn!("Cannot see node wallet in the node reward register. (Add new node command may still be pending....)");
+                return Err(Error::NetworkData(DtError::NoSuchKey));
             }
         };
         debug!("Node wallet set! {}, {:?}", node_id, state);
@@ -296,7 +304,7 @@ impl Rewards {
     ) -> Result<NodeMessagingDuty> {
         use NodeQuery::*;
         use NodeRewardQuery::*;
-        use NodeRewards::*;
+        use NodeRewardStage::*;
 
         let state = AwaitingActivation(age);
         let _ = self.node_rewards.insert(new_node_id, state);
@@ -341,8 +349,8 @@ impl Rewards {
             Some(state) => {
                 match *state {
                     // ..and validate its state.
-                    NodeRewards::AwaitingActivation(age) => age,
-                    NodeRewards::Active { .. } => {
+                    NodeRewardStage::AwaitingActivation(age) => age,
+                    NodeRewardStage::Active { .. } => {
                         info!("Node already activated.");
                         return Ok(NodeMessagingDuty::NoOp);
                     }
@@ -357,7 +365,7 @@ impl Rewards {
         // Store account as `Active`
         let _ = self
             .node_rewards
-            .insert(node_id, NodeRewards::Active { wallet, age });
+            .insert(node_id, NodeRewardStage::Active { wallet, age });
 
         info!("Initiating reward payout to: {}.", wallet);
         self.section_funds
@@ -385,13 +393,13 @@ impl Rewards {
             node_id, entry
         );
         let wallet = match entry {
-            NodeRewards::Active { wallet, .. } => wallet,
-            NodeRewards::AwaitingRelocation(_) => {
+            NodeRewardStage::Active { wallet, .. } => wallet,
+            NodeRewardStage::AwaitingRelocation(_) => {
                 debug!("Rewards: {} is already awaiting relocation", node_id);
                 return Ok(NodeMessagingDuty::NoOp);
             }
-            NodeRewards::AwaitingActivation { .. } // hmm.. left when AwaitingActivation is a tricky case.. // Might be case for lazy messaging..
-            | NodeRewards::NewNode => {
+            NodeRewardStage::AwaitingActivation { .. } // hmm.. left when AwaitingActivation is a tricky case.. // Might be case for lazy messaging..
+            | NodeRewardStage::NewNode => {
                 debug!("Rewards: Could not deactivate {}, node was never activated!", node_id);
                 return Err(Error::Logic(format!("Rewards: Could not deactivate {}, node was never activated!", node_id)));
             }
@@ -402,7 +410,7 @@ impl Rewards {
         );
         let _ = self
             .node_rewards
-            .insert(node_id, NodeRewards::AwaitingRelocation(wallet));
+            .insert(node_id, NodeRewardStage::AwaitingRelocation(wallet));
         debug!(
             "Rewards: deactivated {}. It is now awaiting relocation.",
             node_id
@@ -426,10 +434,10 @@ impl Rewards {
             None => return Ok(NodeMessagingDuty::NoOp),
         };
         let wallet = match entry {
-            NodeRewards::AwaitingRelocation(id) => id,
-            NodeRewards::NewNode
-            | NodeRewards::AwaitingActivation { .. }
-            | NodeRewards::Active { .. } => {
+            NodeRewardStage::AwaitingRelocation(id) => id,
+            NodeRewardStage::NewNode
+            | NodeRewardStage::AwaitingActivation { .. }
+            | NodeRewardStage::Active { .. } => {
                 // ..means the node has not left, and was not
                 // marked as relocating..
                 // (Could be a case for lazy messaging..)

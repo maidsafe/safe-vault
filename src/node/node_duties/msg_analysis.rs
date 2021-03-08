@@ -303,11 +303,11 @@ impl ReceivedMsgAnalysis {
             .into(),
             // Accumulates at remote section, for security
             Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetWalletReplicas(sections_info)),
+                query: NodeQuery::Transfers(NodeTransferQuery::GetWalletReplicas(wallet)),
                 id,
                 ..
-            } => TransferDuty::ProcessQuery {
-                query: TransferQuery::GetWalletReplicas(*sections_info),
+            } => NodeDuty::GetWalletReplicas {
+                wallet: *wallet,
                 msg_id: *id,
                 origin,
             }
@@ -318,6 +318,20 @@ impl ReceivedMsgAnalysis {
             } => NodeDuty::CompleteElderChange {
                 previous_key: *from,
                 new_key: *to,
+            }
+            .into(),
+            Message::NodeEvent {
+                event:
+                    NodeEvent::PromotedToElder {
+                        section_wallet,
+                        node_rewards,
+                        user_wallets,
+                    },
+                ..
+            } => NodeDuty::CompleteTransitionToElder {
+                section_wallet: section_wallet.to_owned(),
+                node_rewards: node_rewards.to_owned(),
+                user_wallets: user_wallets.to_owned(),
             }
             .into(),
             _ => vec![],
@@ -333,13 +347,15 @@ impl ReceivedMsgAnalysis {
             //
             // ------ wallet register ------
             Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet { wallet, .. }),
+                cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet)),
                 id,
                 ..
             } => RewardDuty::ProcessCmd {
                 cmd: RewardCmd::SetNodeWallet {
                     wallet_id: *wallet,
-                    node_id: origin.to_dst().name().unwrap(),
+                    node_id: origin.to_dst().name().ok_or_else(|| {
+                        Error::InvalidMessage(*id, "Missing origin name!".to_string())
+                    })?,
                 },
                 msg_id: *id,
                 origin,
@@ -434,17 +450,17 @@ impl ReceivedMsgAnalysis {
                 }
                 .into()
             }
-            // from a single src, so cannot be accumulated
-            Message::NodeQuery {
-                query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
-                id,
-                ..
-            } => RewardDuty::ProcessQuery {
-                query: RewardQuery::GetSectionWalletHistory,
-                msg_id: *id,
-                origin,
-            }
-            .into(),
+            // // from a single src, so cannot be accumulated
+            // Message::NodeQuery {
+            //     query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
+            //     id,
+            //     ..
+            // } => RewardDuty::ProcessQuery {
+            //     query: RewardQuery::GetSectionWalletHistory,
+            //     msg_id: *id,
+            //     origin,
+            // }
+            // .into(),
             // --- Adult ---
             Message::NodeQuery {
                 query: NodeQuery::Chunks { query, origin },
@@ -481,14 +497,14 @@ impl ReceivedMsgAnalysis {
                 }
                 .into()
             }
-            // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
-            Message::NodeQueryResponse {
-                response:
-                    NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetSectionWalletHistory(
-                        wallet_info,
-                    )),
-                ..
-            } => NodeDuty::CompleteTransitionToElder(wallet_info.clone()).into(),
+            // // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
+            // Message::NodeQueryResponse {
+            //     response:
+            //         NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetSectionWalletHistory(
+            //             wallet_info,
+            //         )),
+            //     ..
+            // } => NodeDuty::CompleteTransitionToElder(wallet_info.clone()).into(),
             _ => vec![],
         };
         Ok(res)

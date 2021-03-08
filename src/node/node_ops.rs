@@ -10,14 +10,14 @@ use bls::PublicKeySet;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
-    Blob, BlobAddress, Credit, CreditAgreementProof, PublicKey, ReplicaEvent, SignatureShare,
-    SignedCredit, SignedTransfer, SignedTransferShare, TransferAgreementProof, TransferValidated,
-    WalletInfo,
+    ActorHistory, Blob, BlobAddress, Credit, CreditAgreementProof, NodeRewardStage, PublicKey,
+    ReplicaEvent, SignatureShare, SignedCredit, SignedTransfer, SignedTransferShare,
+    TransferAgreementProof, TransferValidated, WalletInfo,
 };
 use sn_messaging::{client::Message, Aggregation, DstLocation, EndUser, MessageId, SrcLocation};
 use sn_routing::{Event as RoutingEvent, Prefix};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Formatter},
 };
 use xor_name::XorName;
@@ -54,17 +54,16 @@ pub enum NetworkDuty {
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
-    ///
-    RegisterWallet(PublicKey),
+    /// Get section actor replicas' public key.
+    GetWalletReplicas {
+        wallet: PublicKey,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
     /// On being promoted, an Infant node becomes an Adult.
     AssumeAdultDuties,
     /// On being promoted, an Adult node becomes an Elder.
-    BeginTransitionToElder {
-        /// The new SectionKey.
-        new_key: PublicKey,
-        /// The previous SectionKey.
-        previous_key: PublicKey,
-    },
+    BeginFormingGenesisSection,
     /// Bootstrap of genesis section actor.
     ReceiveGenesisProposal {
         /// The genesis credit.
@@ -100,8 +99,13 @@ pub enum NodeDuty {
         /// The new section key.
         new_key: PublicKey,
     },
+    InformNewElders,
     /// Initiates the section wallet.
-    CompleteTransitionToElder(WalletInfo),
+    CompleteTransitionToElder {
+        section_wallet: WalletInfo,
+        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+        user_wallets: BTreeMap<PublicKey, ActorHistory>,
+    },
     /// Sending messages on to the network.
     ProcessMessaging(NodeMessagingDuty),
     /// Receiving and processing events from the network.
@@ -132,11 +136,12 @@ impl From<NodeDuty> for NetworkDuty {
 impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::RegisterWallet(_) => write!(f, "RegisterWallet"),
+            Self::InformNewElders => write!(f, "InformNewElders"),
+            Self::GetWalletReplicas { .. } => write!(f, "GetWalletReplicas"),
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
             Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),
-            Self::BeginTransitionToElder { .. } => write!(f, "BeginTransitionToElder"),
+            Self::BeginFormingGenesisSection => write!(f, "BeginFormingGenesisSection"),
             Self::CompleteTransitionToElder { .. } => write!(f, "CompleteTransitionToElder"),
             Self::ProcessMessaging(duty) => write!(f, "ProcessMessaging({:?})", duty),
             Self::ProcessNetworkEvent(event) => write!(f, "ProcessNetworkEvent({:?}", event),
@@ -532,9 +537,9 @@ pub enum RewardQuery {
         /// The id of the node at its new section (i.e. this one).
         new_node_id: XorName,
     },
-    /// When a new Section Actor share joins,
-    /// it queries the other shares for the section wallet history.
-    GetSectionWalletHistory,
+    // /// When a new Section Actor share joins,
+    // /// it queries the other shares for the section wallet history.
+    // GetSectionWalletHistory,
 }
 
 impl From<RewardDuty> for NetworkDuties {
@@ -602,8 +607,6 @@ impl From<TransferDuty> for NetworkDuties {
 /// handled by AT2 Replicas.
 #[derive(Debug)]
 pub enum TransferQuery {
-    /// Get section actor replicas' public key.
-    GetWalletReplicas(PublicKey),
     /// Get the PublicKeySet for replicas of a given PK
     GetReplicaKeys(PublicKey),
     /// Get key balance.

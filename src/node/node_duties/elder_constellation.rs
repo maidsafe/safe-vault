@@ -47,7 +47,12 @@ impl ElderConstellation {
     }
 
     ///
-    pub fn duties(&mut self) -> &mut ElderDuties {
+    pub fn duties(&self) -> &ElderDuties {
+        &self.duties
+    }
+
+    ///
+    pub fn duties_mut(&mut self) -> &mut ElderDuties {
         &mut self.duties
     }
 
@@ -166,6 +171,8 @@ impl ElderConstellation {
                 };
             }
         }
+
+        // inform the new elder
 
         // if changes have queued up, make sure the queue is worked down
         if !self.pending_changes.is_empty() {

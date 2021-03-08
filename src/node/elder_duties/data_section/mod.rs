@@ -19,96 +19,56 @@ use crate::{
     capacity::ChunkHolderDbs,
     node::node_ops::{DataSectionDuty, NetworkDuties, RewardCmd, RewardDuty},
     node::NodeInfo,
-    ElderState, Error, Result,
+    ElderState, Result,
 };
 use log::info;
-use sn_data_types::{PublicKey, WalletInfo};
+use sn_data_types::{NodeRewardStage, PublicKey, WalletInfo};
 use sn_messaging::{MessageId, SrcLocation};
 use sn_routing::Prefix;
 use sn_transfers::TransferActor;
+use std::collections::BTreeMap;
 use xor_name::XorName;
 
 /// A DataSection is responsible for
 /// the storage and retrieval of data,
 /// and the rewarding of nodes in the section
 /// for participating in these duties.
-#[allow(clippy::large_enum_variant)]
-pub enum DataSection {
-    PreElder {
-        /// The logic for managing data.
-        metadata: Metadata,
-        /// The network state.
-        elder_state: ElderState,
-    },
-    Elder {
-        /// The logic for managing data.
-        metadata: Metadata,
-        /// Rewards for performing storage
-        /// services to the network.
-        rewards: Rewards,
-        /// The network state.
-        elder_state: ElderState,
-    },
+pub struct DataSection {
+    /// The logic for managing data.
+    metadata: Metadata,
+    /// Rewards for performing storage
+    /// services to the network.
+    rewards: Rewards,
+    /// The network state.
+    elder_state: ElderState,
+}
+
+pub struct RewardData {
+    pub section_wallet: WalletInfo,
+    pub node_rewards: BTreeMap<XorName, NodeRewardStage>,
 }
 
 impl DataSection {
     ///
-    pub async fn pre_elder(
+    pub async fn new(
         info: &NodeInfo,
         dbs: ChunkHolderDbs,
         elder_state: ElderState,
+        reward_data: RewardData,
     ) -> Result<Self> {
         // Metadata
         let metadata = Metadata::new(info, dbs, elder_state.clone()).await?;
-        Ok(Self::PreElder {
+        // Rewards
+        let signing = ElderSigning::new(elder_state.clone());
+        let actor = TransferActor::from_info(signing, reward_data.section_wallet, Validator {})?;
+        let reward_calc = RewardCalc::new(*elder_state.prefix());
+        let rewards = Rewards::new(actor, reward_data.node_rewards, reward_calc);
+
+        Ok(Self {
             metadata,
+            rewards,
             elder_state,
         })
-    }
-
-    /// Only once we have the section wallet info
-    /// can we instantiate rewards module.
-    pub async fn enable(self, wallet_info: WalletInfo) -> Result<Self> {
-        if let Self::PreElder {
-            metadata,
-            elder_state,
-        } = self
-        {
-            // Rewards
-            let signing = ElderSigning::new(elder_state.clone());
-            let actor = TransferActor::from_info(signing, wallet_info, Validator {})?;
-            let reward_calc = RewardCalc::new(*elder_state.prefix());
-            let rewards = Rewards::new(actor, reward_calc);
-
-            Ok(Self::Elder {
-                metadata,
-                rewards,
-                elder_state,
-            })
-        } else {
-            Err(Error::InvalidOperation(
-                "This instance is already enabled.".to_string(),
-            ))
-        }
-    }
-
-    fn metadata(&mut self) -> &mut Metadata {
-        match self {
-            Self::PreElder { metadata, .. } | Self::Elder { metadata, .. } => metadata,
-        }
-    }
-
-    fn rewards(&mut self) -> Result<&mut Rewards> {
-        match self {
-            Self::PreElder { .. } => Err(Error::InvalidOperation(format!(""))),
-            Self::Elder { rewards, .. } => Ok(rewards),
-        }
-    }
-
-    fn elder_state(&self) -> &ElderState {
-        match &self {
-            Self::PreElder { elder_state, .. } | Self::Elder { elder_state, .. } => elder_state,
-        }
     }
 
     pub async fn process_data_section_duty(
@@ -117,17 +77,27 @@ impl DataSection {
     ) -> Result<NetworkDuties> {
         use DataSectionDuty::*;
         match duty {
-            RunAsMetadata(duty) => self.metadata().process_metadata_duty(duty).await,
-            RunAsRewards(duty) => self.rewards()?.process_reward_duty(duty).await,
+            RunAsMetadata(duty) => self.metadata.process_metadata_duty(duty).await,
+            RunAsRewards(duty) => self.rewards.process_reward_duty(duty).await,
             NoOp => Ok(vec![]),
         }
+    }
+
+    ///
+    pub fn section_wallet(&self) -> WalletInfo {
+        self.rewards.section_wallet()
+    }
+
+    ///
+    pub fn node_rewards(&self) -> BTreeMap<XorName, NodeRewardStage> {
+        self.rewards.node_rewards()
     }
 
     // /// Issues query to Elders of the section
     // /// as to catch up with the current state of the replicas.
     // pub async fn catchup_with_section(&mut self) -> Result<NetworkDuties> {
     //     let prefix_name = self.elder_state().prefix().name();
-    //     self.rewards()?
+    //     self.rewards
     //         .get_section_wallet_history(prefix_name)
     //         .await
     // }
@@ -146,7 +116,7 @@ impl DataSection {
         // make sure demoted is handled properly first, so that
         // EldersChanged doesn't lead to calling this method..
 
-        self.rewards()?
+        self.rewards
             .init_wallet_transition(elder_state, sibling_key)
             .await
     }
@@ -155,12 +125,12 @@ impl DataSection {
     pub async fn split_section(&mut self, prefix: Prefix) -> Result<NetworkDuties> {
         // First remove nodes that are no longer in our section.
         let to_remove = self
-            .rewards()?
+            .rewards
             .all_nodes()
             .into_iter()
             .filter(|c| !prefix.matches(&XorName(c.0)))
             .collect();
-        self.rewards()?.remove(to_remove);
+        self.rewards.remove(to_remove);
 
         Ok(vec![])
         // // Then payout rewards to all the Elders.
@@ -170,8 +140,8 @@ impl DataSection {
 
     /// When a new node joins, it is registered for receiving rewards.
     pub async fn new_node_joined(&mut self, id: XorName) -> Result<NetworkDuties> {
-        let node_name = self.elder_state().node_name();
-        self.rewards()?
+        let node_name = self.elder_state.node_name();
+        self.rewards
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddNewNode(id),
                 msg_id: MessageId::new(),
@@ -190,8 +160,8 @@ impl DataSection {
         age: u8,
     ) -> Result<NetworkDuties> {
         // Adds the relocated account.
-        let node_name = self.elder_state().node_name();
-        self.rewards()?
+        let node_name = self.elder_state.node_name();
+        self.rewards
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::AddRelocatingNode {
                     old_node_id,
@@ -207,16 +177,16 @@ impl DataSection {
     /// Name of the node
     /// Age of the node
     pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Result<NetworkDuties> {
-        let node_name = self.elder_state().node_name();
+        let node_name = self.elder_state.node_name();
         let mut duties = self
-            .rewards()?
+            .rewards
             .process_reward_duty(RewardDuty::ProcessCmd {
                 cmd: RewardCmd::DeactivateNode(node_id),
                 msg_id: MessageId::new(),
                 origin: SrcLocation::Node(node_name),
             })
             .await?;
-        duties.extend(self.metadata().trigger_chunk_replication(node_id).await?);
+        duties.extend(self.metadata.trigger_chunk_replication(node_id).await?);
         Ok(duties)
     }
 }

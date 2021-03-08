@@ -27,12 +27,12 @@ use log::{debug, error, info, trace, warn};
 use replica_signing::ReplicaSigningImpl;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use futures::lock::Mutex;
 use sn_data_types::{
-    CreditAgreementProof, DebitId, PublicKey, ReplicaEvent, SignedTransfer, SignedTransferShare,
-    TransferAgreementProof, TransferPropagated,
+    ActorHistory, CreditAgreementProof, DebitId, PublicKey, ReplicaEvent, SignedTransfer,
+    SignedTransferShare, TransferAgreementProof, TransferPropagated,
 };
 use sn_messaging::{
     client::{
@@ -97,24 +97,29 @@ impl Transfers {
             .await
     }
 
-    /// Issues a query to existing Replicas
-    /// asking for their events, as to catch up and
-    /// start working properly in the group.
-    pub async fn catchup_with_replicas(&self) -> Result<NetworkDuties> {
-        info!("Transfers: Catching up with transfer Replicas!");
-        // prepare replica init
-        let pub_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
-        Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::NodeQuery {
-                query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
-                id: MessageId::new(),
-                target_section_pk: None,
-            },
-            section_source: false, // sent as a single node, when catching up
-            dst: DstLocation::Section(pub_key.into()),
-            aggregation: Aggregation::None,
-        })))
+    ///
+    pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
+        self.replicas.user_wallets()
     }
+
+    // /// Issues a query to existing Replicas
+    // /// asking for their events, as to catch up and
+    // /// start working properly in the group.
+    // pub async fn catchup_with_replicas(&self) -> Result<NetworkDuties> {
+    //     info!("Transfers: Catching up with transfer Replicas!");
+    //     // prepare replica init
+    //     let pub_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
+    //     Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
+    //         msg: Message::NodeQuery {
+    //             query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
+    //             id: MessageId::new(),
+    //             target_section_pk: None,
+    //         },
+    //         section_source: false, // sent as a single node, when catching up
+    //         dst: DstLocation::Section(pub_key.into()),
+    //         aggregation: Aggregation::None,
+    //     })))
+    // }
 
     /// When section splits, the Replicas in either resulting section
     /// also split the responsibility of the accounts.
@@ -158,10 +163,10 @@ impl Transfers {
     ) -> Result<NetworkDuties> {
         use TransferQuery::*;
         let duty = match query {
-            GetWalletReplicas(wallet_key) => {
-                self.get_wallet_replicas(*wallet_key, msg_id, origin)
-                    .await?
-            }
+            // GetWalletReplicas(wallet_key) => {
+            //     self.get_wallet_replicas(*wallet_key, msg_id, origin)
+            //         .await?
+            // }
             GetReplicaEvents => self.all_events(msg_id, origin).await?,
             GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await?,
             GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await?,
@@ -481,29 +486,29 @@ impl Transfers {
         }))
     }
 
-    async fn get_wallet_replicas(
-        &self,
-        _wallet_key: PublicKey,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    ) -> Result<NodeMessagingDuty> {
-        info!(">>> Handling GetWalletReplicas query");
-        use NodeQueryResponse::*;
-        use NodeTransferQueryResponse::*;
-        // todo: validate signature
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::NodeQueryResponse {
-                response: Transfers(GetWalletReplicas(self.replicas.replicas_pk_set())),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                query_origin: origin,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: origin.to_dst(),
-            aggregation: Aggregation::AtDestination,
-        }))
-    }
+    // async fn get_wallet_replicas(
+    //     &self,
+    //     _wallet_key: PublicKey,
+    //     msg_id: MessageId,
+    //     origin: SrcLocation,
+    // ) -> Result<NodeMessagingDuty> {
+    //     info!(">>> Handling GetWalletReplicas query");
+    //     use NodeQueryResponse::*;
+    //     use NodeTransferQueryResponse::*;
+    //     // todo: validate signature
+    //     Ok(NodeMessagingDuty::Send(OutgoingMsg {
+    //         msg: Message::NodeQueryResponse {
+    //             response: Transfers(GetWalletReplicas(self.replicas.replicas_pk_set())),
+    //             id: MessageId::in_response_to(&msg_id),
+    //             correlation_id: msg_id,
+    //             query_origin: origin,
+    //             target_section_pk: None,
+    //         },
+    //         section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+    //         dst: origin.to_dst(),
+    //         aggregation: Aggregation::AtDestination,
+    //     }))
+    // }
 
     async fn history(
         &self,
@@ -516,7 +521,6 @@ impl Transfers {
         let result = self
             .replicas
             .history(*wallet_id)
-            .await
             .map_err(|_e| ErrorMessage::NoHistoryForPublicKey(*wallet_id));
 
         Ok(NodeMessagingDuty::Send(OutgoingMsg {
