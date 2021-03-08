@@ -201,7 +201,7 @@ mod test {
     }
 
     #[test]
-    fn rate_limit_is_applied_up_to_3400_billion_nodes() {
+    fn rate_limit_is_applied_up_to_3300_billion_nodes() {
         // setup
         // The size of the actual DataCmd
         // is used for storecost calc,
@@ -211,7 +211,7 @@ mod test {
         let minimum_storage_bytes = mem::size_of::<DataCmd>() as u64;
         let half_full_nodes = 99;
         let big_section_node_count = 199;
-        let big_prefix_len = 34;
+        let big_prefix_len = 33;
         // storage rate limit is applied up to 3400 billion nodes
         let endcost = RateLimit::rate_limit(
             minimum_storage_bytes,
