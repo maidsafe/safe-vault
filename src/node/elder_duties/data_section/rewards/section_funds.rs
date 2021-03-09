@@ -426,11 +426,15 @@ impl SectionFunds {
             }
         }?;
 
+        debug!(">>>>>>>>>>>>>> continuing in transfer validation");
+
         if let Some(event) = validated_event {
             self.apply(TransferValidationReceived(event.clone()))?;
             let proof = if let Some(proof) = event.proof {
                 proof
             } else {
+                debug!(">>>>>>>>>>>>>> no proof as yet");
+
                 return Ok(vec![]);
             };
             // If we have an accumulated proof, we'll continue with registering the proof.
@@ -479,7 +483,7 @@ impl SectionFunds {
                     queued_ops.push(NetworkDuty::from(t2));
 
                     // TODO: broadcast the op to the new section!
-                    let propagateToNewSection = 
+                    // let propagateToNewSection = 
                     
                     self.state.transition = Transition::Split(SplitStage::CompletingT2 {
                         next_actor,
