@@ -6,17 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::node_ops::ElderDuty, ElderState, Error, Result};
+use crate::{ElderState, Error, Result};
 use log::info;
 use sn_data_types::{Credit, CreditAgreementProof, SignatureShare, SignedCredit};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 
 pub(crate) struct GenesisProposal {
     pub elder_state: ElderState,
     pub proposal: Credit,
     pub signatures: BTreeMap<usize, bls::SignatureShare>,
     pub pending_agreement: Option<SignedCredit>,
-    pub queued_ops: VecDeque<ElderDuty>,
 }
 
 pub(crate) struct GenesisAccumulation {
@@ -24,7 +23,6 @@ pub(crate) struct GenesisAccumulation {
     pub agreed_proposal: SignedCredit,
     pub signatures: BTreeMap<usize, bls::SignatureShare>,
     pub pending_agreement: Option<CreditAgreementProof>,
-    pub queued_ops: VecDeque<ElderDuty>,
 }
 
 impl GenesisProposal {

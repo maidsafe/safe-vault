@@ -59,8 +59,6 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
-    /// On being promoted, an Infant node becomes an Adult.
-    AssumeAdultDuties,
     /// On being promoted, an Adult node becomes an Elder.
     BeginFormingGenesisSection,
     /// Bootstrap of genesis section actor.
@@ -77,6 +75,8 @@ pub enum NodeDuty {
         /// An individual elder's sig over the credit.
         sig: SignatureShare,
     },
+    /// On being promoted, an Infant node becomes an Adult.
+    AssumeAdultDuties,
     /// Elder changes means the section public key
     /// changes as well, which leads to necessary updates
     /// of various places using the multisig of the section.

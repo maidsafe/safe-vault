@@ -21,7 +21,7 @@ use sn_data_types::{
     WalletInfo,
 };
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeQuery, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery},
+    client::{Message, NodeCmd, NodeQuery, NodeSystemQuery, NodeTransferCmd},
     Aggregation, DstLocation, MessageId,
 };
 use sn_transfers::{ActorEvent, TransferActor};
@@ -84,7 +84,7 @@ enum SplitStage {
     },
     CompletingT2 {
         next_actor: SectionActor,
-        if_t1_was_ours: Option<CreditAgreementProof>,
+        credit_if_t1_was_ours: Option<CreditAgreementProof>,
     },
 }
 
@@ -446,7 +446,7 @@ impl SectionFunds {
                 Transition::Split(SplitStage::CompletingT1 { next_actor, ref t2 }) => {
                     debug!(">>>> ************************* Completing t1!");
 
-                    let if_t1_was_ours = if t2.recipient != next_actor.id() {
+                    let credit_if_t1_was_ours = if t2.recipient != next_actor.id() {
                         Some(proof.credit_proof())
                     } else {
                         None
@@ -455,15 +455,15 @@ impl SectionFunds {
                     queued_ops.push(NetworkDuty::from(t2));
                     self.state.transition = Transition::Split(SplitStage::CompletingT2 {
                         next_actor,
-                        if_t1_was_ours,
+                        credit_if_t1_was_ours,
                     });
                 }
                 Transition::Split(SplitStage::CompletingT2 {
                     next_actor,
-                    ref if_t1_was_ours,
+                    ref credit_if_t1_was_ours,
                 }) => {
                     debug!(">>>> ********************** Completing t2!");
-                    if let Some(credit) = if_t1_was_ours {
+                    if let Some(credit) = credit_if_t1_was_ours {
                         // t1 was the credit to our next actor
                         queued_ops.extend(self.move_to_next(next_actor, credit.clone())?)
                     } else {

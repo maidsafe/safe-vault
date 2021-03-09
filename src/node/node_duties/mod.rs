@@ -51,7 +51,10 @@ use GenesisStage::*;
 #[allow(clippy::large_enum_variant)]
 enum Stage {
     Infant,
-    Adult(AdultDuties),
+    Adult {
+        adult: AdultDuties,
+        queued_ops: VecDeque<ElderDuty>,
+    },
     Genesis(GenesisStage),
     //AssumingElderDuties(ElderDuties),
     Elder(ElderConstellation),
@@ -59,7 +62,7 @@ enum Stage {
 
 #[allow(clippy::large_enum_variant)]
 enum GenesisStage {
-    AwaitingGenesisThreshold(VecDeque<ElderDuty>),
+    AwaitingGenesisThreshold,
     ProposingGenesis(GenesisProposal),
     AccumulatingGenesis(GenesisAccumulation),
 }
@@ -122,8 +125,14 @@ impl NodeDuties {
             RunAsElder(duty) => {
                 if let Some(duties) = self.elder_duties_mut() {
                     duties.process_elder_duty(duty).await
+                } else if let Stage::Adult {
+                    ref mut queued_ops, ..
+                } = &mut self.stage
+                {
+                    queued_ops.push_back(duty);
+                    Ok(vec![])
                 } else {
-                    Err(Error::Logic("Currently not an Elder".to_string()))
+                    Err(Error::Logic("Cannot process the Elder duty".to_string()))
                 }
             }
             RunAsNode(duty) => self.process_node_duty(duty).await,
@@ -132,9 +141,8 @@ impl NodeDuties {
     }
 
     pub fn adult_duties(&mut self) -> Option<&mut AdultDuties> {
-        use Stage::*;
         match &mut self.stage {
-            Adult(ref mut duties) => Some(duties),
+            Stage::Adult { ref mut adult, .. } => Some(adult),
             _ => None,
         }
     }
@@ -172,9 +180,14 @@ impl NodeDuties {
         //info!("Processing Node duty: {:?}", duty);
         match duty {
             GetSectionPkSet { msg_id, origin } => self.section_pk_set(msg_id, origin).await,
-            InformNewElders => self.inform_new_elders().await,
-            AssumeAdultDuties => self.assume_adult_duties().await,
             BeginFormingGenesisSection => self.begin_forming_genesis_section().await,
+            ReceiveGenesisProposal { credit, sig } => {
+                self.receive_genesis_proposal(credit, sig).await
+            }
+            ReceiveGenesisAccumulation { signed_credit, sig } => {
+                self.receive_genesis_accumulation(signed_credit, sig).await
+            }
+            AssumeAdultDuties => self.assume_adult_duties().await,
             CompleteTransitionToElder {
                 section_wallet,
                 node_rewards,
@@ -182,12 +195,6 @@ impl NodeDuties {
             } => {
                 self.complete_transition_to_elder(section_wallet, node_rewards, user_wallets, None)
                     .await
-            }
-            ReceiveGenesisProposal { credit, sig } => {
-                self.receive_genesis_proposal(credit, sig).await
-            }
-            ReceiveGenesisAccumulation { signed_credit, sig } => {
-                self.receive_genesis_accumulation(signed_credit, sig).await
             }
             InitiateElderChange {
                 prefix,
@@ -199,6 +206,7 @@ impl NodeDuties {
                 previous_key,
                 new_key,
             } => self.complete_elder_change(previous_key, new_key).await,
+            InformNewElders => self.inform_new_elders().await,
             ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
             ProcessNetworkEvent(event) => {
                 self.network_events
@@ -284,14 +292,17 @@ impl NodeDuties {
     }
 
     async fn assume_adult_duties(&mut self) -> Result<NetworkDuties> {
-        if matches!(self.stage, Stage::Adult(_)) {
+        if matches!(self.stage, Stage::Adult { .. }) {
             return Ok(vec![]);
         }
         info!("Assuming Adult duties..");
         let state = AdultState::new(self.network_api.clone()).await?;
-        let duties = AdultDuties::new(&self.node_info, state.clone()).await?;
+        let adult = AdultDuties::new(&self.node_info, state.clone()).await?;
         self.node_info.used_space.reset().await;
-        self.stage = Stage::Adult(duties);
+        self.stage = Stage::Adult {
+            adult,
+            queued_ops: VecDeque::new(),
+        };
         self.network_events = NetworkEvents::new(ReceivedMsgAnalysis::new(NodeState::Adult(state)));
         info!("Adult duties assumed.");
         // NB: This is wrong, shouldn't write to disk here,
@@ -331,8 +342,7 @@ impl NodeDuties {
 
     async fn begin_forming_genesis_section(&mut self) -> Result<NetworkDuties> {
         if matches!(self.stage, Stage::Elder(_))
-            //|| matches!(self.stage, Stage::AssumingElderDuties { .. })
-            || matches!(self.stage, Stage::Genesis(AwaitingGenesisThreshold(_)))
+            || matches!(self.stage, Stage::Genesis(AwaitingGenesisThreshold))
         {
             return Ok(vec![]);
         } else if !self.node_info.genesis && matches!(self.stage, Stage::Infant) {
@@ -350,7 +360,7 @@ impl NodeDuties {
         // );
         if is_genesis_section
             && elder_count == GENESIS_ELDER_COUNT
-            && matches!(self.stage, Stage::Adult(_))
+            && matches!(self.stage, Stage::Adult { .. })
             && section_chain_len <= GENESIS_ELDER_COUNT
         {
             // this is the case when we are the GENESIS_ELDER_COUNT-th Elder!
@@ -373,7 +383,6 @@ impl NodeDuties {
                 proposal: credit.clone(),
                 signatures,
                 pending_agreement: None,
-                queued_ops: VecDeque::new(),
             }));
 
             let dst = DstLocation::Section(credit.recipient.into());
@@ -395,32 +404,13 @@ impl NodeDuties {
             && section_chain_len <= GENESIS_ELDER_COUNT
         {
             debug!("AwaitingGenesisThreshold!");
-            self.stage = Stage::Genesis(AwaitingGenesisThreshold(VecDeque::new()));
+            self.stage = Stage::Genesis(AwaitingGenesisThreshold);
             return Ok(vec![]);
         } else {
             Err(Error::InvalidOperation(
                 "Only for genesis formation".to_string(),
             ))
         }
-
-        // trace!("Beginning transition to Elder duties.");
-        // let state = ElderState::new(self.network_api.clone()).await?;
-        // let our_section = DstLocation::Section(state.prefix().name());
-        // // must get the above wrapping instance before overwriting stage
-        // self.stage =
-        //     Stage::AssumingElderDuties(ElderDuties::pre_elder(&self.node_info, state).await?);
-        // // queries the other Elders for the section wallet history
-        // // NB: we most likely will get the wallet of the constellation as it was before we joined
-        // return Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
-        //     msg: Message::NodeQuery {
-        //         query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
-        //         id: MessageId::new(),
-        //         target_section_pk: None,
-        //     },
-        //     section_source: false, // sent as single node
-        //     dst: our_section,
-        //     aggregation: Aggregation::None,
-        // })));
     }
 
     /// Wallet info of our constellation is supplied here
@@ -433,8 +423,7 @@ impl NodeDuties {
     ) -> Result<NetworkDuties> {
         debug!(">>>>>>>>>>> Completing transition to elder!!!");
         debug!("????");
-
-        match &mut self.stage {
+        let queued_ops = match &mut self.stage {
             Stage::Elder(_) => {
                 debug!("was already elder");
                 return Ok(vec![])
@@ -443,19 +432,19 @@ impl NodeDuties {
                 if !self.node_info.genesis {
                     return Err(Error::InvalidOperation("cannot complete transition to elder as Infant".to_string()));
                 }
+                VecDeque::new()
             }
             // consider accepting the completion for these as well..
-            Stage::Genesis(AwaitingGenesisThreshold(_)) | Stage::Genesis(ProposingGenesis(_)) => {
+            Stage::Genesis(AwaitingGenesisThreshold) | Stage::Genesis(ProposingGenesis(_)) => {
                 return Err(Error::InvalidOperation("cannot complete transition to elder as AwaitingGenesisThreshold | ProposingGenesis".to_string()))
             }
-            Stage::Genesis(AccumulatingGenesis(_)) | Stage::Adult(_) => (),
+            Stage::Genesis(AccumulatingGenesis(_)) => VecDeque::new(),
+            Stage::Adult { queued_ops, .. } => mem::take(queued_ops),
         };
 
         trace!(">>> Setting stage to Elder..");
 
-        //let mut ops: NetworkDuties = vec![];
         let elder_state = ElderState::new(self.network_api.clone()).await?;
-
         let node_id = elder_state.node_name();
         let register_wallet = match node_rewards.get(&node_id) {
             None => true,
@@ -485,43 +474,21 @@ impl NodeDuties {
             elder_duties,
             self.network_api.clone(),
         ));
-
         self.network_events = NetworkEvents::new(ReceivedMsgAnalysis::new(NodeState::Elder(
             elder_state.clone(),
         )));
-        // NB: This is wrong, shouldn't write to disk here,
-        // let it be upper layer resp.
-        // Also, "Error-to-Unit" is not a good conversion..
-        //dump_state(AgeGroup::Elder, self.node_info.path(), &self.id).unwrap_or(())
 
         info!("Successfully assumed Elder duties!");
 
+        let mut ops: Vec<_> = queued_ops
+            .into_iter()
+            .map(|d| NetworkDuty::from(d))
+            .collect();
         if register_wallet {
-            self.register_wallet().await
-        } else {
-            Ok(vec![])
+            ops.extend(NetworkDuties::from(self.register_wallet().await?))
         }
 
-        // // 4. Add own node id to rewards.
-        // ops.push(NetworkDuty::from(RewardDuty::ProcessCmd {
-        //     cmd: RewardCmd::AddNewNode(node_id),
-        //     msg_id: MessageId::new(),
-        //     origin: SrcLocation::Node(node_id),
-        // }));
-
-        // debug!(">>>>>>>> ALLLLLLLMOST THERE");
-
-        // // 5. Add own wallet to rewards.
-        // ops.push(NetworkDuty::from(RewardDuty::ProcessCmd {
-        //     cmd: RewardCmd::SetNodeWallet {
-        //         node_id,
-        //         wallet_id: self.node_info.reward_key,
-        //     },
-        //     msg_id: MessageId::new(),
-        //     origin: SrcLocation::Node(node_id),
-        // }));
-
-        //Ok(ops)
+        Ok(ops)
     }
 
     ///
@@ -533,10 +500,13 @@ impl NodeDuties {
     ) -> Result<NetworkDuties> {
         match &mut self.stage {
             Stage::Infant | Stage::Genesis(_) => Ok(vec![]),
-            Stage::Adult(_old_state) => {
+            Stage::Adult { queued_ops, .. } => {
                 let state = AdultState::new(self.network_api.clone()).await?;
-                let duties = AdultDuties::new(&self.node_info, state).await?;
-                self.stage = Stage::Adult(duties);
+                let adult = AdultDuties::new(&self.node_info, state).await?;
+                self.stage = Stage::Adult {
+                    adult,
+                    queued_ops: mem::take(queued_ops),
+                };
                 Ok(vec![])
             }
             Stage::Elder(elder) => {
@@ -554,7 +524,7 @@ impl NodeDuties {
         new_key: PublicKey,
     ) -> Result<NetworkDuties> {
         match &mut self.stage {
-            Stage::Infant | Stage::Adult(_) | Stage::Genesis(_) => Ok(vec![]), // Should be unreachable
+            Stage::Infant | Stage::Adult { .. } | Stage::Genesis(_) => Ok(vec![]), // Should be unreachable
             Stage::Elder(elder) => {
                 elder
                     .complete_elder_change(&self.node_info, previous_key, new_key)
@@ -576,7 +546,7 @@ impl NodeDuties {
         }
 
         let (stage, cmd) = match self.stage {
-            Stage::Genesis(AwaitingGenesisThreshold(ref mut queued_ops)) => {
+            Stage::Genesis(AwaitingGenesisThreshold) => {
                 let elder_state = ElderState::new(self.network_api.clone()).await?;
 
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
@@ -591,7 +561,6 @@ impl NodeDuties {
                     proposal: credit.clone(),
                     signatures,
                     pending_agreement: None,
-                    queued_ops: queued_ops.drain(..).collect(),
                 }));
                 let cmd = NodeMessagingDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmd {
@@ -625,7 +594,6 @@ impl NodeDuties {
                         agreed_proposal: signed_credit.clone(),
                         signatures,
                         pending_agreement: None,
-                        queued_ops: bootstrap.queued_ops.drain(..).collect(),
                     }));
 
                     let cmd = NodeMessagingDuty::Send(OutgoingMsg {
@@ -684,7 +652,6 @@ impl NodeDuties {
                     agreed_proposal: signed_credit,
                     signatures,
                     pending_agreement: None,
-                    queued_ops: bootstrap.queued_ops.drain(..).collect(),
                 }));
                 Ok(vec![])
             }
