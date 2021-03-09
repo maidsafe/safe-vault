@@ -15,9 +15,8 @@ use crate::{
 };
 use log::info;
 use sn_data_types::{
-    Error as DtError, Sequence, SequenceAction, SequenceAddress, SequenceDataWriteOp,
-    SequenceEntry, SequenceIndex, SequencePolicyWriteOp, SequencePrivatePolicy,
-    SequencePublicPolicy, SequenceUser,
+    Error as DtError, Sequence, SequenceAction, SequenceAddress, SequenceEntry, SequenceIndex,
+    SequenceOp, SequenceUser,
 };
 use sn_messaging::{
     client::{CmdError, Message, QueryResponse, SequenceRead, SequenceWrite},
@@ -74,13 +73,6 @@ impl SequenceStorage {
                 self.edit(operation, msg_id, origin).await
             }
             Delete(address) => self.delete(address, msg_id, origin).await,
-            SetPublicPolicy(operation) => {
-                self.set_public_permissions(operation, msg_id, origin).await
-            }
-            SetPrivatePolicy(operation) => {
-                self.set_private_permissions(operation, msg_id, origin)
-                    .await
-            }
         }
     }
 
@@ -128,7 +120,7 @@ impl SequenceStorage {
         origin: EndUser,
     ) -> Result<Sequence> {
         let data = self.chunks.get(&address)?;
-        data.check_permission(action, Some(*origin.id()), None)?;
+        data.check_permission(action, Some(*origin.id()))?;
         Ok(data)
     }
 
@@ -350,70 +342,9 @@ impl SequenceStorage {
         }))
     }
 
-    async fn set_public_permissions(
-        &mut self,
-        write_op: SequencePolicyWriteOp<SequencePublicPolicy>,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
-        let address = write_op.address;
-        let result = self
-            .edit_chunk(
-                address,
-                SequenceAction::Admin,
-                origin,
-                move |mut sequence| {
-                    sequence.apply_public_policy_op(write_op)?;
-                    Ok(sequence)
-                },
-            )
-            .await;
-        self.ok_or_error(result, msg_id, origin).await
-    }
-
-    async fn set_private_permissions(
-        &mut self,
-        write_op: SequencePolicyWriteOp<SequencePrivatePolicy>,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
-        let address = write_op.address;
-        let result = self
-            .edit_chunk(
-                address,
-                SequenceAction::Admin,
-                origin,
-                move |mut sequence| {
-                    sequence.apply_private_policy_op(write_op)?;
-                    Ok(sequence)
-                },
-            )
-            .await;
-        self.ok_or_error(result, msg_id, origin).await
-    }
-
-    // fn set_owner(
-    //     &mut self,
-    //     write_op: SequenceDataWriteOp<SequenceOwner>,
-    //     msg_id: MessageId,
-    //     origin: EndUser,
-    // ) -> Result<NodeMessagingDuty> {
-    //     let address = write_op.address;
-    //     let result = self.edit_chunk(
-    //         address,
-    //         SequenceAction::Admin,
-    //         origin,
-    //         move |mut sequence| {
-    //             sequence.apply_crdt_owner_op(write_op.crdt_op);
-    //             Ok(sequence)
-    //         },
-    //     );
-    //     self.ok_or_error(result, msg_id, origin)
-    // }
-
     async fn edit(
         &mut self,
-        write_op: SequenceDataWriteOp<SequenceEntry>,
+        write_op: SequenceOp<SequenceEntry>,
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeMessagingDuty> {
@@ -425,7 +356,7 @@ impl SequenceStorage {
                 SequenceAction::Append,
                 origin,
                 move |mut sequence| {
-                    sequence.apply_data_op(write_op)?;
+                    sequence.apply_op(write_op)?;
                     Ok(sequence)
                 },
             )
