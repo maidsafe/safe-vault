@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::ElderDuties;
-use crate::{ElderState, Network, NodeInfo, Result};
+use crate::{node::RewardsAndWallets, Network, NodeInfo, Result};
 
 use crate::{node::node_ops::NetworkDuties, Error};
 use log::{debug, info};
@@ -63,12 +63,12 @@ impl ElderConstellation {
         new_section_key: PublicKey,
         sibling_key: Option<PublicKey>,
     ) -> Result<NetworkDuties> {
-        let elder_state = self.duties.state();
+        let rewards_and_wallets = self.duties.state();
         debug!(">> Prefix we have w/ elder change: {:?}", prefix);
         debug!(">> New section key w/ change {:?}", new_section_key);
         debug!(">> IS THERE A SIBLING KEY??? {:?}", sibling_key);
 
-        if new_section_key == elder_state.section_public_key()
+        if new_section_key == rewards_and_wallets.section_public_key()
             || self
                 .pending_changes
                 .iter()
@@ -101,9 +101,9 @@ impl ElderConstellation {
         // 1. First we must update data section..
         // TODO: Query network for data corresponding to provided "new_section_key"!!!!
         // Otherwise there is no guarantee of not getting more recent info than expected!
-        let new_elder_state = ElderState::new(self.network.clone()).await?;
+        let new_rewards_and_wallets = RewardsAndWallets::new(self.network.clone()).await?;
         self.duties
-            .perform_elder_change_updates(new_elder_state, sibling_key)
+            .perform_elder_change_updates(new_rewards_and_wallets, sibling_key)
             .await
     }
 
@@ -132,23 +132,23 @@ impl ElderConstellation {
         // 2. We must load _current_ elder state..
         // TODO: Query network for data corresponding to provided "new_section_key"!!!!
         // Otherwise there is no guarantee of not getting more recent info than expected!
-        let new_elder_state = ElderState::new(self.network.clone()).await?;
+        let new_rewards_and_wallets = RewardsAndWallets::new(self.network.clone()).await?;
         // 3. And update key section with it.
         self.duties
-            .complete_elder_change(node_info, new_elder_state.clone())
+            .complete_elder_change(node_info, new_rewards_and_wallets.clone())
             .await?;
 
         debug!(">>>>Key section completed elder change update.");
         debug!(">>>>Elder change update completed.");
 
         if !self.pending_changes.is_empty() {
-            let old_elder_state = self.duties.state().clone();
-            if old_elder_state.section_public_key() != previous_key
+            let old_rewards_and_wallets = self.duties.state().clone();
+            if old_rewards_and_wallets.section_public_key() != previous_key
                 || new_key != self.pending_changes[0].section_key
             {
                 debug!(
                     ">>>> !!old state key is not same as prev. ??  {:?}, {:?}",
-                    old_elder_state.section_public_key(),
+                    old_rewards_and_wallets.section_public_key(),
                     previous_key
                 );
                 debug!(
@@ -162,7 +162,7 @@ impl ElderConstellation {
             let change = self.pending_changes.remove(0);
 
             // split section _after_ transition to new constellation
-            if &change.prefix != old_elder_state.prefix() {
+            if &change.prefix != old_rewards_and_wallets.prefix() {
                 info!(">>>>Split occurred");
                 info!(">>>>New prefix is: {:?}", change.prefix);
                 let duties = self.duties.split_section(change.prefix).await?;

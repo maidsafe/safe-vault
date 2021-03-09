@@ -126,7 +126,7 @@ pub async fn run_network() -> Result<(), String> {
         &INTERVAL,
         "--local",
         "--num-nodes",
-        "45",
+        "11",
     ];
 
     // If RUST_LOG was set we pass it down to the launch tool

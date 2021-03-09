@@ -22,6 +22,21 @@ pub enum Error {
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
+    /// Not Section PublicKey.
+    #[error("Not section public key returned from routing")]
+    NoSectionPublicKey,
+    /// Not a Section PublicKeyShare.
+    #[error("PublicKey provided for signing as elder is not a BLS PublicKeyShare")]
+    ProvidedPkIsNotBlsShare,
+    /// Not a Section PublicKey.
+    #[error("PublicKey provided for signing as elder is not a BLS")]
+    ProvidedPkIsNotBls,
+    /// Not Section PublicKeySet.
+    #[error("Not section public key set returned from routing")]
+    NoSectionPublicKeySet,
+    /// Unable to parse genesis proposal.
+    #[error("Cannot parse genesis proposal at this stage")]
+    InvalidGenesisStage,
     /// Node not found for rewarding
     #[error("Node not found for rewards")]
     NodeNotFoundForReward,

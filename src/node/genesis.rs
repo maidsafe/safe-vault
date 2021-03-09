@@ -6,39 +6,50 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{ElderState, Error, Result};
+use crate::{node::RewardsAndWallets, Error, Result};
 use log::info;
-use sn_data_types::{Credit, CreditAgreementProof, SignatureShare, SignedCredit};
+use sn_data_types::{
+    Credit, CreditAgreementProof, ReplicaPublicKeySet, SignatureShare, SignedCredit,
+};
 use std::collections::BTreeMap;
 
 pub(crate) struct GenesisProposal {
-    pub elder_state: ElderState,
+    // pub rewards_and_wallets: RewardsAndWallets,
     pub proposal: Credit,
     pub signatures: BTreeMap<usize, bls::SignatureShare>,
     pub pending_agreement: Option<SignedCredit>,
 }
 
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum GenesisStage {
+    None,
+    AwaitingGenesisThreshold,
+    ProposingGenesis(GenesisProposal),
+    AccumulatingGenesis(GenesisAccumulation),
+}
+
 pub(crate) struct GenesisAccumulation {
-    pub elder_state: ElderState,
+    // pub rewards_and_wallets: RewardsAndWallets,
     pub agreed_proposal: SignedCredit,
     pub signatures: BTreeMap<usize, bls::SignatureShare>,
     pub pending_agreement: Option<CreditAgreementProof>,
 }
 
 impl GenesisProposal {
-    pub(crate) fn add(&mut self, sig: SignatureShare) -> Result<()> {
+    pub(crate) fn add(&mut self, sig: SignatureShare, pk_set: ReplicaPublicKeySet) -> Result<()> {
         let _ = self.signatures.insert(sig.index, sig.share);
-        let min_count = 1 + self.elder_state.public_key_set().threshold();
+        let min_count = 1 + pk_set.threshold();
         if self.signatures.len() >= min_count {
             info!("Aggregating actor signature..");
 
             // Combine shares to produce the main signature.
             let actor_signature = sn_data_types::Signature::Bls(
-                self.elder_state
-                    .public_key_set()
+                pk_set
                     .combine_signatures(&self.signatures)
                     .map_err(|_| Error::CouldNotCombineSignatures)?,
             );
+
+            info!("We got a sig?");
 
             let signed_credit = SignedCredit {
                 credit: self.proposal.clone(),
@@ -53,15 +64,14 @@ impl GenesisProposal {
 }
 
 impl GenesisAccumulation {
-    pub(crate) fn add(&mut self, sig: SignatureShare) -> Result<()> {
+    pub(crate) fn add(&mut self, sig: SignatureShare, pk_set: ReplicaPublicKeySet) -> Result<()> {
         let _ = self.signatures.insert(sig.index, sig.share);
-        let min_count = 1 + self.elder_state.public_key_set().threshold();
+        let min_count = 1 + pk_set.threshold();
         if self.signatures.len() >= min_count {
             info!("Aggregating replica signature..");
             // Combine shares to produce the main signature.
             let debiting_replicas_sig = sn_data_types::Signature::Bls(
-                self.elder_state
-                    .public_key_set()
+                pk_set
                     .combine_signatures(&self.signatures)
                     .map_err(|_| Error::CouldNotCombineSignatures)?,
             );
@@ -69,7 +79,7 @@ impl GenesisAccumulation {
             self.pending_agreement = Some(CreditAgreementProof {
                 signed_credit: self.agreed_proposal.clone(),
                 debiting_replicas_sig,
-                debiting_replicas_keys: self.elder_state.public_key_set().clone(),
+                debiting_replicas_keys: pk_set.clone(),
             });
         }
 

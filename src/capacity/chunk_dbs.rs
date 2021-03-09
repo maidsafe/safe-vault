@@ -7,7 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{utils, Result};
+use futures::lock::Mutex;
 use pickledb::PickleDb;
+use std::sync::Arc;
 use std::{cell::RefCell, path::Path, rc::Rc};
 
 const BLOB_META_DB_NAME: &str = "immutable_data.db";
@@ -17,9 +19,12 @@ const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 
 #[derive(Clone)]
 pub struct ChunkHolderDbs {
-    pub metadata: Rc<RefCell<PickleDb>>,
-    pub holders: Rc<RefCell<PickleDb>>,
-    pub full_adults: Rc<RefCell<PickleDb>>,
+    // pub metadata: Rc<RefCell<PickleDb>>,
+    // pub holders: Rc<RefCell<PickleDb>>,
+    // pub full_adults: Rc<RefCell<PickleDb>>,
+    pub metadata: Arc<Mutex<PickleDb>>,
+    pub holders: Arc<Mutex<PickleDb>>,
+    pub full_adults: Arc<Mutex<PickleDb>>,
 }
 
 impl ChunkHolderDbs {
@@ -28,13 +33,13 @@ impl ChunkHolderDbs {
         let metadata = utils::new_auto_dump_db(path, BLOB_META_DB_NAME)?;
         let holders = utils::new_auto_dump_db(path, HOLDER_META_DB_NAME)?;
         let full_adults = utils::new_auto_dump_db(path, FULL_ADULTS_DB_NAME)?;
-        let metadata = Rc::new(RefCell::new(metadata));
-        let holders = Rc::new(RefCell::new(holders));
-        let full_adults = Rc::new(RefCell::new(full_adults));
+        // let metadata = Rc::new(RefCell::new(metadata));
+        // let holders = Rc::new(RefCell::new(holders));
+        // let full_adults = Rc::new(RefCell::new(full_adults));
         Ok(Self {
-            metadata,
-            holders,
-            full_adults,
+            metadata: Arc::new(Mutex::new(metadata)),
+            holders: Arc::new(Mutex::new(holders)),
+            full_adults: Arc::new(Mutex::new(full_adults)),
         })
     }
 }

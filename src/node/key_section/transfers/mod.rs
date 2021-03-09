@@ -74,6 +74,7 @@ Replicas don't initiate transfers or drive the algo - only Actors do.
 
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.
+#[derive(Clone)]
 pub struct Transfers {
     replicas: Replicas<ReplicaSigningImpl>,
     rate_limit: RateLimit,
@@ -131,8 +132,8 @@ impl Transfers {
     }
 
     ///
-    pub fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
-        self.rate_limit.increase_full_node_count(node_id)
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+        self.rate_limit.increase_full_node_count(node_id).await
     }
 
     /// When handled by Elders in the dst

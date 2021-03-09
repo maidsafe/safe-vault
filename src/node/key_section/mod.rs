@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod transfers;
+pub mod transfers;
 
 use self::transfers::{replica_signing::ReplicaSigning, replicas::Replicas, Transfers};
 use crate::{
     capacity::RateLimit,
     node::node_ops::{KeySectionDuty, NetworkDuties},
-    ElderState, NodeInfo, Result,
+    node::RewardsAndWallets,
+    Error, Network, NodeInfo, Result,
 };
 use log::{info, trace};
 use sn_data_types::{ActorHistory, PublicKey, TransferPropagated};
@@ -27,13 +28,17 @@ use transfers::replica_signing::ReplicaSigningImpl;
 /// The main module of a WalletSection is Transfers.
 /// Transfers deals with the payment for data writes and
 /// with sending tokens between keys.
+#[derive(Clone)]
 pub struct WalletSection {
     transfers: Transfers,
-    elder_state: ElderState,
+    pub rewards_and_wallets: RewardsAndWallets,
+    network: Network,
+    // replica_signing: ReplicaSigning
 }
+// pub struct ReplicaInfo
 
-#[derive(Clone, Debug)]
 ///
+#[derive(Clone, Debug)]
 pub struct ReplicaInfo<T>
 where
     T: ReplicaSigning,
@@ -50,15 +55,24 @@ impl WalletSection {
     pub async fn new(
         rate_limit: RateLimit,
         node_info: &NodeInfo,
-        elder_state: ElderState,
+        rewards_and_wallets: RewardsAndWallets,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
+        replica_signing: ReplicaSigningImpl,
+        network: Network,
     ) -> Result<Self> {
-        let replicas =
-            Self::transfer_replicas(&node_info, elder_state.clone(), user_wallets).await?;
+        let replicas = Self::transfer_replicas(
+            &node_info,
+            rewards_and_wallets.clone(),
+            network.clone(),
+            user_wallets,
+        )
+        .await?;
         let transfers = Transfers::new(replicas, rate_limit);
         Ok(Self {
+            network,
             transfers,
-            elder_state,
+            rewards_and_wallets,
+            // replica_signing
         })
     }
 
@@ -69,7 +83,7 @@ impl WalletSection {
 
     ///
     pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
-        self.transfers.increase_full_node_count(node_id)
+        self.transfers.increase_full_node_count(node_id).await
     }
 
     /// Initiates as first node in a network.
@@ -86,26 +100,36 @@ impl WalletSection {
     // }
 
     pub async fn set_node_join_flag(&mut self, joins_allowed: bool) -> Result<()> {
-        self.elder_state.set_joins_allowed(joins_allowed).await
+        self.network.set_joins_allowed(joins_allowed).await
     }
 
     // Update our replica with the latest keys
-    pub fn elders_changed(&mut self, elder_state: ElderState, rate_limit: RateLimit) {
+    pub async fn elders_changed(
+        &mut self,
+        rewards_and_wallets: RewardsAndWallets,
+        rate_limit: RateLimit,
+    ) -> Result<()> {
         // TODO: Query sn_routing for info for [new_section_key]
         // specifically (regardless of how far back that was) - i.e. not the current info!
-        let id = elder_state.public_key_share();
-        let key_index = elder_state.key_index();
-        let peer_replicas = elder_state.public_key_set().clone();
-        let signing = ReplicaSigningImpl::new(elder_state.clone());
+        let id = self.network.our_public_key_share().await?;
+        let key_index = self
+            .network
+            .our_index()
+            .await
+            .map_err(|_| Error::NoSectionPublicKeySet)?;
+        let peer_replicas = self.network.our_public_key_set().await?;
+        let signing = ReplicaSigningImpl::new(rewards_and_wallets.clone(), self.network.clone());
         let info = ReplicaInfo {
-            id,
+            id: id.bls_share().ok_or(Error::ProvidedPkIsNotBlsShare)?,
             key_index,
             peer_replicas,
-            section_chain: elder_state.section_chain().clone(),
+            section_chain: self.network.section_chain().await,
             signing,
             initiating: false,
         };
         self.transfers.update_replica_info(info, rate_limit);
+
+        Ok(())
     }
 
     /// When section splits, the Replicas in either resulting section
@@ -125,19 +149,25 @@ impl WalletSection {
 
     async fn transfer_replicas(
         node_info: &NodeInfo,
-        elder_state: ElderState,
+        rewards_and_wallets: RewardsAndWallets,
+        network: Network,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
+        // signing: ReplicaSigningImpl
     ) -> Result<Replicas<ReplicaSigningImpl>> {
         let root_dir = node_info.root_dir.clone();
-        let id = elder_state.public_key_share();
-        let key_index = elder_state.key_index();
-        let peer_replicas = elder_state.public_key_set().clone();
-        let signing = ReplicaSigningImpl::new(elder_state.clone());
+        let id = network
+            .our_public_key_share()
+            .await?
+            .bls_share()
+            .ok_or(Error::ProvidedPkIsNotBlsShare)?;
+        let key_index = network.our_index().await?;
+        let peer_replicas = network.our_public_key_set().await?.clone();
+        let signing = ReplicaSigningImpl::new(rewards_and_wallets.clone(), network.clone());
         let info = ReplicaInfo {
             id,
             key_index,
             peer_replicas,
-            section_chain: elder_state.section_chain().clone(),
+            section_chain: network.section_chain().await.clone(),
             signing,
             initiating: true,
         };

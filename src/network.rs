@@ -9,17 +9,22 @@
 use crate::{node::state_db::AgeGroup, utils, Config as NodeConfig, Error, Result};
 use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
+
+// TODO: use only sn_data_types
+use bls::{PublicKeySet, PublicKeyShare as BlsPublicKeyShare};
+
 use futures::lock::Mutex;
+use log::debug;
 use serde::Serialize;
-use sn_data_types::{PublicKey, Signature};
+use sn_data_types::{Error as DtError, PublicKey, Result as DtResult, Signature};
 use sn_messaging::Itinerary;
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
     SectionChain,
 };
-use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::{collections::BTreeSet, path::PathBuf};
 use xor_name::{Prefix, XorName};
 
 ///
@@ -46,23 +51,38 @@ impl Network {
         ))
     }
 
+    /// Sign with our node's ED25519 key
     pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
         let data = utils::serialise(data)?;
         let sig = self.routing.lock().await.sign_as_node(&data).await;
         Ok(Signature::Ed25519(sig))
     }
 
+    /// Sign with our BLS PK Share
     pub async fn sign_as_elder<T: Serialize>(
         &self,
         data: &T,
-        public_key: &bls::PublicKey,
+        // public_key_share: PublicKey,
     ) -> Result<bls::SignatureShare> {
+        //TODO: just use PKshare from routing direct here?
+        // This has to be a Dt error for signing trait
+
+        let bls_pk = self
+            .section_public_key()
+            .await
+            .ok_or(Error::NoSectionPublicKey)?
+            .bls()
+            .ok_or(Error::ProvidedPkIsNotBlsShare)?;
+        // debug!("pre-sign-as-elder {:?}", public_key_share);
+        // let bls_pk = public_key_share.bls_share().ok_or(DtError::InvalidOperation)?;
+        debug!("post-sign-as-elder");
+
         let data = utils::serialise(data)?;
         let share = self
             .routing
             .lock()
             .await
-            .sign_as_elder(&data, public_key)
+            .sign_as_elder(&data, &bls_pk)
             .await
             .map_err(Error::Routing)?;
         Ok(share)
@@ -98,7 +118,7 @@ impl Network {
             .map(|key| PublicKey::Bls(key))
     }
 
-    pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+    pub async fn our_public_key_set(&self) -> Result<bls::PublicKeySet> {
         self.routing
             .lock()
             .await
@@ -152,6 +172,15 @@ impl Network {
             .map_err(Error::Routing)
     }
 
+    /// get our PKshare
+    pub async fn our_public_key_share(&self) -> Result<PublicKey> {
+        let index = self.our_index().await?;
+        Ok(PublicKey::from(
+            self.our_public_key_set().await?.public_key_share(index),
+        ))
+    }
+
+    /// BLS key index in routing for key shares
     pub async fn our_index(&self) -> Result<usize> {
         self.routing
             .lock()

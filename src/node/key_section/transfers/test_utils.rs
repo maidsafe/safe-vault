@@ -60,8 +60,8 @@ impl TestReplicaSigning {
 #[async_trait]
 impl ReplicaSigning for TestReplicaSigning {
     /// Get the replica's PK set
-    fn replicas_pk_set(&self) -> &PublicKeySet {
-        &self.peer_replicas
+    async fn replicas_pk_set(&self) -> Result<PublicKeySet> {
+        Ok(self.peer_replicas.clone())
     }
 
     async fn try_genesis(&self, balance: u64) -> Result<CreditAgreementProof> {

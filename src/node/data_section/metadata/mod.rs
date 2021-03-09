@@ -17,7 +17,8 @@ use crate::{
     capacity::ChunkHolderDbs,
     node::node_ops::{MetadataDuty, NetworkDuties},
     node::NodeInfo,
-    ElderState, Result,
+    node::RewardsAndWallets,
+    Network, Result,
 };
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
@@ -40,9 +41,10 @@ impl Metadata {
     pub async fn new(
         node_info: &NodeInfo,
         dbs: ChunkHolderDbs,
-        elder_state: ElderState,
+        // rewards_and_wallets: RewardsAndWallets,
+        network: Network,
     ) -> Result<Self> {
-        let blob_register = BlobRegister::new(dbs, elder_state);
+        let blob_register = BlobRegister::new(dbs, network);
         let map_storage = MapStorage::new(node_info).await?;
         let sequence_storage = SequenceStorage::new(node_info).await?;
         let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);

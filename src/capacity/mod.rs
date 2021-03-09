@@ -18,6 +18,7 @@ use sn_data_types::PublicKey;
 /// A util for sharing the
 /// info on data capacity among the
 /// chunk storing nodes in the section.
+#[derive(Clone)]
 pub struct Capacity {
     dbs: ChunkHolderDbs,
 }
@@ -29,17 +30,18 @@ impl Capacity {
     }
 
     /// Number of full chunk storing nodes in the section.
-    pub fn full_nodes(&self) -> u8 {
-        self.dbs.full_adults.borrow().total_keys() as u8
+    pub async fn full_nodes(&self) -> u8 {
+        self.dbs.full_adults.lock().await.total_keys() as u8
     }
 
     ///
-    pub fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
         info!("Increasing full node count");
         let _ = self
             .dbs
             .full_adults
-            .borrow_mut()
+            .lock()
+            .await
             .lcreate(&node_id.to_string())?
             .ladd(&"Node Full");
         Ok(())

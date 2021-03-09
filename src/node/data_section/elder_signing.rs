@@ -6,20 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::ElderState;
-use sn_data_types::{OwnerType, Result as DtResult, Signing};
+// use crate::node::RewardsAndWallets;
+use crate::{Error, Network};
+use bls::PublicKeySet;
+use log::error;
+use sn_data_types::{Error as DtError, OwnerType, Result as DtResult, SignatureShare, Signing};
 
 #[derive(Clone)]
 pub struct ElderSigning {
     id: OwnerType,
-    elder_state: ElderState,
+    network: Network,
 }
 
 impl ElderSigning {
-    pub fn new(elder_state: ElderState) -> Self {
+    pub fn new(network: Network, pk_set: PublicKeySet) -> Self {
         Self {
-            id: OwnerType::Multi(elder_state.public_key_set().clone()),
-            elder_state,
+            id: OwnerType::Multi(pk_set),
+            network,
         }
     }
 }
@@ -30,11 +33,26 @@ impl Signing for ElderSigning {
     }
 
     fn sign<T: serde::Serialize>(&self, data: &T) -> DtResult<sn_data_types::Signature> {
-        use sn_data_types::Error as DtError;
-        Ok(sn_data_types::Signature::BlsShare(
-            futures::executor::block_on(self.elder_state.sign_as_elder(data))
-                .map_err(|_| DtError::InvalidOperation)?,
-        ))
+        // use sn_data_types::Error as DtError;
+
+        let (share, index) = futures::executor::block_on(async {
+                // let pk = self.network.our_public_key_share().await?;
+                 //.await.ok_or(|_| Error::NoSectionPublicKey)?;
+                let share = self.network.sign_as_elder(data).await?;
+                let index = self.network.our_index().await?;
+
+                Ok((share, index))
+            })
+            // TODO add more errors for this
+            .map_err( |error: Error | {
+                error!("Error signing in ElderSigning");
+                DtError::InvalidOperation
+            })?;
+
+        Ok(sn_data_types::Signature::BlsShare(SignatureShare {
+            share,
+            index,
+        }))
     }
 
     fn verify<T: serde::Serialize>(&self, sig: &sn_data_types::Signature, data: &T) -> bool {
