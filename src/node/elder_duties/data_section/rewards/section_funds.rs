@@ -15,7 +15,7 @@ use crate::{
     ElderState, Error, Result,
 };
 use bls::PublicKeySet;
-use log::{debug, info};
+use log::{debug, info, error};
 use sn_data_types::{
     ActorHistory, CreditAgreementProof, PublicKey, SignedTransferShare, Token, TransferValidated,
     WalletInfo,
@@ -418,7 +418,15 @@ impl SectionFunds {
         use NodeTransferCmd::*;
 
         debug!(">>>>>>>>>>>>>> Receiving transfer validation");
-        if let Some(event) = self.actor.receive(validation)? {
+        let validated_event = match self.actor.receive(validation) {
+            Ok(event) => Ok(event),
+            Err(error) => {
+                error!(">>>>>There was an error receiving funds {:?}", error);
+                Err(error)
+            }
+        }?;
+
+        if let Some(event) = validated_event {
             self.apply(TransferValidationReceived(event.clone()))?;
             let proof = if let Some(proof) = event.proof {
                 proof
