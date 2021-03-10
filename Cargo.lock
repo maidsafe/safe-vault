@@ -483,10 +483,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a1db1cc69b5d38a2549f4d78a5f9010e311d59542f876bea6763e7bb64dc395"
 dependencies = [
  "bitvec",
- "num-bigint",
+ "num-bigint 0.2.6",
  "quickcheck",
  "rand 0.7.3",
  "serde",
+]
+
+[[package]]
+name = "crdts"
+version = "6.3.0"
+source = "git+https://github.com/bochaco/rust-crdt?branch=feat-additional-info-merkle-reg-nodes#8307c559fa7a12b553b91dadf728549da9f1fec7"
+dependencies = [
+ "num",
+ "quickcheck",
+ "rand 0.7.3",
+ "serde",
+ "tiny-keccak 2.0.2",
 ]
 
 [[package]]
@@ -754,7 +766,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3776aaf60a45037a9c3cabdd8542b38693acaa3e241ff957181b72579d29feb"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.2.6",
  "num-integer",
  "num-traits",
  "proc-macro2 1.0.24",
@@ -1419,6 +1431,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "num"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b7a8e9be5e039e2ff869df49155f1c06bd01ade2117ec783e56ab0932b67a8f"
+dependencies = [
+ "num-bigint 0.3.2",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1430,6 +1456,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d0a3d5e207573f948a9e5376662aa743a2ea13f7c50a554d7af443a73fbfeba"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "747d632c0c558b87dbabbe6a82f3b4ae03720d0646ac5b7b4dae89394be5f2c5"
+dependencies = [
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "num-integer"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1437,6 +1485,30 @@ checksum = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
 dependencies = [
  "autocfg",
  "num-traits",
+]
+
+[[package]]
+name = "num-iter"
+version = "0.1.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2021c8337a54d21aca0d59a92577a029af9431cb59b909b03252b9c164fad59"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12ac428b1cb17fce6f731001d307d351ec70a6d202fc2e60f7d4c5e42d8f4f07"
+dependencies = [
+ "autocfg",
+ "num-bigint 0.3.2",
+ "num-integer",
+ "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -2250,11 +2322,10 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_data_types"
 version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "474a9777c2d8f79ceaf4a4c3224269132a14e74ed3404e726a4bf23b2ed13f68"
+source = "git+https://github.com/bochaco/sn_data_types.git?branch=feat-merkle-reg-for-seq#c6c334b3059803f19d1ce336cdf8e8fe7432e39f"
 dependencies = [
  "bincode",
- "crdts",
+ "crdts 6.3.0",
  "ed25519-dalek",
  "hex_fmt",
  "multibase",
@@ -2284,13 +2355,12 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "8.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2119f03b71982b5165f24b7cb28af8fd39e12f7c1d779891a9b9c9d608130433"
+source = "git+https://github.com/bochaco/sn_messaging.git?branch=feat-register-client-msgs#e95b7da5d89379fedd8bfe5487940cfe0702c3e7"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
  "cookie-factory",
- "crdts",
+ "crdts 6.3.0",
  "ed25519-dalek",
  "hex_fmt",
  "multibase",
@@ -2309,17 +2379,16 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.28.2"
+version = "0.29.0"
 dependencies = [
  "async-log",
  "async-trait",
  "base64 0.10.1",
  "bincode",
  "bytes 1.0.1",
- "crdts",
+ "crdts 4.3.0",
  "dashmap",
  "dirs-next 1.0.2",
- "ed25519",
  "ed25519-dalek",
  "flexi_logger",
  "futures",
@@ -2353,8 +2422,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.48.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a608268120ad67de2f2ede8673832c58eee6f64d3ae653c1fbfdec24182dfe53"
+source = "git+https://github.com/bochaco/sn_routing.git?branch=chore-upgrade-messaging-register-dt#a0067deabf2fee1e7a85d37463f082f673146e69"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2383,11 +2451,10 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3a21fadc04cc66d65c98d6f4e138f991ada27d4225c63041cf5351089969875"
+source = "git+https://github.com/bochaco/sn_transfers.git?branch=chore-upgrade-dt-register#62f77dd7914caa01121cc4d7a9af176ac6e753b0"
 dependencies = [
  "bincode",
- "crdts",
+ "crdts 6.3.0",
  "itertools 0.9.0",
  "log",
  "rand 0.7.3",

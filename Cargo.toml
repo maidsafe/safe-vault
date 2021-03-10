@@ -31,11 +31,14 @@ serde_json = "1.0.53"
 structopt = "~0.3.17"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0"
-sn_routing = "~0.48.1"
-sn_transfers = "~0.5.0"
-sn_messaging = "8.0.0"
-sn_data_types = "~0.16.0"
-ed25519 = "1.0.1"
+sn_routing = { git = "https://github.com/bochaco/sn_routing.git", branch = "chore-upgrade-messaging-register-dt" }
+#sn_routing = "~0.46.0"
+sn_transfers = { git = "https://github.com/bochaco/sn_transfers.git", branch = "chore-upgrade-dt-register" }
+#sn_transfers = "~0.5.0"
+sn_messaging = { git = "https://github.com/bochaco/sn_messaging.git", branch = "feat-register-client-msgs" }
+#sn_messaging = "~6.0.0"
+sn_data_types = { git = "https://github.com/bochaco/sn_data_types.git", branch = "feat-merkle-reg-for-seq" }
+#sn_data_types = "~0.15.0"ed25519 = "1.0.1"
 signature = "1.1.10"
 xor_name = "1.1.10"
 sn_launch_tool = "~0.0.15"

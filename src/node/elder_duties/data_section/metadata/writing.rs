@@ -8,13 +8,13 @@
 
 use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
-    sequence_storage::SequenceStorage,
+    register_storage::RegisterStorage,
 };
 use crate::node::node_ops::{NetworkDuties, NodeMessagingDuty};
 use crate::Result;
 use log::info;
 use sn_messaging::{
-    client::{BlobWrite, DataCmd, MapWrite, SequenceWrite},
+    client::{BlobWrite, DataCmd, MapWrite, RegisterWrite},
     EndUser, MessageId,
 };
 
@@ -35,9 +35,9 @@ pub(super) async fn get_result(
             info!("Writing Map");
             map(write, stores.map_storage_mut(), msg_id, origin).await?
         }
-        Sequence(write) => {
-            info!("Writing Sequence");
-            sequence(write, stores.sequence_storage_mut(), msg_id, origin).await?
+        Register(write) => {
+            info!("Writing Register");
+            register(write, stores.register_storage_mut(), msg_id, origin).await?
         }
     };
 
@@ -46,11 +46,11 @@ pub(super) async fn get_result(
 
 async fn blob(
     write: BlobWrite,
-    register: &mut BlobRegister,
+    blob_register: &mut BlobRegister,
     msg_id: MessageId,
     origin: EndUser,
 ) -> Result<NodeMessagingDuty> {
-    register.write(write, msg_id, origin).await
+    blob_register.write(write, msg_id, origin).await
 }
 
 async fn map(
@@ -62,9 +62,9 @@ async fn map(
     storage.write(write, msg_id, origin).await
 }
 
-async fn sequence(
-    write: SequenceWrite,
-    storage: &mut SequenceStorage,
+async fn register(
+    write: RegisterWrite,
+    storage: &mut RegisterStorage,
     msg_id: MessageId,
     origin: EndUser,
 ) -> Result<NodeMessagingDuty> {

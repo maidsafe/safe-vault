@@ -10,7 +10,7 @@ mod blob_register;
 mod elder_stores;
 mod map_storage;
 mod reading;
-mod sequence_storage;
+mod register_storage;
 mod writing;
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
-use sequence_storage::SequenceStorage;
+use register_storage::RegisterStorage;
 use std::fmt::{self, Display, Formatter};
 use xor_name::XorName;
 
@@ -44,8 +44,8 @@ impl Metadata {
     ) -> Result<Self> {
         let blob_register = BlobRegister::new(dbs, elder_state);
         let map_storage = MapStorage::new(node_info).await?;
-        let sequence_storage = SequenceStorage::new(node_info).await?;
-        let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
+        let register_storage = RegisterStorage::new(node_info).await?;
+        let elder_stores = ElderStores::new(blob_register, map_storage, register_storage);
         Ok(Self { elder_stores })
     }
 
