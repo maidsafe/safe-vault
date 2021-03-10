@@ -582,7 +582,7 @@ mod test {
     use bls::{PublicKeySet, SecretKeySet};
     use futures::executor::block_on as run;
     use sn_data_types::{Keypair, OwnerType, PublicKey, SignedTransferShare, Token};
-    use sn_routing::SectionProofChain;
+    use sn_routing::SectionChain;
     use sn_transfers::{ActorEvent, TransferActor as Actor, Wallet};
     use tempdir::TempDir;
 
@@ -737,7 +737,7 @@ mod test {
             id,
             key_index,
             peer_replicas: peer_replicas.clone(),
-            section_proof_chain: SectionProofChain::new(peer_replicas.public_key()),
+            section_proof_chain: SectionChain::new(peer_replicas.public_key()),
             signing,
             initiating: true,
         };

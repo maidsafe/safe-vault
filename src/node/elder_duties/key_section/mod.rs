@@ -28,7 +28,7 @@ where
     id: bls::PublicKeyShare,
     key_index: usize,
     peer_replicas: bls::PublicKeySet,
-    section_proof_chain: sn_routing::SectionProofChain,
+    section_proof_chain: sn_routing::SectionChain,
     signing: T,
     initiating: bool,
 }

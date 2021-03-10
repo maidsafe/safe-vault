@@ -27,7 +27,7 @@ use sn_messaging::{
         Error as ErrorMessage, Message, NodeQuery, NodeQueryResponse, NodeRewardQuery,
         NodeRewardQueryResponse,
     },
-    DstLocation, MessageId, SrcLocation,
+    Aggregation, DstLocation, MessageId, SrcLocation,
 };
 
 use sn_transfers::TransferActor;
@@ -101,7 +101,7 @@ impl Rewards {
                 target_section_pk: None,
             },
             dst: DstLocation::Section(section),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         })
         .into())
     }
@@ -248,7 +248,7 @@ impl Rewards {
                 target_section_pk: None,
             },
             dst: origin.to_dst(),
-            to_be_aggregated: false, // TODO: to_be_aggregated: true,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         })
     }
 
@@ -314,7 +314,7 @@ impl Rewards {
                 target_section_pk: None,
             },
             dst: DstLocation::Section(old_node_id),
-            to_be_aggregated: false, // TODO: to_be_aggregated: true,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -439,7 +439,7 @@ impl Rewards {
                         target_section_pk: None,
                     },
                     dst: origin.to_dst(),
-                    to_be_aggregated: false, // TODO: to_be_aggregated: true,
+                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 }));
             }
         };
@@ -462,7 +462,7 @@ impl Rewards {
                 target_section_pk: None,
             },
             dst: DstLocation::Section(new_node_id),
-            to_be_aggregated: false, // TODO: to_be_aggregated: true,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 }

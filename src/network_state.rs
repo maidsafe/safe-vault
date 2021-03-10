@@ -22,7 +22,7 @@ use itertools::Itertools;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
 use sn_messaging::client::TransientElderKey;
-use sn_routing::SectionProofChain;
+use sn_routing::SectionChain;
 use std::{
     collections::BTreeSet,
     net::SocketAddr,
@@ -72,7 +72,7 @@ pub struct AdultState {
     prefix: Prefix,
     node_name: XorName,
     node_id: Ed25519PublicKey,
-    section_proof_chain: SectionProofChain,
+    section_proof_chain: SectionChain,
     elders: Vec<(XorName, SocketAddr)>,
     adult_reader: AdultReader,
     node_signing: NodeSigning,
@@ -109,7 +109,7 @@ impl AdultState {
     }
 
     /// Static state
-    pub fn section_proof_chain(&self) -> &SectionProofChain {
+    pub fn section_proof_chain(&self) -> &SectionChain {
         &self.section_proof_chain
     }
 
@@ -128,7 +128,7 @@ pub struct ElderState {
     node_id: Ed25519PublicKey,
     key_index: usize,
     public_key_set: PublicKeySet,
-    section_proof_chain: SectionProofChain,
+    section_proof_chain: SectionChain,
     elders: Vec<(XorName, SocketAddr)>,
     adult_reader: AdultReader,
     interaction: NodeInteraction,
@@ -215,7 +215,7 @@ impl ElderState {
     }
 
     /// Static state
-    pub fn section_proof_chain(&self) -> &SectionProofChain {
+    pub fn section_proof_chain(&self) -> &SectionChain {
         &self.section_proof_chain
     }
 

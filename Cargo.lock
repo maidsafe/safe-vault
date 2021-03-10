@@ -1665,12 +1665,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "quick-error"
-version = "1.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
-
-[[package]]
 name = "quick-xml"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2337,7 +2331,6 @@ dependencies = [
  "log",
  "maplit",
  "pickledb",
- "quick-error",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
  "self_update",

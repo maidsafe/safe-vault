@@ -14,7 +14,7 @@ use crate::{
 };
 use crate::{Network, Result};
 use log::error;
-use sn_messaging::{client::Message, DstLocation, SrcLocation};
+use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::XorName;
 
 /// Sending of messages
@@ -41,15 +41,12 @@ impl Messaging {
     }
 
     async fn send(&mut self, msg: OutgoingMsg) -> Result<NetworkDuties> {
-        let src = if msg.to_be_aggregated {
-            SrcLocation::Section(self.network.our_prefix().await)
-        } else {
-            SrcLocation::Node(self.network.our_name().await)
+        let itry = Itinerary {
+            src: SrcLocation::Node(self.network.our_name().await),
+            dst: msg.dst,
+            aggregation: msg.aggregation,
         };
-        let result = self
-            .network
-            .send_message(src, msg.dst, msg.msg.serialize()?)
-            .await;
+        let result = self.network.send_message(itry, msg.msg.serialize()?).await;
 
         result.map_or_else(
             |err| {
@@ -70,8 +67,11 @@ impl Messaging {
         for target in targets {
             self.network
                 .send_message(
-                    SrcLocation::Node(name),
-                    DstLocation::AccumulatingNode(XorName(target.0)),
+                    Itinerary {
+                        src: SrcLocation::Node(name),
+                        dst: DstLocation::Node(XorName(target.0)),
+                        aggregation: Aggregation::AtDestination,
+                    },
                     bytes.clone(),
                 )
                 .await

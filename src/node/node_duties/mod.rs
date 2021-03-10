@@ -33,7 +33,7 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{Message, NodeCmd, NodeQuery, NodeRewardQuery, NodeSystemCmd},
-    DstLocation, MessageId, SrcLocation,
+    Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use std::collections::{BTreeMap, VecDeque};
 
@@ -257,7 +257,7 @@ impl NodeDuties {
                 target_section_pk: None,
             },
             dst: DstLocation::Section(node_id.into()),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         })))
     }
 
@@ -274,7 +274,7 @@ impl NodeDuties {
                 target_section_pk: None,
             },
             dst: DstLocation::Section(wallet.into()),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         })))
     }
 
@@ -352,7 +352,7 @@ impl NodeDuties {
                     target_section_pk: None,
                 },
                 dst,
-                to_be_aggregated: false,
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             })));
         } else if is_genesis_section && elder_count < GENESIS_ELDER_COUNT {
             debug!("AwaitingGenesisThreshold!");
@@ -374,7 +374,7 @@ impl NodeDuties {
                     target_section_pk: None,
                 },
                 dst: DstLocation::Section(wallet_id.into()),
-                to_be_aggregated: false,
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             })));
         }
 
@@ -421,7 +421,7 @@ impl NodeDuties {
                         target_section_pk: None,
                     },
                     dst,
-                    to_be_aggregated: false,
+                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                 });
 
                 (stage, cmd)
@@ -457,7 +457,7 @@ impl NodeDuties {
                         dst: DstLocation::Section(
                             bootstrap.elder_state.section_public_key().into(),
                         ),
-                        to_be_aggregated: false,
+                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                     });
 
                     (stage, cmd)

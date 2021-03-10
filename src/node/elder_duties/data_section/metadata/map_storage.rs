@@ -20,7 +20,7 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{CmdError, MapRead, MapWrite, Message, QueryResponse},
-    DstLocation, EndUser, MessageId, SrcLocation,
+    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 
 use std::fmt::{self, Display, Formatter};
@@ -233,7 +233,7 @@ impl MapStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -261,7 +261,7 @@ impl MapStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -289,7 +289,7 @@ impl MapStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -327,7 +327,7 @@ impl MapStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -355,7 +355,7 @@ impl MapStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -384,7 +384,7 @@ impl MapStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -413,7 +413,7 @@ impl MapStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -441,7 +441,7 @@ impl MapStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -473,7 +473,7 @@ impl MapStorage {
                 target_section_pk: None,
             },
             dst: DstLocation::EndUser(origin),
-            to_be_aggregated: false,
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
@@ -496,7 +496,7 @@ impl MapStorage {
                     target_section_pk: None,
                 },
                 dst: DstLocation::EndUser(origin),
-                to_be_aggregated: false, // TODO: to_be_aggregated: true, // this needs more consideration...
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,  // this needs more consideration...
             }))
         } else {
             info!("MapStorage: Writing chunk PASSED!");
