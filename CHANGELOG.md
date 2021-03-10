@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.29.0](https://github.com/maidsafe/sn_node/compare/v0.28.2...v0.29.0) (2021-03-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **routing:** Policy mutation operations are removed.
+
+Co-authored-by: oetyng <oetyng@gmail.com>
+* **Seq:** Policy mutation operations are removed.
+
+### Features
+
+* **Seq:** upgrading sn_data_types to v0.16.0 which makes the Policy of a Sequence data type immutable. ([1334b08](https://github.com/maidsafe/sn_node/commit/1334b0876e4dabea492d425180e8199227b4c5b3))
+
+
+* **routing:** upgrading sn_routing to 0.48.1 ([8659be7](https://github.com/maidsafe/sn_node/commit/8659be7ca580b5a62a0e0bd4c5f701cf51e244da))
+
 ### [0.28.2](https://github.com/maidsafe/sn_node/compare/v0.28.1...v0.28.2) (2021-03-04)
 
 ### [0.28.1](https://github.com/maidsafe/sn_node/compare/v0.28.0...v0.28.1) (2021-03-03)
