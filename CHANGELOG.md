@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.30.0](https://github.com/maidsafe/sn_node/compare/v0.29.0...v0.30.0) (2021-03-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* **tokio:** new Tokio v1 is not backward compatible with previous runtime versions < 1.
+
+* **tokio:** upgrade tokio to v1.3.0 ([ffb74f9](https://github.com/maidsafe/sn_node/commit/ffb74f9976172d49b92b42f51c1eaef6129e391f))
+
 ## [0.29.0](https://github.com/maidsafe/sn_node/compare/v0.28.2...v0.29.0) (2021-03-10)
 
 
