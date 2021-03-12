@@ -18,7 +18,7 @@ use sn_data_types::Token;
 
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
-pub(super) enum SectionWalletStage {
+pub(super) enum SectionFunds {
     Rewarding(RewardingWallet),
     SoonChurning {
         current: SectionWallet,
