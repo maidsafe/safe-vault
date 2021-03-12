@@ -104,6 +104,8 @@ pub enum NodeDuty {
     InformNewElders,
     /// When promoted, node levels up
     LevelUp,
+    /// When demoted, node levels down
+    LevelDown,
     /// Initiates the section wallet.
     CompleteTransitionToElder {
         section_wallet: WalletInfo,
@@ -168,6 +170,7 @@ impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::LevelUp => write!(f, "LevelUp"),
+            Self::LevelDown => write!(f, "LevelDown"),
             Self::InformNewElders => write!(f, "InformNewElders"),
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),

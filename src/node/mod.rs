@@ -10,6 +10,7 @@ mod handle_msg;
 mod handle_network_event;
 mod messaging;
 mod metadata;
+mod section_funds;
 mod transfers;
 mod work;
 
@@ -19,29 +20,18 @@ pub mod state_db;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     chunk_store::UsedSpace,
-    node::{
-        handle_msg::handle,
-        handle_network_event::handle_network_event,
-        messaging::send,
-        state_db::store_new_reward_keypair,
-        transfers::get_replicas::transfer_replicas,
-        work::{
-            genesis::begin_forming_genesis_section, genesis::receive_genesis_accumulation,
-            genesis::receive_genesis_proposal, genesis_stage::GenesisStage,
-        },
-    },
     Config, Error, Network, Result,
 };
 use bls::SecretKey;
-use hex_fmt::HexFmt;
-// use handle_msg::handle_msg;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use futures::lock::Mutex;
+use hex_fmt::HexFmt;
 use log::{debug, error, info, trace};
 use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, TransferPropagated, WalletInfo};
 use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
+use sn_transfers::{TransferActor, Wallet};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -51,10 +41,20 @@ use std::{
 };
 
 use self::{
+    handle_msg::handle,
+    handle_network_event::handle_network_event,
+    messaging::send,
     messaging::send_to_nodes,
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty},
+    section_funds::{rewarding_wallet::RewardingWallet, SectionFunds},
+    state_db::store_new_reward_keypair,
+    transfers::get_replicas::transfer_replicas,
     transfers::Transfers,
+    work::{
+        genesis::begin_forming_genesis_section, genesis::receive_genesis_accumulation,
+        genesis::receive_genesis_proposal, genesis_stage::GenesisStage,
+    },
 };
 
 /// Info about the node.
@@ -99,26 +99,16 @@ pub struct Node {
     network_api: Network,
     network_events: EventStream,
     node_info: NodeInfo,
-    //old elder
     prefix: Option<Prefix>,
     node_name: XorName,
     node_id: Ed25519PublicKey,
-    // key_index: usize,
-    // public_key_set: ReplicaPublicKeySet,
-    // sibling_public_key: Option<PublicKey>,
-    // section_chain: SectionChain,
-    // elders: Vec<(XorName, SocketAddr)>,
-    // adult_reader: AdultReader,
-    // interaction: NodeInteraction,
-    // node_signing: NodeSigning,
     genesis_stage: GenesisStage,
-    // transfers
-    transfers: Option<Transfers>,
     // data operations
     meta_data: Option<Metadata>,
-    // rate_limit: RateLimit,
-    // dbs: ChunkHolderDbs
-    // replica_signing: ReplicaSigningImpl,
+    // transfers
+    transfers: Option<Transfers>,
+    // reward payouts
+    section_funds: Option<SectionFunds>,
 }
 
 impl Node {
@@ -171,8 +161,9 @@ impl Node {
             network_api,
             network_events,
             genesis_stage: GenesisStage::None,
-            transfers: None,
             meta_data: None,
+            transfers: None,
+            section_funds: None,
         };
 
         Ok(node)
@@ -259,6 +250,11 @@ impl Node {
             NodeDuty::LevelUp => {
                 self.level_up(None).await?;
             }
+            NodeDuty::LevelDown => {
+                self.meta_data = None;
+                self.transfers = None;
+                self.section_funds = None;
+            }
             NodeDuty::AssumeAdultDuties => {}
             NodeDuty::UpdateElderInfo {
                 prefix,
@@ -306,11 +302,13 @@ impl Node {
     }
 
     async fn level_up(&mut self, genesis_tx: Option<TransferPropagated>) -> Result<()> {
+        // metadata
         let dbs = ChunkHolderDbs::new(self.node_info.path())?;
         let reader = AdultReader::new(self.network_api.clone());
         let meta_data = Metadata::new(&self.node_info, dbs, reader).await?;
         self.meta_data = Some(meta_data);
 
+        // transfers
         let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
@@ -322,6 +320,11 @@ impl Node {
             transfers.genesis(genesis_tx.clone()).await?;
         }
         self.transfers = Some(transfers);
+
+        // rewards
+        // let actor = TransferActor::from_info(signing, reward_data.section_wallet, Validator {})?;
+        // let wallet = RewardingWallet::new(actor);
+        // self.section_funds = Some(SectionFunds::Rewarding(wallet));
         Ok(())
     }
 

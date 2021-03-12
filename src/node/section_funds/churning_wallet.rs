@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::node_ops::{NetworkDuties, NetworkDuty, NodeMessagingDuty, OutgoingMsg},
+    node::node_ops::{NetworkDuty, NodeDuties, NodeDuty, OutgoingMsg},
     Result,
 };
 use sn_data_types::{PublicKey, SectionElders, Token};
@@ -70,13 +70,10 @@ impl ChurningWallet {
     }
 
     /// Move Wallet
-    pub async fn move_wallet(&mut self) -> Result<NetworkDuties> {
+    pub async fn move_wallet(&mut self) -> Result<NodeDuties> {
         match self.churn.clone() {
             Churn::Regular(next) => self.create_wallet(self.balance, next),
-            Churn::Split {
-                child_1,
-                child_2,
-            } => {
+            Churn::Split { child_1, child_2 } => {
                 // Split the tokens of current actor.
                 let half_balance = self.balance.as_nano() / 2;
                 let remainder = self.balance.as_nano() % 2;
@@ -105,7 +102,7 @@ impl ChurningWallet {
     /// Generates validation
     /// to transfer the tokens from
     /// previous actor to new actor.
-    fn create_wallet(&mut self, amount: Token, new_wallet: SectionWallet) -> Result<NetworkDuties> {
+    fn create_wallet(&mut self, amount: Token, new_wallet: SectionWallet) -> Result<NodeDuties> {
         use NodeSystemCmd::CreateSectionWallet;
         let cmd = NodeCmd::System(CreateSectionWallet {
             amount,
@@ -115,7 +112,7 @@ impl ChurningWallet {
         let mut ops = vec![];
 
         // send to new wallet replicas
-        ops.push(NetworkDuty::from(NodeMessagingDuty::Send(OutgoingMsg {
+        ops.push(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeCmd {
                 cmd: cmd.clone(),
                 id: MessageId::combine(vec![new_wallet.replicas_address(), new_wallet.name()]),
@@ -124,10 +121,10 @@ impl ChurningWallet {
             section_source: true,
             dst: DstLocation::Section(new_wallet.replicas_address()),
             aggregation: Aggregation::AtDestination,
-        })));
+        }));
 
         // send to our section
-        ops.push(NetworkDuty::from(NodeMessagingDuty::Send(OutgoingMsg {
+        ops.push(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeCmd {
                 cmd,
                 id: MessageId::combine(vec![new_wallet.owner_address(), new_wallet.name()]),
@@ -136,7 +133,7 @@ impl ChurningWallet {
             section_source: true,
             dst: DstLocation::Section(new_wallet.owner_address()),
             aggregation: Aggregation::AtDestination,
-        })));
+        }));
 
         Ok(ops)
     }

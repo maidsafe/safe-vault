@@ -8,8 +8,8 @@
 
 use super::elder_signing::ElderSigning;
 use crate::{
-    node::node_ops::{NetworkDuties, NetworkDuty, NodeMessagingDuty, OutgoingMsg},
-    ElderState, Error, Result,
+    node::node_ops::{NetworkDuties, NetworkDuty, NodeDuties, NodeDuty, OutgoingMsg},
+    Error, Result,
 };
 use log::{debug, info};
 use sn_data_types::{
@@ -63,12 +63,12 @@ impl RewardingWallet {
             },
         }
     }
-   
+
     /// Balance
     pub fn balance(&self) -> Token {
         self.actor.balance()
     }
-        
+
     /// Current Replicas
     pub fn replicas(&self) -> PublicKey {
         self.actor.replicas_public_key()
@@ -83,7 +83,7 @@ impl RewardingWallet {
     }
 
     /// Replica history are synched to section actor instances.
-    pub async fn synch(&mut self, history: ActorHistory) -> Result<NodeMessagingDuty> {
+    pub async fn synch(&mut self, history: ActorHistory) -> Result<NodeDuty> {
         info!("Synching replica events to section transfer actor...");
         let event = match self.actor.from_history(history) {
             Ok(event) => Ok(event),
@@ -98,32 +98,19 @@ impl RewardingWallet {
             info!("Synched: {:?}", event);
         }
         info!("Section Actor balance: {}", self.actor.balance());
-        Ok(NodeMessagingDuty::NoOp)
-    }
-
-    fn get_actor(replicas: SectionElders, elder_state: ElderState) -> Result<SectionActor> {
-        let signing = ElderSigning::new(elder_state);
-        let actor = TransferActor::from_info(
-            signing,
-            WalletInfo {
-                replicas,
-                history: ActorHistory::empty(),
-            },
-            Validator {},
-        )?;
-        Ok(actor)
+        Ok(NodeDuty::NoOp)
     }
 
     /// Will validate and sign the payout, and ask of the replicas to
     /// do the same, and await their responses as to accumulate the result.
-    pub async fn initiate_reward_payout(&mut self, payout: Payout) -> Result<NodeMessagingDuty> {
+    pub async fn initiate_reward_payout(&mut self, payout: Payout) -> Result<NodeDuty> {
         if self.state.completed.contains(&payout.node_id) {
-            return Ok(NodeMessagingDuty::NoOp);
+            return Ok(NodeDuty::NoOp);
         }
         // if we have a payout in flight, the payout is deferred.
         if self.has_payout_in_flight() {
             self.state.queued_payouts.push_back(payout);
-            return Ok(NodeMessagingDuty::NoOp);
+            return Ok(NodeDuty::NoOp);
         }
 
         use NodeCmd::*;
@@ -134,13 +121,13 @@ impl RewardingWallet {
             payout.to,
             format!("Reward for node id: {}", payout.node_id),
         )? {
-            None => Ok(NodeMessagingDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
+            None => Ok(NodeDuty::NoOp), // Would indicate that this apparently has already been done, so no change.
             Some(event) => {
                 self.apply(TransferInitiated(event.clone()))?;
                 // We now have a payout in flight.
                 self.state.payout_in_flight = Some(payout);
                 // We ask of our Replicas to validate this transfer.
-                Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                Ok(NodeDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmd {
                         cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
                             event.signed_debit.as_share()?,
@@ -164,7 +151,7 @@ impl RewardingWallet {
     /// result, which each actor instance accumulates locally.
     /// This validated transfer can be either a reward payout, or
     /// a transition of section funds to a new section actor.
-    pub async fn receive(&mut self, validation: TransferValidated) -> Result<NetworkDuties> {
+    pub async fn receive(&mut self, validation: TransferValidated) -> Result<NodeDuties> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
 
@@ -192,7 +179,7 @@ impl RewardingWallet {
                 .into_iter()
                 .map(|elder| {
                     // We ask of our Replicas to validate this transfer.
-                    Some(NodeMessagingDuty::Send(OutgoingMsg {
+                    Some(NodeDuty::Send(OutgoingMsg {
                         msg: Message::NodeCmd {
                             cmd: Transfers(RegisterSectionPayout(proof.clone())),
                             id: MessageId(msg_id),
@@ -204,7 +191,6 @@ impl RewardingWallet {
                     }))
                 })
                 .flatten()
-                .map(|m| NetworkDuty::from(m))
                 .collect();
 
             debug!(">>> registering");
@@ -214,31 +200,31 @@ impl RewardingWallet {
         }
     }
 
-    // Can safely be called without overwriting any
-    // payout in flight, since validations for that are made.
-    async fn try_pop_queue(&mut self) -> Result<NetworkDuties> {
-        if let Some(payout) = self.state.queued_payouts.pop_front() {
-            // Validation logic when inititating rewards prevents enqueueing a payout that is already
-            // in the completed set. Therefore, calling initiate here cannot return None because of
-            // the payout already being completed.
-            // For that reason it is safe to enqueue it again, if this call returns None.
-            // (we will not loop on that payout)
-            match self.initiate_reward_payout(payout.clone()).await? {
-                NodeMessagingDuty::NoOp => {
-                    if !self.state.completed.contains(&payout.node_id) {
-                        // buut.. just to prevent any future changes to
-                        // enable such a loop, we do the check above anyway :)
-                        // (NB: We put it at the front of the queue again,
-                        //  since that's where the other instances will expect it to be. (Unclear atm if this is necessary or not.))
-                        self.state.queued_payouts.insert(0, payout);
-                    }
-                }
-                op => return Ok(NetworkDuties::from(op)),
-            }
-        }
+    // // Can safely be called without overwriting any
+    // // payout in flight, since validations for that are made.
+    // async fn try_pop_queue(&mut self) -> Result<NodeDuty> {
+    //     if let Some(payout) = self.state.queued_payouts.pop_front() {
+    //         // Validation logic when inititating rewards prevents enqueueing a payout that is already
+    //         // in the completed set. Therefore, calling initiate here cannot return None because of
+    //         // the payout already being completed.
+    //         // For that reason it is safe to enqueue it again, if this call returns None.
+    //         // (we will not loop on that payout)
+    //         match self.initiate_reward_payout(payout.clone()).await? {
+    //             NodeDuty::NoOp => {
+    //                 if !self.state.completed.contains(&payout.node_id) {
+    //                     // buut.. just to prevent any future changes to
+    //                     // enable such a loop, we do the check above anyway :)
+    //                     // (NB: We put it at the front of the queue again,
+    //                     //  since that's where the other instances will expect it to be. (Unclear atm if this is necessary or not.))
+    //                     self.state.queued_payouts.insert(0, payout);
+    //                 }
+    //             }
+    //             op => return Ok(op),
+    //         }
+    //     }
 
-        Ok(vec![])
-    }
+    //     Ok(NodeDuty::NoOp)
+    // }
 
     fn apply(&mut self, event: ActorEvent) -> Result<()> {
         self.actor.apply(event).map_err(Error::Transfer)

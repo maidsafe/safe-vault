@@ -6,21 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::ElderState;
-use sn_data_types::{OwnerType, Result as DtResult, Signing};
+use crate::{Network, Result};
+use bls::PublicKeySet;
+use sn_data_types::{OwnerType, Result as DtResult, SignatureShare, Signing};
 
 #[derive(Clone)]
 pub struct ElderSigning {
     id: OwnerType,
-    elder_state: ElderState,
+    network: Network,
 }
 
 impl ElderSigning {
-    pub fn new(elder_state: ElderState) -> Self {
-        Self {
-            id: OwnerType::Multi(elder_state.public_key_set().clone()),
-            elder_state,
-        }
+    pub async fn new(network: Network) -> Result<Self> {
+        Ok(Self {
+            id: OwnerType::Multi(network.our_public_key_set().await?),
+            network,
+        })
     }
 }
 
@@ -31,10 +32,12 @@ impl Signing for ElderSigning {
 
     fn sign<T: serde::Serialize>(&self, data: &T) -> DtResult<sn_data_types::Signature> {
         use sn_data_types::Error as DtError;
-        Ok(sn_data_types::Signature::BlsShare(
-            futures::executor::block_on(self.elder_state.sign_as_elder(data))
+        Ok(sn_data_types::Signature::BlsShare(SignatureShare {
+            share: futures::executor::block_on(self.network.sign_as_elder(data))
                 .map_err(|_| DtError::InvalidOperation)?,
-        ))
+            index: futures::executor::block_on(self.network.our_index())
+                .map_err(|_| DtError::InvalidOperation)?,
+        }))
     }
 
     fn verify<T: serde::Serialize>(&self, sig: &sn_data_types::Signature, data: &T) -> bool {

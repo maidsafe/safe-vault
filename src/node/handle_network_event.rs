@@ -88,58 +88,31 @@ pub async fn handle_network_event(event: RoutingEvent, network_api: Network) -> 
             sibling_key,
         } => {
             trace!("******Elders changed event!");
-            // let mut duties: NetworkDuties =
             match self_status_change {
                 NodeElderChange::None => {
-                    // do nothing
+                    let mut sibling_pk = None;
+                    if let Some(pk) = sibling_key {
+                        sibling_pk = Some(PublicKey::Bls(pk));
+                    }
+                    // duties.push(NetworkDuty::from(NodeDuty::UpdateElderInfo {
+                    //     prefix,
+                    //     key: PublicKey::Bls(key),
+                    //     elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+                    //     sibling_key: sibling_pk,
+                    // }));
+
+                    // Ok(duties)
+                    Ok(vec![])
                 }
                 NodeElderChange::Promoted => {
                     if is_forming_genesis(network_api).await {
                         return Ok(vec![NodeDuty::BeginFormingGenesisSection]);
                     } else {
                         return Ok(vec![NodeDuty::LevelUp]);
-                        // After genesis section formation, any new Elder will be informed
-                        // by its peers of data required.
-                        // It may also request this if missing.
-                        // For now we start with defaults
-                        // unimplemented!("PROMOTED");
-
-                        // Ok(NetworkDuties::from(NodeDuty::CompleteTransitionToElder{
-                        //     node_rewards: Default::default(),
-                        //     section_wallet: WalletInfo {
-                        //         replicas:  network_api.public_key_set().await?,
-                        //         history: ActorHistory{
-                        //             credits: vec![],
-                        //             debits: vec![]
-                        //         }
-                        //     },
-                        //     user_wallets: Default::default()
-                        // }))
                     }
                 }
-                NodeElderChange::Demoted => {
-                    //TODO: Demotion
-                    debug!("TODO: demotion");
-                    // NetworkDuties::from(NodeDuty::AssumeAdultDuties)
-                }
-            };
-
-            let mut sibling_pk = None;
-            if let Some(pk) = sibling_key {
-                sibling_pk = Some(PublicKey::Bls(pk));
+                NodeElderChange::Demoted => return Ok(vec![NodeDuty::LevelDown]),
             }
-            // TODO: Update elder info.
-
-            // duties.push(NetworkDuty::from(NodeDuty::UpdateElderInfo {
-            //     prefix,
-            //     key: PublicKey::Bls(key),
-            //     elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
-            //     sibling_key: sibling_pk,
-            // }));
-
-            // Ok(duties)
-
-            Ok(vec![])
         }
         RoutingEvent::Relocated { .. } => {
             // Check our current status
