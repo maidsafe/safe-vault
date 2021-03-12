@@ -31,11 +31,8 @@ use transfers::replica_signing::ReplicaSigningImpl;
 #[derive(Clone)]
 pub struct WalletSection {
     transfers: Transfers,
-    pub rewards_and_wallets: RewardsAndWallets,
     network: Network,
-    // replica_signing: ReplicaSigning
 }
-// pub struct ReplicaInfo
 
 ///
 #[derive(Clone, Debug)]
@@ -55,25 +52,12 @@ impl WalletSection {
     pub async fn new(
         rate_limit: RateLimit,
         node_info: &NodeInfo,
-        rewards_and_wallets: RewardsAndWallets,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
-        replica_signing: ReplicaSigningImpl,
         network: Network,
     ) -> Result<Self> {
-        let replicas = Self::transfer_replicas(
-            &node_info,
-            rewards_and_wallets.clone(),
-            network.clone(),
-            user_wallets,
-        )
-        .await?;
+        let replicas = Self::transfer_replicas(&node_info, network.clone(), user_wallets).await?;
         let transfers = Transfers::new(replicas, rate_limit);
-        Ok(Self {
-            network,
-            transfers,
-            rewards_and_wallets,
-            // replica_signing
-        })
+        Ok(Self { network, transfers })
     }
 
     ///
@@ -104,13 +88,7 @@ impl WalletSection {
     }
 
     // Update our replica with the latest keys
-    pub async fn elders_changed(
-        &mut self,
-        rewards_and_wallets: RewardsAndWallets,
-        rate_limit: RateLimit,
-    ) -> Result<()> {
-        // TODO: Query sn_routing for info for [new_section_key]
-        // specifically (regardless of how far back that was) - i.e. not the current info!
+    pub async fn elders_changed(&mut self, rate_limit: RateLimit) -> Result<()> {
         let id = self.network.our_public_key_share().await?;
         let key_index = self
             .network
@@ -118,7 +96,7 @@ impl WalletSection {
             .await
             .map_err(|_| Error::NoSectionPublicKeySet)?;
         let peer_replicas = self.network.our_public_key_set().await?;
-        let signing = ReplicaSigningImpl::new(rewards_and_wallets.clone(), self.network.clone());
+        let signing = ReplicaSigningImpl::new(self.network.clone());
         let info = ReplicaInfo {
             id: id.bls_share().ok_or(Error::ProvidedPkIsNotBlsShare)?,
             key_index,
@@ -149,10 +127,8 @@ impl WalletSection {
 
     async fn transfer_replicas(
         node_info: &NodeInfo,
-        rewards_and_wallets: RewardsAndWallets,
         network: Network,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
-        // signing: ReplicaSigningImpl
     ) -> Result<Replicas<ReplicaSigningImpl>> {
         let root_dir = node_info.root_dir.clone();
         let id = network
@@ -162,7 +138,7 @@ impl WalletSection {
             .ok_or(Error::ProvidedPkIsNotBlsShare)?;
         let key_index = network.our_index().await?;
         let peer_replicas = network.our_public_key_set().await?.clone();
-        let signing = ReplicaSigningImpl::new(rewards_and_wallets.clone(), network.clone());
+        let signing = ReplicaSigningImpl::new(network.clone());
         let info = ReplicaInfo {
             id,
             key_index,

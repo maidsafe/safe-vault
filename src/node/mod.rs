@@ -33,7 +33,6 @@ use futures::lock::Mutex;
 use log::{debug, error, info, trace};
 use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, WalletInfo};
 use sn_messaging::{
-    client::TransientElderKey,
     client::{Message, MsgSender, NodeCmd, NodeSystemCmd},
     Aggregation, DstLocation, MessageId,
 };
@@ -92,15 +91,6 @@ pub struct Node {
     network_api: Network,
     network_events: EventStream,
     node_info: NodeInfo,
-
-    // old adult
-    // prefix: Prefix,
-    // node_name: XorName,
-    // node_id: Ed25519PublicKey,
-    // section_chain: SectionChain,
-    // elders: Vec<(XorName, SocketAddr)>,
-    // adult_reader: AdultReader,
-    // node_signing: NodeSigning,
 
     //old elder
     prefix: Option<Prefix>,

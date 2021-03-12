@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::genesis::get_genesis;
-use crate::{node::RewardsAndWallets, Network, Node, Result};
+use crate::{Network, Result};
 use async_trait::async_trait;
 use bls::PublicKeySet;
 use sn_data_types::{
@@ -42,18 +42,13 @@ pub trait ReplicaSigning {
 /// Replicas don't initiate transfers or drive the algo - only Actors do.
 #[derive(Clone)]
 pub struct ReplicaSigningImpl {
-    /// RewardsAndWallets.
-    rewards_and_wallets: RewardsAndWallets,
     network: Network,
 }
 
 impl ReplicaSigningImpl {
     /// A new instance
-    pub fn new(rewards_and_wallets: RewardsAndWallets, network: Network) -> Self {
-        Self {
-            rewards_and_wallets,
-            network,
-        }
+    pub fn new(network: Network) -> Self {
+        Self { network }
     }
 }
 
@@ -65,7 +60,7 @@ impl ReplicaSigning for ReplicaSigningImpl {
     }
 
     async fn try_genesis(&self, balance: u64) -> Result<CreditAgreementProof> {
-        get_genesis(balance, &self.rewards_and_wallets, self.network.clone()).await
+        get_genesis(balance, self.network.clone()).await
     }
 
     async fn sign_transfer(

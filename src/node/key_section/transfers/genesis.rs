@@ -6,16 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::RewardsAndWallets, Error, Network, Result};
+use crate::{Error, Network, Result};
 use sn_data_types::{Credit, CreditAgreementProof, SignedCredit, Token};
 use std::collections::BTreeMap;
 
 /// Produces a genesis balance for a new network.
-pub async fn get_genesis(
-    balance: u64,
-    rewards_and_wallets: &RewardsAndWallets,
-    network: Network,
-) -> Result<CreditAgreementProof> {
+pub async fn get_genesis(balance: u64, network: Network) -> Result<CreditAgreementProof> {
     let recipient = network
         .section_public_key()
         .await

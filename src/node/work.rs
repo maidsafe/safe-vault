@@ -36,18 +36,18 @@ use log::{debug, error, info, trace, warn};
 // use msg_analysis::ReceivedMsgAnalysis;
 // use network_events::w;
 use sn_data_types::{
-    ActorHistory, Credit, NodeRewardStage, PublicKey, SignatureShare, SignedCredit, Token,
-    TransferPropagated, WalletInfo,
+    Credit, NodeRewardStage, PublicKey, SectionElders, SignatureShare, SignedCredit,
+    Token, TransferPropagated,
 };
 use sn_messaging::{
     client::{
-        Message, NodeCmd, NodeEvent, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
+        Message, NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use sn_routing::{XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::BTreeMap,
     mem,
 };
 
@@ -227,26 +227,30 @@ use std::{
 // }
 
 impl Node {
-    // async fn section_pk_set(
-    //     &self,
-    //     msg_id: MessageId,
-    //     origin: SrcLocation,
-    // ) -> Result<NetworkDuties> {
-    //     let replicas = self.network_api.public_key_set().await?;
-    //     Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
-    //         msg: Message::NodeQueryResponse {
-    //             response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionPkSet(
-    //                 replicas,
-    //             )),
-    //             correlation_id: msg_id,
-    //             id: MessageId::in_response_to(&msg_id),
-    //             target_section_pk: None,
-    //         },
-    //         section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-    //         dst: origin.to_dst(),
-    //         aggregation: Aggregation::AtDestination,
-    //     })))
-    // }
+    async fn section_elders(
+        &self,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    ) -> Result<NetworkDuties> {
+        let elders = SectionElders {
+            prefix: self.network_api.our_prefix().await,
+            names: self.network_api.our_elder_names().await,
+            key_set: self.network_api.our_public_key_set().await?,
+        };
+        Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
+            msg: Message::NodeQueryResponse {
+                response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(
+                    elders,
+                )),
+                correlation_id: msg_id,
+                id: MessageId::in_response_to(&msg_id),
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+            dst: origin.to_dst(),  // this will be a single Node
+            aggregation: Aggregation::AtDestination,
+        })))
+    }
 
     // async fn inform_new_elders(&mut self) -> Result<NetworkDuties> {
     //     debug!("@@@@@@ INFORMING NEW ELDERS");
@@ -301,40 +305,6 @@ impl Node {
     //     })))
     // }
 
-    // async fn assume_adult_duties(&mut self) -> Result<NetworkDuties> {
-    //     if matches!(self.stage, Stage::Adult { .. }) {
-    //         return Ok(vec![]);
-    //     }
-    //     info!("Assuming Adult duties..");
-    //     let state = AdultState::new(self.network_api.clone()).await?;
-    //     let adult = AdultDuties::new(&self.node_info, state.clone()).await?;
-    //     self.node_info.used_space.reset().await;
-    //     self.stage = Stage::Adult {
-    //         adult,
-    //         queued_ops: VecDeque::new(),
-    //     };
-    //     self.network_events = w::new(ReceivedMsgAnalysis::new(NodeState::Adult(state)));
-    //     info!("Adult duties assumed.");
-    //     // NB: This is wrong, shouldn't write to disk here,
-    //     // let it be upper layer resp.
-    //     // Also, "Error-to-Unit" is not a good conversion..
-    //     //dump_state(AgeGroup::Adult, self.node_info.path(), &self.id).unwrap_or(());
-
-    //     let is_genesis_section = self.network_api.our_prefix().await.is_empty();
-    //     let elder_count = self.network_api.our_elder_names().await.len();
-    //     let section_chain_len = self.network_api.section_chain().await.len();
-
-    //     let genesis_stage = is_genesis_section
-    //         && elder_count < GENESIS_ELDER_COUNT
-    //         && section_chain_len <= GENESIS_ELDER_COUNT;
-
-    //     if !genesis_stage {
-    //         self.register_wallet().await
-    //     } else {
-    //         Ok(vec![])
-    //     }
-    // }
-
     async fn register_wallet(&self) -> Result<()> {
         let address = self.network_api.our_prefix().await.name();
         info!("Registering wallet: {}", self.node_info.reward_key);
@@ -354,6 +324,7 @@ impl Node {
         Ok(())
     }
 
+    ///
     pub async fn begin_forming_genesis_section(&self) -> Result<()> {
         let is_genesis_section = self.network_api.our_prefix().await.is_empty();
         let elder_count = self.network_api.our_elder_names().await.len();
@@ -444,31 +415,22 @@ impl Node {
 
         trace!(">>> Setting up node dbs etc...");
 
-        let rewards_and_wallets = RewardsAndWallets::new(WalletInfo {
-            replicas: self.network_api.our_public_key_set().await?,
-            history: ActorHistory {
-                credits: vec![],
-                debits: vec![],
-            },
-        });
         let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
 
-        let replica_signing =
-            ReplicaSigningImpl::new(rewards_and_wallets.clone(), self.network_api.clone());
+        let replica_signing = ReplicaSigningImpl::new(self.network_api.clone());
         let mut wallet_section = WalletSection::new(
             rate_limit,
             &self.node_info,
-            rewards_and_wallets.clone(),
-            Default::default(),
+            BTreeMap::new(),
             replica_signing,
             self.network_api.clone(),
         )
         .await?;
 
-        let node_rewards = rewards_and_wallets.node_rewards;
+        let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
         let node_id = self.network_api.our_name().await;
-        let register_wallet = match node_rewards.lock().await.get(&node_id) {
+        let register_wallet = match node_rewards.get(&node_id) {
             None => true,
             Some(stage) => match stage {
                 NodeRewardStage::NewNode | NodeRewardStage::AwaitingActivation(_) => true,

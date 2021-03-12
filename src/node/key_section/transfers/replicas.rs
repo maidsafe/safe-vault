@@ -638,7 +638,7 @@ mod test {
     use crate::{Error, Result};
     use bls::{PublicKeySet, SecretKeySet};
     use futures::executor::block_on as run;
-    use sn_data_types::{Keypair, OwnerType, PublicKey, SignedTransferShare, Token};
+    use sn_data_types::{Keypair, OwnerType, PublicKey, SectionElders, SignedTransferShare, Token};
     use sn_routing::SectionChain;
     use sn_transfers::{ActorEvent, TransferActor as Actor, Wallet};
     use tempdir::TempDir;
@@ -809,7 +809,16 @@ mod test {
             Keypair::new_bls_share(0, bls_secret_key.secret_key_share(0), peer_replicas.clone());
         let owner = OwnerType::Multi(peer_replicas.clone());
         let wallet = Wallet::new(owner);
-        let actor = Actor::from_snapshot(wallet, keypair, peer_replicas, Validator {});
+        let actor = Actor::from_snapshot(
+            wallet,
+            keypair,
+            SectionElders {
+                prefix: sn_routing::Prefix::default(),
+                key_set: peer_replicas,
+                names: Default::default(),
+            },
+            Validator {},
+        );
 
         Ok((replicas, actor))
     }
