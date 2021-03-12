@@ -29,6 +29,8 @@ use std::{
 };
 use xor_name::XorName;
 
+use super::adult_reader::AdultReader;
+
 // The number of separate copies of a blob chunk which should be maintained.
 const CHUNK_COPY_COUNT: usize = 4;
 
@@ -46,11 +48,12 @@ struct HolderMetadata {
 /// Operations over the data type Blob.
 pub(super) struct BlobRegister {
     dbs: ChunkHolderDbs,
+    reader: AdultReader,
 }
 
 impl BlobRegister {
-    pub(super) fn new(dbs: ChunkHolderDbs) -> Self {
-        Self { dbs }
+    pub(super) fn new(dbs: ChunkHolderDbs, reader: AdultReader) -> Self {
+        Self { dbs, reader }
     }
 
     pub(super) async fn write(
@@ -58,48 +61,39 @@ impl BlobRegister {
         write: BlobWrite,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         use BlobWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, origin, network).await,
-            DeletePrivate(address) => self.delete(address, msg_id, origin, network).await,
+            New(data) => self.store(data, msg_id, origin).await,
+            DeletePrivate(address) => self.delete(address, msg_id, origin).await,
         }
     }
 
-    async fn store(
-        &mut self,
-        data: Blob,
-        msg_id: MessageId,
-        origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    async fn store(&mut self, data: Blob, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
         let target_holders = if let Ok(metadata) = self.get_metadata_for(*data.address()).await {
             if metadata.holders.len() == CHUNK_COPY_COUNT {
                 if data.is_public() {
                     trace!("{}: All good, {:?}, chunk already exists.", self, data);
-                    return Ok(());
+                    return Ok(NodeDuty::NoOp);
                 } else {
-                    return network
-                        .send(OutgoingMsg {
-                            msg: Message::CmdError {
-                                error: CmdError::Data(ErrorMessage::DataExists),
-                                id: MessageId::in_response_to(&msg_id),
-                                correlation_id: msg_id,
-                                target_section_pk: None,
-                            },
-                            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-                            dst: DstLocation::EndUser(origin),
-                            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                        })
-                        .await;
+                    return Ok(NodeDuty::Send(OutgoingMsg {
+                        msg: Message::CmdError {
+                            error: CmdError::Data(ErrorMessage::DataExists),
+                            id: MessageId::in_response_to(&msg_id),
+                            correlation_id: msg_id,
+                            target_section_pk: None,
+                        },
+                        section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                        dst: DstLocation::EndUser(origin),
+                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                    }));
                 }
             } else {
                 let mut existing_holders = metadata.holders;
                 let closest_holders = self
-                    .get_holders_for_chunk(data.name(), network)
+                    .get_holders_for_chunk(data.name())
                     .await
                     .iter()
                     .cloned()
@@ -115,7 +109,7 @@ impl BlobRegister {
                 existing_holders
             }
         } else {
-            self.get_holders_for_chunk(data.name(), network)
+            self.get_holders_for_chunk(data.name())
                 .await
                 .iter()
                 .cloned()
@@ -151,7 +145,10 @@ impl BlobRegister {
             id: msg_id,
             target_section_pk: None,
         };
-        network.send_to_nodes(target_holders, &msg).await
+        Ok(NodeDuty::SendToNodes {
+            targets: target_holders,
+            msg,
+        })
     }
 
     async fn send_blob_cmd_error(
@@ -159,22 +156,19 @@ impl BlobRegister {
         error: Error,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let message_error = convert_to_error_message(error)?;
-        network
-            .send(OutgoingMsg {
-                msg: Message::CmdError {
-                    error: CmdError::Data(message_error),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })
-            .await
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::CmdError {
+                error: CmdError::Data(message_error),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+            dst: DstLocation::EndUser(origin),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 
     async fn delete(
@@ -182,15 +176,10 @@ impl BlobRegister {
         address: BlobAddress,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let metadata = match self.get_metadata_for(address).await {
             Ok(metadata) => metadata,
-            Err(error) => {
-                return self
-                    .send_blob_cmd_error(error, msg_id, origin, network)
-                    .await
-            }
+            Err(error) => return self.send_blob_cmd_error(error, msg_id, origin).await,
         };
 
         // todo: use signature verification instead
@@ -201,7 +190,6 @@ impl BlobRegister {
                         Error::NetworkData(DtError::AccessDenied(*origin.id())),
                         msg_id,
                         origin,
-                        network,
                     )
                     .await;
             }
@@ -227,7 +215,10 @@ impl BlobRegister {
             id: msg_id,
             target_section_pk: None,
         };
-        network.send_to_nodes(metadata.holders, &msg).await
+        Ok(NodeDuty::SendToNodes {
+            targets: metadata.holders,
+            msg,
+        })
     }
 
     async fn set_chunk_holder(
@@ -329,11 +320,7 @@ impl BlobRegister {
         Ok(())
     }
 
-    pub(super) async fn replicate_chunks(
-        &mut self,
-        holder: XorName,
-        network: &Network,
-    ) -> Result<NodeDuties> {
+    pub(super) async fn replicate_chunks(&mut self, holder: XorName) -> Result<NodeDuties> {
         trace!("Replicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder).await {
@@ -342,7 +329,7 @@ impl BlobRegister {
         };
         let mut cmds = Vec::new();
         for (address, holders) in chunks_stored {
-            cmds.extend(self.get_replication_msgs(address, holders, network).await);
+            cmds.extend(self.get_replication_msgs(address, holders).await);
         }
         Ok(cmds)
     }
@@ -351,12 +338,11 @@ impl BlobRegister {
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
-        network: &Network,
     ) -> NodeDuties {
         use NodeCmd::*;
         let mut node_ops = Vec::new();
         let messages = self
-            .get_new_holders_for_chunk(&address, network)
+            .get_new_holders_for_chunk(&address)
             .await
             .into_iter()
             .map(|new_holder| {
@@ -377,12 +363,15 @@ impl BlobRegister {
             })
             .collect::<Vec<_>>();
         for (msg, dst) in messages {
-            node_ops.push(NodeDuty::Send(OutgoingMsg {
-                msg,
-                section_source: true, // i.e. errors go to our section
-                dst: DstLocation::Node(dst),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            }));
+            node_ops.push(
+                NodeDuty::Send(OutgoingMsg {
+                    msg,
+                    section_source: true, // i.e. errors go to our section
+                    dst: DstLocation::Node(dst),
+                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                })
+                .into(),
+            );
         }
         node_ops
     }
@@ -392,11 +381,10 @@ impl BlobRegister {
         read: &BlobRead,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         use BlobRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin, network).await,
+            Get(address) => self.get(*address, msg_id, origin).await,
         }
     }
 
@@ -405,8 +393,7 @@ impl BlobRegister {
         address: BlobAddress,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let query_error = |error: Error| async {
             let message_error = convert_to_error_message(error)?;
             let err_msg = Message::QueryResponse {
@@ -415,14 +402,12 @@ impl BlobRegister {
                 correlation_id: msg_id,
                 target_section_pk: None,
             };
-            network
-                .send(OutgoingMsg {
-                    msg: err_msg,
-                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-                    dst: DstLocation::EndUser(origin),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                })
-                .await
+            Ok(NodeDuty::Send(OutgoingMsg {
+                msg: err_msg,
+                section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            }))
         };
 
         let metadata = match self.get_metadata_for(address).await {
@@ -443,7 +428,10 @@ impl BlobRegister {
             id: msg_id,
             target_section_pk: None,
         };
-        network.send_to_nodes(metadata.holders, &msg).await
+        Ok(NodeDuty::SendToNodes {
+            targets: metadata.holders,
+            msg,
+        })
     }
 
     #[allow(unused)]
@@ -573,22 +561,17 @@ impl BlobRegister {
 
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
-    async fn get_holders_for_chunk(&self, target: &XorName, network: &Network) -> Vec<XorName> {
-        network
+    async fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
+        self.reader
             .our_adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
-            // .adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
             .await
     }
 
     // Returns `XorName`s of the new target holders for an Blob chunk.
     // Used to fetch the additional list of holders for existing chunks.
-    async fn get_new_holders_for_chunk(
-        &self,
-        target: &BlobAddress,
-        network: &Network,
-    ) -> BTreeSet<XorName> {
+    async fn get_new_holders_for_chunk(&self, target: &BlobAddress) -> BTreeSet<XorName> {
         let closest_holders = self
-            .get_holders_for_chunk(target.name(), network)
+            .get_holders_for_chunk(target.name())
             .await
             .iter()
             .cloned()

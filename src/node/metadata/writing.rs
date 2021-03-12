@@ -10,9 +10,9 @@ use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::network::Network;
 use crate::node::node_ops::{NetworkDuties, NodeMessagingDuty};
 use crate::Result;
+use crate::{network::Network, node::node_ops::NodeDuty};
 use log::info;
 use sn_messaging::{
     client::{BlobWrite, DataCmd, MapWrite, SequenceWrite},
@@ -24,29 +24,21 @@ pub(super) async fn get_result(
     msg_id: MessageId,
     origin: EndUser,
     stores: &mut ElderStores,
-    network: &Network,
-) -> Result<()> {
+) -> Result<NodeDuty> {
     use DataCmd::*;
     info!("Writing Data");
     match cmd {
         Blob(write) => {
             info!("Writing Blob");
-            blob(write, stores.blob_register_mut(), msg_id, origin, network).await
+            blob(write, stores.blob_register_mut(), msg_id, origin).await
         }
         Map(write) => {
             info!("Writing Map");
-            map(write, stores.map_storage_mut(), msg_id, origin, network).await
+            map(write, stores.map_storage_mut(), msg_id, origin).await
         }
         Sequence(write) => {
             info!("Writing Sequence");
-            sequence(
-                write,
-                stores.sequence_storage_mut(),
-                msg_id,
-                origin,
-                network,
-            )
-            .await
+            sequence(write, stores.sequence_storage_mut(), msg_id, origin).await
         }
     }
 }
@@ -56,9 +48,8 @@ async fn blob(
     register: &mut BlobRegister,
     msg_id: MessageId,
     origin: EndUser,
-    network: &Network,
-) -> Result<()> {
-    register.write(write, msg_id, origin, network).await
+) -> Result<NodeDuty> {
+    register.write(write, msg_id, origin).await
 }
 
 async fn map(
@@ -66,9 +57,8 @@ async fn map(
     storage: &mut MapStorage,
     msg_id: MessageId,
     origin: EndUser,
-    network: &Network,
-) -> Result<()> {
-    storage.write(write, msg_id, origin, network).await
+) -> Result<NodeDuty> {
+    storage.write(write, msg_id, origin).await
 }
 
 async fn sequence(
@@ -76,7 +66,6 @@ async fn sequence(
     storage: &mut SequenceStorage,
     msg_id: MessageId,
     origin: EndUser,
-    network: &Network,
-) -> Result<()> {
-    storage.write(write, msg_id, origin, network).await
+) -> Result<NodeDuty> {
+    storage.write(write, msg_id, origin).await
 }

@@ -46,7 +46,7 @@ use std::{
 
 use self::{
     messaging::send_to_nodes,
-    metadata::Metadata,
+    metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty},
     transfers::Transfers,
 };
@@ -113,14 +113,6 @@ pub struct Node {
     // dbs: ChunkHolderDbs
     // replica_signing: ReplicaSigningImpl,
 }
-// ///
-// pub async fn metadata(
-//     info: &NodeInfo,
-//     dbs: ChunkHolderDbs,
-//     network: Network,
-// ) -> Result<Metadata> {
-//     Metadata::new(info, dbs, network.clone()).await
-// }
 
 impl Node {
     /// Initialize a new node.
@@ -165,7 +157,8 @@ impl Node {
         debug!("NEW NODE after messaging");
 
         let dbs = ChunkHolderDbs::new(node_info.path())?;
-        let meta_data = Metadata::new(&node_info, dbs).await?;
+        let reader = AdultReader::new(network_api.clone());
+        let meta_data = Metadata::new(&node_info, dbs, reader).await?;
 
         let node = Self {
             prefix: Some(network_api.our_prefix().await),
@@ -414,14 +407,10 @@ impl Node {
                 send_to_nodes(targets, &msg, self.network_api.clone()).await?
             }
             NodeDuty::ProcessRead { query, id, origin } => {
-                self.meta_data
-                    .read(query, id, origin, &self.network_api)
-                    .await?
+                return Ok(vec![self.meta_data.read(query, id, origin).await?]);
             }
             NodeDuty::ProcessWrite { cmd, id, origin } => {
-                self.meta_data
-                    .write(cmd, id, origin, &self.network_api)
-                    .await?
+                return Ok(vec![self.meta_data.write(cmd, id, origin).await?]);
             }
             NodeDuty::NoOp => {}
         }

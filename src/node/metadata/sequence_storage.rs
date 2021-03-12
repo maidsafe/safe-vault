@@ -9,7 +9,7 @@
 use crate::{
     chunk_store::SequenceChunkStore,
     error::convert_to_error_message,
-    node::node_ops::{NodeMessagingDuty, OutgoingMsg},
+    node::node_ops::{NodeDuty, NodeMessagingDuty, OutgoingMsg},
     node::NodeInfo,
     Error, Network, Result,
 };
@@ -42,29 +42,19 @@ impl SequenceStorage {
         read: &SequenceRead,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         use SequenceRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin, network).await,
-            GetRange { address, range } => {
-                self.get_range(*address, *range, msg_id, origin, network)
-                    .await
-            }
-            GetLastEntry(address) => self.get_last_entry(*address, msg_id, origin, network).await,
-            GetOwner(address) => self.get_owner(*address, msg_id, origin, network).await,
+            Get(address) => self.get(*address, msg_id, origin).await,
+            GetRange { address, range } => self.get_range(*address, *range, msg_id, origin).await,
+            GetLastEntry(address) => self.get_last_entry(*address, msg_id, origin).await,
+            GetOwner(address) => self.get_owner(*address, msg_id, origin).await,
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, msg_id, origin, network)
+                self.get_user_permissions(*address, *user, msg_id, origin)
                     .await
             }
-            GetPublicPolicy(address) => {
-                self.get_public_policy(*address, msg_id, origin, network)
-                    .await
-            }
-            GetPrivatePolicy(address) => {
-                self.get_private_policy(*address, msg_id, origin, network)
-                    .await
-            }
+            GetPublicPolicy(address) => self.get_public_policy(*address, msg_id, origin).await,
+            GetPrivatePolicy(address) => self.get_private_policy(*address, msg_id, origin).await,
         }
     }
 
@@ -73,15 +63,14 @@ impl SequenceStorage {
         write: SequenceWrite,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         use SequenceWrite::*;
         info!("Matching Sequence Write");
         match write {
-            New(data) => self.store(&data, msg_id, origin, network).await,
+            New(data) => self.store(&data, msg_id, origin).await,
             Edit(operation) => {
                 info!("Editing Sequence");
-                self.edit(operation, msg_id, origin, network).await
+                self.edit(operation, msg_id, origin).await
             }
             Delete(address) => self.delete(address, msg_id, origin).await,
         }
@@ -92,14 +81,13 @@ impl SequenceStorage {
         data: &Sequence,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let result = if self.chunks.has(data.address()) {
             Err(Error::DataExists)
         } else {
             self.chunks.put(&data).await
         };
-        self.ok_or_error(result, msg_id, origin, network).await
+        self.ok_or_error(result, msg_id, origin).await
     }
 
     async fn get(
@@ -107,25 +95,22 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let result = match self.get_chunk(address, SequenceAction::Read, origin) {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        network
-            .send(OutgoingMsg {
-                msg: Message::QueryResponse {
-                    response: QueryResponse::GetSequence(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })
-            .await
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequence(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+            dst: DstLocation::EndUser(origin),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 
     fn get_chunk(
@@ -144,8 +129,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let result = match self.chunks.get(&address).and_then(|sequence| {
             // TODO - Sequence::check_permission() doesn't support Delete yet in safe-nd
             if sequence.address().is_public() {
@@ -168,7 +152,7 @@ impl SequenceStorage {
             Err(error) => Err(error),
         };
 
-        self.ok_or_error(result, msg_id, origin, network).await
+        self.ok_or_error(result, msg_id, origin).await
     }
 
     async fn get_range(
@@ -177,8 +161,7 @@ impl SequenceStorage {
         range: (SequenceIndex, SequenceIndex),
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
@@ -189,19 +172,17 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        network
-            .send(OutgoingMsg {
-                msg: Message::QueryResponse {
-                    response: QueryResponse::GetSequenceRange(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })
-            .await
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequenceRange(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+            dst: DstLocation::EndUser(origin),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 
     async fn get_last_entry(
@@ -209,8 +190,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| match sequence.last_entry(Some(*origin.id()))? {
@@ -220,19 +200,17 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        network
-            .send(OutgoingMsg {
-                msg: Message::QueryResponse {
-                    response: QueryResponse::GetSequenceLastEntry(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })
-            .await
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequenceLastEntry(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+            dst: DstLocation::EndUser(origin),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 
     async fn get_owner(
@@ -240,8 +218,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
@@ -256,19 +233,17 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        network
-            .send(OutgoingMsg {
-                msg: Message::QueryResponse {
-                    response: QueryResponse::GetSequenceOwner(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })
-            .await
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequenceOwner(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+            dst: DstLocation::EndUser(origin),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 
     async fn get_user_permissions(
@@ -277,8 +252,7 @@ impl SequenceStorage {
         user: SequenceUser,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
@@ -289,19 +263,17 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        network
-            .send(OutgoingMsg {
-                msg: Message::QueryResponse {
-                    response: QueryResponse::GetSequenceUserPermissions(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })
-            .await
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequenceUserPermissions(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+            dst: DstLocation::EndUser(origin),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 
     async fn get_public_policy(
@@ -309,8 +281,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
@@ -325,19 +296,17 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        network
-            .send(OutgoingMsg {
-                msg: Message::QueryResponse {
-                    response: QueryResponse::GetSequencePublicPolicy(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })
-            .await
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequencePublicPolicy(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+            dst: DstLocation::EndUser(origin),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 
     async fn get_private_policy(
@@ -345,8 +314,7 @@ impl SequenceStorage {
         address: SequenceAddress,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let result = match self
             .get_chunk(address, SequenceAction::Read, origin)
             .and_then(|sequence| {
@@ -361,19 +329,17 @@ impl SequenceStorage {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
-        network
-            .send(OutgoingMsg {
-                msg: Message::QueryResponse {
-                    response: QueryResponse::GetSequencePrivatePolicy(result),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })
-            .await
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetSequencePrivatePolicy(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+            dst: DstLocation::EndUser(origin),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 
     async fn edit(
@@ -381,8 +347,7 @@ impl SequenceStorage {
         write_op: SequenceOp<SequenceEntry>,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let address = write_op.address;
         info!("Editing Sequence chunk");
         let result = self
@@ -394,7 +359,6 @@ impl SequenceStorage {
                     sequence.apply_op(write_op)?;
                     Ok(sequence)
                 },
-                network,
             )
             .await;
         if result.is_ok() {
@@ -402,7 +366,7 @@ impl SequenceStorage {
         } else {
             info!("Editing Sequence chunk FAILEDDD!");
         }
-        self.ok_or_error(result, msg_id, origin, network).await
+        self.ok_or_error(result, msg_id, origin).await
     }
 
     async fn edit_chunk<F>(
@@ -411,7 +375,6 @@ impl SequenceStorage {
         action: SequenceAction,
         origin: EndUser,
         write_fn: F,
-        network: &Network,
     ) -> Result<()>
     where
         F: FnOnce(Sequence) -> Result<Sequence>,
@@ -428,28 +391,25 @@ impl SequenceStorage {
         result: Result<T>,
         msg_id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let error = match result {
-            Ok(_) => return Ok(()),
+            Ok(_) => return Ok(NodeDuty::NoOp),
             Err(error) => {
                 info!("Error on writing Sequence! {:?}", error);
                 convert_to_error_message(error)?
             }
         };
-        network
-            .send(OutgoingMsg {
-                msg: Message::CmdError {
-                    id: MessageId::in_response_to(&msg_id),
-                    error: CmdError::Data(error),
-                    correlation_id: msg_id,
-                    target_section_pk: None,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-                dst: DstLocation::Section(origin.name()),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            })
-            .await
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::CmdError {
+                id: MessageId::in_response_to(&msg_id),
+                error: CmdError::Data(error),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+            dst: DstLocation::Section(origin.name()),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        }))
     }
 }
 

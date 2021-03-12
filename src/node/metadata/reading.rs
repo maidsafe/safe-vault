@@ -12,9 +12,9 @@ use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::network::Network;
 use crate::node::node_ops::{NetworkDuties, NodeMessagingDuty};
 use crate::Result;
+use crate::{network::Network, node::node_ops::NodeDuty};
 use sn_messaging::{
     client::{BlobRead, DataQuery, MapRead, SequenceRead},
     EndUser, MessageId,
@@ -25,13 +25,12 @@ pub(super) async fn get_result(
     msg_id: MessageId,
     origin: EndUser,
     stores: &ElderStores,
-    network: &Network,
-) -> Result<()> {
+) -> Result<NodeDuty> {
     use DataQuery::*;
     match &query {
-        Blob(read) => blob(read, stores.blob_register(), msg_id, origin, network).await,
-        Map(read) => map(read, stores.map_storage(), msg_id, origin, network).await,
-        Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin, network).await,
+        Blob(read) => blob(read, stores.blob_register(), msg_id, origin).await,
+        Map(read) => map(read, stores.map_storage(), msg_id, origin).await,
+        Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin).await,
     }
 }
 
@@ -40,9 +39,8 @@ async fn blob(
     register: &BlobRegister,
     msg_id: MessageId,
     origin: EndUser,
-    network: &Network,
-) -> Result<()> {
-    register.read(read, msg_id, origin, network).await
+) -> Result<NodeDuty> {
+    register.read(read, msg_id, origin).await
 }
 
 async fn map(
@@ -50,9 +48,8 @@ async fn map(
     storage: &MapStorage,
     msg_id: MessageId,
     origin: EndUser,
-    network: &Network,
-) -> Result<()> {
-    storage.read(read, msg_id, origin, network).await
+) -> Result<NodeDuty> {
+    storage.read(read, msg_id, origin).await
 }
 
 async fn sequence(
@@ -60,7 +57,6 @@ async fn sequence(
     storage: &SequenceStorage,
     msg_id: MessageId,
     origin: EndUser,
-    network: &Network,
-) -> Result<()> {
-    storage.read(read, msg_id, origin, network).await
+) -> Result<NodeDuty> {
+    storage.read(read, msg_id, origin).await
 }

@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub mod adult_reader;
 mod blob_register;
 mod elder_stores;
 mod map_storage;
@@ -13,6 +14,8 @@ mod reading;
 mod sequence_storage;
 mod writing;
 
+use self::adult_reader::AdultReader;
+use super::node_ops::NodeDuty;
 use crate::{
     capacity::ChunkHolderDbs,
     node::node_ops::{MetadataDuty, NodeDuties},
@@ -42,8 +45,12 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub async fn new(node_info: &NodeInfo, dbs: ChunkHolderDbs) -> Result<Self> {
-        let blob_register = BlobRegister::new(dbs);
+    pub async fn new(
+        node_info: &NodeInfo,
+        dbs: ChunkHolderDbs,
+        reader: AdultReader,
+    ) -> Result<Self> {
+        let blob_register = BlobRegister::new(dbs, reader);
         let map_storage = MapStorage::new(node_info).await?;
         let sequence_storage = SequenceStorage::new(node_info).await?;
         let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
@@ -55,9 +62,8 @@ impl Metadata {
         query: DataQuery,
         id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
-        reading::get_result(query, id, origin, &self.elder_stores, network).await
+    ) -> Result<NodeDuty> {
+        reading::get_result(query, id, origin, &self.elder_stores).await
     }
 
     pub async fn write(
@@ -65,22 +71,17 @@ impl Metadata {
         cmd: DataCmd,
         id: MessageId,
         origin: EndUser,
-        network: &Network,
-    ) -> Result<()> {
-        writing::get_result(cmd, id, origin, &mut self.elder_stores, network).await
+    ) -> Result<NodeDuty> {
+        writing::get_result(cmd, id, origin, &mut self.elder_stores).await
     }
 
     // This should be called whenever a node leaves the section. It fetches the list of data that was
     // previously held by the node and requests the other holders to store an additional copy.
     // The list of holders is also updated by removing the node that left.
-    pub async fn trigger_chunk_replication(
-        &mut self,
-        node: XorName,
-        network: &Network,
-    ) -> Result<NodeDuties> {
+    pub async fn trigger_chunk_replication(&mut self, node: XorName) -> Result<NodeDuties> {
         self.elder_stores
             .blob_register_mut()
-            .replicate_chunks(node, network)
+            .replicate_chunks(node)
             .await
     }
 }
