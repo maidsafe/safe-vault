@@ -8,6 +8,7 @@
 
 //! Implementation of the "Node" node for the SAFE Network.
 
+#![allow(unused)] // FIXME: Remove this
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/maidsafe/QA/master/Images/maidsafe_logo.png",
     html_favicon_url = "https://maidsafe.net/img/favicon.ico",

@@ -11,7 +11,7 @@ use crate::{
     error::convert_to_error_message,
     node::node_ops::{NodeMessagingDuty, OutgoingMsg},
     node::NodeInfo,
-    Error, Result,
+    Error, Network, Result,
 };
 use log::info;
 use sn_data_types::{
@@ -41,19 +41,25 @@ impl MapStorage {
         read: &MapRead,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         use MapRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin).await,
-            GetValue { address, ref key } => self.get_value(*address, key, msg_id, origin).await,
-            GetShell(address) => self.get_shell(*address, msg_id, origin).await,
-            GetVersion(address) => self.get_version(*address, msg_id, origin).await,
-            ListEntries(address) => self.list_entries(*address, msg_id, origin).await,
-            ListKeys(address) => self.list_keys(*address, msg_id, origin).await,
-            ListValues(address) => self.list_values(*address, msg_id, origin).await,
-            ListPermissions(address) => self.list_permissions(*address, msg_id, origin).await,
+            Get(address) => self.get(*address, msg_id, origin, network).await,
+            GetValue { address, ref key } => {
+                self.get_value(*address, key, msg_id, origin, network).await
+            }
+            GetShell(address) => self.get_shell(*address, msg_id, origin, network).await,
+            GetVersion(address) => self.get_version(*address, msg_id, origin, network).await,
+            ListEntries(address) => self.list_entries(*address, msg_id, origin, network).await,
+            ListKeys(address) => self.list_keys(*address, msg_id, origin, network).await,
+            ListValues(address) => self.list_values(*address, msg_id, origin, network).await,
+            ListPermissions(address) => {
+                self.list_permissions(*address, msg_id, origin, network)
+                    .await
+            }
             ListUserPermissions { address, user } => {
-                self.list_user_permissions(*address, *user, msg_id, origin)
+                self.list_user_permissions(*address, *user, msg_id, origin, network)
                     .await
             }
         }
@@ -64,29 +70,41 @@ impl MapStorage {
         write: MapWrite,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         use MapWrite::*;
         match write {
-            New(data) => self.create(&data, msg_id, origin).await,
-            Delete(address) => self.delete(address, msg_id, origin).await,
+            New(data) => self.create(&data, msg_id, origin, network).await,
+            Delete(address) => self.delete(address, msg_id, origin, network).await,
             SetUserPermissions {
                 address,
                 user,
                 ref permissions,
                 version,
             } => {
-                self.set_user_permissions(address, user, permissions, version, msg_id, origin)
-                    .await
+                self.set_user_permissions(
+                    address,
+                    user,
+                    permissions,
+                    version,
+                    msg_id,
+                    origin,
+                    network,
+                )
+                .await
             }
             DelUserPermissions {
                 address,
                 user,
                 version,
             } => {
-                self.delete_user_permissions(address, user, version, msg_id, origin)
+                self.delete_user_permissions(address, user, version, msg_id, origin, network)
                     .await
             }
-            Edit { address, changes } => self.edit_entries(address, changes, msg_id, origin).await,
+            Edit { address, changes } => {
+                self.edit_entries(address, changes, msg_id, origin, network)
+                    .await
+            }
         }
     }
 
@@ -109,7 +127,8 @@ impl MapStorage {
         origin: EndUser,
         msg_id: MessageId,
         mutation_fn: F,
-    ) -> Result<NodeMessagingDuty>
+        network: &Network,
+    ) -> Result<()>
     where
         F: FnOnce(Map) -> NdResult<Map>,
     {
@@ -121,7 +140,7 @@ impl MapStorage {
             Err(error) => Err(error),
         };
 
-        self.ok_or_error(result, msg_id, origin).await
+        self.ok_or_error(result, msg_id, origin, network).await
     }
 
     /// Put Map.
@@ -130,13 +149,14 @@ impl MapStorage {
         data: &Map,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let result = if self.chunks.has(data.address()) {
             Err(Error::DataExists)
         } else {
             self.chunks.put(&data).await
         };
-        self.ok_or_error(result, msg_id, origin).await
+        self.ok_or_error(result, msg_id, origin, network).await
     }
 
     async fn delete(
@@ -144,7 +164,8 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let result = match self.chunks.get(&address) {
             Ok(map) => match map.check_is_owner(origin.id()) {
                 Ok(()) => {
@@ -159,7 +180,7 @@ impl MapStorage {
             Err(error) => Err(error),
         };
 
-        self.ok_or_error(result, msg_id, origin).await
+        self.ok_or_error(result, msg_id, origin, network).await
     }
 
     /// Set Map user permissions.
@@ -171,12 +192,19 @@ impl MapStorage {
         version: u64,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
-        self.edit_chunk(&address, origin, msg_id, move |mut data| {
-            data.check_permissions(MapAction::ManagePermissions, origin.id())?;
-            data.set_user_permissions(user, permissions.clone(), version)?;
-            Ok(data)
-        })
+        network: &Network,
+    ) -> Result<()> {
+        self.edit_chunk(
+            &address,
+            origin,
+            msg_id,
+            move |mut data| {
+                data.check_permissions(MapAction::ManagePermissions, origin.id())?;
+                data.set_user_permissions(user, permissions.clone(), version)?;
+                Ok(data)
+            },
+            network,
+        )
         .await
     }
 
@@ -188,12 +216,19 @@ impl MapStorage {
         version: u64,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
-        self.edit_chunk(&address, origin, msg_id, move |mut data| {
-            data.check_permissions(MapAction::ManagePermissions, origin.id())?;
-            data.del_user_permissions(user, version)?;
-            Ok(data)
-        })
+        network: &Network,
+    ) -> Result<()> {
+        self.edit_chunk(
+            &address,
+            origin,
+            msg_id,
+            move |mut data| {
+                data.check_permissions(MapAction::ManagePermissions, origin.id())?;
+                data.del_user_permissions(user, version)?;
+                Ok(data)
+            },
+            network,
+        )
         .await
     }
 
@@ -204,11 +239,18 @@ impl MapStorage {
         actions: MapEntryActions,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
-        self.edit_chunk(&address, origin, msg_id, move |mut data| {
-            data.mutate_entries(actions, origin.id())?;
-            Ok(data)
-        })
+        network: &Network,
+    ) -> Result<()> {
+        self.edit_chunk(
+            &address,
+            origin,
+            msg_id,
+            move |mut data| {
+                data.mutate_entries(actions, origin.id())?;
+                Ok(data)
+            },
+            network,
+        )
         .await
     }
 
@@ -218,23 +260,26 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let result = match self.get_chunk(&address, origin, MapAction::Read) {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::GetMap(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        network
+            .send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response: QueryResponse::GetMap(result),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            })
+            .await
     }
 
     /// Get Map shell.
@@ -243,7 +288,8 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let result = match self
             .get_chunk(&address, origin, MapAction::Read)
             .map(|data| data.shell())
@@ -252,17 +298,19 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::GetMapShell(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        network
+            .send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response: QueryResponse::GetMapShell(result),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            })
+            .await
     }
 
     /// Get Map version.
@@ -271,7 +319,8 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let result = match self
             .get_chunk(&address, origin, MapAction::Read)
             .map(|data| data.version())
@@ -280,17 +329,19 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::GetMapVersion(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        network
+            .send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response: QueryResponse::GetMapVersion(result),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            })
+            .await
     }
 
     /// Get Map value.
@@ -300,7 +351,8 @@ impl MapStorage {
         key: &[u8],
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let res = self.get_chunk(&address, origin, MapAction::Read);
         let result = match res.and_then(|data| match data {
             Map::Seq(map) => map
@@ -318,17 +370,19 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::GetMapValue(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        network
+            .send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response: QueryResponse::GetMapValue(result),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            })
+            .await
     }
 
     /// Get Map keys.
@@ -337,7 +391,8 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let result = match self
             .get_chunk(&address, origin, MapAction::Read)
             .map(|data| data.keys())
@@ -346,17 +401,19 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::ListMapKeys(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        network
+            .send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response: QueryResponse::ListMapKeys(result),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            })
+            .await
     }
 
     /// Get Map values.
@@ -365,7 +422,8 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let res = self.get_chunk(&address, origin, MapAction::Read);
         let result = match res.map(|data| match data {
             Map::Seq(map) => map.values().into(),
@@ -375,17 +433,19 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::ListMapValues(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        network
+            .send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response: QueryResponse::ListMapValues(result),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            })
+            .await
     }
 
     /// Get Map entries.
@@ -394,7 +454,8 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let res = self.get_chunk(&address, origin, MapAction::Read);
         let result = match res.map(|data| match data {
             Map::Seq(map) => map.entries().clone().into(),
@@ -404,17 +465,19 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::ListMapEntries(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        network
+            .send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response: QueryResponse::ListMapEntries(result),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            })
+            .await
     }
 
     /// Get Map permissions.
@@ -423,7 +486,8 @@ impl MapStorage {
         address: MapAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let result = match self
             .get_chunk(&address, origin, MapAction::Read)
             .map(|data| data.permissions())
@@ -432,17 +496,19 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::ListMapPermissions(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        network
+            .send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response: QueryResponse::ListMapPermissions(result),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            })
+            .await
     }
 
     /// Get Map user permissions.
@@ -452,7 +518,8 @@ impl MapStorage {
         user: PublicKey,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let result = match self
             .get_chunk(&address, origin, MapAction::Read)
             .and_then(|data| {
@@ -464,32 +531,10 @@ impl MapStorage {
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::ListMapUserPermissions(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
-    }
-
-    async fn ok_or_error(
-        &self,
-        result: Result<()>,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
-        if let Err(error) = result {
-            let messaging_error = convert_to_error_message(error)?;
-            info!("MapStorage: Writing chunk FAILED!");
-
-            Ok(NodeMessagingDuty::Send(OutgoingMsg {
-                msg: Message::CmdError {
-                    error: CmdError::Data(messaging_error),
+        network
+            .send(OutgoingMsg {
+                msg: Message::QueryResponse {
+                    response: QueryResponse::ListMapUserPermissions(result),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                     target_section_pk: None,
@@ -497,10 +542,37 @@ impl MapStorage {
                 section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                 dst: DstLocation::EndUser(origin),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            }))
+            })
+            .await
+    }
+
+    async fn ok_or_error(
+        &self,
+        result: Result<()>,
+        msg_id: MessageId,
+        origin: EndUser,
+        network: &Network,
+    ) -> Result<()> {
+        if let Err(error) = result {
+            let messaging_error = convert_to_error_message(error)?;
+            info!("MapStorage: Writing chunk FAILED!");
+
+            network
+                .send(OutgoingMsg {
+                    msg: Message::CmdError {
+                        error: CmdError::Data(messaging_error),
+                        id: MessageId::in_response_to(&msg_id),
+                        correlation_id: msg_id,
+                        target_section_pk: None,
+                    },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                    dst: DstLocation::EndUser(origin),
+                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                })
+                .await
         } else {
             info!("MapStorage: Writing chunk PASSED!");
-            Ok(NodeMessagingDuty::NoOp)
+            Ok(())
         }
     }
 }

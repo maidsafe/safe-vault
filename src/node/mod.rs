@@ -6,17 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod data_section;
 mod genesis;
 mod handle_msg;
 mod messaging;
-mod node_ops;
-pub mod state_db;
 mod transfers;
+mod metadata;
 mod work;
 
-use hex_fmt::HexFmt;
+pub(crate) mod node_ops;
+pub mod state_db;
 
+use hex_fmt::HexFmt;
 use crate::{
+    capacity::ChunkHolderDbs,
     chunk_store::UsedSpace,
     node::{
         genesis::GenesisStage,
@@ -46,6 +49,7 @@ use std::{
 };
 
 use self::transfers::Transfers;
+use self::data_section::DataSection;
 
 /// Info about the node.
 #[derive(Clone)]
@@ -91,6 +95,9 @@ pub struct Node {
     network_api: Network,
     network_events: EventStream,
     node_info: NodeInfo,
+
+    // data operations
+    data_section: DataSection,
 
     //old elder
     prefix: Option<Prefix>,
@@ -161,12 +168,16 @@ impl Node {
 
         let messaging = Messaging::new(network_api.clone());
 
+        let dbs = ChunkHolderDbs::new(node_info.path())?;
+        let data_section = DataSection::new(&node_info, dbs, network_api.clone()).await?;
+
         debug!("NEW NODE after messaging");
 
         let node = Self {
             prefix: Some(network_api.our_prefix().await),
             node_name: network_api.our_name().await,
             node_id: network_api.public_key().await,
+            data_section,
 
             // interaction: NodeInteraction::new(network_api.clone()),
             node_info,

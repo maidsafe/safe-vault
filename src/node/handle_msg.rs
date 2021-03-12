@@ -31,6 +31,8 @@ use sn_messaging::{
 };
 use sn_routing::XorName;
 
+use super::node_ops::MetadataDuty;
+
 /// Evaluates remote msgs from the network,
 /// i.e. not msgs sent directly from a client.
 // pub struct HandleMessage {
@@ -47,6 +49,7 @@ use sn_routing::XorName;
 // }
 
 impl Node {
+    /// Handle incoming message to the Node
     pub async fn handle_msg(
         &mut self,
         msg: Message,
@@ -56,7 +59,7 @@ impl Node {
         debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
         let msg_id = msg.id();
         if let SrcLocation::EndUser(origin) = src {
-            self.match_user_sent_msg(msg.clone(), origin)?
+            self.match_user_sent_msg(msg.clone(), origin).await?
             // if res.is_empty() {
             //     return Err(Error::InvalidMessage(
             //         msg_id,
@@ -93,14 +96,18 @@ impl Node {
         }
     }
 
-    fn match_user_sent_msg(&self, msg: Message, origin: EndUser) -> Result<()> {
+    async fn match_user_sent_msg(&mut self, msg: Message, origin: EndUser) -> Result<()> {
         match msg {
             // TODO: match and parse directly
-            // Message::Query {
-            //     query: Query::Data(query),
-            //     id,
-            //     ..
-            // } => NetworkDuties::from(MetadataDuty::ProcessRead { query, id, origin }),
+            Message::Query {
+                query: Query::Data(query),
+                id,
+                ..
+            } => {
+                self.data_section
+                    .process_metadata_duty(MetadataDuty::ProcessRead { query, id, origin })
+                    .await
+            }
             // Message::Cmd {
             //     cmd: Cmd::Data { .. },
             //     id,

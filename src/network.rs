@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::node_ops::OutgoingMsg;
 use crate::{node::state_db::AgeGroup, utils, Config as NodeConfig, Error, Result};
 use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
@@ -14,10 +15,10 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use bls::{PublicKeySet, PublicKeyShare as BlsPublicKeyShare};
 
 use futures::lock::Mutex;
-use log::debug;
+use log::{debug, error};
 use serde::Serialize;
 use sn_data_types::{Error as DtError, PublicKey, Result as DtResult, Signature};
-use sn_messaging::Itinerary;
+use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
     SectionChain,
@@ -118,7 +119,7 @@ impl Network {
             .map(|key| PublicKey::Bls(key))
     }
 
-    pub async fn our_public_key_set(&self) -> Result<bls::PublicKeySet> {
+    pub async fn our_public_key_set(&self) -> Result<PublicKeySet> {
         self.routing
             .lock()
             .await
@@ -151,8 +152,48 @@ impl Network {
             .await
     }
 
+    pub async fn send_to_nodes(&self, targets: BTreeSet<XorName>, msg: &Message) -> Result<()> {
+        let name = self.our_name().await;
+        let bytes = &msg.serialize()?;
+        for target in targets {
+            self.send_message(
+                Itinerary {
+                    src: SrcLocation::Node(name),
+                    dst: DstLocation::Node(XorName(target.0)),
+                    aggregation: Aggregation::AtDestination,
+                },
+                bytes.clone(),
+            )
+            .await
+            .map_or_else(
+                |err| {
+                    error!("Unable to send Message to Peer: {:?}", err);
+                },
+                |()| {},
+            );
+        }
+        Ok(())
+    }
+
+    pub async fn send(&self, msg: OutgoingMsg) -> Result<()> {
+        let itry = Itinerary {
+            src: SrcLocation::Node(self.our_name().await),
+            dst: msg.dst,
+            aggregation: msg.aggregation,
+        };
+        let result = self.send_message(itry, msg.msg.serialize()?).await;
+
+        result.map_or_else(
+            |err| {
+                error!("Unable to send msg: {:?}", err);
+                Err(Error::Logic(format!("Unable to send msg: {:?}", msg.id())))
+            },
+            |()| Ok(()),
+        )
+    }
+
     pub async fn send_message(
-        &mut self,
+        &self,
         itinerary: Itinerary,
         content: Bytes,
     ) -> Result<(), RoutingError> {

@@ -66,11 +66,12 @@ impl BlobRegister {
         write: BlobWrite,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         use BlobWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, origin).await,
-            DeletePrivate(address) => self.delete(address, msg_id, origin).await,
+            New(data) => self.store(data, msg_id, origin, network).await,
+            DeletePrivate(address) => self.delete(address, msg_id, origin, network).await,
         }
     }
 
@@ -79,26 +80,29 @@ impl BlobRegister {
         data: Blob,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
         let target_holders = if let Ok(metadata) = self.get_metadata_for(*data.address()).await {
             if metadata.holders.len() == CHUNK_COPY_COUNT {
                 if data.is_public() {
                     trace!("{}: All good, {:?}, chunk already exists.", self, data);
-                    return Ok(NodeMessagingDuty::NoOp);
+                    return Ok(());
                 } else {
-                    return Ok(NodeMessagingDuty::Send(OutgoingMsg {
-                        msg: Message::CmdError {
-                            error: CmdError::Data(ErrorMessage::DataExists),
-                            id: MessageId::in_response_to(&msg_id),
-                            correlation_id: msg_id,
-                            target_section_pk: None,
-                        },
-                        section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-                        dst: DstLocation::EndUser(origin),
-                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                    }));
+                    return network
+                        .send(OutgoingMsg {
+                            msg: Message::CmdError {
+                                error: CmdError::Data(ErrorMessage::DataExists),
+                                id: MessageId::in_response_to(&msg_id),
+                                correlation_id: msg_id,
+                                target_section_pk: None,
+                            },
+                            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                            dst: DstLocation::EndUser(origin),
+                            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                        })
+                        .await;
                 }
             } else {
                 let mut existing_holders = metadata.holders;
@@ -155,10 +159,7 @@ impl BlobRegister {
             id: msg_id,
             target_section_pk: None,
         };
-        Ok(NodeMessagingDuty::SendToAdults {
-            targets: target_holders,
-            msg,
-        })
+        network.send_to_nodes(target_holders, &msg).await
     }
 
     async fn send_blob_cmd_error(
@@ -166,19 +167,22 @@ impl BlobRegister {
         error: Error,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let message_error = convert_to_error_message(error)?;
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::CmdError {
-                error: CmdError::Data(message_error),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        network
+            .send(OutgoingMsg {
+                msg: Message::CmdError {
+                    error: CmdError::Data(message_error),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            })
+            .await
     }
 
     async fn delete(
@@ -186,10 +190,15 @@ impl BlobRegister {
         address: BlobAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let metadata = match self.get_metadata_for(address).await {
             Ok(metadata) => metadata,
-            Err(error) => return self.send_blob_cmd_error(error, msg_id, origin).await,
+            Err(error) => {
+                return self
+                    .send_blob_cmd_error(error, msg_id, origin, network)
+                    .await
+            }
         };
 
         // todo: use signature verification instead
@@ -200,6 +209,7 @@ impl BlobRegister {
                         Error::NetworkData(DtError::AccessDenied(*origin.id())),
                         msg_id,
                         origin,
+                        network,
                     )
                     .await;
             }
@@ -225,10 +235,7 @@ impl BlobRegister {
             id: msg_id,
             target_section_pk: None,
         };
-        Ok(NodeMessagingDuty::SendToAdults {
-            targets: metadata.holders,
-            msg,
-        })
+        network.send_to_nodes(metadata.holders, &msg).await
     }
 
     async fn set_chunk_holder(
@@ -391,10 +398,11 @@ impl BlobRegister {
         read: &BlobRead,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         use BlobRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin).await,
+            Get(address) => self.get(*address, msg_id, origin, network).await,
         }
     }
 
@@ -403,7 +411,8 @@ impl BlobRegister {
         address: BlobAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+        network: &Network,
+    ) -> Result<()> {
         let query_error = |error: Error| async {
             let message_error = convert_to_error_message(error)?;
             let err_msg = Message::QueryResponse {
@@ -412,12 +421,14 @@ impl BlobRegister {
                 correlation_id: msg_id,
                 target_section_pk: None,
             };
-            Ok(NodeMessagingDuty::Send(OutgoingMsg {
-                msg: err_msg,
-                section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            }))
+            network
+                .send(OutgoingMsg {
+                    msg: err_msg,
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                    dst: DstLocation::EndUser(origin),
+                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                })
+                .await
         };
 
         let metadata = match self.get_metadata_for(address).await {
@@ -438,10 +449,7 @@ impl BlobRegister {
             id: msg_id,
             target_section_pk: None,
         };
-        Ok(NodeMessagingDuty::SendToAdults {
-            targets: metadata.holders,
-            msg,
-        })
+        network.send_to_nodes(metadata.holders, &msg).await
     }
 
     #[allow(unused)]

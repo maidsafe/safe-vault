@@ -35,6 +35,7 @@ use xor_name::XorName;
 /// all underlying data being chunks stored at `Adults`.
 pub struct Metadata {
     elder_stores: ElderStores,
+    network: Network,
 }
 
 impl Metadata {
@@ -44,23 +45,26 @@ impl Metadata {
         // rewards_and_wallets: RewardsAndWallets,
         network: Network,
     ) -> Result<Self> {
-        let blob_register = BlobRegister::new(dbs, network);
+        let blob_register = BlobRegister::new(dbs, network.clone());
         let map_storage = MapStorage::new(node_info).await?;
         let sequence_storage = SequenceStorage::new(node_info).await?;
         let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
-        Ok(Self { elder_stores })
+        Ok(Self {
+            elder_stores,
+            network,
+        })
     }
 
-    pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Result<NetworkDuties> {
+    pub async fn process_metadata_duty(&mut self, duty: MetadataDuty) -> Result<()> {
         use MetadataDuty::*;
         match duty {
             ProcessRead { query, id, origin } => {
-                reading::get_result(query, id, origin, &self.elder_stores).await
+                reading::get_result(query, id, origin, &self.elder_stores, &self.network).await
             }
             ProcessWrite { cmd, id, origin } => {
-                writing::get_result(cmd, id, origin, &mut self.elder_stores).await
+                writing::get_result(cmd, id, origin, &mut self.elder_stores, &self.network).await
             }
-            NoOp => Ok(vec![]),
+            NoOp => Ok(()),
         }
     }
 
