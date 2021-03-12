@@ -97,11 +97,11 @@ pub async fn handle_network_event(event: RoutingEvent, network_api: Network) -> 
                     if is_forming_genesis(network_api).await {
                         return Ok(vec![NodeDuty::BeginFormingGenesisSection]);
                     } else {
+                        return Ok(vec![NodeDuty::LevelUp]);
                         // After genesis section formation, any new Elder will be informed
                         // by its peers of data required.
                         // It may also request this if missing.
                         // For now we start with defaults
-                        debug!("TODO: FINISH ELDER MAKING");
                         // unimplemented!("PROMOTED");
 
                         // Ok(NetworkDuties::from(NodeDuty::CompleteTransitionToElder{

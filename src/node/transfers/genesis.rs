@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{replica_signing::ReplicaSigningImpl, replicas::Replicas, ReplicaInfo};
 use crate::{Error, Network, NodeInfo, Result};
-use super::{ReplicaInfo, replica_signing::ReplicaSigningImpl, replicas::Replicas};
 use sn_data_types::{ActorHistory, Credit, CreditAgreementProof, PublicKey, SignedCredit, Token};
 use std::collections::BTreeMap;
 

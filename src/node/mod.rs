@@ -38,7 +38,7 @@ use hex_fmt::HexFmt;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use futures::lock::Mutex;
 use log::{debug, error, info, trace};
-use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, WalletInfo};
+use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, TransferPropagated, WalletInfo};
 use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
@@ -250,24 +250,14 @@ impl Node {
                     self.network_api.clone(),
                 )
                 .await?;
-                if let GenesisStage::Completed(genesis_tx) = &self.genesis_stage {
-                    let dbs = ChunkHolderDbs::new(self.node_info.path())?;
-                    let reader = AdultReader::new(self.network_api.clone());
-                    let meta_data = Metadata::new(&self.node_info, dbs, reader).await?;
-                    self.meta_data = Some(meta_data);
-
-                    let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
-                    let rate_limit =
-                        RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
-                    let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
-                    let replicas =
-                        transfer_replicas(&self.node_info, self.network_api.clone(), user_wallets)
-                            .await?;
-                    let transfers = Transfers::new(replicas, rate_limit);
-                    // does local init, with no roundrip via network messaging
-                    transfers.genesis(genesis_tx.clone()).await?;
-                    self.transfers = Some(transfers);
-                }
+                let genesis_tx = match &self.genesis_stage {
+                    GenesisStage::Completed(genesis_tx) => genesis_tx.clone(),
+                    _ => return Ok(vec![]),
+                };
+                self.level_up(Some(genesis_tx)).await?;
+            }
+            NodeDuty::LevelUp => {
+                self.level_up(None).await?;
             }
             NodeDuty::AssumeAdultDuties => {}
             NodeDuty::UpdateElderInfo {
@@ -313,6 +303,26 @@ impl Node {
             NodeDuty::NoOp => {}
         }
         Ok(vec![])
+    }
+
+    async fn level_up(&mut self, genesis_tx: Option<TransferPropagated>) -> Result<()> {
+        let dbs = ChunkHolderDbs::new(self.node_info.path())?;
+        let reader = AdultReader::new(self.network_api.clone());
+        let meta_data = Metadata::new(&self.node_info, dbs, reader).await?;
+        self.meta_data = Some(meta_data);
+
+        let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
+        let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
+        let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
+        let replicas =
+            transfer_replicas(&self.node_info, self.network_api.clone(), user_wallets).await?;
+        let transfers = Transfers::new(replicas, rate_limit);
+        // does local init, with no roundrip via network messaging
+        if let Some(genesis_tx) = genesis_tx {
+            transfers.genesis(genesis_tx.clone()).await?;
+        }
+        self.transfers = Some(transfers);
+        Ok(())
     }
 
     fn handle_error(&self, err: &Error) {
