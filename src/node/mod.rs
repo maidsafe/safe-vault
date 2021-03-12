@@ -6,18 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-// mod adult_duties;
-// mod elder_duties;
-// mod node_duties;
-pub mod data_section;
-pub mod key_section;
-mod node_ops;
-pub mod state_db;
-use crdts::Actor;
-use serde::Serialize;
 mod genesis;
 mod handle_msg;
+pub mod key_section;
 mod messaging;
+mod node_ops;
+pub mod state_db;
 mod work;
 
 use hex_fmt::HexFmt;
@@ -25,43 +19,33 @@ use hex_fmt::HexFmt;
 use crate::{
     chunk_store::UsedSpace,
     node::{
-        data_section::{DataSection, RewardData},
         genesis::GenesisStage,
-        key_section::transfers::replica_signing::ReplicaSigningImpl,
         key_section::WalletSection,
         messaging::Messaging,
-        node_ops::{NetworkDuties, NodeDuty, NodeMessagingDuty, OutgoingMsg},
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup},
     },
     Config, Error, Network, Result,
 };
 use bls::SecretKey;
 // use handle_msg::handle_msg;
-use log::{debug, error, info, trace};
-use sn_data_types::{
-    ActorHistory, Credit, NodeRewardStage, PublicKey, ReplicaPublicKeySet, Signature,
-    SignatureShare, SignedCredit, Token, TransferPropagated, WalletInfo,
-};
-use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
-use std::collections::BTreeMap;
-use std::{
-    fmt::{self, Display, Formatter},
-    net::SocketAddr,
-};
-
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
-
+use futures::lock::Mutex;
+use log::{debug, error, info, trace};
+use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, WalletInfo};
 use sn_messaging::{
     client::TransientElderKey,
     client::{Message, MsgSender, NodeCmd, NodeSystemCmd},
     Aggregation, DstLocation, MessageId,
 };
-
-use futures::lock::Mutex;
+use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
-use std::sync::Arc;
-
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::{
+    fmt::{self, Display, Formatter},
+    net::SocketAddr,
+};
 
 /// Info about the node.
 #[derive(Clone)]
@@ -137,6 +121,14 @@ pub struct Node {
     // dbs: ChunkHolderDbs
     // replica_signing: ReplicaSigningImpl,
 }
+// ///
+// pub async fn metadata(
+//     info: &NodeInfo,
+//     dbs: ChunkHolderDbs,
+//     network: Network,
+// ) -> Result<Metadata> {
+//     Metadata::new(info, dbs, network.clone()).await
+// }
 
 impl Node {
     /// Initialize a new node.
