@@ -6,30 +6,30 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::RewardsAndWallets, Error, Result};
+use crate::{Error, Result};
 use log::info;
 use sn_data_types::{
     Credit, CreditAgreementProof, ReplicaPublicKeySet, SignatureShare, SignedCredit,
+    TransferPropagated,
 };
 use std::collections::BTreeMap;
 
-pub(crate) struct GenesisProposal {
-    // pub rewards_and_wallets: RewardsAndWallets,
+pub struct GenesisProposal {
     pub proposal: Credit,
     pub signatures: BTreeMap<usize, bls::SignatureShare>,
     pub pending_agreement: Option<SignedCredit>,
 }
 
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum GenesisStage {
+pub enum GenesisStage {
     None,
     AwaitingGenesisThreshold,
     ProposingGenesis(GenesisProposal),
     AccumulatingGenesis(GenesisAccumulation),
+    Completed(TransferPropagated),
 }
 
-pub(crate) struct GenesisAccumulation {
-    // pub rewards_and_wallets: RewardsAndWallets,
+pub struct GenesisAccumulation {
     pub agreed_proposal: SignedCredit,
     pub signatures: BTreeMap<usize, bls::SignatureShare>,
     pub pending_agreement: Option<CreditAgreementProof>,

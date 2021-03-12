@@ -23,7 +23,7 @@ use xor_name::Prefix;
 
 #[cfg(feature = "simulated-payouts")]
 use {
-    crate::node::node_ops::NodeMessagingDuty,
+    crate::node::node_ops::NodeDuty,
     bls::{SecretKey, SecretKeySet},
     log::debug,
     rand::thread_rng,
@@ -488,7 +488,7 @@ impl<T: ReplicaSigning> Replicas<T> {
     // ------------------------------------------------------------------
 
     #[cfg(feature = "simulated-payouts")]
-    pub async fn credit_without_proof(&self, transfer: Transfer) -> Result<NodeMessagingDuty> {
+    pub async fn credit_without_proof(&self, transfer: Transfer) -> Result<NodeDuty> {
         debug!("Performing credit without proof");
 
         let debit = transfer.debit();
@@ -539,7 +539,7 @@ impl<T: ReplicaSigning> Replicas<T> {
             credit_proof: transfer_proof.credit_proof(),
         }))?;
 
-        Ok(NodeMessagingDuty::NoOp)
+        Ok(NodeDuty::NoOp)
     }
 
     #[cfg(feature = "simulated-payouts")]

@@ -15,7 +15,7 @@ use sn_data_types::{
     TransferAgreementProof, TransferValidated, WalletInfo,
 };
 use sn_messaging::{client::Message, Aggregation, DstLocation, EndUser, MessageId, SrcLocation};
-use sn_routing::{Event as RoutingEvent, Prefix};
+use sn_routing::Prefix;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Formatter},
@@ -34,6 +34,9 @@ use xor_name::XorName;
 /// Finally, an internal message might be destined for Messaging
 /// module, by which it leaves the process boundary of this node
 /// and is sent on the wire to some other destination(s) on the network.
+
+/// Vec of NodeDuty
+pub type NodeDuties = Vec<NodeDuty>;
 
 /// Vec of NetworkDuty
 pub type NetworkDuties = Vec<NetworkDuty>;
@@ -54,8 +57,8 @@ pub enum NetworkDuty {
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
-    /// Get section actor replicas'.
-    GetSectionPkSet {
+    /// Get section elders.
+    GetSectionElders {
         msg_id: MessageId,
         origin: SrcLocation,
     },
@@ -105,30 +108,57 @@ pub enum NodeDuty {
         node_rewards: BTreeMap<XorName, NodeRewardStage>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },
-    /// Sending messages on to the network.
-    ProcessMessaging(NodeMessagingDuty),
-    /// Receiving and processing events from the network.
-    ProcessNetworkEvent(RoutingEvent),
-    NoOp,
+    ProcessNewMember(XorName),
+    /// As members are lost for various reasons
+    /// there are certain things the Elders need
+    /// to do, to update for that.
+    ProcessLostMember {
+        name: XorName,
+        age: u8,
+    },
+    ProcessRelocatedMember {
+        /// The id of the node at the previous section.
+        old_node_id: XorName,
+        /// The id of the node at its new section (i.e. this one).
+        new_node_id: XorName,
+        // The age of the node (among things determines if it is eligible for rewards yet).
+        age: u8,
+    },
     /// Storage reaching max capacity.
-    StorageFull,
+    ReachingMaxCapacity,
+    /// Increment count of full nodes in the network
+    IncrementFullNodeCount {
+        /// Node ID of node that reached max capacity.
+        node_id: PublicKey,
+    },
+    SwitchNodeJoin(bool),
+    /// Send a message to the specified dst.
+    Send(OutgoingMsg),
+    /// Send the same request to each individual node.
+    SendToNodes {
+        targets: BTreeSet<XorName>,
+        msg: Message,
+    },
+    ProcessRead {
+        query: sn_messaging::client::DataQuery,
+        id: MessageId,
+        origin: EndUser,
+    },
+    ProcessWrite {
+        cmd: sn_messaging::client::DataCmd,
+        id: MessageId,
+        origin: EndUser,
+    },
+    NoOp,
 }
 
-impl From<NodeDuty> for NetworkDuties {
+impl From<NodeDuty> for NodeDuties {
     fn from(duty: NodeDuty) -> Self {
-        use NetworkDuty::*;
         if matches!(duty, NodeDuty::NoOp) {
             vec![]
         } else {
-            vec![RunAsNode(duty)]
+            vec![duty]
         }
-    }
-}
-
-impl From<NodeDuty> for NetworkDuty {
-    fn from(duty: NodeDuty) -> Self {
-        use NetworkDuty::*;
-        RunAsNode(duty)
     }
 }
 
@@ -136,18 +166,27 @@ impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InformNewElders => write!(f, "InformNewElders"),
-            Self::GetSectionPkSet { .. } => write!(f, "GetSectionPkSet"),
+            Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
             Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),
             Self::BeginFormingGenesisSection => write!(f, "BeginFormingGenesisSection"),
             Self::CompleteTransitionToElder { .. } => write!(f, "CompleteTransitionToElder"),
-            Self::ProcessMessaging(duty) => write!(f, "ProcessMessaging({:?})", duty),
-            Self::ProcessNetworkEvent(event) => write!(f, "ProcessNetworkEvent({:?}", event),
             Self::NoOp => write!(f, "No op."),
-            Self::StorageFull => write!(f, "StorageFull"),
+            Self::ReachingMaxCapacity => write!(f, "ReachingMaxCapacity"),
             Self::UpdateElderInfo { .. } => write!(f, "UpdateElderInfo"),
             Self::CompleteElderChange { .. } => write!(f, "CompleteElderChange"),
+            Self::ProcessNewMember(_) => write!(f, "ProcessNewMember"),
+            Self::ProcessLostMember { .. } => write!(f, "ProcessLostMember"),
+            Self::ProcessRelocatedMember { .. } => write!(f, "ProcessRelocatedMember"),
+            Self::IncrementFullNodeCount { .. } => write!(f, "IncrementFullNodeCount"),
+            Self::SwitchNodeJoin(_) => write!(f, "SwitchNodeJoin"),
+            Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),
+            Self::SendToNodes { targets, msg } => {
+                write!(f, "SendToNodes [ targets: {:?}, msg: {:?} ]", targets, msg)
+            }
+            Self::ProcessRead { .. } => write!(f, "ProcessRead"),
+            Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
         }
     }
 }
@@ -173,46 +212,45 @@ impl OutgoingMsg {
 /// part of the system, that it can be considered domain.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeMessagingDuty {
-    /// Send a message to the specified dst.
-    Send(OutgoingMsg),
-    /// Send the same request to each individual Adult.
-    SendToAdults {
-        targets: BTreeSet<XorName>,
-        msg: Message,
-    },
     // No operation
     NoOp,
-}
-
-impl From<NodeMessagingDuty> for NetworkDuties {
-    fn from(duty: NodeMessagingDuty) -> Self {
-        use NetworkDuty::*;
-        use NodeDuty::*;
-        if matches!(duty, NodeMessagingDuty::NoOp) {
-            vec![]
-        } else {
-            vec![RunAsNode(ProcessMessaging(duty))]
-        }
-    }
-}
-
-impl From<NodeMessagingDuty> for NetworkDuty {
-    fn from(duty: NodeMessagingDuty) -> Self {
-        use NetworkDuty::*;
-        use NodeDuty::*;
-        RunAsNode(ProcessMessaging(duty))
-    }
 }
 
 impl Debug for NodeMessagingDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),
-            Self::SendToAdults { targets, msg } => {
-                write!(f, "SendToAdults [ targets: {:?}, msg: {:?} ]", targets, msg)
-            }
             Self::NoOp => write!(f, "No op."),
         }
+    }
+}
+
+// --------------- Adult ---------------
+
+/// Duties only run as an Adult.
+#[derive(Debug)]
+pub enum AdultDuty {
+    /// The main duty of an Adult is
+    /// storage and retrieval of data chunks.
+    RunAsChunkStore(ChunkStoreDuty),
+    RunAsChunkReplication(ChunkReplicationDuty),
+    NoOp,
+}
+
+impl From<AdultDuty> for NetworkDuties {
+    fn from(duty: AdultDuty) -> Self {
+        use NetworkDuty::*;
+        if matches!(duty, AdultDuty::NoOp) {
+            vec![]
+        } else {
+            vec![RunAsAdult(duty)]
+        }
+    }
+}
+
+impl From<AdultDuty> for NetworkDuty {
+    fn from(duty: AdultDuty) -> Self {
+        use NetworkDuty::*;
+        RunAsAdult(duty)
     }
 }
 
@@ -267,36 +305,6 @@ impl From<ElderDuty> for NetworkDuty {
     fn from(duty: ElderDuty) -> Self {
         use NetworkDuty::*;
         RunAsElder(duty)
-    }
-}
-
-// --------------- Adult ---------------
-
-/// Duties only run as an Adult.
-#[derive(Debug)]
-pub enum AdultDuty {
-    /// The main duty of an Adult is
-    /// storage and retrieval of data chunks.
-    RunAsChunkStore(ChunkStoreDuty),
-    RunAsChunkReplication(ChunkReplicationDuty),
-    NoOp,
-}
-
-impl From<AdultDuty> for NetworkDuties {
-    fn from(duty: AdultDuty) -> Self {
-        use NetworkDuty::*;
-        if matches!(duty, AdultDuty::NoOp) {
-            vec![]
-        } else {
-            vec![RunAsAdult(duty)]
-        }
-    }
-}
-
-impl From<AdultDuty> for NetworkDuty {
-    fn from(duty: AdultDuty) -> Self {
-        use NetworkDuty::*;
-        RunAsAdult(duty)
     }
 }
 

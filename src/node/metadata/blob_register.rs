@@ -9,12 +9,8 @@
 use crate::{
     capacity::ChunkHolderDbs,
     error::convert_to_error_message,
-    node::node_ops::{NetworkDuties, NodeMessagingDuty, OutgoingMsg},
-    Error,
-    Network,
-    Result,
-    ToDbKey,
-    // node::RewardsAndWallets
+    node::node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    Error, Network, Result, ToDbKey,
 };
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
@@ -50,15 +46,11 @@ struct HolderMetadata {
 /// Operations over the data type Blob.
 pub(super) struct BlobRegister {
     dbs: ChunkHolderDbs,
-    network: Network, // rewards_and_wallets: RewardsAndWallets,
 }
 
 impl BlobRegister {
-    pub(super) fn new(dbs: ChunkHolderDbs, network: Network) -> Self {
-        Self {
-            dbs,
-            network, // rewards_and_wallets,
-        }
+    pub(super) fn new(dbs: ChunkHolderDbs) -> Self {
+        Self { dbs }
     }
 
     pub(super) async fn write(
@@ -107,7 +99,7 @@ impl BlobRegister {
             } else {
                 let mut existing_holders = metadata.holders;
                 let closest_holders = self
-                    .get_holders_for_chunk(data.name())
+                    .get_holders_for_chunk(data.name(), network)
                     .await
                     .iter()
                     .cloned()
@@ -123,7 +115,7 @@ impl BlobRegister {
                 existing_holders
             }
         } else {
-            self.get_holders_for_chunk(data.name())
+            self.get_holders_for_chunk(data.name(), network)
                 .await
                 .iter()
                 .cloned()
@@ -337,7 +329,11 @@ impl BlobRegister {
         Ok(())
     }
 
-    pub(super) async fn replicate_chunks(&mut self, holder: XorName) -> Result<NetworkDuties> {
+    pub(super) async fn replicate_chunks(
+        &mut self,
+        holder: XorName,
+        network: &Network,
+    ) -> Result<NodeDuties> {
         trace!("Replicating chunks of holder {:?}", holder);
 
         let chunks_stored = match self.remove_holder(holder).await {
@@ -346,7 +342,7 @@ impl BlobRegister {
         };
         let mut cmds = Vec::new();
         for (address, holders) in chunks_stored {
-            cmds.extend(self.get_replication_msgs(address, holders).await);
+            cmds.extend(self.get_replication_msgs(address, holders, network).await);
         }
         Ok(cmds)
     }
@@ -355,11 +351,12 @@ impl BlobRegister {
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
-    ) -> NetworkDuties {
+        network: &Network,
+    ) -> NodeDuties {
         use NodeCmd::*;
         let mut node_ops = Vec::new();
         let messages = self
-            .get_new_holders_for_chunk(&address)
+            .get_new_holders_for_chunk(&address, network)
             .await
             .into_iter()
             .map(|new_holder| {
@@ -380,15 +377,12 @@ impl BlobRegister {
             })
             .collect::<Vec<_>>();
         for (msg, dst) in messages {
-            node_ops.push(
-                NodeMessagingDuty::Send(OutgoingMsg {
-                    msg,
-                    section_source: true, // i.e. errors go to our section
-                    dst: DstLocation::Node(dst),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                })
-                .into(),
-            );
+            node_ops.push(NodeDuty::Send(OutgoingMsg {
+                msg,
+                section_source: true, // i.e. errors go to our section
+                dst: DstLocation::Node(dst),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            }));
         }
         node_ops
     }
@@ -459,7 +453,7 @@ impl BlobRegister {
         holder: XorName,
         result: NdResult<()>,
         message_id: MessageId,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         let mut chunk_metadata = self.get_metadata_for(address).await.unwrap_or_default();
         let _ = chunk_metadata.holders.insert(holder);
         if let Err(error) = self
@@ -486,7 +480,7 @@ impl BlobRegister {
             );
         }
         info!("Replication process completed for: {:?}", message_id);
-        Ok(NodeMessagingDuty::NoOp)
+        Ok(NodeDuty::NoOp)
     }
 
     // Updates the metadata of the chunks help by a node that left.
@@ -579,8 +573,8 @@ impl BlobRegister {
 
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
-    async fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
-        self.network
+    async fn get_holders_for_chunk(&self, target: &XorName, network: &Network) -> Vec<XorName> {
+        network
             .our_adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
             // .adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
             .await
@@ -588,9 +582,13 @@ impl BlobRegister {
 
     // Returns `XorName`s of the new target holders for an Blob chunk.
     // Used to fetch the additional list of holders for existing chunks.
-    async fn get_new_holders_for_chunk(&self, target: &BlobAddress) -> BTreeSet<XorName> {
+    async fn get_new_holders_for_chunk(
+        &self,
+        target: &BlobAddress,
+        network: &Network,
+    ) -> BTreeSet<XorName> {
         let closest_holders = self
-            .get_holders_for_chunk(target.name())
+            .get_holders_for_chunk(target.name(), network)
             .await
             .iter()
             .cloned()

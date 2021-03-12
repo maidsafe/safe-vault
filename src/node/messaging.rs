@@ -6,96 +6,63 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::collections::BTreeSet;
-
-use crate::{
-    node::node_ops::{NetworkDuties, NodeMessagingDuty, OutgoingMsg},
-    Error,
-};
+use crate::{node::node_ops::OutgoingMsg, Error};
 use crate::{Network, Result};
 use log::error;
 use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::XorName;
+use std::collections::BTreeSet;
 
-/// Sending of messages
-/// to nodes and clients in the network.
-#[derive(Clone)]
-pub struct Messaging {
-    network: Network,
+pub(crate) async fn send(msg: OutgoingMsg, network: Network) -> Result<()> {
+    let src = if msg.section_source {
+        SrcLocation::Section(network.our_prefix().await.name())
+    } else {
+        SrcLocation::Node(network.our_name().await)
+    };
+    let itinerary = Itinerary {
+        src,
+        dst: msg.dst,
+        aggregation: msg.aggregation,
+    };
+    let result = network
+        .clone()
+        .send_message(itinerary, msg.msg.serialize()?)
+        .await;
+
+    result.map_or_else(
+        |err| {
+            error!("Unable to send msg: {:?}", err);
+            Err(Error::Logic(format!("Unable to send msg: {:?}", msg.id())))
+        },
+        |()| Ok(()),
+    )
 }
 
-impl Messaging {
-    pub fn new(network: Network) -> Self {
-        Self { network }
-    }
-
-    // pub async fn process_messaging_duty(&self, duty: NodeMessagingDuty) -> Result<()> {
-    //     use NodeMessagingDuty::*;
-    //     match duty {
-    //         Send(msg) => {
-    //             self.send(msg).await?;
-    //             Ok(())
-    //         }
-    //         SendToAdults { targets, msg } => {
-    //             self.send_to_nodes(targets, &msg).await?;
-    //             Ok(())
-    //         }
-    //         NoOp => Ok(()),
-    //     }
-    // }
-
-    pub(crate) async fn send(&self, msg: OutgoingMsg) -> Result<()> {
-        let src = if msg.section_source {
-            SrcLocation::Section(self.network.our_prefix().await.name())
-        } else {
-            SrcLocation::Node(self.network.our_name().await)
-        };
-        let itry = Itinerary {
-            src,
-            dst: msg.dst,
-            aggregation: msg.aggregation,
-        };
-        let result = self
-            .network
+pub(crate) async fn send_to_nodes(
+    targets: BTreeSet<XorName>,
+    msg: &Message,
+    network: Network,
+) -> Result<()> {
+    let name = network.our_name().await;
+    let bytes = &msg.serialize()?;
+    for target in targets {
+        network
             .clone()
-            .send_message(itry, msg.msg.serialize()?)
-            .await;
-
-        result.map_or_else(
-            |err| {
-                error!("Unable to send msg: {:?}", err);
-                Err(Error::Logic(format!("Unable to send msg: {:?}", msg.id())))
-            },
-            |()| Ok(()),
-        )
+            .send_message(
+                Itinerary {
+                    src: SrcLocation::Node(name),
+                    dst: DstLocation::Node(XorName(target.0)),
+                    aggregation: Aggregation::AtDestination,
+                },
+                bytes.clone(),
+            )
+            .await
+            .map_or_else(
+                |err| {
+                    error!("Unable to send Message to Peer: {:?}", err);
+                },
+                |()| {},
+            );
     }
-
-    pub(crate) async fn send_to_nodes(
-        &self,
-        targets: BTreeSet<XorName>,
-        msg: &Message,
-    ) -> Result<()> {
-        let name = self.network.our_name().await;
-        let bytes = &msg.serialize()?;
-        for target in targets {
-            self.network
-                .clone()
-                .send_message(
-                    Itinerary {
-                        src: SrcLocation::Node(name),
-                        dst: DstLocation::Node(XorName(target.0)),
-                        aggregation: Aggregation::AtDestination,
-                    },
-                    bytes.clone(),
-                )
-                .await
-                .map_or_else(
-                    |err| {
-                        error!("Unable to send Message to Peer: {:?}", err);
-                    },
-                    |()| {},
-                );
-        }
-        Ok(())
-    }
+    Ok(())
 }

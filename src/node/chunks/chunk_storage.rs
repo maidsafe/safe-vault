@@ -136,7 +136,7 @@ impl ChunkStorage {
         };
         info!("Sending NodeSystemQuery::GetChunk to existing holders");
 
-        Ok(NodeMessagingDuty::SendToAdults {
+        Ok(NodeMessagingDuty::SendToNodes {
             msg,
             targets: current_holders,
         })
