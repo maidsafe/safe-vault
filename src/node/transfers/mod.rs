@@ -12,8 +12,7 @@ pub mod replicas;
 pub mod store;
 mod test_utils;
 
-use self::replicas::Replicas;
-use super::ReplicaInfo;
+use self::{replica_signing::ReplicaSigning, replicas::Replicas};
 use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
@@ -72,6 +71,20 @@ apply operations that has a valid proof of agreement from the group.
 Replicas don't initiate transfers or drive the algo - only Actors do.
 */
 
+///
+#[derive(Clone, Debug)]
+pub struct ReplicaInfo<T>
+where
+    T: ReplicaSigning,
+{
+    pub id: bls::PublicKeyShare,
+    pub key_index: usize,
+    pub peer_replicas: bls::PublicKeySet,
+    pub section_chain: sn_routing::SectionChain,
+    pub signing: T,
+    pub initiating: bool,
+}
+
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.
 #[derive(Clone)]
@@ -102,25 +115,6 @@ impl Transfers {
     pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
         self.replicas.user_wallets()
     }
-
-    // /// Issues a query to existing Replicas
-    // /// asking for their events, as to catch up and
-    // /// start working properly in the group.
-    // pub async fn catchup_with_replicas(&self) -> Result<NetworkDuties> {
-    //     info!("Transfers: Catching up with transfer Replicas!");
-    //     // prepare replica init
-    //     let pub_key = PublicKey::Bls(self.replicas.replicas_pk_set().public_key());
-    //     Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
-    //         msg: Message::NodeQuery {
-    //             query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
-    //             id: MessageId::new(),
-    //             target_section_pk: None,
-    //         },
-    //         section_source: false, // sent as a single node, when catching up
-    //         dst: DstLocation::Section(pub_key.into()),
-    //         aggregation: Aggregation::None,
-    //     })))
-    // }
 
     /// When section splits, the Replicas in either resulting section
     /// also split the responsibility of the accounts.

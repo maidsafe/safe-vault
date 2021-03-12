@@ -8,10 +8,10 @@
 
 mod genesis;
 mod handle_msg;
-pub mod key_section;
 mod messaging;
 mod node_ops;
 pub mod state_db;
+mod transfers;
 mod work;
 
 use hex_fmt::HexFmt;
@@ -20,7 +20,6 @@ use crate::{
     chunk_store::UsedSpace,
     node::{
         genesis::GenesisStage,
-        key_section::WalletSection,
         messaging::Messaging,
         state_db::{get_age_group, store_age_group, store_new_reward_keypair, AgeGroup},
     },
@@ -46,6 +45,8 @@ use std::{
     net::SocketAddr,
 };
 
+use self::transfers::Transfers;
+
 /// Info about the node.
 #[derive(Clone)]
 pub struct NodeInfo {
@@ -57,7 +58,6 @@ pub struct NodeInfo {
     pub used_space: UsedSpace,
     /// The key used by the node to receive earned rewards.
     pub reward_key: PublicKey,
-    // pub wallet_section: WalletSection
 }
 
 impl NodeInfo {
@@ -105,8 +105,7 @@ pub struct Node {
     // interaction: NodeInteraction,
     // node_signing: NodeSigning,
     genesis_stage: Arc<Mutex<GenesisStage>>,
-
-    pub wallet_section: Arc<Mutex<Option<WalletSection>>>,
+    transfers: Arc<Mutex<Option<Transfers>>>,
     // rate_limit: RateLimit,
     // dbs: ChunkHolderDbs
     // replica_signing: ReplicaSigningImpl,
@@ -178,7 +177,7 @@ impl Node {
 
             genesis_stage: Arc::new(Mutex::new(GenesisStage::None)),
 
-            wallet_section: Arc::new(Mutex::new(None)),
+            transfers: Arc::new(Mutex::new(None)),
         };
 
         Ok(node)

@@ -19,14 +19,14 @@
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     node::{
-        // adult_duties::AdultDuties,
-        // elder_duties::{ElderData, ElderDuties},
-        // node_duties::messaging::Messaging,
         genesis::{GenesisAccumulation, GenesisProposal, GenesisStage},
-        key_section::{transfers::replica_signing::ReplicaSigningImpl, WalletSection},
         node_ops::{
             ElderDuty, NetworkDuties, NetworkDuty, NodeDuty, NodeMessagingDuty, OutgoingMsg,
         },
+        // adult_duties::AdultDuties,
+        // elder_duties::{ElderData, ElderDuties},
+        // node_duties::messaging::Messaging,
+        transfers::Transfers,
         NodeInfo,
         RewardsAndWallets,
     },
@@ -36,8 +36,8 @@ use log::{debug, error, info, trace, warn};
 // use msg_analysis::ReceivedMsgAnalysis;
 // use network_events::w;
 use sn_data_types::{
-    Credit, NodeRewardStage, PublicKey, SectionElders, SignatureShare, SignedCredit, Token,
-    TransferPropagated,
+    ActorHistory, Credit, NodeRewardStage, PublicKey, SectionElders, SignatureShare, SignedCredit,
+    Token, TransferPropagated,
 };
 use sn_messaging::{
     client::{Message, NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse},
@@ -45,6 +45,8 @@ use sn_messaging::{
 };
 use sn_routing::{XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
 use std::{collections::BTreeMap, mem};
+
+use super::transfers::{replica_signing::ReplicaSigningImpl, replicas::Replicas, ReplicaInfo};
 
 // use GenesisStage::*;
 
@@ -412,14 +414,12 @@ impl Node {
 
         let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
+        let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
+        let replicas =
+            Self::transfer_replicas(&self.node_info, self.network_api.clone(), user_wallets)
+                .await?;
 
-        let mut wallet_section = WalletSection::new(
-            rate_limit,
-            &self.node_info,
-            BTreeMap::new(),
-            self.network_api.clone(),
-        )
-        .await?;
+        let mut transfers = Transfers::new(replicas, rate_limit);
 
         let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
         let node_id = self.network_api.our_name().await;
@@ -434,7 +434,7 @@ impl Node {
         if let Some(genesis) = genesis {
             // if we are genesis
             // does local init, with no roundrip via network messaging
-            wallet_section.init_genesis_node(genesis).await?;
+            transfers.genesis(genesis).await?;
         }
 
         // 3. Set new stage
@@ -684,5 +684,53 @@ impl Node {
             return self.complete_elder_setup(finish_setup).await;
         }
         Ok(())
+    }
+
+    // // Update our replica with the latest keys
+    // pub async fn elders_changed(&mut self, rate_limit: RateLimit) -> Result<()> {
+    //     let id = self.network.our_public_key_share().await?;
+    //     let key_index = self
+    //         .network
+    //         .our_index()
+    //         .await
+    //         .map_err(|_| Error::NoSectionPublicKeySet)?;
+    //     let peer_replicas = self.network.our_public_key_set().await?;
+    //     let signing = ReplicaSigningImpl::new(self.network.clone());
+    //     let info = ReplicaInfo {
+    //         id: id.bls_share().ok_or(Error::ProvidedPkIsNotBlsShare)?,
+    //         key_index,
+    //         peer_replicas,
+    //         section_chain: self.network.section_chain().await,
+    //         signing,
+    //         initiating: false,
+    //     };
+    //     self.transfers.update_replica_info(info, rate_limit);
+
+    //     Ok(())
+    // }
+
+    async fn transfer_replicas(
+        node_info: &NodeInfo,
+        network: Network,
+        user_wallets: BTreeMap<PublicKey, ActorHistory>,
+    ) -> Result<Replicas<ReplicaSigningImpl>> {
+        let root_dir = node_info.root_dir.clone();
+        let id = network
+            .our_public_key_share()
+            .await?
+            .bls_share()
+            .ok_or(Error::ProvidedPkIsNotBlsShare)?;
+        let key_index = network.our_index().await?;
+        let peer_replicas = network.our_public_key_set().await?.clone();
+        let signing = ReplicaSigningImpl::new(network.clone());
+        let info = ReplicaInfo {
+            id,
+            key_index,
+            peer_replicas,
+            section_chain: network.section_chain().await.clone(),
+            signing,
+            initiating: true,
+        };
+        Replicas::new(root_dir, info, user_wallets).await
     }
 }
