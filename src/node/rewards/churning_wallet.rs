@@ -28,7 +28,7 @@ pub struct ChurningWallet {
 pub enum Churn {
     /// Contains next section wallet.
     Regular(SectionWallet),
-    ///
+    /// Contains the new children wallets.
     Split {
         ///
         child_1: SectionWallet,

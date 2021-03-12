@@ -36,20 +36,15 @@ use log::{debug, error, info, trace, warn};
 // use msg_analysis::ReceivedMsgAnalysis;
 // use network_events::w;
 use sn_data_types::{
-    Credit, NodeRewardStage, PublicKey, SectionElders, SignatureShare, SignedCredit,
-    Token, TransferPropagated,
+    Credit, NodeRewardStage, PublicKey, SectionElders, SignatureShare, SignedCredit, Token,
+    TransferPropagated,
 };
 use sn_messaging::{
-    client::{
-        Message, NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
-    },
+    client::{Message, NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse},
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use sn_routing::{XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
-use std::{
-    collections::BTreeMap,
-    mem,
-};
+use std::{collections::BTreeMap, mem};
 
 // use GenesisStage::*;
 
@@ -418,12 +413,10 @@ impl Node {
         let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
 
-        let replica_signing = ReplicaSigningImpl::new(self.network_api.clone());
         let mut wallet_section = WalletSection::new(
             rate_limit,
             &self.node_info,
             BTreeMap::new(),
-            replica_signing,
             self.network_api.clone(),
         )
         .await?;
