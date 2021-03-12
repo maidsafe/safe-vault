@@ -37,6 +37,9 @@ pub enum Error {
     /// Unable to parse genesis proposal.
     #[error("Cannot parse genesis proposal at this stage")]
     InvalidGenesisStage,
+    /// Unable to parse non genesis proposal.
+    #[error("Cannot parse anything but genesis proposal at this stage")]
+    InvalidGenesisStageForProposal,
     /// Node not found for rewarding
     #[error("Node not found for rewards")]
     NodeNotFoundForReward,

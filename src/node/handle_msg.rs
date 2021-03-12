@@ -47,7 +47,12 @@ use sn_routing::XorName;
 // }
 
 impl Node {
-    pub async fn handle_msg(&self, msg: Message, src: SrcLocation, dst: DstLocation) -> Result<()> {
+    pub async fn handle_msg(
+        &mut self,
+        msg: Message,
+        src: SrcLocation,
+        dst: DstLocation,
+    ) -> Result<()> {
         debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
         let msg_id = msg.id();
         if let SrcLocation::EndUser(origin) = src {
@@ -127,7 +132,7 @@ impl Node {
         }
     }
 
-    async fn match_section_msg(&self, msg: Message, origin: SrcLocation) -> Result<()> {
+    async fn match_section_msg(&mut self, msg: Message, origin: SrcLocation) -> Result<()> {
         debug!("Evaluating section message: {:?}", msg);
 
         match &msg {
@@ -139,11 +144,21 @@ impl Node {
                 self.receive_genesis_proposal(credit.clone(), sig.clone())
                     .await
             }
+
+            Message::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis { signed_credit, sig }),
+                ..
+            } => {
+                self.receive_genesis_accumulation(signed_credit.clone(), sig.clone())
+                    .await
+            }
             // NodeDuty::ReceiveGenesisProposal {
             //     credit: credit.clone(),
             //     sig: sig.clone(),
+            // } => {
+            //     self.receive_genesis_proposal(credit.clone(), sig.clone())
+            //     .await
             // }
-            // .into(),
             //
             // ------ metadata ------
             // Message::NodeQuery {

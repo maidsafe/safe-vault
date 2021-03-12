@@ -32,7 +32,7 @@ use crate::{
     },
     Error, Network, Node, Result,
 };
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 // use msg_analysis::ReceivedMsgAnalysis;
 // use network_events::w;
 use sn_data_types::{
@@ -437,34 +437,10 @@ impl Node {
     }
 
     /// Wallet info of our constellation is supplied here
-    async fn complete_elder_setup(
-        &mut self,
-        // section_wallet: WalletInfo,
-        // node_rewards: BTreeMap<XorName, NodeRewardStage>,
-        // user_wallets: BTreeMap<PublicKey, ActorHistory>,
-        genesis: Option<TransferPropagated>,
-    ) -> Result<()> {
+    async fn complete_elder_setup(&mut self, genesis: Option<TransferPropagated>) -> Result<()> {
         debug!(">>>>>>>>>>> Completing transition to elder!!!");
         debug!("????");
         let stage = self.genesis_stage.lock().await;
-        // let queued_ops = match *stage {
-        //     // Stage::Elder(_) => {
-        //     //     debug!("was already elder");
-        //     //     return Ok(vec![])
-        //     // },
-        //     // Stage::Infant => {
-        //     //     if !self.node_info.genesis {
-        //     //         return Err(Error::InvalidOperation("cannot complete transition to elder as Infant".to_string()));
-        //     //     }
-        //     //     VecDeque::new()
-        //     // }
-        //     // consider accepting the completion for these as well..
-        //     GenesisStage::AwaitingGenesisThreshold | GenesisStage::ProposingGenesis(_) => {
-        //         return Err(Error::InvalidOperation("cannot complete transition to elder as AwaitingGenesisThreshold | ProposingGenesis".to_string()))
-        //     }
-        //     GenesisStage::AccumulatingGenesis(_) => VecDeque::new(),
-        //     // Stage::Adult { queued_ops, .. } => mem::take(queued_ops),
-        // };
 
         trace!(">>> Setting up node dbs etc...");
 
@@ -490,8 +466,6 @@ impl Node {
         )
         .await?;
 
-        // let rewards_and_wallets = RewardsAndWallets::new(self.network_api.clone()).await?;
-
         let node_rewards = rewards_and_wallets.node_rewards;
         let node_id = self.network_api.our_name().await;
         let register_wallet = match node_rewards.lock().await.get(&node_id) {
@@ -501,17 +475,6 @@ impl Node {
                 NodeRewardStage::Active { .. } | NodeRewardStage::AwaitingRelocation(_) => false,
             },
         };
-
-        // let mut elder_duties = ElderDuties::new(
-        //     &self.node_info,
-        //     rewards_and_wallets.clone(),
-        //     ElderData {
-        //         section_wallet,
-        //         node_rewards,
-        //         user_wallets,
-        //     },
-        // )
-        // .await?;
 
         if let Some(genesis) = genesis {
             // if we are genesis
@@ -533,14 +496,11 @@ impl Node {
 
         info!("Successfully assumed Elder duties!");
 
-        // let mut ops: Vec<_> = queued_ops
-        //     .into_iter()
-        //     .map(|d| NetworkDuty::from(d))
-        //     .collect();
         if register_wallet {
             self.register_wallet().await?
         }
 
+        debug!(">>>> I AM ELDER");
         Ok(())
     }
 
@@ -592,15 +552,8 @@ impl Node {
         credit: Credit,
         sig: SignatureShare,
     ) -> Result<()> {
-        let our_pk_share = self.network_api.our_public_key_share().await?;
         let our_index = self.network_api.our_index().await?;
-        // if matches!(self.stage, Stage::Genesis(AccumulatingGenesis(_)))
-        //     || matches!(self.stage, Stage::Elder(_))
-        // {
-        //     return Ok(vec![]);
-        // }
 
-        // let (stage, cmd) =
         let mut stage = self.genesis_stage.lock().await;
         let new_stage = match *stage {
             GenesisStage::AwaitingGenesisThreshold => {
@@ -609,10 +562,7 @@ impl Node {
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
                 let _ = signatures.insert(sig.index, sig.share);
 
-                let credit_sig_share = self
-                    .network_api
-                    .sign_as_elder(&credit)
-                    .await?;
+                let credit_sig_share = self.network_api.sign_as_elder(&credit).await?;
                 let _ = signatures.insert(our_index, credit_sig_share.clone());
 
                 let dst = DstLocation::Section(XorName::from(
@@ -645,7 +595,7 @@ impl Node {
                         dst,
                         aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                     })
-                    .await;
+                    .await?;
 
                 stage
             }
@@ -657,17 +607,12 @@ impl Node {
                     .await
                     .map_err(|_| Error::NoSectionPublicKeySet)?;
                 let section_pk = PublicKey::Bls(section_pk_set.public_key());
-                // let our_pk_share = self.network_api.our_public_key_share().await?;
-                // let our_index = self.network_api.our_index().await?;
                 bootstrap.add(sig, section_pk_set)?;
                 if let Some(signed_credit) = &bootstrap.pending_agreement {
                     info!("******* there is an agreement");
                     // replicas signatures over > signed_credit <
                     let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-                    let credit_sig_share = self
-                        .network_api
-                        .sign_as_elder(&signed_credit)
-                        .await?;
+                    let credit_sig_share = self.network_api.sign_as_elder(&signed_credit).await?;
                     let _ = signatures.insert(our_index, credit_sig_share.clone());
 
                     let stage = GenesisStage::AccumulatingGenesis(GenesisAccumulation {
@@ -701,20 +646,13 @@ impl Node {
                     return Ok(());
                 }
             }
-            GenesisStage::AccumulatingGenesis(GenesisAccumulation {
-                // rewards_and_wallets: bootstrap.rewards_and_wallets.clone(),
-                ref agreed_proposal,
-                ..
-                // signatures,
-                // pending_agreement: None,
-            }) => {
-                // we already have a proposal
-                return Ok(())
-            }
             _ => {
-                return Err(Error::InvalidOperation(
-                    "invalid self.stage at fn receive_genesis_proposal".to_string(),
-                ))
+                warn!("Recevied an out of order proposal for genesis.");
+                warn!("We may already have seen + verified genesis, in which case this can be ignored.");
+
+                // TODO: do we want to Lazy err here?
+
+                return Ok(());
             }
         };
 
@@ -723,14 +661,12 @@ impl Node {
         // Ok(NetworkDuties::from(cmd))
     }
 
-    async fn receive_genesis_accumulation(
+    /// Receive genesis accumulation
+    pub async fn receive_genesis_accumulation(
         &mut self,
         signed_credit: SignedCredit,
         sig: SignatureShare,
     ) -> Result<()> {
-        // if matches!(self.stage, Stage::Elder(_)) {
-        //     return Ok(vec![]);
-        // }
         let mut stage = self.genesis_stage.lock().await;
 
         let (new_stage, finish_setup) = match *stage {
@@ -738,7 +674,6 @@ impl Node {
                 // replicas signatures over > signed_credit <
                 let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
                 let _ = signatures.insert(sig.index, sig.share);
-                // let our_pk = self.network_api.our_public_key_share().await?;
                 let our_sig_index = self.network_api.our_index().await?;
 
                 let credit_sig_share = self.network_api.sign_as_elder(&signed_credit).await?;
@@ -753,7 +688,6 @@ impl Node {
                     })),
                     None,
                 ))
-                // Ok(())
             }
             GenesisStage::AccumulatingGenesis(ref mut bootstrap) => {
                 let section_pk_set = self
@@ -761,14 +695,12 @@ impl Node {
                     .our_public_key_set()
                     .await
                     .map_err(|_| Error::NoSectionPublicKeySet)?;
-                let section_pk = PublicKey::Bls(section_pk_set.public_key());
                 bootstrap.add(sig, section_pk_set)?;
 
                 let mut the_genesis = None;
                 if let Some(genesis) = bootstrap.pending_agreement.take() {
                     // TODO: do not take this? (in case of fail further blow)
                     let our_sig_index = self.network_api.our_index().await?;
-                    // let our_pk = self.network_api.our_public_key_share().await?;
                     let credit_sig_share = self.network_api.sign_as_elder(&genesis).await?;
                     let _ = bootstrap
                         .signatures
@@ -780,10 +712,6 @@ impl Node {
                 }
 
                 Ok((None, the_genesis))
-
-                // GenesisStage::AccumulatingGenesis(bootstrap)
-                // Ok()
-                // Ok(vec![])
             }
             _ => Err(Error::InvalidGenesisStage),
         }?;
@@ -796,22 +724,9 @@ impl Node {
         drop(stage);
 
         if finish_setup.is_some() {
-            debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENSIS AGREEMENT PROOFED");
+            debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENSIS AGREEMENT PROOFED!!!!");
 
-            return self
-                .complete_elder_setup(
-                    // WalletInfo {
-                    //     replicas: genesis.credit_proof.debiting_replicas_keys.clone(),
-                    //     history: ActorHistory {
-                    //         credits: vec![genesis.credit_proof.clone()],
-                    //         debits: vec![],
-                    //     },
-                    // },
-                    // Default::default(),
-                    // Default::default(),
-                    finish_setup,
-                )
-                .await;
+            return self.complete_elder_setup(finish_setup).await;
         }
         Ok(())
     }

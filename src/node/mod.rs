@@ -229,7 +229,7 @@ impl Node {
     }
 
     /// Process any routing event
-    pub async fn process_network_event(&self, event: RoutingEvent) -> Result<()> {
+    pub async fn process_network_event(&mut self, event: RoutingEvent) -> Result<()> {
         trace!("Processing Routing Event: {:?}", event);
         match event {
             RoutingEvent::Genesis => self.begin_forming_genesis_section().await,
