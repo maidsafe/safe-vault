@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Error, Network, Result};
-use sn_data_types::{Credit, CreditAgreementProof, SignedCredit, Token};
+use crate::{Error, Network, NodeInfo, Result};
+use super::{ReplicaInfo, replica_signing::ReplicaSigningImpl, replicas::Replicas};
+use sn_data_types::{ActorHistory, Credit, CreditAgreementProof, PublicKey, SignedCredit, Token};
 use std::collections::BTreeMap;
 
 /// Produces a genesis balance for a new network.

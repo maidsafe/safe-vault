@@ -17,14 +17,18 @@ pub(crate) mod node_ops;
 pub mod state_db;
 
 use crate::{
-    capacity::ChunkHolderDbs,
+    capacity::{Capacity, ChunkHolderDbs, RateLimit},
     chunk_store::UsedSpace,
     node::{
         handle_msg::handle,
         handle_network_event::handle_network_event,
         messaging::send,
         state_db::store_new_reward_keypair,
-        work::{genesis::begin_forming_genesis_section, genesis_stage::GenesisStage},
+        transfers::get_replicas::transfer_replicas,
+        work::{
+            genesis::begin_forming_genesis_section, genesis::receive_genesis_accumulation,
+            genesis::receive_genesis_proposal, genesis_stage::GenesisStage,
+        },
     },
     Config, Error, Network, Result,
 };
@@ -95,8 +99,6 @@ pub struct Node {
     network_api: Network,
     network_events: EventStream,
     node_info: NodeInfo,
-    // data operations
-    meta_data: Metadata,
     //old elder
     prefix: Option<Prefix>,
     node_name: XorName,
@@ -110,7 +112,10 @@ pub struct Node {
     // interaction: NodeInteraction,
     // node_signing: NodeSigning,
     genesis_stage: GenesisStage,
-    transfers: Arc<Mutex<Option<Transfers>>>,
+    // transfers
+    transfers: Option<Transfers>,
+    // data operations
+    meta_data: Option<Metadata>,
     // rate_limit: RateLimit,
     // dbs: ChunkHolderDbs
     // replica_signing: ReplicaSigningImpl,
@@ -158,21 +163,16 @@ impl Node {
 
         debug!("NEW NODE after messaging");
 
-        let dbs = ChunkHolderDbs::new(node_info.path())?;
-        let reader = AdultReader::new(network_api.clone());
-        let meta_data = Metadata::new(&node_info, dbs, reader).await?;
-
         let node = Self {
             prefix: Some(network_api.our_prefix().await),
             node_name: network_api.our_name().await,
             node_id: network_api.public_key().await,
-            // interaction: NodeInteraction::new(network_api.clone()),
             node_info,
             network_api,
             network_events,
             genesis_stage: GenesisStage::None,
-            transfers: Arc::new(Mutex::new(None)),
-            meta_data,
+            transfers: None,
+            meta_data: None,
         };
 
         Ok(node)
@@ -233,8 +233,42 @@ impl Node {
                 self.genesis_stage =
                     begin_forming_genesis_section(self.network_api.clone()).await?;
             }
-            NodeDuty::ReceiveGenesisProposal { credit, sig } => {}
-            NodeDuty::ReceiveGenesisAccumulation { signed_credit, sig } => {}
+            NodeDuty::ReceiveGenesisProposal { credit, sig } => {
+                self.genesis_stage = receive_genesis_proposal(
+                    credit,
+                    sig,
+                    self.genesis_stage.clone(),
+                    self.network_api.clone(),
+                )
+                .await?;
+            }
+            NodeDuty::ReceiveGenesisAccumulation { signed_credit, sig } => {
+                self.genesis_stage = receive_genesis_accumulation(
+                    signed_credit,
+                    sig,
+                    self.genesis_stage.clone(),
+                    self.network_api.clone(),
+                )
+                .await?;
+                if let GenesisStage::Completed(genesis_tx) = &self.genesis_stage {
+                    let dbs = ChunkHolderDbs::new(self.node_info.path())?;
+                    let reader = AdultReader::new(self.network_api.clone());
+                    let meta_data = Metadata::new(&self.node_info, dbs, reader).await?;
+                    self.meta_data = Some(meta_data);
+
+                    let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
+                    let rate_limit =
+                        RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
+                    let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
+                    let replicas =
+                        transfer_replicas(&self.node_info, self.network_api.clone(), user_wallets)
+                            .await?;
+                    let transfers = Transfers::new(replicas, rate_limit);
+                    // does local init, with no roundrip via network messaging
+                    transfers.genesis(genesis_tx.clone()).await?;
+                    self.transfers = Some(transfers);
+                }
+            }
             NodeDuty::AssumeAdultDuties => {}
             NodeDuty::UpdateElderInfo {
                 prefix,
@@ -267,10 +301,14 @@ impl Node {
                 send_to_nodes(targets, &msg, self.network_api.clone()).await?
             }
             NodeDuty::ProcessRead { query, id, origin } => {
-                return Ok(vec![self.meta_data.read(query, id, origin).await?]);
+                if let Some(ref meta_data) = self.meta_data {
+                    return Ok(vec![meta_data.read(query, id, origin).await?]);
+                }
             }
             NodeDuty::ProcessWrite { cmd, id, origin } => {
-                return Ok(vec![self.meta_data.write(cmd, id, origin).await?]);
+                if let Some(ref mut meta_data) = self.meta_data {
+                    return Ok(vec![meta_data.write(cmd, id, origin).await?]);
+                }
             }
             NodeDuty::NoOp => {}
         }

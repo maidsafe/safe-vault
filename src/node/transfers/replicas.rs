@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{replica_signing::ReplicaSigning, store::TransferStore, ReplicaInfo};
+use super::{replica_signing::ReplicaSigning, store::TransferStore};
 use crate::{Error, Result};
 use bls::PublicKeySet;
 use dashmap::DashMap;
@@ -31,6 +31,19 @@ use {
 };
 
 type WalletLocks = DashMap<PublicKey, Arc<Mutex<TransferStore<ReplicaEvent>>>>;
+///
+#[derive(Clone, Debug)]
+pub struct ReplicaInfo<T>
+where
+    T: ReplicaSigning,
+{
+    pub id: bls::PublicKeyShare,
+    pub key_index: usize,
+    pub peer_replicas: PublicKeySet,
+    pub section_chain: sn_routing::SectionChain,
+    pub signing: T,
+    pub initiating: bool,
+}
 
 #[derive(Clone)]
 pub struct Replicas<T>

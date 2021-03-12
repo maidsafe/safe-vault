@@ -57,12 +57,7 @@ impl Metadata {
         Ok(Self { elder_stores })
     }
 
-    pub async fn read(
-        &mut self,
-        query: DataQuery,
-        id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
+    pub async fn read(&self, query: DataQuery, id: MessageId, origin: EndUser) -> Result<NodeDuty> {
         reading::get_result(query, id, origin, &self.elder_stores).await
     }
 

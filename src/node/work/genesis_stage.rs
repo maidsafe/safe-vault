@@ -14,12 +14,14 @@ use sn_data_types::{
 };
 use std::collections::BTreeMap;
 
+#[derive(Clone)]
 pub struct GenesisProposal {
     pub proposal: Credit,
     pub signatures: BTreeMap<usize, bls::SignatureShare>,
     pub pending_agreement: Option<SignedCredit>,
 }
 
+#[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum GenesisStage {
     None,
@@ -29,6 +31,7 @@ pub enum GenesisStage {
     Completed(TransferPropagated),
 }
 
+#[derive(Clone)]
 pub struct GenesisAccumulation {
     pub agreed_proposal: SignedCredit,
     pub signatures: BTreeMap<usize, bls::SignatureShare>,

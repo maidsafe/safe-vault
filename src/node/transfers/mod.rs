@@ -7,12 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod genesis;
+pub mod get_replicas;
 pub mod replica_signing;
 pub mod replicas;
 pub mod store;
 mod test_utils;
 
-use self::{replica_signing::ReplicaSigning, replicas::Replicas};
+use self::{
+    replica_signing::ReplicaSigning,
+    replicas::{ReplicaInfo, Replicas},
+};
 use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
@@ -67,20 +71,6 @@ They validate incoming requests for transfer, and
 apply operations that has a valid proof of agreement from the group.
 Replicas don't initiate transfers or drive the algo - only Actors do.
 */
-
-///
-#[derive(Clone, Debug)]
-pub struct ReplicaInfo<T>
-where
-    T: ReplicaSigning,
-{
-    pub id: bls::PublicKeyShare,
-    pub key_index: usize,
-    pub peer_replicas: bls::PublicKeySet,
-    pub section_chain: sn_routing::SectionChain,
-    pub signing: T,
-    pub initiating: bool,
-}
 
 /// Transfers is the layer that manages
 /// interaction with an AT2 Replica.

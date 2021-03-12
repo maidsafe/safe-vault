@@ -16,10 +16,7 @@ use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
 
 /// Process any routing event
-pub async fn handle_network_event(
-    event: RoutingEvent,
-    network_api: Network,
-) -> Result<NodeDuties> {
+pub async fn handle_network_event(event: RoutingEvent, network_api: Network) -> Result<NodeDuties> {
     trace!("Processing Routing Event: {:?}", event);
     match event {
         RoutingEvent::Genesis => Ok(vec![NodeDuty::BeginFormingGenesisSection]),

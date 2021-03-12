@@ -15,7 +15,9 @@ use crate::{
         messaging::send,
         node_ops::OutgoingMsg,
         transfers::{
-            replica_signing::ReplicaSigningImpl, replicas::Replicas, ReplicaInfo, Transfers,
+            replica_signing::ReplicaSigningImpl,
+            replicas::{ReplicaInfo, Replicas},
+            Transfers,
         },
     },
     Error, Network, Node, NodeInfo, Result,
@@ -107,8 +109,8 @@ pub async fn begin_forming_genesis_section(network_api: Network) -> Result<Genes
 pub async fn receive_genesis_proposal(
     credit: Credit,
     sig: SignatureShare,
-    network_api: Network,
     stage: GenesisStage,
+    network_api: Network,
 ) -> Result<GenesisStage> {
     let our_index = network_api.our_index().await?;
     match stage {
