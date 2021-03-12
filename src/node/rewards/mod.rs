@@ -26,3 +26,19 @@ pub(super) enum SectionWalletStage {
     },
     Churning(ChurningWallet),
 }
+
+
+pub fn query_for_new_replicas(new_wallet: PublicKey) -> NodeMessagingDuty {
+    // deterministic msg id for aggregation
+    let msg_id = MessageId::combine(vec![new_wallet.into()]);
+    NodeMessagingDuty::Send(OutgoingMsg {
+        msg: Message::NodeQuery {
+            query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
+            id: msg_id,
+            target_section_pk: None,
+        },
+        section_source: true,
+        dst: DstLocation::Section(new_wallet.into()),
+        aggregation: Aggregation::AtDestination,
+    })
+}

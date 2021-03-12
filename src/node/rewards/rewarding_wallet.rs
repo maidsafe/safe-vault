@@ -63,6 +63,12 @@ impl RewardingWallet {
             },
         }
     }
+   
+    /// Balance
+    pub fn balance(&self) -> Token {
+        self.actor.balance()
+    }
+        
     /// Current Replicas
     pub fn replicas(&self) -> PublicKey {
         self.actor.replicas_public_key()

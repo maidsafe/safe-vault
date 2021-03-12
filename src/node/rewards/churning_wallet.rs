@@ -26,17 +26,10 @@ pub struct ChurningWallet {
 ///
 #[derive(Clone, Debug)]
 pub enum Churn {
-    ///
-    Regular {
-        ///
-        current: SectionWallet,
-        ///
-        next: SectionWallet,
-    },
+    /// Contains next section wallet.
+    Regular(SectionWallet),
     ///
     Split {
-        ///
-        current: SectionWallet,
         ///
         child_1: SectionWallet,
         ///
@@ -76,27 +69,11 @@ impl ChurningWallet {
         Self { balance, churn }
     }
 
-    pub fn query_for_new_replicas(new_wallet: PublicKey) -> NodeMessagingDuty {
-        // deterministic msg id for aggregation
-        let msg_id = MessageId::combine(vec![new_wallet.into()]);
-        NodeMessagingDuty::Send(OutgoingMsg {
-            msg: Message::NodeQuery {
-                query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
-                id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: true,
-            dst: DstLocation::Section(new_wallet.into()),
-            aggregation: Aggregation::AtDestination,
-        })
-    }
-
     /// Move Wallet
     pub async fn move_wallet(&mut self) -> Result<NetworkDuties> {
         match self.churn.clone() {
-            Churn::Regular { current, next } => self.create_wallet(self.balance, next),
+            Churn::Regular(next) => self.create_wallet(self.balance, next),
             Churn::Split {
-                current,
                 child_1,
                 child_2,
             } => {
@@ -149,6 +126,7 @@ impl ChurningWallet {
             aggregation: Aggregation::AtDestination,
         })));
 
+        // send to our section
         ops.push(NetworkDuty::from(NodeMessagingDuty::Send(OutgoingMsg {
             msg: Message::NodeCmd {
                 cmd,
