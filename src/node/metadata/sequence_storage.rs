@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::SequenceChunkStore,
+    chunk_store::{SequenceChunkStore, UsedSpace},
     error::convert_to_error_message,
     node::node_ops::{NodeDuty, NodeMessagingDuty, OutgoingMsg},
-    node::NodeInfo,
     Error, Network, Result,
 };
 use log::info;
@@ -23,7 +22,10 @@ use sn_messaging::{
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    path::Path,
+};
 
 /// Operations over the data type Sequence.
 pub(super) struct SequenceStorage {
@@ -31,9 +33,8 @@ pub(super) struct SequenceStorage {
 }
 
 impl SequenceStorage {
-    pub(super) async fn new(node_info: &NodeInfo) -> Result<Self> {
-        let chunks =
-            SequenceChunkStore::new(node_info.path(), node_info.used_space.clone()).await?;
+    pub(super) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+        let chunks = SequenceChunkStore::new(path, used_space).await?;
         Ok(Self { chunks })
     }
 

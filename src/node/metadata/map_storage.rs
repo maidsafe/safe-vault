@@ -7,10 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::MapChunkStore,
+    chunk_store::{MapChunkStore, UsedSpace},
     error::convert_to_error_message,
     node::node_ops::{NodeDuty, NodeMessagingDuty, OutgoingMsg},
-    node::NodeInfo,
     Error, Network, Result,
 };
 use log::info;
@@ -23,7 +22,10 @@ use sn_messaging::{
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    path::Path,
+};
 
 /// Operations over the data type Map.
 pub(super) struct MapStorage {
@@ -31,8 +33,8 @@ pub(super) struct MapStorage {
 }
 
 impl MapStorage {
-    pub(super) async fn new(node_info: &NodeInfo) -> Result<Self> {
-        let chunks = MapChunkStore::new(node_info.path(), node_info.used_space.clone()).await?;
+    pub(super) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+        let chunks = MapChunkStore::new(path, used_space).await?;
         Ok(Self { chunks })
     }
 

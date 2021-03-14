@@ -18,8 +18,8 @@ use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
 use crate::{
     capacity::ChunkHolderDbs,
+    chunk_store::UsedSpace,
     node::node_ops::{MetadataDuty, NodeDuties},
-    node::NodeInfo,
     node::RewardsAndWallets,
     Network, Result,
 };
@@ -31,7 +31,10 @@ use sn_messaging::{
     client::{DataCmd, DataQuery},
     EndUser, MessageId,
 };
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    path::Path,
+};
 use xor_name::XorName;
 
 /// This module is called `Metadata`
@@ -46,13 +49,14 @@ pub struct Metadata {
 
 impl Metadata {
     pub async fn new(
-        node_info: &NodeInfo,
+        path: &Path,
+        used_space: &UsedSpace,
         dbs: ChunkHolderDbs,
         reader: AdultReader,
     ) -> Result<Self> {
         let blob_register = BlobRegister::new(dbs, reader);
-        let map_storage = MapStorage::new(node_info).await?;
-        let sequence_storage = SequenceStorage::new(node_info).await?;
+        let map_storage = MapStorage::new(path, used_space.clone()).await?;
+        let sequence_storage = SequenceStorage::new(path, used_space.clone()).await?;
         let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
         Ok(Self { elder_stores })
     }

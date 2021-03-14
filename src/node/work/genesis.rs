@@ -296,8 +296,8 @@ pub async fn complete_elder_setup(
         transfers.genesis(genesis).await?;
     }
 
-    // 3. Set new stage
-    node_info.used_space.reset().await;
+    // // 3. Set new stage
+    // node_info.used_space.reset().await;
 
     // self.stage = Stage::Elder(ElderConstellation::new(
     //     elder_duties,

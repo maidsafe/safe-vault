@@ -57,7 +57,7 @@ use self::{
     },
 };
 
-/// Info about the node.
+/// Static info about the node.
 #[derive(Clone)]
 pub struct NodeInfo {
     ///
@@ -65,7 +65,9 @@ pub struct NodeInfo {
     ///
     pub root_dir: PathBuf,
     ///
-    pub used_space: UsedSpace,
+    pub node_name: XorName,
+    ///
+    pub node_id: Ed25519PublicKey,
     /// The key used by the node to receive earned rewards.
     pub reward_key: PublicKey,
 }
@@ -99,9 +101,8 @@ pub struct Node {
     network_api: Network,
     network_events: EventStream,
     node_info: NodeInfo,
+    used_space: UsedSpace,
     prefix: Option<Prefix>,
-    node_name: XorName,
-    node_id: Ed25519PublicKey,
     genesis_stage: GenesisStage,
     // data operations
     meta_data: Option<Metadata>,
@@ -146,18 +147,17 @@ impl Node {
         let node_info = NodeInfo {
             genesis: config.is_first(),
             root_dir: root_dir_buf,
-            used_space: UsedSpace::new(config.max_capacity()),
+            node_name: network_api.our_name().await,
+            node_id: network_api.public_key().await,
             reward_key,
-            // wallet_section
         };
 
         debug!("NEW NODE after messaging");
 
         let node = Self {
             prefix: Some(network_api.our_prefix().await),
-            node_name: network_api.our_name().await,
-            node_id: network_api.public_key().await,
             node_info,
+            used_space: UsedSpace::new(config.max_capacity()),
             network_api,
             network_events,
             genesis_stage: GenesisStage::None,
@@ -305,7 +305,8 @@ impl Node {
         // metadata
         let dbs = ChunkHolderDbs::new(self.node_info.path())?;
         let reader = AdultReader::new(self.network_api.clone());
-        let meta_data = Metadata::new(&self.node_info, dbs, reader).await?;
+        let meta_data =
+            Metadata::new(&self.node_info.path(), &self.used_space, dbs, reader).await?;
         self.meta_data = Some(meta_data);
 
         // transfers
