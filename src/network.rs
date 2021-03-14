@@ -14,7 +14,6 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 // TODO: use only sn_data_types
 use bls::{PublicKeySet, PublicKeyShare as BlsPublicKeyShare};
 
-use futures::lock::Mutex;
 use log::{debug, error};
 use serde::Serialize;
 use sn_data_types::{Error as DtError, PublicKey, Result as DtResult, Signature};
@@ -31,7 +30,7 @@ use xor_name::{Prefix, XorName};
 ///
 #[derive(Clone)]
 pub struct Network {
-    routing: Arc<Mutex<RoutingNode>>,
+    routing: Arc<RoutingNode>,
 }
 
 #[allow(missing_docs)]
@@ -46,7 +45,7 @@ impl Network {
 
         Ok((
             Self {
-                routing: Arc::new(Mutex::new(routing)),
+                routing: Arc::new(routing),
             },
             event_stream,
         ))
@@ -55,7 +54,7 @@ impl Network {
     /// Sign with our node's ED25519 key
     pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
         let data = utils::serialise(data)?;
-        let sig = self.routing.lock().await.sign_as_node(&data).await;
+        let sig = self.routing.sign_as_node(&data).await;
         Ok(Signature::Ed25519(sig))
     }
 
@@ -81,8 +80,6 @@ impl Network {
         let data = utils::serialise(data)?;
         let share = self
             .routing
-            .lock()
-            .await
             .sign_as_elder(&data, &bls_pk)
             .await
             .map_err(Error::Routing)?;
@@ -90,66 +87,49 @@ impl Network {
     }
 
     pub async fn age(&self) -> u8 {
-        self.routing.lock().await.age().await
+        self.routing.age().await
     }
 
     pub async fn public_key(&self) -> Ed25519PublicKey {
-        self.routing.lock().await.public_key().await
+        self.routing.public_key().await
     }
 
     pub async fn section_public_key(&self) -> Option<PublicKey> {
         Some(PublicKey::Bls(
-            self.routing
-                .lock()
-                .await
-                .public_key_set()
-                .await
-                .ok()?
-                .public_key(),
+            self.routing.public_key_set().await.ok()?.public_key(),
         ))
     }
 
     pub async fn sibling_public_key(&self) -> Option<PublicKey> {
         let sibling_prefix = self.our_prefix().await.sibling();
         self.routing
-            .lock()
-            .await
             .section_key(&sibling_prefix)
             .await
             .map(|key| PublicKey::Bls(key))
     }
 
     pub async fn our_public_key_set(&self) -> Result<PublicKeySet> {
-        self.routing
-            .lock()
-            .await
-            .public_key_set()
-            .await
-            .map_err(Error::Routing)
+        self.routing.public_key_set().await.map_err(Error::Routing)
     }
 
     pub async fn our_name(&self) -> XorName {
-        self.routing.lock().await.name().await
+        self.routing.name().await
     }
 
     pub async fn our_connection_info(&mut self) -> SocketAddr {
-        self.routing.lock().await.our_connection_info()
+        self.routing.our_connection_info()
     }
 
     pub async fn our_prefix(&self) -> Prefix {
-        self.routing.lock().await.our_prefix().await
+        self.routing.our_prefix().await
     }
 
     pub async fn section_chain(&self) -> SectionChain {
-        self.routing.lock().await.section_chain().await
+        self.routing.section_chain().await
     }
 
     pub async fn matches_our_prefix(&self, name: XorName) -> bool {
-        self.routing
-            .lock()
-            .await
-            .matches_our_prefix(&XorName(name.0))
-            .await
+        self.routing.matches_our_prefix(&XorName(name.0)).await
     }
 
     pub async fn send_to_nodes(&self, targets: BTreeSet<XorName>, msg: &Message) -> Result<()> {
@@ -197,17 +177,11 @@ impl Network {
         itinerary: Itinerary,
         content: Bytes,
     ) -> Result<(), RoutingError> {
-        self.routing
-            .lock()
-            .await
-            .send_message(itinerary, content)
-            .await
+        self.routing.send_message(itinerary, content).await
     }
 
     pub async fn set_joins_allowed(&mut self, joins_allowed: bool) -> Result<()> {
         self.routing
-            .lock()
-            .await
             .set_joins_allowed(joins_allowed)
             .await
             .map_err(Error::Routing)
@@ -223,18 +197,11 @@ impl Network {
 
     /// BLS key index in routing for key shares
     pub async fn our_index(&self) -> Result<usize> {
-        self.routing
-            .lock()
-            .await
-            .our_index()
-            .await
-            .map_err(Error::Routing)
+        self.routing.our_index().await.map_err(Error::Routing)
     }
 
     pub async fn our_elder_names(&self) -> BTreeSet<XorName> {
         self.routing
-            .lock()
-            .await
             .our_elders()
             .await
             .iter()
@@ -244,8 +211,6 @@ impl Network {
 
     pub async fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
         self.routing
-            .lock()
-            .await
             .our_elders()
             .await
             .iter()
@@ -258,8 +223,6 @@ impl Network {
         name: &XorName,
     ) -> Vec<(XorName, SocketAddr)> {
         self.routing
-            .lock()
-            .await
             .our_elders_sorted_by_distance_to(&XorName(name.0))
             .await
             .into_iter()
@@ -273,8 +236,6 @@ impl Network {
         count: usize,
     ) -> Vec<XorName> {
         self.routing
-            .lock()
-            .await
             .our_elders_sorted_by_distance_to(&XorName(name.0))
             .await
             .into_iter()
@@ -285,8 +246,6 @@ impl Network {
 
     pub async fn our_adults(&self) -> Vec<XorName> {
         self.routing
-            .lock()
-            .await
             .our_adults_sorted_by_distance_to(&XorName::default())
             .await
             .into_iter()
@@ -301,8 +260,6 @@ impl Network {
         count: usize,
     ) -> Vec<XorName> {
         self.routing
-            .lock()
-            .await
             .our_adults_sorted_by_distance_to(&XorName(name.0))
             .await
             .into_iter()
@@ -324,15 +281,13 @@ impl Network {
 
         let is_elder;
         {
-            is_elder = self.routing.lock().await.is_elder().await;
+            is_elder = self.routing.is_elder().await;
         }
 
         let is_adult;
         {
             is_adult = self
                 .routing
-                .lock()
-                .await
                 .our_adults()
                 .await
                 .iter()
