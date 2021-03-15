@@ -35,7 +35,7 @@ mod chaos;
 mod chunk_store;
 mod config_handler;
 mod error;
-mod mapping;
+mod event_mapping;
 mod messaging;
 mod metadata;
 mod network;

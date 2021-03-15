@@ -9,7 +9,7 @@
 use super::genesis_stage::GenesisStage;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
-    mapping::{map_routing_event, LazyError, Mapping, MsgContext},
+    event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty},
     section_funds::{rewarding_wallet::RewardingWallet, SectionFunds},
