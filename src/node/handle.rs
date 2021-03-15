@@ -13,7 +13,8 @@ use super::{
 use crate::{
     messaging::{send, send_to_nodes},
     node_ops::{NodeDuties, NodeDuty},
-    Node, Result,
+    section_funds::SectionFunds,
+    Error, Node, Result,
 };
 
 impl Node {
@@ -26,7 +27,21 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                return Ok(vec![]);
+                if let Some(SectionFunds::Rewarding(rewards)) = &self.section_funds {
+                    return Ok(NodeDuties::from(
+                        rewards
+                            .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
+                            .await?,
+                    ));
+                } else if self.section_funds.is_some() {
+                    return Err(Error::InvalidOperation(
+                        "Section fund churn, cannot complete request.".to_string(),
+                    ));
+                } else {
+                    return Err(Error::InvalidOperation(
+                        "No section funds at this node".to_string(),
+                    ));
+                }
             }
             NodeDuty::ActivateNodeRewards {
                 id,
@@ -34,74 +49,69 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                return Ok(vec![]);
+                if let Some(SectionFunds::Rewarding(rewards)) = &mut self.section_funds {
+                    return Ok(NodeDuties::from(
+                        rewards.activate_node_rewards(id, node_id).await?,
+                    ));
+                } else if self.section_funds.is_some() {
+                    return Err(Error::InvalidOperation(
+                        "Section fund churn, cannot complete request.".to_string(),
+                    ));
+                } else {
+                    return Err(Error::InvalidOperation(
+                        "No section funds at this node".to_string(),
+                    ));
+                }
             }
             NodeDuty::PropagateTransfer {
                 proof,
                 msg_id,
                 origin,
-            } => {
-                return Ok(vec![]);
-            }
+            } => Ok(vec![]),
             NodeDuty::RegisterSectionPayout {
                 debit_agreement,
                 msg_id,
                 origin,
-            } => {
-                return Ok(vec![]);
-            }
+            } => Ok(vec![]),
             NodeDuty::SetNodeWallet {
                 wallet_id,
                 node_id,
                 msg_id,
                 origin,
-            } => {
-                return Ok(vec![]);
-            }
+            } => Ok(vec![]),
             NodeDuty::ReceivePayoutValidation {
                 validation,
                 msg_id,
                 origin,
-            } => {
-                return Ok(vec![]);
-            }
-            NodeDuty::GetTransferReplicaEvents { msg_id, origin } => {
-                return Ok(vec![]);
-            }
+            } => Ok(vec![]),
+            NodeDuty::GetTransferReplicaEvents { msg_id, origin } => Ok(vec![]),
             NodeDuty::ValidateSectionPayout {
                 signed_transfer,
                 msg_id,
                 origin,
-            } => {
-                return Ok(vec![]);
-            }
+            } => Ok(vec![]),
             NodeDuty::ReadChunk {
                 read,
                 msg_id,
                 origin,
-            } => {
-                return Ok(vec![]);
-            }
+            } => Ok(vec![]),
             NodeDuty::WriteChunk {
                 write,
                 msg_id,
                 origin,
-            } => {
-                return Ok(vec![]);
-            }
+            } => Ok(vec![]),
             NodeDuty::CompleteWalletTransition {
                 replicas,
                 msg_id,
                 origin,
-            } => {
-                return Ok(vec![]);
-            }
+            } => Ok(vec![]),
 
             // ---------------------
-            NodeDuty::GetSectionElders { msg_id, origin } => {}
+            NodeDuty::GetSectionElders { msg_id, origin } => Ok(vec![]),
             NodeDuty::BeginFormingGenesisSection => {
                 self.genesis_stage =
                     begin_forming_genesis_section(self.network_api.clone()).await?;
+                Ok(vec![])
             }
             NodeDuty::ReceiveGenesisProposal { credit, sig } => {
                 self.genesis_stage = receive_genesis_proposal(
@@ -111,6 +121,7 @@ impl Node {
                     self.network_api.clone(),
                 )
                 .await?;
+                Ok(vec![])
             }
             NodeDuty::ReceiveGenesisAccumulation { signed_credit, sig } => {
                 self.genesis_stage = receive_genesis_accumulation(
@@ -125,59 +136,68 @@ impl Node {
                     _ => return Ok(vec![]),
                 };
                 self.level_up(Some(genesis_tx)).await?;
+                Ok(vec![])
             }
             NodeDuty::LevelUp => {
                 self.level_up(None).await?;
+                Ok(vec![])
             }
             NodeDuty::LevelDown => {
                 self.meta_data = None;
                 self.transfers = None;
                 self.section_funds = None;
+                Ok(vec![])
             }
-            NodeDuty::AssumeAdultDuties => {}
             NodeDuty::UpdateElderInfo {
                 prefix,
                 key,
                 elders,
                 sibling_key,
-            } => {}
+            } => Ok(vec![]),
             NodeDuty::CompleteElderChange {
                 previous_key,
                 new_key,
-            } => {}
-            NodeDuty::InformNewElders => {}
+            } => Ok(vec![]),
+            NodeDuty::InformNewElders => Ok(vec![]),
             NodeDuty::CompleteTransitionToElder {
                 section_wallet,
                 node_rewards,
                 user_wallets,
-            } => {}
-            NodeDuty::ProcessNewMember(_) => {}
-            NodeDuty::ProcessLostMember { name, age } => {}
+            } => Ok(vec![]),
+            NodeDuty::ProcessNewMember(_) => Ok(vec![]),
+            NodeDuty::ProcessLostMember { name, age } => Ok(vec![]),
             NodeDuty::ProcessRelocatedMember {
                 old_node_id,
                 new_node_id,
                 age,
-            } => {}
-            NodeDuty::ReachingMaxCapacity => {}
-            NodeDuty::IncrementFullNodeCount { node_id } => {}
-            NodeDuty::SwitchNodeJoin(_) => {}
-            NodeDuty::Send(msg) => send(msg, self.network_api.clone()).await?,
+            } => Ok(vec![]),
+            NodeDuty::ReachingMaxCapacity => Ok(vec![]),
+            NodeDuty::IncrementFullNodeCount { node_id } => Ok(vec![]),
+            NodeDuty::SwitchNodeJoin(_) => Ok(vec![]),
+            NodeDuty::Send(msg) => {
+                send(msg, self.network_api.clone()).await?;
+                Ok(vec![])
+            }
             NodeDuty::SendToNodes { targets, msg } => {
-                send_to_nodes(targets, &msg, self.network_api.clone()).await?
+                send_to_nodes(targets, &msg, self.network_api.clone()).await?;
+                Ok(vec![])
             }
             NodeDuty::ProcessRead { query, id, origin } => {
                 if let Some(ref meta_data) = self.meta_data {
-                    return Ok(vec![meta_data.read(query, id, origin).await?]);
+                    Ok(vec![meta_data.read(query, id, origin).await?])
+                } else {
+                    Ok(vec![])
                 }
             }
             NodeDuty::ProcessWrite { cmd, id, origin } => {
                 if let Some(ref mut meta_data) = self.meta_data {
-                    return Ok(vec![meta_data.write(cmd, id, origin).await?]);
+                    Ok(vec![meta_data.write(cmd, id, origin).await?])
+                } else {
+                    Ok(vec![])
                 }
             }
-            NodeDuty::NoOp => {}
+            NodeDuty::NoOp => Ok(vec![]),
         }
-        Ok(vec![])
     }
 }
 

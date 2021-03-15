@@ -139,8 +139,6 @@ pub enum NodeDuty {
         /// An individual elder's sig over the credit.
         sig: SignatureShare,
     },
-    /// On being promoted, an Infant node becomes an Adult.
-    AssumeAdultDuties,
     /// Elder changes means the section public key
     /// changes as well, which leads to necessary updates
     /// of various places using the multisig of the section.
@@ -248,7 +246,6 @@ impl Debug for NodeDuty {
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
-            Self::AssumeAdultDuties => write!(f, "AssumeAdultDuties"),
             Self::BeginFormingGenesisSection => write!(f, "BeginFormingGenesisSection"),
             Self::CompleteTransitionToElder { .. } => write!(f, "CompleteTransitionToElder"),
             Self::NoOp => write!(f, "No op."),

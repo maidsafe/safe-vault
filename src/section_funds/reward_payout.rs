@@ -1,5 +1,4 @@
-
-    // Copyright 2021 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -7,14 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use self::{ElderSigning, rewarding_wallet::{Payout, RewardingWallet}};
-pub use self::{reward_calc::RewardCalc, validator::Validator};
-use crate::{
-    node_ops::{
-        NetworkDuties, NodeMessagingDuty, OutgoingMsg, RewardCmd, RewardDuty, RewardQuery,
-    },
-    ElderState,
+pub use super::reward_calc::RewardCalc;
+use super::{
+    elder_signing::ElderSigning,
+    rewarding_wallet::{Payout, RewardingWallet, Validator},
 };
+use crate::node_ops::{NodeDuties, NodeDuty, OutgoingMsg};
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
@@ -86,91 +83,18 @@ impl RewardPayout {
         }
     }
 
-    pub async fn process_reward_duty(&mut self, duty: RewardDuty) -> Result<NetworkDuties> {
-        use RewardDuty::*;
-        match duty {
-            ProcessCmd {
-                cmd,
-                msg_id,
-                origin,
-            } => self.process_reward_cmd(cmd, msg_id, origin).await,
-            ProcessQuery {
-                query,
-                origin,
-                msg_id,
-            } => self.process_reward_query(query, msg_id, origin).await,
-            NoOp => Ok(vec![]),
+    pub async fn synch(&mut self, info: WalletInfo) -> Result<NodeDuty> {
+        if self.wallet.replicas() != PublicKey::Bls(info.replicas.key_set.public_key()) {
+            error!("Section funds keys dont match");
+            return Err(Error::Logic("crap..".to_string()));
         }
-    }
-
-    async fn process_reward_cmd(
-        &mut self,
-        cmd: RewardCmd,
-        _msg_id: MessageId,
-        _origin: SrcLocation,
-    ) -> Result<NetworkDuties> {
-        use RewardCmd::*;
-
-        //debug!("Process reward cmd {:?}", cmd);
-        let result = match cmd {
-            SynchHistory(info) => {
-                if self.wallet.replicas()
-                    != PublicKey::Bls(info.replicas.key_set.public_key())
-                {
-                    error!("Section funds keys dont match");
-                    return Err(Error::Logic("crap..".to_string()));
-                }
-                debug!(">>>> syncing....");
-                self.wallet.synch(info.history).await?.into()
-            }
-            AddNewNode(node_id) => self.add_new_node(node_id).into(),
-            SetNodeWallet { node_id, wallet_id } => {
-                self.set_node_wallet(node_id, wallet_id)?.into()
-            }
-            AddRelocatingNode {
-                old_node_id,
-                new_node_id,
-                age,
-            } => self
-                .add_relocating_node(old_node_id, new_node_id, age)
-                .await?
-                .into(),
-            ActivateNodeRewards { id, node_id } => {
-                self.activate_node_rewards(id, node_id).await?.into()
-            }
-            DeactivateNode(node_id) => self.deactivate(node_id)?.into(),
-            ReceivePayoutValidation(validation) => {
-                debug!(">>>>>>>>>>>>> processing receive payout validation");
-                self.wallet.receive(validation).await?
-            }
-        };
-
-        Ok(result)
-    }
-
-    async fn process_reward_query(
-        &self,
-        query: RewardQuery,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    ) -> Result<NetworkDuties> {
-        use RewardQuery::*;
-        let result = match query {
-            GetNodeWalletId {
-                old_node_id,
-                new_node_id,
-            } => self
-                .get_wallet_id(old_node_id, new_node_id, msg_id, origin)
-                .await?
-                .into(),
-        };
-
-        Ok(result)
+        debug!(">>>> syncing....");
+        self.wallet.synch(info.history).await
     }
 
     /// On section splits, we are paying out to Elders.
-    pub async fn payout_rewards(&mut self, node_ids: BTreeSet<&XorName>) -> Result<NetworkDuties> {
-        let mut payouts: NetworkDuties = vec![];
+    pub async fn payout_rewards(&mut self, node_ids: BTreeSet<&XorName>) -> Result<NodeDuties> {
+        let mut payouts: NodeDuties = vec![];
         for node_id in node_ids {
             // Try get the wallet..
             let (wallet, age) = match self.node_rewards.get(node_id) {
@@ -203,7 +127,7 @@ impl RewardPayout {
                 .await?;
 
             // add the payout to list of ops
-            payouts.push(payout.into());
+            payouts.push(payout);
         }
 
         Ok(payouts)
@@ -214,15 +138,15 @@ impl RewardPayout {
     /// It still hasn't registered a wallet id at
     /// this point, but will as part of starting up.
     /// At age 5 it gets its first reward payout.
-    fn add_new_node(&self, node_id: XorName) -> NodeMessagingDuty {
+    pub fn add_new_node(&self, node_id: XorName) -> NodeDuty {
         info!("Rewards: New node added: {:?}", node_id);
         let _ = self.node_rewards.insert(node_id, NodeRewardStage::NewNode);
-        NodeMessagingDuty::NoOp
+        NodeDuty::NoOp
     }
 
     /// 1. A new node registers a wallet id for future reward payout.
     /// ... or, an active node updates its wallet.
-    fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeMessagingDuty> {
+    pub fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeDuty> {
         // Try get the info..
         if !self.node_rewards.contains_key(&node_id) {
             let _ = self.node_rewards.insert(node_id, NodeRewardStage::NewNode);
@@ -247,24 +171,24 @@ impl RewardPayout {
         };
         debug!("Node wallet set! {}, {:?}", node_id, state);
         let _ = self.node_rewards.insert(node_id, state);
-        Ok(NodeMessagingDuty::NoOp)
+        Ok(NodeDuty::NoOp)
     }
 
     /// 2. When a node is relocated to our section, we add the node id
     /// and send a query to old section, for retreiving the wallet id.
-    async fn add_relocating_node(
+    pub async fn add_relocating_node(
         &self,
         old_node_id: XorName,
         new_node_id: XorName,
         age: u8,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         use NodeQuery::*;
         use NodeRewardQuery::*;
         use NodeRewardStage::*;
 
         let state = AwaitingActivation(age);
         let _ = self.node_rewards.insert(new_node_id, state);
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+        Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeQuery {
                 query: Rewards(GetNodeWalletId {
                     old_node_id,
@@ -282,11 +206,11 @@ impl RewardPayout {
     /// 3. The old section will send back the wallet id, which allows us to activate it.
     /// At this point, we payout a standard reward based on the node age,
     /// which represents the work performed in its previous section.
-    async fn activate_node_rewards(
+    pub async fn activate_node_rewards(
         &mut self,
         wallet: PublicKey,
         node_id: XorName,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         // If we ever hit these errors, something is very odd
         // most likely a bug, because we are receiving a response to our query.
         // So, it doesn't make much sense to send some error msg back on the wire.
@@ -308,7 +232,7 @@ impl RewardPayout {
                     NodeRewardStage::AwaitingActivation(age) => age,
                     NodeRewardStage::Active { .. } => {
                         info!("Node already activated.");
-                        return Ok(NodeMessagingDuty::NoOp);
+                        return Ok(NodeDuty::NoOp);
                     }
                     _ => {
                         warn!("Invalid operation: Node is not awaiting reward activation.");
@@ -335,7 +259,7 @@ impl RewardPayout {
 
     /// 4. When the section becomes aware that a node has left,
     /// its account is deactivated.
-    fn deactivate(&self, node_id: XorName) -> Result<NodeMessagingDuty> {
+    pub fn deactivate(&self, node_id: XorName) -> Result<NodeDuty> {
         debug!("Rewards: trying to deactivate {}", node_id);
         let entry = match self.node_rewards.get(&node_id) {
             Some(entry) => entry.clone(),
@@ -352,7 +276,7 @@ impl RewardPayout {
             NodeRewardStage::Active { wallet, .. } => wallet,
             NodeRewardStage::AwaitingRelocation(_) => {
                 debug!("Rewards: {} is already awaiting relocation", node_id);
-                return Ok(NodeMessagingDuty::NoOp);
+                return Ok(NodeDuty::NoOp);
             }
             NodeRewardStage::AwaitingActivation { .. } // hmm.. left when AwaitingActivation is a tricky case.. // Might be case for lazy messaging..
             | NodeRewardStage::NewNode => {
@@ -371,23 +295,23 @@ impl RewardPayout {
             "Rewards: deactivated {}. It is now awaiting relocation.",
             node_id
         );
-        Ok(NodeMessagingDuty::NoOp)
+        Ok(NodeDuty::NoOp)
     }
 
     /// 5. The section that received a relocated node,
     /// will locally be executing `add_wallet(..)` of this very module,
     /// thereby sending a query to the old section, leading to this method
     /// here being called. A query response will be sent back with the wallet id.
-    async fn get_wallet_id(
+    pub async fn get_wallet_key(
         &self,
         old_node_id: XorName,
         new_node_id: XorName,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         let entry = match self.node_rewards.get(&old_node_id) {
             Some(entry) => entry.clone(),
-            None => return Ok(NodeMessagingDuty::NoOp),
+            None => return Ok(NodeDuty::NoOp),
         };
         let wallet = match entry {
             NodeRewardStage::AwaitingRelocation(id) => id,
@@ -397,7 +321,7 @@ impl RewardPayout {
                 // ..means the node has not left, and was not
                 // marked as relocating..
                 // (Could be a case for lazy messaging..)
-                return Ok(NodeMessagingDuty::Send(OutgoingMsg {
+                return Ok(NodeDuty::Send(OutgoingMsg {
                     msg: Message::NodeQueryResponse {
                         response: Rewards(GetNodeWalletId(Err(ErrorMessage::NodeWasNotRelocated))),
                         id: MessageId::in_response_to(&msg_id),
@@ -420,7 +344,7 @@ impl RewardPayout {
         // will pay out rewards to the wallet.
         use NodeQueryResponse::*;
         use NodeRewardQueryResponse::*;
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+        Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeQueryResponse {
                 response: Rewards(GetNodeWalletId(Ok((wallet, new_node_id)))),
                 id: MessageId::in_response_to(&msg_id),

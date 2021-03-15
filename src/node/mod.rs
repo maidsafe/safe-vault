@@ -22,7 +22,7 @@ use crate::{
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty},
-    section_funds::{rewarding_wallet::RewardingWallet, SectionFunds},
+    section_funds::SectionFunds,
     state_db::store_new_reward_keypair,
     transfers::get_replicas::transfer_replicas,
     transfers::Transfers,

@@ -8,10 +8,13 @@
 
 pub mod churning_wallet;
 mod elder_signing;
-pub mod rewarding_wallet;
+mod reward_calc;
+pub mod reward_payout;
+mod rewarding_wallet;
 
 use self::{
     churning_wallet::{ChurningWallet, SectionWallet},
+    reward_payout::RewardPayout,
     rewarding_wallet::{RewardingWallet, Validator},
 };
 use super::node_ops::{NodeDuty, OutgoingMsg};
@@ -24,7 +27,7 @@ use sn_messaging::{
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
 pub enum SectionFunds {
-    Rewarding(RewardingWallet),
+    Rewarding(RewardPayout),
     SoonChurning {
         current: SectionWallet,
         balance: Token,

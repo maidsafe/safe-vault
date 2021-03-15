@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Age;
 use sn_data_types::Token;
 use sn_routing::Prefix;
 
@@ -14,6 +13,9 @@ use sn_routing::Prefix;
 pub struct RewardCalc {
     prefix: Prefix,
 }
+
+// Node age
+type Age = u8;
 
 impl RewardCalc {
     /// Ctor
