@@ -6,20 +6,73 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod map_msg;
+
 use super::node_ops::{NodeDuties, NodeDuty};
-use crate::{node::handle_msg::handle, Network, Result};
+use crate::{Network, Result};
 use hex_fmt::HexFmt;
 use log::{debug, info, trace};
+use map_msg::{map_node_msg, match_user_sent_msg};
 use sn_data_types::PublicKey;
 use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
 
 /// Process any routing event
-pub async fn handle_network_event(event: RoutingEvent, network_api: Network) -> Result<NodeDuties> {
+pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Result<NodeDuties> {
     trace!("Processing Routing Event: {:?}", event);
     match event {
         RoutingEvent::Genesis => Ok(vec![NodeDuty::BeginFormingGenesisSection]),
+        RoutingEvent::MessageReceived { content, src, dst } => {
+            info!(
+                "Received network message: {:8?}\n Sent from {:?} to {:?}",
+                HexFmt(&content),
+                src,
+                dst
+            );
+            map_node_msg(Message::from(content)?, src, dst)
+        }
+        RoutingEvent::ClientMessageReceived { msg, user } => {
+            info!(
+                "TODO: Received client message: {:8?}\n Sent from {:?}",
+                msg, user
+            );
+            match_user_sent_msg(*msg, DstLocation::Node(network_api.our_name().await), user)
+        }
+        RoutingEvent::EldersChanged {
+            key,
+            elders,
+            prefix,
+            self_status_change,
+            sibling_key,
+        } => {
+            trace!("******Elders changed event!");
+            match self_status_change {
+                NodeElderChange::None => {
+                    let mut sibling_pk = None;
+                    if let Some(pk) = sibling_key {
+                        sibling_pk = Some(PublicKey::Bls(pk));
+                    }
+                    // duties.push(NetworkDuty::from(NodeDuty::UpdateElderInfo {
+                    //     prefix,
+                    //     key: PublicKey::Bls(key),
+                    //     elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
+                    //     sibling_key: sibling_pk,
+                    // }));
+
+                    // Ok(duties)
+                    Ok(vec![])
+                }
+                NodeElderChange::Promoted => {
+                    if is_forming_genesis(network_api).await {
+                        return Ok(vec![NodeDuty::BeginFormingGenesisSection]);
+                    } else {
+                        return Ok(vec![NodeDuty::LevelUp]);
+                    }
+                }
+                NodeElderChange::Demoted => return Ok(vec![NodeDuty::LevelDown]),
+            }
+        }
         RoutingEvent::MemberLeft { name, age } => {
             debug!("A node has left the section. Node: {:?}", name);
             Ok(vec![NodeDuty::ProcessLostMember {
@@ -56,62 +109,6 @@ pub async fn handle_network_event(event: RoutingEvent, network_api: Network) -> 
             } else {
                 //trace!("New node has just joined the network and is a fresh node.",);
                 Ok(vec![NodeDuty::ProcessNewMember(XorName(name.0))])
-            }
-        }
-        RoutingEvent::ClientMessageReceived { msg, user } => {
-            info!(
-                "TODO: Received client message: {:8?}\n Sent from {:?}",
-                msg, user
-            );
-            handle(
-                *msg,
-                SrcLocation::EndUser(user),
-                DstLocation::Node(network_api.our_name().await),
-            )
-            .await
-        }
-        RoutingEvent::MessageReceived { content, src, dst } => {
-            info!(
-                "Received network message: {:8?}\n Sent from {:?} to {:?}",
-                HexFmt(&content),
-                src,
-                dst
-            );
-            handle(Message::from(content)?, src, dst).await
-            // ERR -> LAZY
-        }
-        RoutingEvent::EldersChanged {
-            key,
-            elders,
-            prefix,
-            self_status_change,
-            sibling_key,
-        } => {
-            trace!("******Elders changed event!");
-            match self_status_change {
-                NodeElderChange::None => {
-                    let mut sibling_pk = None;
-                    if let Some(pk) = sibling_key {
-                        sibling_pk = Some(PublicKey::Bls(pk));
-                    }
-                    // duties.push(NetworkDuty::from(NodeDuty::UpdateElderInfo {
-                    //     prefix,
-                    //     key: PublicKey::Bls(key),
-                    //     elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
-                    //     sibling_key: sibling_pk,
-                    // }));
-
-                    // Ok(duties)
-                    Ok(vec![])
-                }
-                NodeElderChange::Promoted => {
-                    if is_forming_genesis(network_api).await {
-                        return Ok(vec![NodeDuty::BeginFormingGenesisSection]);
-                    } else {
-                        return Ok(vec![NodeDuty::LevelUp]);
-                    }
-                }
-                NodeElderChange::Demoted => return Ok(vec![NodeDuty::LevelDown]),
             }
         }
         RoutingEvent::Relocated { .. } => {

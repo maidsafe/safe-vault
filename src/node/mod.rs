@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod handle_msg;
-mod handle_network_event;
+mod mapping;
 mod messaging;
 mod metadata;
 mod section_funds;
@@ -41,8 +40,7 @@ use std::{
 };
 
 use self::{
-    handle_msg::handle,
-    handle_network_event::handle_network_event,
+    mapping::map_routing_event,
     messaging::send,
     messaging::send_to_nodes,
     metadata::{adult_reader::AdultReader, Metadata},
@@ -189,7 +187,7 @@ impl Node {
         //info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
-            let node_duties = handle_network_event(event, self.network_api.clone()).await;
+            let node_duties = map_routing_event(event, self.network_api.clone()).await;
             self.process_while_any(node_duties).await;
         }
 
@@ -200,20 +198,16 @@ impl Node {
     async fn process_while_any(&mut self, ops_vec: Result<NodeDuties>) {
         let mut next_ops = ops_vec;
 
-        while let Ok(ops) = next_ops {
+        if let Ok(ops) = next_ops {
             let mut pending_node_ops = Vec::new();
 
-            if !ops.is_empty() {
-                for duty in ops {
-                    match self.handle_node_duty(duty).await {
-                        Ok(new_ops) => pending_node_ops.extend(new_ops),
-                        Err(e) => self.handle_error(&e),
-                    };
-                }
-                next_ops = Ok(pending_node_ops);
-            } else {
-                break;
+            for duty in ops {
+                match self.handle_node_duty(duty).await {
+                    Ok(new_ops) => pending_node_ops.extend(new_ops),
+                    Err(e) => handle_error(&e),
+                };
             }
+            next_ops = Ok(pending_node_ops);
         }
     }
 
@@ -328,17 +322,17 @@ impl Node {
         // self.section_funds = Some(SectionFunds::Rewarding(wallet));
         Ok(())
     }
+}
 
-    fn handle_error(&self, err: &Error) {
-        use std::error::Error;
-        info!(
-            "unimplemented: Handle errors. This should be return w/ lazyError to sender. {}",
-            err
-        );
+fn handle_error(err: &Error) {
+    use std::error::Error;
+    info!(
+        "unimplemented: Handle errors. This should be return w/ lazyError to sender. {}",
+        err
+    );
 
-        if let Some(source) = err.source() {
-            error!("Source of error: {:?}", source);
-        }
+    if let Some(source) = err.source() {
+        error!("Source of error: {:?}", source);
     }
 }
 

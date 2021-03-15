@@ -6,59 +6,24 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Error, Result};
+use crate::{
+    node::node_ops::{NodeDuties, NodeDuty},
+    Error, Result,
+};
 use log::debug;
 use sn_messaging::{
     client::{Message, NodeCmd, NodeSystemCmd, Query},
     DstLocation, EndUser, SrcLocation,
 };
 
-use super::node_ops::{NodeDuties, NodeDuty};
-
-pub async fn handle(msg: Message, src: SrcLocation, dst: DstLocation) -> Result<NodeDuties> {
-    debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
-    let msg_id = msg.id();
-    if let SrcLocation::EndUser(origin) = src {
-        return match_user_sent_msg(msg.clone(), origin);
-        // if res.is_empty() {
-        //     return Err(Error::InvalidMessage(
-        //         msg_id,
-        //         format!("No match for user msg: {:?}", msg),
-        //     ));
-        // }
-        // return Ok()
-    }
+pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> Result<NodeDuties> {
     if let DstLocation::EndUser(_dst) = dst {
-        unimplemented!()
+        return Err(Error::InvalidMessage(
+            msg.id(),
+            "User-to-user msg is not yet implemented.".to_string(),
+        ));
     }
-
-    match &dst {
-        DstLocation::Section(_name) => {
-            match_section_msg(msg.clone(), src).await
-            // if res.is_empty() {
-            //     match_node_msg(msg, src)
-            // } else {
-            //     Ok(res)
-            // }
-        }
-        DstLocation::Node(_name) => {
-            match_node_msg(msg.clone(), src)
-            // if res.is_empty() {
-            //     match_section_msg(msg, src)
-            // } else {
-            //     Ok(res)
-            // }
-        }
-        _ => Err(Error::InvalidMessage(
-            msg_id,
-            format!("Invalid dst: {:?}", msg),
-        )),
-    }
-}
-
-fn match_user_sent_msg(msg: Message, origin: EndUser) -> Result<NodeDuties> {
     match msg {
-        // TODO: match and parse directly
         Message::Query {
             query: Query::Data(query),
             id,
@@ -91,11 +56,42 @@ fn match_user_sent_msg(msg: Message, origin: EndUser) -> Result<NodeDuties> {
         //     msg_id: id,
         //     origin: SrcLocation::EndUser(origin),
         // }),
-        _ => Ok(vec![]),
+        _ => Err(Error::InvalidMessage(
+            msg.id(),
+            "No mapping for user msg".to_string(),
+        )),
     }
 }
 
-async fn match_section_msg(msg: Message, origin: SrcLocation) -> Result<NodeDuties> {
+pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Result<NodeDuties> {
+    debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
+    let msg_id = msg.id();
+
+    match &dst {
+        DstLocation::Section(_name) => {
+            match_section_msg(msg.clone(), src)
+            // if res.is_empty() {
+            //     match_node_msg(msg, src)
+            // } else {
+            //     Ok(res)
+            // }
+        }
+        DstLocation::Node(_name) => {
+            match_node_msg(msg.clone(), src)
+            // if res.is_empty() {
+            //     match_section_msg(msg, src)
+            // } else {
+            //     Ok(res)
+            // }
+        }
+        _ => Err(Error::InvalidMessage(
+            msg_id,
+            format!("Invalid dst: {:?}", msg),
+        )),
+    }
+}
+
+fn match_section_msg(msg: Message, origin: SrcLocation) -> Result<NodeDuties> {
     debug!("Evaluating section message: {:?}", msg);
 
     match &msg {
