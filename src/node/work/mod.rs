@@ -12,6 +12,22 @@ mod queries;
 
 use crate::Node;
 
+// pub struct RewardsAndWallets {
+//     pub section_wallet: WalletInfo,
+//     pub node_rewards: BTreeMap<XorName, NodeRewardStage>,
+//     pub user_wallets: BTreeMap<PublicKey, ActorHistory>,
+// }
+
+// impl RewardsAndWallets {
+//     fn new(section_wallet: WalletInfo) -> Self {
+//         Self {
+//             section_wallet: section_wallet,
+//             node_rewards: Default::default(),
+//             user_wallets: Default::default(),
+//         }
+//     }
+// }
+
 impl Node {
     // use GenesisStage::*;
 

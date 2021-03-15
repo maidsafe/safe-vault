@@ -56,7 +56,7 @@ impl ReplicaSigningImpl {
 impl ReplicaSigning for ReplicaSigningImpl {
     /// Get the replica's PK set
     async fn replicas_pk_set(&self) -> Result<PublicKeySet> {
-        Ok(self.network.our_public_key_set().await?.clone())
+        Ok(self.network.our_public_key_set().await?)
     }
 
     async fn try_genesis(&self, balance: u64) -> Result<CreditAgreementProof> {

@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod handle;
 mod mapping;
 mod messaging;
 mod metadata;
@@ -41,18 +42,13 @@ use std::{
 
 use self::{
     mapping::{map_routing_event, LazyError, Mapping, MsgContext},
-    messaging::send,
-    messaging::send_to_nodes,
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty},
     section_funds::{rewarding_wallet::RewardingWallet, SectionFunds},
     state_db::store_new_reward_keypair,
     transfers::get_replicas::transfer_replicas,
     transfers::Transfers,
-    work::{
-        genesis::begin_forming_genesis_section, genesis::receive_genesis_accumulation,
-        genesis::receive_genesis_proposal, genesis_stage::GenesisStage,
-    },
+    work::genesis_stage::GenesisStage,
 };
 
 /// Static info about the node.
@@ -77,23 +73,6 @@ impl NodeInfo {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct RewardsAndWallets {
-    pub section_wallet: Arc<Mutex<WalletInfo>>,
-    pub node_rewards: Arc<Mutex<BTreeMap<XorName, NodeRewardStage>>>,
-    pub user_wallets: Arc<Mutex<BTreeMap<PublicKey, ActorHistory>>>,
-}
-
-impl RewardsAndWallets {
-    fn new(section_wallet: WalletInfo) -> Self {
-        Self {
-            section_wallet: Arc::new(Mutex::new(section_wallet)),
-            node_rewards: Default::default(),
-            user_wallets: Default::default(),
-        }
-    }
-}
-
 /// Main node struct.
 pub struct Node {
     network_api: Network,
@@ -112,6 +91,8 @@ pub struct Node {
 
 impl Node {
     /// Initialize a new node.
+    /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
+    #[allow(clippy::eval_order_dependence)]
     pub async fn new(config: &Config) -> Result<Self> {
         // TODO: STARTUP all things
         let root_dir_buf = config.root_dir()?;
@@ -203,124 +184,12 @@ impl Node {
         let mut pending_node_ops = Vec::new();
 
         for duty in next_ops {
-            match self.handle_node_duty(duty).await {
+            match self.handle(duty).await {
                 Ok(new_ops) => pending_node_ops.extend(new_ops),
                 Err(e) => try_handle_error(e, ctx.clone()),
             };
         }
         next_ops = pending_node_ops;
-    }
-
-    async fn handle_node_duty(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
-        match duty {
-            NodeDuty::GetSectionElders { msg_id, origin } => {}
-            NodeDuty::BeginFormingGenesisSection => {
-                self.genesis_stage =
-                    begin_forming_genesis_section(self.network_api.clone()).await?;
-            }
-            NodeDuty::ReceiveGenesisProposal { credit, sig } => {
-                self.genesis_stage = receive_genesis_proposal(
-                    credit,
-                    sig,
-                    self.genesis_stage.clone(),
-                    self.network_api.clone(),
-                )
-                .await?;
-            }
-            NodeDuty::ReceiveGenesisAccumulation { signed_credit, sig } => {
-                self.genesis_stage = receive_genesis_accumulation(
-                    signed_credit,
-                    sig,
-                    self.genesis_stage.clone(),
-                    self.network_api.clone(),
-                )
-                .await?;
-                let genesis_tx = match &self.genesis_stage {
-                    GenesisStage::Completed(genesis_tx) => genesis_tx.clone(),
-                    _ => return Ok(vec![]),
-                };
-                self.level_up(Some(genesis_tx)).await?;
-            }
-            NodeDuty::LevelUp => {
-                self.level_up(None).await?;
-            }
-            NodeDuty::LevelDown => {
-                self.meta_data = None;
-                self.transfers = None;
-                self.section_funds = None;
-            }
-            NodeDuty::AssumeAdultDuties => {}
-            NodeDuty::UpdateElderInfo {
-                prefix,
-                key,
-                elders,
-                sibling_key,
-            } => {}
-            NodeDuty::CompleteElderChange {
-                previous_key,
-                new_key,
-            } => {}
-            NodeDuty::InformNewElders => {}
-            NodeDuty::CompleteTransitionToElder {
-                section_wallet,
-                node_rewards,
-                user_wallets,
-            } => {}
-            NodeDuty::ProcessNewMember(_) => {}
-            NodeDuty::ProcessLostMember { name, age } => {}
-            NodeDuty::ProcessRelocatedMember {
-                old_node_id,
-                new_node_id,
-                age,
-            } => {}
-            NodeDuty::ReachingMaxCapacity => {}
-            NodeDuty::IncrementFullNodeCount { node_id } => {}
-            NodeDuty::SwitchNodeJoin(_) => {}
-            NodeDuty::Send(msg) => send(msg, self.network_api.clone()).await?,
-            NodeDuty::SendToNodes { targets, msg } => {
-                send_to_nodes(targets, &msg, self.network_api.clone()).await?
-            }
-            NodeDuty::ProcessRead { query, id, origin } => {
-                if let Some(ref meta_data) = self.meta_data {
-                    return Ok(vec![meta_data.read(query, id, origin).await?]);
-                }
-            }
-            NodeDuty::ProcessWrite { cmd, id, origin } => {
-                if let Some(ref mut meta_data) = self.meta_data {
-                    return Ok(vec![meta_data.write(cmd, id, origin).await?]);
-                }
-            }
-            NodeDuty::NoOp => {}
-        }
-        Ok(vec![])
-    }
-
-    async fn level_up(&mut self, genesis_tx: Option<TransferPropagated>) -> Result<()> {
-        // metadata
-        let dbs = ChunkHolderDbs::new(self.node_info.path())?;
-        let reader = AdultReader::new(self.network_api.clone());
-        let meta_data =
-            Metadata::new(&self.node_info.path(), &self.used_space, dbs, reader).await?;
-        self.meta_data = Some(meta_data);
-
-        // transfers
-        let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
-        let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
-        let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
-        let replicas =
-            transfer_replicas(&self.node_info, self.network_api.clone(), user_wallets).await?;
-        let transfers = Transfers::new(replicas, rate_limit);
-        // does local init, with no roundrip via network messaging
-        if let Some(genesis_tx) = genesis_tx {
-            transfers.genesis(genesis_tx.clone()).await?;
-        }
-        self.transfers = Some(transfers);
-
-        // rewards
-        // let actor = TransferActor::from_info(signing, reward_data.section_wallet, Validator {})?;
-        // let wallet = RewardingWallet::new(actor);
-        // self.section_funds = Some(SectionFunds::Rewarding(wallet));
-        Ok(())
     }
 }
 

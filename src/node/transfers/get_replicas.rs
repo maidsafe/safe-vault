@@ -23,13 +23,13 @@ pub async fn transfer_replicas(
         .bls_share()
         .ok_or(Error::ProvidedPkIsNotBlsShare)?;
     let key_index = network.our_index().await?;
-    let peer_replicas = network.our_public_key_set().await?.clone();
+    let peer_replicas = network.our_public_key_set().await?;
     let signing = ReplicaSigningImpl::new(network.clone());
     let info = ReplicaInfo {
         id,
         key_index,
         peer_replicas,
-        section_chain: network.section_chain().await.clone(),
+        section_chain: network.section_chain().await,
         signing,
         initiating: true,
     };

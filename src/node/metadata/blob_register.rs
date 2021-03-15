@@ -369,8 +369,7 @@ impl BlobRegister {
                     section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Node(dst),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                })
-                .into(),
+                }),
             );
         }
         node_ops

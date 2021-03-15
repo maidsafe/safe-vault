@@ -105,7 +105,7 @@ impl Network {
         self.routing
             .section_key(&sibling_prefix)
             .await
-            .map(|key| PublicKey::Bls(key))
+            .map(PublicKey::Bls)
     }
 
     pub async fn our_public_key_set(&self) -> Result<PublicKeySet> {

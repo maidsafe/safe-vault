@@ -623,19 +623,16 @@ impl Transfers {
                 let mut ops: NodeDuties = vec![];
                 // notify receiving section
                 let location = event.transfer_proof.recipient().into();
-                ops.push(
-                    NodeDuty::Send(OutgoingMsg {
-                        msg: Message::NodeCmd {
-                            cmd: Transfers(PropagateTransfer(event.transfer_proof)),
-                            id: MessageId::in_response_to(&msg_id),
-                            target_section_pk: None,
-                        },
-                        section_source: true, // i.e. errors go to our section
-                        dst: DstLocation::Section(location),
-                        aggregation: Aggregation::AtDestination, // not necessary, but will be slimmer
-                    })
-                    .into(),
-                );
+                ops.push(NodeDuty::Send(OutgoingMsg {
+                    msg: Message::NodeCmd {
+                        cmd: Transfers(PropagateTransfer(event.transfer_proof)),
+                        id: MessageId::in_response_to(&msg_id),
+                        target_section_pk: None,
+                    },
+                    section_source: true, // i.e. errors go to our section
+                    dst: DstLocation::Section(location),
+                    aggregation: Aggregation::AtDestination, // not necessary, but will be slimmer
+                }));
                 Ok(ops)
             }
             Err(e) => {

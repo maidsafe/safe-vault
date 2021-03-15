@@ -14,6 +14,8 @@ use sn_messaging::{
 };
 
 impl Node {
+    /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
+    #[allow(clippy::eval_order_dependence)]
     async fn section_elders(&self, msg_id: MessageId, origin: SrcLocation) -> Result<OutgoingMsg> {
         let elders = SectionElders {
             prefix: self.network_api.our_prefix().await,

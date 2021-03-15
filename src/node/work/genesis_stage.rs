@@ -82,7 +82,7 @@ impl GenesisAccumulation {
             self.pending_agreement = Some(CreditAgreementProof {
                 signed_credit: self.agreed_proposal.clone(),
                 debiting_replicas_sig,
-                debiting_replicas_keys: pk_set.clone(),
+                debiting_replicas_keys: pk_set,
             });
         }
 

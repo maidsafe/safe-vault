@@ -11,10 +11,13 @@ use bls::PublicKeySet;
 use sn_data_types::Transfer;
 use sn_data_types::{
     ActorHistory, Blob, BlobAddress, Credit, CreditAgreementProof, NodeRewardStage, PublicKey,
-    ReplicaEvent, SignatureShare, SignedCredit, SignedTransfer, SignedTransferShare,
+    ReplicaEvent, SectionElders, SignatureShare, SignedCredit, SignedTransfer, SignedTransferShare,
     TransferAgreementProof, TransferValidated, WalletInfo,
 };
-use sn_messaging::{client::Message, Aggregation, DstLocation, EndUser, MessageId, SrcLocation};
+use sn_messaging::{
+    client::{BlobRead, BlobWrite, Message},
+    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
+};
 use sn_routing::Prefix;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -57,6 +60,64 @@ pub enum NetworkDuty {
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
+    GetNodeWalletKey {
+        old_node_id: XorName,
+        new_node_id: XorName,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+    ActivateNodeRewards {
+        id: PublicKey,
+        node_id: XorName,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+    PropagateTransfer {
+        proof: CreditAgreementProof,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+    RegisterSectionPayout {
+        debit_agreement: TransferAgreementProof,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+    SetNodeWallet {
+        wallet_id: PublicKey,
+        node_id: XorName,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+    ReceivePayoutValidation {
+        validation: TransferValidated,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+    GetTransferReplicaEvents {
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+    ValidateSectionPayout {
+        signed_transfer: SignedTransferShare,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+    ReadChunk {
+        read: BlobRead,
+        msg_id: MessageId,
+        origin: EndUser,
+    },
+    WriteChunk {
+        write: BlobWrite,
+        msg_id: MessageId,
+        origin: EndUser,
+    },
+    CompleteWalletTransition {
+        replicas: SectionElders,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+
     /// Get section elders.
     GetSectionElders {
         msg_id: MessageId,
@@ -169,6 +230,18 @@ impl From<NodeDuty> for NodeDuties {
 impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::GetNodeWalletKey { .. } => write!(f, "GetNodeWalletKey"),
+            Self::ActivateNodeRewards { .. } => write!(f, "ActivateNodeRewards"),
+            Self::PropagateTransfer { .. } => write!(f, "PropagateTransfer"),
+            Self::RegisterSectionPayout { .. } => write!(f, "RegisterSectionPayout"),
+            Self::SetNodeWallet { .. } => write!(f, "SetNodeWallet"),
+            Self::ReceivePayoutValidation { .. } => write!(f, "ReceivePayoutValidation"),
+            Self::GetTransferReplicaEvents { .. } => write!(f, "GetTransferReplicaEvents"),
+            Self::ValidateSectionPayout { .. } => write!(f, "ValidateSectionPayout"),
+            Self::ReadChunk { .. } => write!(f, "ReadChunk"),
+            Self::WriteChunk { .. } => write!(f, "WriteChunk"),
+            Self::CompleteWalletTransition { .. } => write!(f, "CompleteWalletTransition"),
+            // ------
             Self::LevelUp => write!(f, "LevelUp"),
             Self::LevelDown => write!(f, "LevelDown"),
             Self::InformNewElders => write!(f, "InformNewElders"),
@@ -401,13 +474,13 @@ impl From<MetadataDuty> for NetworkDuties {
 pub enum ChunkStoreDuty {
     /// Reads.
     ReadChunk {
-        read: sn_messaging::client::BlobRead,
+        read: BlobRead,
         id: MessageId,
         origin: EndUser,
     },
     /// Writes.
     WriteChunk {
-        write: sn_messaging::client::BlobWrite,
+        write: BlobWrite,
         id: MessageId,
         origin: EndUser,
     },

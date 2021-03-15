@@ -119,7 +119,6 @@ impl<T: ReplicaSigning> Replicas<T> {
             .iter()
             .map(|r| *r.key())
             .filter_map(|id| self.history(id).ok().map(|history| Some((id, history))))
-            .map(|wallet| wallet)
             .flatten()
             .collect();
         wallets

@@ -70,7 +70,7 @@ impl ChurningWallet {
     }
 
     /// Move Wallet
-    pub async fn move_wallet(&mut self) -> Result<NodeDuties> {
+    pub async fn move_wallet(&mut self) -> NodeDuties {
         match self.churn.clone() {
             Churn::Regular(next) => self.create_wallet(self.balance, next),
             Churn::Split { child_1, child_2 } => {
@@ -87,13 +87,13 @@ impl ChurningWallet {
                 // Determine which transfer is first
                 // (deterministic order is important for reaching consensus)
                 if child_1.key() > child_2.key() {
-                    ops.extend(self.create_wallet(t1_amount, child_1)?);
-                    ops.extend(self.create_wallet(t2_amount, child_2)?);
-                    Ok(ops)
+                    ops.extend(self.create_wallet(t1_amount, child_1));
+                    ops.extend(self.create_wallet(t2_amount, child_2));
+                    ops
                 } else {
-                    ops.extend(self.create_wallet(t1_amount, child_2)?);
-                    ops.extend(self.create_wallet(t2_amount, child_1)?);
-                    Ok(ops)
+                    ops.extend(self.create_wallet(t1_amount, child_2));
+                    ops.extend(self.create_wallet(t2_amount, child_1));
+                    ops
                 }
             }
         }
@@ -102,7 +102,7 @@ impl ChurningWallet {
     /// Generates validation
     /// to transfer the tokens from
     /// previous actor to new actor.
-    fn create_wallet(&mut self, amount: Token, new_wallet: SectionWallet) -> Result<NodeDuties> {
+    fn create_wallet(&mut self, amount: Token, new_wallet: SectionWallet) -> NodeDuties {
         use NodeSystemCmd::CreateSectionWallet;
         let cmd = NodeCmd::System(CreateSectionWallet {
             amount,
@@ -135,6 +135,6 @@ impl ChurningWallet {
             aggregation: Aggregation::AtDestination,
         }));
 
-        Ok(ops)
+        ops
     }
 }
