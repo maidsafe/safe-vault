@@ -15,7 +15,9 @@ use crate::node_ops::{NodeDuties, NodeDuty, OutgoingMsg};
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
-use sn_data_types::{Error as DtError, NodeRewardStage, PublicKey, Token, WalletInfo};
+use sn_data_types::{
+    Error as DtError, NodeRewardStage, PublicKey, Token, TransferValidated, WalletInfo,
+};
 use sn_messaging::{
     client::{
         Error as ErrorMessage, Message, NodeQuery, NodeQueryResponse, NodeRewardQuery,
@@ -131,6 +133,13 @@ impl RewardPayout {
         }
 
         Ok(payouts)
+    }
+
+    pub async fn receive_validation(
+        &mut self,
+        validation: TransferValidated,
+    ) -> Result<NodeDuties> {
+        self.wallet.receive(validation).await
     }
 
     /// 0. A brand new node has joined our section.

@@ -117,97 +117,29 @@ impl Transfers {
         self.rate_limit.increase_full_node_count(node_id).await
     }
 
-    /// When handled by Elders in the dst
-    /// section, the actual business logic is executed.
-    pub async fn process_transfer_duty(&self, duty: &TransferDuty) -> Result<NodeDuties> {
-        //trace!("Processing transfer duty");
-        use TransferDuty::*;
-        match duty {
-            ProcessQuery {
-                query,
-                msg_id,
-                origin,
-            } => self.process_query(query, *msg_id, *origin).await,
-            ProcessCmd {
-                cmd,
-                msg_id,
-                origin,
-            } => self.process_cmd(cmd, *msg_id, *origin).await,
-            NoOp => Ok(vec![]),
-        }
-    }
-
-    async fn process_query(
+    pub async fn get_store_cost(
         &self,
-        query: &TransferQuery,
+        bytes: u64,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<NodeDuties> {
-        use TransferQuery::*;
-        let duty = match query {
-            GetReplicaEvents => self.all_events(msg_id, origin).await?,
-            GetReplicaKeys(_wallet_id) => self.get_replica_pks(msg_id, origin).await?,
-            GetBalance(wallet_id) => self.balance(*wallet_id, msg_id, origin).await?,
-            GetHistory { at, .. } => self.history(at, msg_id, origin).await?,
-            GetStoreCost { bytes, .. } => {
-                let result = self.rate_limit.from(*bytes).await;
-                info!("StoreCost for {:?} bytes: {}", bytes, result);
-                let mut ops = vec![];
-                ops.push(NodeDuty::Send(OutgoingMsg {
-                    msg: Message::QueryResponse {
-                        response: QueryResponse::GetStoreCost(Ok(result)),
-                        id: MessageId::in_response_to(&msg_id),
-                        correlation_id: msg_id,
-                        target_section_pk: None,
-                    },
-                    section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-                    dst: origin.to_dst(),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                }));
-                //ops.push(Ok(ElderDuty::SwitchNodeJoin(self.rate_limit.check_network_storage().await).into()));
-                return Ok(ops);
-            }
-        };
-        Ok(NodeDuties::from(duty))
-    }
-
-    async fn process_cmd(
-        &self,
-        cmd: &TransferCmd,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    ) -> Result<NodeDuties> {
-        use TransferCmd::*;
-        debug!(">>>Processing cmd in Transfers mod");
-        let duty = match cmd {
-            InitiateReplica(events) => self.initiate_replica(events).await?,
-            ProcessPayment(msg) => self.process_payment(msg, origin).await?,
-            #[cfg(feature = "simulated-payouts")]
-            // Cmd to simulate a farming payout
-            SimulatePayout(transfer) => {
-                self.replicas.credit_without_proof(transfer.clone()).await?
-            }
-            ValidateTransfer(signed_transfer) => {
-                self.validate(signed_transfer.clone(), msg_id, origin)
-                    .await?
-            }
-            ValidateSectionPayout(signed_transfer) => {
-                debug!(">>>> ?? Validating section payout");
-                self.validate_section_payout(signed_transfer.clone(), msg_id, origin)
-                    .await?
-            }
-            RegisterTransfer(debit_agreement) => self.register(&debit_agreement, msg_id).await?,
-            RegisterSectionPayout(debit_agreement) => {
-                return self
-                    .register_reward_payout(&debit_agreement, msg_id, origin)
-                    .await;
-            }
-            PropagateTransfer(debit_agreement) => {
-                self.receive_propagated(&debit_agreement, msg_id, origin)
-                    .await?
-            }
-        };
-        Ok(NodeDuties::from(duty))
+    ) -> NodeDuty {
+        let result = self.rate_limit.from(bytes).await;
+        info!("StoreCost for {:?} bytes: {}", bytes, result);
+        NodeDuty::Send(OutgoingMsg {
+            msg: Message::QueryResponse {
+                response: QueryResponse::GetStoreCost(Ok(result)),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+            dst: origin.to_dst(),
+            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+        })
+        //let mut ops = vec![];
+        //ops.push();
+        //ops.push(Ok(ElderDuty::SwitchNodeJoin(self.rate_limit.check_network_storage().await).into()));
+        //ops
     }
 
     ///
@@ -222,7 +154,7 @@ impl Transfers {
 
     /// Initiates a new Replica with the
     /// state of existing Replicas in the group.
-    async fn initiate_replica(&self, events: &[ReplicaEvent]) -> Result<NodeDuty> {
+    pub async fn initiate_replica(&self, events: &[ReplicaEvent]) -> Result<NodeDuty> {
         // We must be able to initiate the replica, otherwise this node cannot function.
         self.replicas.initiate(events).await?;
         Ok(NodeDuty::NoOp)
@@ -231,7 +163,7 @@ impl Transfers {
     /// Makes sure the payment contained
     /// within a data write, is credited
     /// to the section funds.
-    async fn process_payment(&self, msg: &Message, origin: SrcLocation) -> Result<NodeDuty> {
+    pub async fn process_payment(&self, msg: &Message, origin: SrcLocation) -> Result<NodeDuty> {
         debug!(">>>> processing payment");
         let origin = match origin {
             SrcLocation::EndUser(enduser) => enduser,
@@ -364,7 +296,11 @@ impl Transfers {
     }
 
     /// Get all the events of the Replica.
-    async fn all_events(&self, msg_id: MessageId, query_origin: SrcLocation) -> Result<NodeDuty> {
+    pub async fn all_events(
+        &self,
+        msg_id: MessageId,
+        query_origin: SrcLocation,
+    ) -> Result<NodeDuty> {
         let result = match self.replicas.all_events().await {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
@@ -388,7 +324,11 @@ impl Transfers {
     /// Also check for Section storage capacity and report accordingly.
 
     /// Get the PublicKeySet of our replicas
-    async fn get_replica_pks(&self, msg_id: MessageId, origin: SrcLocation) -> Result<NodeDuty> {
+    pub async fn get_replica_pks(
+        &self,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    ) -> Result<NodeDuty> {
         // validate signature
         let pk_set = self.replicas.replicas_pk_set();
 
@@ -405,7 +345,7 @@ impl Transfers {
         }))
     }
 
-    async fn balance(
+    pub async fn balance(
         &self,
         wallet_id: PublicKey,
         msg_id: MessageId,
@@ -432,7 +372,7 @@ impl Transfers {
         }))
     }
 
-    async fn history(
+    pub async fn history(
         &self,
         wallet_id: &PublicKey,
         msg_id: MessageId,
@@ -461,7 +401,7 @@ impl Transfers {
     /// This validation will render a signature over the
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
-    async fn validate(
+    pub async fn validate(
         &self,
         transfer: SignedTransfer,
         msg_id: MessageId,
@@ -500,7 +440,7 @@ impl Transfers {
     /// This validation will render a signature over the
     /// original request (ValidateTransfer), giving a partial
     /// proof by this individual Elder, that the transfer is valid.
-    async fn validate_section_payout(
+    pub async fn validate_section_payout(
         &self,
         transfer: SignedTransferShare,
         msg_id: MessageId,
@@ -565,7 +505,7 @@ impl Transfers {
 
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
-    async fn register(
+    pub async fn register(
         &self,
         proof: &TransferAgreementProof,
         msg_id: MessageId,
@@ -608,7 +548,7 @@ impl Transfers {
 
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
-    async fn register_reward_payout(
+    pub async fn register_reward_payout(
         &self,
         proof: &TransferAgreementProof,
         msg_id: MessageId,
@@ -659,7 +599,7 @@ impl Transfers {
     /// (See fn register_transfer).
     /// After a successful registration of a transfer at
     /// the source, the transfer is propagated to the destination.
-    async fn receive_propagated(
+    pub async fn receive_propagated(
         &self,
         credit_proof: &CreditAgreementProof,
         msg_id: MessageId,

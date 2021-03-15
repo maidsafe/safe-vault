@@ -34,9 +34,7 @@ impl Node {
                 origin,
             } => {
                 let rewards = self.get_rewards()?;
-                Ok(NodeDuties::from(
-                    rewards.set_node_wallet(node_id, wallet_id)?,
-                ))
+                Ok(vec![rewards.set_node_wallet(node_id, wallet_id)?])
             }
             NodeDuty::GetNodeWalletKey {
                 old_node_id,
@@ -45,11 +43,11 @@ impl Node {
                 origin,
             } => {
                 let rewards = self.get_rewards()?;
-                Ok(NodeDuties::from(
+                Ok(vec![
                     rewards
                         .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
                         .await?,
-                ))
+                ])
             }
             NodeDuty::ActivateNodeRewards {
                 id,
@@ -58,19 +56,10 @@ impl Node {
                 origin,
             } => {
                 let rewards = self.get_rewards()?;
-                Ok(NodeDuties::from(
-                    rewards.activate_node_rewards(id, node_id).await?,
-                ))
+                Ok(vec![rewards.activate_node_rewards(id, node_id).await?])
             }
             NodeDuty::CompleteWalletTransition {
                 replicas,
-                msg_id,
-                origin,
-            } => Ok(vec![]),
-            // transfers
-            NodeDuty::GetTransferReplicaEvents { msg_id, origin } => Ok(vec![]),
-            NodeDuty::PropagateTransfer {
-                proof,
                 msg_id,
                 origin,
             } => Ok(vec![]),
@@ -78,17 +67,54 @@ impl Node {
                 validation,
                 msg_id,
                 origin,
+            } => {
+                let rewards = self.get_rewards()?;
+                Ok(rewards.receive_validation(validation).await?)
+            }
+            NodeDuty::ProcessNewMember(_) => Ok(vec![]),
+            NodeDuty::ProcessLostMember { name, age } => Ok(vec![]),
+            NodeDuty::ProcessRelocatedMember {
+                old_node_id,
+                new_node_id,
+                age,
             } => Ok(vec![]),
+            // transfers
+            NodeDuty::GetTransferReplicaEvents { msg_id, origin } => {
+                let transfers = self.get_transfers()?;
+                Ok(vec![transfers.all_events(msg_id, origin).await?])
+            }
+            NodeDuty::PropagateTransfer {
+                proof,
+                msg_id,
+                origin,
+            } => {
+                let transfers = self.get_transfers()?;
+                Ok(vec![
+                    transfers.receive_propagated(&proof, msg_id, origin).await?,
+                ])
+            }
             NodeDuty::ValidateSectionPayout {
                 signed_transfer,
                 msg_id,
                 origin,
-            } => Ok(vec![]),
+            } => {
+                let transfers = self.get_transfers()?;
+                Ok(vec![
+                    transfers
+                        .validate_section_payout(signed_transfer, msg_id, origin)
+                        .await?,
+                ])
+            }
             NodeDuty::RegisterSectionPayout {
                 debit_agreement,
                 msg_id,
                 origin,
-            } => Ok(vec![]),
+            } => {
+                let transfers = self.get_transfers()?;
+                Ok(transfers
+                    .register_reward_payout(&debit_agreement, msg_id, origin)
+                    .await?)
+            }
             // immutable chunks
             NodeDuty::ReadChunk {
                 read,
@@ -96,7 +122,7 @@ impl Node {
                 origin,
             } => {
                 let chunks = self.get_chunks()?;
-                Ok(NodeDuties::from(chunks.read(&read, msg_id, origin).await?))
+                Ok(vec![chunks.read(&read, msg_id, origin).await?])
             }
             NodeDuty::WriteChunk {
                 write,
@@ -104,9 +130,7 @@ impl Node {
                 origin,
             } => {
                 let chunks = self.get_chunks()?;
-                Ok(NodeDuties::from(
-                    chunks.write(&write, msg_id, origin).await?,
-                ))
+                Ok(vec![chunks.write(&write, msg_id, origin).await?])
             }
             // ---------------------
             NodeDuty::GetSectionElders { msg_id, origin } => {
@@ -175,13 +199,6 @@ impl Node {
                 section_wallet,
                 node_rewards,
                 user_wallets,
-            } => Ok(vec![]),
-            NodeDuty::ProcessNewMember(_) => Ok(vec![]),
-            NodeDuty::ProcessLostMember { name, age } => Ok(vec![]),
-            NodeDuty::ProcessRelocatedMember {
-                old_node_id,
-                new_node_id,
-                age,
             } => Ok(vec![]),
             NodeDuty::ReachingMaxCapacity => Ok(vec![]),
             NodeDuty::IncrementFullNodeCount { node_id } => Ok(vec![]),
