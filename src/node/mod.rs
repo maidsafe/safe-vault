@@ -6,21 +6,26 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub mod genesis;
+pub mod genesis_stage;
 mod handle;
-mod mapping;
-mod messaging;
-mod metadata;
-mod section_funds;
-mod transfers;
-mod work;
+mod level_up;
+mod queries;
 
-pub(crate) mod node_ops;
-pub mod state_db;
-
+use self::genesis_stage::GenesisStage;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     chunk_store::UsedSpace,
     Config, Error, Network, Result,
+};
+use crate::{
+    mapping::{map_routing_event, LazyError, Mapping, MsgContext},
+    metadata::{adult_reader::AdultReader, Metadata},
+    node_ops::{NodeDuties, NodeDuty},
+    section_funds::{rewarding_wallet::RewardingWallet, SectionFunds},
+    state_db::store_new_reward_keypair,
+    transfers::get_replicas::transfer_replicas,
+    transfers::Transfers,
 };
 use bls::SecretKey;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
@@ -38,17 +43,6 @@ use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
-};
-
-use self::{
-    mapping::{map_routing_event, LazyError, Mapping, MsgContext},
-    metadata::{adult_reader::AdultReader, Metadata},
-    node_ops::{NodeDuties, NodeDuty},
-    section_funds::{rewarding_wallet::RewardingWallet, SectionFunds},
-    state_db::store_new_reward_keypair,
-    transfers::get_replicas::transfer_replicas,
-    transfers::Transfers,
-    work::genesis_stage::GenesisStage,
 };
 
 /// Static info about the node.
@@ -104,7 +98,7 @@ impl Node {
             let res: Result<PublicKey>;
             match config.wallet_id() {
                 Some(public_key) => {
-                    res = Ok(PublicKey::Bls(state_db::pk_from_hex(public_key)?));
+                    res = Ok(PublicKey::Bls(crate::state_db::pk_from_hex(public_key)?));
                 }
                 None => {
                     let secret = SecretKey::random();
@@ -151,11 +145,6 @@ impl Node {
     /// Returns our connection info.
     pub async fn our_connection_info(&mut self) -> SocketAddr {
         self.network_api.our_connection_info().await
-    }
-
-    /// Returns whether routing node is in elder state.
-    pub async fn is_elder(&self) -> bool {
-        self.network_api.is_elder().await
     }
 
     /// Starts the node, and runs the main event loop.

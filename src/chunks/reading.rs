@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk_storage::ChunkStorage;
-use crate::node::node_ops::NodeMessagingDuty;
+use crate::node_ops::NodeMessagingDuty;
 use crate::Result;
 use sn_messaging::{client::BlobRead, EndUser, MessageId};
 

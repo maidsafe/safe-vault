@@ -8,7 +8,7 @@
 
 use super::elder_signing::ElderSigning;
 use crate::{
-    node::node_ops::{NetworkDuties, NetworkDuty, NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NetworkDuties, NetworkDuty, NodeDuties, NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use log::{debug, info};

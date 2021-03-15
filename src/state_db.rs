@@ -29,31 +29,22 @@ pub async fn store_new_reward_keypair(
     Ok(())
 }
 
-/// Writes the info to disk.
-pub async fn store_age_group(root_dir: &Path, age_group: &AgeGroup) -> Result<()> {
-    let path = root_dir.join(AGE_GROUP_FILENAME);
-    fs::write(path, utils::serialise(age_group)?).await?;
-    Ok(())
-}
+// /// Writes the info to disk.
+// pub async fn store_age_group(root_dir: &Path, age_group: &AgeGroup) -> Result<()> {
+//     let path = root_dir.join(AGE_GROUP_FILENAME);
+//     fs::write(path, utils::serialise(age_group)?).await?;
+//     Ok(())
+// }
 
-/// Returns Some(AgeGroup) or None if file doesn't exist.
-pub async fn get_age_group(root_dir: &Path) -> Result<Option<AgeGroup>> {
-    let path = root_dir.join(AGE_GROUP_FILENAME);
-    if !path.is_file() {
-        return Ok(None);
-    }
-    let contents = fs::read(path).await?;
-    Ok(Some(bincode::deserialize(&contents)?))
-}
-
-/// A node is within one
-/// out of three age groups.
-#[derive(Serialize, Deserialize, Clone)]
-pub enum AgeGroup {
-    Infant,
-    Adult,
-    Elder,
-}
+// /// Returns Some(AgeGroup) or None if file doesn't exist.
+// pub async fn get_age_group(root_dir: &Path) -> Result<Option<AgeGroup>> {
+//     let path = root_dir.join(AGE_GROUP_FILENAME);
+//     if !path.is_file() {
+//         return Ok(None);
+//     }
+//     let contents = fs::read(path).await?;
+//     Ok(Some(bincode::deserialize(&contents)?))
+// }
 
 ///
 pub fn pk_to_hex(pk: &PublicKey) -> String {

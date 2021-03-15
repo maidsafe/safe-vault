@@ -9,7 +9,7 @@
 //! Write operations on data chunks.
 
 use super::chunk_storage::ChunkStorage;
-use crate::node::node_ops::NodeMessagingDuty;
+use crate::node_ops::NodeMessagingDuty;
 use crate::Result;
 use sn_messaging::{client::BlobWrite, EndUser, MessageId};
 

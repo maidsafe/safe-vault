@@ -12,9 +12,9 @@ use super::{
     blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::node::node_ops::{NetworkDuties, NodeMessagingDuty};
+use crate::node_ops::{NetworkDuties, NodeMessagingDuty};
 use crate::Result;
-use crate::{network::Network, node::node_ops::NodeDuty};
+use crate::{network::Network, node_ops::NodeDuty};
 use sn_messaging::{
     client::{BlobRead, DataQuery, MapRead, SequenceRead},
     EndUser, MessageId,

@@ -19,7 +19,7 @@ use super::node_ops::NodeDuty;
 use crate::{
     capacity::ChunkHolderDbs,
     chunk_store::UsedSpace,
-    node::node_ops::{MetadataDuty, NodeDuties},
+    node_ops::{MetadataDuty, NodeDuties},
     Network, Result,
 };
 use blob_register::BlobRegister;

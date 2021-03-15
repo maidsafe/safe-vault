@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node::node_ops::OutgoingMsg, Node, Result};
+use crate::{node_ops::OutgoingMsg, Node, Result};
 use sn_data_types::SectionElders;
 use sn_messaging::{
     client::{Message, NodeQueryResponse, NodeSystemQueryResponse},

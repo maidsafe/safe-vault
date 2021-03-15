@@ -8,7 +8,7 @@
 
 use super::{LazyError, Mapping, MsgContext};
 use crate::{
-    node::node_ops::{NodeDuties, NodeDuty},
+    node_ops::{NodeDuties, NodeDuty},
     Error, Result,
 };
 use log::debug;

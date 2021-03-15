@@ -35,9 +35,18 @@ mod chaos;
 mod chunk_store;
 mod config_handler;
 mod error;
+mod mapping;
+mod messaging;
+mod metadata;
 mod network;
 mod node;
+mod section_funds;
 mod to_db_key;
+mod transfers;
+
+pub(crate) mod node_ops;
+/// Docs
+pub mod state_db;
 
 pub mod utils;
 

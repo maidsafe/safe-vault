@@ -20,7 +20,7 @@ use self::{
 use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
-    node::node_ops::{NodeDuties, NodeDuty, OutgoingMsg, TransferCmd, TransferDuty, TransferQuery},
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg, TransferCmd, TransferDuty, TransferQuery},
     utils, Error, Result,
 };
 use log::{debug, error, info, trace, warn};

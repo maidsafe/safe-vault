@@ -6,19 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::collections::BTreeMap;
-
 use super::genesis_stage::{GenesisAccumulation, GenesisProposal, GenesisStage};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
-    node::{
-        messaging::send,
-        node_ops::OutgoingMsg,
-        transfers::{
-            replica_signing::ReplicaSigningImpl,
-            replicas::{ReplicaInfo, Replicas},
-            Transfers,
-        },
+    messaging::send,
+    node_ops::OutgoingMsg,
+    transfers::{
+        replica_signing::ReplicaSigningImpl,
+        replicas::{ReplicaInfo, Replicas},
+        Transfers,
     },
     Error, Network, Node, NodeInfo, Result,
 };
@@ -32,6 +28,7 @@ use sn_messaging::{
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::{XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
+use std::collections::BTreeMap;
 
 ///
 pub async fn begin_forming_genesis_section(network_api: Network) -> Result<GenesisStage> {

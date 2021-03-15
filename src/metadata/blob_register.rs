@@ -9,7 +9,7 @@
 use crate::{
     capacity::ChunkHolderDbs,
     error::convert_to_error_message,
-    node::node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     Error, Network, Result, ToDbKey,
 };
 use log::{info, trace, warn};
@@ -363,14 +363,12 @@ impl BlobRegister {
             })
             .collect::<Vec<_>>();
         for (msg, dst) in messages {
-            node_ops.push(
-                NodeDuty::Send(OutgoingMsg {
-                    msg,
-                    section_source: true, // i.e. errors go to our section
-                    dst: DstLocation::Node(dst),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                }),
-            );
+            node_ops.push(NodeDuty::Send(OutgoingMsg {
+                msg,
+                section_source: true, // i.e. errors go to our section
+                dst: DstLocation::Node(dst),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            }));
         }
         node_ops
     }

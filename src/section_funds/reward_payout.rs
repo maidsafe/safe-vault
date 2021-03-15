@@ -7,10 +7,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use self::rewarding_wallet::{Payout, RewardingWallet};
+use self::{ElderSigning, rewarding_wallet::{Payout, RewardingWallet}};
 pub use self::{reward_calc::RewardCalc, validator::Validator};
 use crate::{
-    node::node_ops::{
+    node_ops::{
         NetworkDuties, NodeMessagingDuty, OutgoingMsg, RewardCmd, RewardDuty, RewardQuery,
     },
     ElderState,
@@ -30,7 +30,6 @@ use sn_transfers::TransferActor;
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
-use super::ElderSigning;
 type SectionActor = TransferActor<Validator, ElderSigning>;
 
 /// The accumulation and paying

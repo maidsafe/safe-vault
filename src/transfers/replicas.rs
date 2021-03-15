@@ -23,7 +23,7 @@ use xor_name::Prefix;
 
 #[cfg(feature = "simulated-payouts")]
 use {
-    crate::node::node_ops::NodeDuty,
+    crate::node_ops::NodeDuty,
     bls::{SecretKey, SecretKeySet},
     log::debug,
     rand::thread_rng,

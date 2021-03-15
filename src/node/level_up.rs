@@ -6,14 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::genesis_stage::GenesisStage;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
-    Node, Result,
-};
-use sn_data_types::{ActorHistory, PublicKey, TransferPropagated};
-use std::collections::BTreeMap;
-
-use crate::node::{
     mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty},
@@ -21,8 +16,10 @@ use crate::node::{
     state_db::store_new_reward_keypair,
     transfers::get_replicas::transfer_replicas,
     transfers::Transfers,
-    work::genesis_stage::GenesisStage,
+    Node, Result,
 };
+use sn_data_types::{ActorHistory, PublicKey, TransferPropagated};
+use std::collections::BTreeMap;
 
 impl Node {
     /// Level up and handle more responsibilities.

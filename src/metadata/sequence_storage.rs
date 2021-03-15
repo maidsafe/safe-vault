@@ -9,7 +9,7 @@
 use crate::{
     chunk_store::{SequenceChunkStore, UsedSpace},
     error::convert_to_error_message,
-    node::node_ops::{NodeDuty, NodeMessagingDuty, OutgoingMsg},
+    node_ops::{NodeDuty, NodeMessagingDuty, OutgoingMsg},
     Error, Network, Result,
 };
 use log::info;

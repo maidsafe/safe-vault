@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::node_ops::{NetworkDuty, NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NetworkDuty, NodeDuties, NodeDuty, OutgoingMsg},
     Result,
 };
 use sn_data_types::{PublicKey, SectionElders, Token};

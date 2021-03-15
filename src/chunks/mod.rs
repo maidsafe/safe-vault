@@ -11,7 +11,7 @@ mod reading;
 mod writing;
 
 use crate::{
-    node::node_ops::{NetworkDuties, NodeDuty, NodeMessagingDuty},
+    node_ops::{NetworkDuties, NodeDuty, NodeMessagingDuty},
     AdultState, NodeInfo, Result,
 };
 use chunk_storage::ChunkStorage;

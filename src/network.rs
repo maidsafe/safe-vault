@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::node_ops::OutgoingMsg;
-use crate::{node::state_db::AgeGroup, utils, Config as NodeConfig, Error, Result};
+use crate::node_ops::OutgoingMsg;
+use crate::{utils, Config as NodeConfig, Error, Result};
 use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 
@@ -266,40 +266,5 @@ impl Network {
             .take(count)
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>()
-    }
-
-    pub async fn is_elder(&self) -> bool {
-        matches!(self.our_duties().await, AgeGroup::Elder)
-    }
-
-    pub async fn is_adult(&self) -> bool {
-        matches!(self.our_duties().await, AgeGroup::Adult)
-    }
-
-    async fn our_duties(&self) -> AgeGroup {
-        let our_name = self.our_name().await;
-
-        let is_elder;
-        {
-            is_elder = self.routing.is_elder().await;
-        }
-
-        let is_adult;
-        {
-            is_adult = self
-                .routing
-                .our_adults()
-                .await
-                .iter()
-                .any(|adult| *adult.name() == our_name)
-        }
-
-        if is_elder {
-            AgeGroup::Elder
-        } else if is_adult {
-            AgeGroup::Adult
-        } else {
-            AgeGroup::Infant
-        }
     }
 }
