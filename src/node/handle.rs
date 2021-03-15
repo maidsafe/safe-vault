@@ -26,6 +26,18 @@ impl Node {
     ///
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         match duty {
+            // rewards
+            NodeDuty::SetNodeWallet {
+                wallet_id,
+                node_id,
+                msg_id,
+                origin,
+            } => {
+                let rewards = self.get_rewards()?;
+                Ok(NodeDuties::from(
+                    rewards.set_node_wallet(node_id, wallet_id)?,
+                ))
+            }
             NodeDuty::GetNodeWalletKey {
                 old_node_id,
                 new_node_id,
@@ -50,19 +62,15 @@ impl Node {
                     rewards.activate_node_rewards(id, node_id).await?,
                 ))
             }
+            NodeDuty::CompleteWalletTransition {
+                replicas,
+                msg_id,
+                origin,
+            } => Ok(vec![]),
+            // transfers
+            NodeDuty::GetTransferReplicaEvents { msg_id, origin } => Ok(vec![]),
             NodeDuty::PropagateTransfer {
                 proof,
-                msg_id,
-                origin,
-            } => Ok(vec![]),
-            NodeDuty::RegisterSectionPayout {
-                debit_agreement,
-                msg_id,
-                origin,
-            } => Ok(vec![]),
-            NodeDuty::SetNodeWallet {
-                wallet_id,
-                node_id,
                 msg_id,
                 origin,
             } => Ok(vec![]),
@@ -71,30 +79,39 @@ impl Node {
                 msg_id,
                 origin,
             } => Ok(vec![]),
-            NodeDuty::GetTransferReplicaEvents { msg_id, origin } => Ok(vec![]),
             NodeDuty::ValidateSectionPayout {
                 signed_transfer,
                 msg_id,
                 origin,
             } => Ok(vec![]),
+            NodeDuty::RegisterSectionPayout {
+                debit_agreement,
+                msg_id,
+                origin,
+            } => Ok(vec![]),
+            // immutable chunks
             NodeDuty::ReadChunk {
                 read,
                 msg_id,
                 origin,
-            } => Ok(vec![]),
+            } => {
+                let chunks = self.get_chunks()?;
+                Ok(NodeDuties::from(chunks.read(&read, msg_id, origin).await?))
+            }
             NodeDuty::WriteChunk {
                 write,
                 msg_id,
                 origin,
-            } => Ok(vec![]),
-            NodeDuty::CompleteWalletTransition {
-                replicas,
-                msg_id,
-                origin,
-            } => Ok(vec![]),
-
+            } => {
+                let chunks = self.get_chunks()?;
+                Ok(NodeDuties::from(
+                    chunks.write(&write, msg_id, origin).await?,
+                ))
+            }
             // ---------------------
-            NodeDuty::GetSectionElders { msg_id, origin } => Ok(vec![]),
+            NodeDuty::GetSectionElders { msg_id, origin } => {
+                Ok(vec![self.get_section_elders(msg_id, origin).await?])
+            }
             NodeDuty::BeginFormingGenesisSection => {
                 self.genesis_stage =
                     begin_forming_genesis_section(self.network_api.clone()).await?;
@@ -186,6 +203,16 @@ impl Node {
                 Ok(vec![meta_data.write(cmd, id, origin).await?])
             }
             NodeDuty::NoOp => Ok(vec![]),
+        }
+    }
+
+    fn get_chunks(&mut self) -> Result<&mut Chunks> {
+        if let Some(chunks) = &mut self.chunks {
+            Ok(chunks)
+        } else {
+            Err(Error::InvalidOperation(
+                "No immutable chunks at this node".to_string(),
+            ))
         }
     }
 

@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{node_ops::OutgoingMsg, Node, Result};
+use crate::{
+    node_ops::{NodeDuty, OutgoingMsg},
+    Node, Result,
+};
 use sn_data_types::SectionElders;
 use sn_messaging::{
     client::{Message, NodeQueryResponse, NodeSystemQueryResponse},
@@ -16,13 +19,17 @@ use sn_messaging::{
 impl Node {
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
     #[allow(clippy::eval_order_dependence)]
-    async fn section_elders(&self, msg_id: MessageId, origin: SrcLocation) -> Result<OutgoingMsg> {
+    pub async fn get_section_elders(
+        &self,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    ) -> Result<NodeDuty> {
         let elders = SectionElders {
             prefix: self.network_api.our_prefix().await,
             names: self.network_api.our_elder_names().await,
             key_set: self.network_api.our_public_key_set().await?,
         };
-        Ok(OutgoingMsg {
+        Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeQueryResponse {
                 response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(
                     elders,
@@ -34,6 +41,6 @@ impl Node {
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),  // this will be a single Node
             aggregation: Aggregation::AtDestination,
-        })
+        }))
     }
 }
