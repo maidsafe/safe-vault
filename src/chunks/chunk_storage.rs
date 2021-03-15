@@ -7,13 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    chunk_store::BlobChunkStore,
+    chunk_store::{BlobChunkStore, UsedSpace},
     error::convert_to_error_message,
-    node::{
-        node_ops::{NodeMessagingDuty, OutgoingMsg},
-        Error,
-    },
-    AdultState, NodeInfo, Result,
+    node_ops::{NodeDuty, OutgoingMsg},
+    Error, NodeInfo, Result,
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress};
@@ -27,6 +24,7 @@ use sn_messaging::{
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
+    path::Path,
 };
 use xor_name::XorName;
 
@@ -37,12 +35,13 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) async fn new(node_info: &NodeInfo, adult_state: AdultState) -> Result<Self> {
-        let chunks = BlobChunkStore::new(&node_info.root_dir, node_info.used_space.clone()).await?;
-        Ok(Self {
-            chunks,
-            node_name: adult_state.node_name(),
-        })
+    pub(crate) async fn new(
+        node_name: XorName,
+        path: &Path,
+        used_space: UsedSpace,
+    ) -> Result<Self> {
+        let chunks = BlobChunkStore::new(path, used_space).await?;
+        Ok(Self { chunks, node_name })
     }
 
     pub(crate) async fn store(
@@ -50,9 +49,9 @@ impl ChunkStorage {
         data: &Blob,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         if let Err(error) = self.try_store(data, origin).await {
-            Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            Ok(NodeDuty::Send(OutgoingMsg {
                 msg: Message::CmdError {
                     error: CmdError::Data(convert_to_error_message(error)?),
                     id: MessageId::in_response_to(&msg_id),
@@ -64,7 +63,7 @@ impl ChunkStorage {
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }))
         } else {
-            Ok(NodeMessagingDuty::NoOp)
+            Ok(NodeDuty::NoOp)
         }
     }
 
@@ -99,12 +98,12 @@ impl ChunkStorage {
         address: &BlobAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         let result = self
             .chunks
             .get(address)
             .map_err(|_| ErrorMessage::NoSuchData);
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+        Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
                 id: MessageId::in_response_to(&msg_id),
                 response: QueryResponse::GetBlob(result),
@@ -124,7 +123,7 @@ impl ChunkStorage {
         //section_authority: MsgSender,
         //_msg_id: MessageId,
         //_origin: MsgSender,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         let msg = Message::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetChunk {
                 address,
@@ -136,7 +135,7 @@ impl ChunkStorage {
         };
         info!("Sending NodeSystemQuery::GetChunk to existing holders");
 
-        Ok(NodeMessagingDuty::SendToNodes {
+        Ok(NodeDuty::SendToNodes {
             msg,
             targets: current_holders,
         })
@@ -148,13 +147,13 @@ impl ChunkStorage {
         address: BlobAddress,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         let result = match self.chunks.get(&address) {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeMessagingDuty::Send(OutgoingMsg {
+        Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeQueryResponse {
                 response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
                 id: MessageId::in_response_to(&msg_id),
@@ -168,19 +167,19 @@ impl ChunkStorage {
     }
 
     ///
-    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
+    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<NodeDuty> {
         if self.chunks.has(blob.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
                 blob.address()
             );
-            return Ok(NodeMessagingDuty::NoOp);
+            return Ok(NodeDuty::NoOp);
         }
 
         self.chunks.put(&blob).await?;
 
-        Ok(NodeMessagingDuty::NoOp)
+        Ok(NodeDuty::NoOp)
     }
 
     pub async fn used_space_ratio(&self) -> f64 {
@@ -192,10 +191,10 @@ impl ChunkStorage {
         address: BlobAddress,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         if !self.chunks.has(&address) {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
-            return Ok(NodeMessagingDuty::NoOp);
+            return Ok(NodeDuty::NoOp);
         }
 
         let result = match self.chunks.get(&address) {
@@ -220,7 +219,7 @@ impl ChunkStorage {
         };
 
         if let Err(error) = result {
-            return Ok(NodeMessagingDuty::Send(OutgoingMsg {
+            return Ok(NodeDuty::Send(OutgoingMsg {
                 msg: Message::CmdError {
                     error: CmdError::Data(error),
                     id: MessageId::in_response_to(&msg_id),
@@ -232,7 +231,7 @@ impl ChunkStorage {
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             }));
         }
-        Ok(NodeMessagingDuty::NoOp)
+        Ok(NodeDuty::NoOp)
     }
 }
 

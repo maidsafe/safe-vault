@@ -11,8 +11,9 @@ mod reading;
 mod writing;
 
 use crate::{
-    node_ops::{NetworkDuties, NodeDuty, NodeMessagingDuty},
-    AdultState, NodeInfo, Result,
+    chunk_store::UsedSpace,
+    node_ops::{NodeDuties, NodeDuty},
+    NodeInfo, Result,
 };
 use chunk_storage::ChunkStorage;
 use log::info;
@@ -24,6 +25,7 @@ use sn_messaging::{
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
+    path::Path,
 };
 use xor_name::XorName;
 
@@ -35,9 +37,9 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    pub async fn new(node_info: &NodeInfo, adult_state: AdultState) -> Result<Self> {
+    pub async fn new(node_name: XorName, path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            chunk_storage: ChunkStorage::new(&node_info, adult_state).await?,
+            chunk_storage: ChunkStorage::new(node_name, path, used_space).await?,
         })
     }
 
@@ -46,7 +48,7 @@ impl Chunks {
         read: &BlobRead,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         reading::get_result(read, msg_id, origin, &self.chunk_storage).await
     }
 
@@ -55,14 +57,14 @@ impl Chunks {
         write: &BlobWrite,
         msg_id: MessageId,
         origin: EndUser,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         writing::get_result(write, msg_id, origin, &mut self.chunk_storage).await
     }
 
-    pub async fn check_storage(&self) -> Result<NetworkDuties> {
+    pub async fn check_storage(&self) -> Result<NodeDuties> {
         info!("Checking used storage");
         if self.chunk_storage.used_space_ratio().await > MAX_STORAGE_USAGE_RATIO {
-            Ok(NetworkDuties::from(NodeDuty::StorageFull))
+            Ok(NodeDuties::from(NodeDuty::ReachingMaxCapacity))
         } else {
             Ok(vec![])
         }
@@ -76,7 +78,7 @@ impl Chunks {
         //section_authority: MsgSender,
         _msg_id: MessageId,
         //origin: MsgSender,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         info!("Creating new Message for acquiring chunk from current_holders");
         self.chunk_storage
             .replicate_chunk(address, current_holders)//section_authority, msg_id, origin)
@@ -89,7 +91,7 @@ impl Chunks {
         address: BlobAddress,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<NodeMessagingDuty> {
+    ) -> Result<NodeDuty> {
         info!("Send blob for replication to the new holder.");
         self.chunk_storage
             .get_for_replication(address, msg_id, origin)
@@ -97,7 +99,7 @@ impl Chunks {
     }
 
     ///
-    pub async fn store_replicated_chunk(&mut self, blob: Blob) -> Result<NodeMessagingDuty> {
+    pub async fn store_replicated_chunk(&mut self, blob: Blob) -> Result<NodeDuty> {
         self.chunk_storage.store_for_replication(blob).await
     }
 }

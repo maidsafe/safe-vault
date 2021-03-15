@@ -6,10 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::genesis_stage::{GenesisAccumulation, GenesisProposal, GenesisStage};
+use super::{
+    genesis_stage::{GenesisAccumulation, GenesisProposal, GenesisStage},
+    messaging::send,
+};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
-    messaging::send,
     node_ops::OutgoingMsg,
     transfers::{
         replica_signing::ReplicaSigningImpl,

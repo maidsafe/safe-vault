@@ -24,14 +24,17 @@ use std::collections::BTreeMap;
 impl Node {
     /// Level up and handle more responsibilities.
     pub async fn level_up(&mut self, genesis_tx: Option<TransferPropagated>) -> Result<()> {
-        // metadata
+        // do not hande immutable chunks anymore
+        self.chunks = None;
+
+        // start handling metadata
         let dbs = ChunkHolderDbs::new(self.node_info.path())?;
         let reader = AdultReader::new(self.network_api.clone());
         let meta_data =
             Metadata::new(&self.node_info.path(), &self.used_space, dbs, reader).await?;
         self.meta_data = Some(meta_data);
 
-        // transfers
+        // start handling transfers
         let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
@@ -44,7 +47,7 @@ impl Node {
         }
         self.transfers = Some(transfers);
 
-        // rewards
+        // start handling rewards
         // let actor = TransferActor::from_info(signing, reward_data.section_wallet, Validator {})?;
         // let wallet = RewardingWallet::new(actor);
         // self.section_funds = Some(SectionFunds::Rewarding(wallet));

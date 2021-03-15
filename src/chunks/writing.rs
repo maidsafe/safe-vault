@@ -9,7 +9,7 @@
 //! Write operations on data chunks.
 
 use super::chunk_storage::ChunkStorage;
-use crate::node_ops::NodeMessagingDuty;
+use crate::node_ops::NodeDuty;
 use crate::Result;
 use sn_messaging::{client::BlobWrite, EndUser, MessageId};
 
@@ -18,7 +18,7 @@ pub(super) async fn get_result(
     msg_id: MessageId,
     origin: EndUser,
     storage: &mut ChunkStorage,
-) -> Result<NodeMessagingDuty> {
+) -> Result<NodeDuty> {
     use BlobWrite::*;
     match &write {
         New(data) => storage.store(&data, msg_id, origin).await,

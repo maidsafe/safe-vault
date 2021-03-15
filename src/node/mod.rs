@@ -10,15 +10,14 @@ pub mod genesis;
 pub mod genesis_stage;
 mod handle;
 mod level_up;
+mod messaging;
 mod queries;
 
 use self::genesis_stage::GenesisStage;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     chunk_store::UsedSpace,
-    Config, Error, Network, Result,
-};
-use crate::{
+    chunks::Chunks,
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty},
@@ -26,6 +25,7 @@ use crate::{
     state_db::store_new_reward_keypair,
     transfers::get_replicas::transfer_replicas,
     transfers::Transfers,
+    Config, Error, Network, Result,
 };
 use bls::SecretKey;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
@@ -75,6 +75,8 @@ pub struct Node {
     used_space: UsedSpace,
     prefix: Option<Prefix>,
     genesis_stage: GenesisStage,
+    // immutable chunks
+    chunks: Option<Chunks>,
     // data operations
     meta_data: Option<Metadata>,
     // transfers
@@ -125,12 +127,20 @@ impl Node {
             reward_key,
         };
 
-        debug!("NEW NODE after messaging");
+        let used_space = UsedSpace::new(config.max_capacity());
 
         let node = Self {
             prefix: Some(network_api.our_prefix().await),
+            chunks: Some(
+                Chunks::new(
+                    node_info.node_name,
+                    node_info.root_dir.as_path(),
+                    used_space.clone(),
+                )
+                .await?,
+            ),
             node_info,
-            used_space: UsedSpace::new(config.max_capacity()),
+            used_space,
             network_api,
             network_events,
             genesis_stage: GenesisStage::None,

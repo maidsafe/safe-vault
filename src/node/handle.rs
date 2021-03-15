@@ -7,13 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    genesis::begin_forming_genesis_section, genesis::receive_genesis_accumulation,
-    genesis::receive_genesis_proposal, genesis_stage::GenesisStage,
+    genesis::begin_forming_genesis_section,
+    genesis::receive_genesis_accumulation,
+    genesis::receive_genesis_proposal,
+    genesis_stage::GenesisStage,
+    messaging::{send, send_to_nodes},
 };
 use crate::{
-    messaging::{send, send_to_nodes},
+    chunks::Chunks,
+    metadata::Metadata,
     node_ops::{NodeDuties, NodeDuty},
-    section_funds::SectionFunds,
+    section_funds::{reward_payout::RewardPayout, SectionFunds},
+    transfers::Transfers,
     Error, Node, Result,
 };
 
@@ -27,21 +32,12 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                if let Some(SectionFunds::Rewarding(rewards)) = &self.section_funds {
-                    return Ok(NodeDuties::from(
-                        rewards
-                            .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
-                            .await?,
-                    ));
-                } else if self.section_funds.is_some() {
-                    return Err(Error::InvalidOperation(
-                        "Section fund churn, cannot complete request.".to_string(),
-                    ));
-                } else {
-                    return Err(Error::InvalidOperation(
-                        "No section funds at this node".to_string(),
-                    ));
-                }
+                let rewards = self.get_rewards()?;
+                Ok(NodeDuties::from(
+                    rewards
+                        .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
+                        .await?,
+                ))
             }
             NodeDuty::ActivateNodeRewards {
                 id,
@@ -49,19 +45,10 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                if let Some(SectionFunds::Rewarding(rewards)) = &mut self.section_funds {
-                    return Ok(NodeDuties::from(
-                        rewards.activate_node_rewards(id, node_id).await?,
-                    ));
-                } else if self.section_funds.is_some() {
-                    return Err(Error::InvalidOperation(
-                        "Section fund churn, cannot complete request.".to_string(),
-                    ));
-                } else {
-                    return Err(Error::InvalidOperation(
-                        "No section funds at this node".to_string(),
-                    ));
-                }
+                let rewards = self.get_rewards()?;
+                Ok(NodeDuties::from(
+                    rewards.activate_node_rewards(id, node_id).await?,
+                ))
             }
             NodeDuty::PropagateTransfer {
                 proof,
@@ -146,6 +133,14 @@ impl Node {
                 self.meta_data = None;
                 self.transfers = None;
                 self.section_funds = None;
+                self.chunks = Some(
+                    Chunks::new(
+                        self.node_info.node_name,
+                        self.node_info.root_dir.as_path(),
+                        self.used_space.clone(),
+                    )
+                    .await?,
+                );
                 Ok(vec![])
             }
             NodeDuty::UpdateElderInfo {
@@ -183,20 +178,48 @@ impl Node {
                 Ok(vec![])
             }
             NodeDuty::ProcessRead { query, id, origin } => {
-                if let Some(ref meta_data) = self.meta_data {
-                    Ok(vec![meta_data.read(query, id, origin).await?])
-                } else {
-                    Ok(vec![])
-                }
+                let meta_data = self.get_metadata()?;
+                Ok(vec![meta_data.read(query, id, origin).await?])
             }
             NodeDuty::ProcessWrite { cmd, id, origin } => {
-                if let Some(ref mut meta_data) = self.meta_data {
-                    Ok(vec![meta_data.write(cmd, id, origin).await?])
-                } else {
-                    Ok(vec![])
-                }
+                let meta_data = self.get_metadata()?;
+                Ok(vec![meta_data.write(cmd, id, origin).await?])
             }
             NodeDuty::NoOp => Ok(vec![]),
+        }
+    }
+
+    fn get_metadata(&mut self) -> Result<&mut Metadata> {
+        if let Some(meta_data) = &mut self.meta_data {
+            Ok(meta_data)
+        } else {
+            Err(Error::InvalidOperation(
+                "No meta data at this node".to_string(),
+            ))
+        }
+    }
+
+    fn get_transfers(&mut self) -> Result<&mut Transfers> {
+        if let Some(transfers) = &mut self.transfers {
+            Ok(transfers)
+        } else {
+            Err(Error::InvalidOperation(
+                "No meta data at this node".to_string(),
+            ))
+        }
+    }
+
+    fn get_rewards(&mut self) -> Result<&mut RewardPayout> {
+        if self.section_funds.is_none() {
+            Err(Error::InvalidOperation(
+                "No section funds at this node".to_string(),
+            ))
+        } else if let Some(SectionFunds::Rewarding(rewards)) = &mut self.section_funds {
+            Ok(rewards)
+        } else {
+            Err(Error::InvalidOperation(
+                "Section fund churn, cannot complete request.".to_string(),
+            ))
         }
     }
 }
