@@ -40,7 +40,7 @@ use std::{
 };
 
 use self::{
-    mapping::map_routing_event,
+    mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     messaging::send,
     messaging::send_to_nodes,
     metadata::{adult_reader::AdultReader, Metadata},
@@ -187,28 +187,28 @@ impl Node {
         //info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
-            let node_duties = map_routing_event(event, self.network_api.clone()).await;
-            self.process_while_any(node_duties).await;
+            match map_routing_event(event, self.network_api.clone()).await {
+                Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,
+                Mapping::Error(error) => handle_error(error),
+            }
         }
 
         Ok(())
     }
 
     /// Keeps processing resulting node operations.
-    async fn process_while_any(&mut self, ops_vec: Result<NodeDuties>) {
-        let mut next_ops = ops_vec;
+    async fn process_while_any(&mut self, op: NodeDuty, ctx: Option<MsgContext>) {
+        let mut next_ops = vec![op];
 
-        if let Ok(ops) = next_ops {
-            let mut pending_node_ops = Vec::new();
+        let mut pending_node_ops = Vec::new();
 
-            for duty in ops {
-                match self.handle_node_duty(duty).await {
-                    Ok(new_ops) => pending_node_ops.extend(new_ops),
-                    Err(e) => handle_error(&e),
-                };
-            }
-            next_ops = Ok(pending_node_ops);
+        for duty in next_ops {
+            match self.handle_node_duty(duty).await {
+                Ok(new_ops) => pending_node_ops.extend(new_ops),
+                Err(e) => try_handle_error(e, ctx.clone()),
+            };
         }
+        next_ops = pending_node_ops;
     }
 
     async fn handle_node_duty(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
@@ -324,15 +324,35 @@ impl Node {
     }
 }
 
-fn handle_error(err: &Error) {
+fn handle_error(err: LazyError) {
     use std::error::Error;
     info!(
-        "unimplemented: Handle errors. This should be return w/ lazyError to sender. {}",
+        "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
         err
     );
 
-    if let Some(source) = err.source() {
+    if let Some(source) = err.error.source() {
         error!("Source of error: {:?}", source);
+    }
+}
+
+fn try_handle_error(err: Error, ctx: Option<MsgContext>) {
+    use std::error::Error;
+    if let Some(source) = err.source() {
+        if let Some(ctx) = ctx {
+            info!(
+                "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
+                err
+            );
+            error!("Source of error: {:?}", source);
+        } else {
+            error!(
+                "Erroring without a msg context. Source of error: {:?}",
+                source
+            );
+        }
+    } else {
+        info!("unimplemented: Handle errors. {:?}", err);
     }
 }
 

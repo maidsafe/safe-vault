@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{LazyError, Mapping, MsgContext};
 use crate::{
     node::node_ops::{NodeDuties, NodeDuty},
     Error, Result,
@@ -16,19 +17,21 @@ use sn_messaging::{
     DstLocation, EndUser, SrcLocation,
 };
 
-pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> Result<NodeDuties> {
-    if let DstLocation::EndUser(_dst) = dst {
-        return Err(Error::InvalidMessage(
-            msg.id(),
-            "User-to-user msg is not yet implemented.".to_string(),
-        ));
-    }
-    match msg {
+pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> Mapping {
+    let msg_id = msg.id();
+
+    match msg.to_owned() {
         Message::Query {
             query: Query::Data(query),
             id,
             ..
-        } => Ok(vec![NodeDuty::ProcessRead { query, id, origin }]),
+        } => Mapping::Ok {
+            op: NodeDuty::ProcessRead { query, id, origin },
+            ctx: Some(super::MsgContext::Msg {
+                msg,
+                src: SrcLocation::EndUser(origin),
+            }),
+        },
         // Message::Cmd {
         //     cmd: Cmd::Data { .. },
         //     id,
@@ -56,65 +59,73 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> R
         //     msg_id: id,
         //     origin: SrcLocation::EndUser(origin),
         // }),
-        _ => Err(Error::InvalidMessage(
-            msg.id(),
-            "No mapping for user msg".to_string(),
-        )),
+        _ => {
+            let info = format!("Unknown user msg: {:?}", msg);
+            Mapping::Error(LazyError {
+                msg: MsgContext::Msg {
+                    msg,
+                    src: SrcLocation::EndUser(origin),
+                },
+                error: Error::InvalidMessage(msg_id, info),
+            })
+        }
     }
 }
 
-pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Result<NodeDuties> {
+pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping {
     debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
     let msg_id = msg.id();
 
     match &dst {
-        DstLocation::Section(_name) => {
-            match_section_msg(msg.clone(), src)
-            // if res.is_empty() {
-            //     match_node_msg(msg, src)
-            // } else {
-            //     Ok(res)
-            // }
+        DstLocation::Section(_name) => match match_section_msg(msg.clone(), src) {
+            NodeDuty::NoOp => Mapping::Error(LazyError {
+                error: Error::InvalidMessage(msg_id, format!("Unknown msg: {:?}", msg)),
+                msg: MsgContext::Msg { msg, src },
+            }),
+            op => Mapping::Ok {
+                op,
+                ctx: Some(MsgContext::Msg { msg, src }),
+            },
+        },
+        DstLocation::Node(_name) => match match_node_msg(msg.clone(), src) {
+            NodeDuty::NoOp => Mapping::Error(LazyError {
+                error: Error::InvalidMessage(msg_id, format!("Unknown msg: {:?}", msg)),
+                msg: MsgContext::Msg { msg, src },
+            }),
+            op => Mapping::Ok {
+                op,
+                ctx: Some(MsgContext::Msg { msg, src }),
+            },
+        },
+        _ => {
+            let info = format!("Invalid dst: {:?}", msg);
+            Mapping::Error(LazyError {
+                msg: MsgContext::Msg { msg, src },
+                error: Error::InvalidMessage(msg_id, info),
+            })
         }
-        DstLocation::Node(_name) => {
-            match_node_msg(msg.clone(), src)
-            // if res.is_empty() {
-            //     match_section_msg(msg, src)
-            // } else {
-            //     Ok(res)
-            // }
-        }
-        _ => Err(Error::InvalidMessage(
-            msg_id,
-            format!("Invalid dst: {:?}", msg),
-        )),
     }
 }
 
-fn match_section_msg(msg: Message, origin: SrcLocation) -> Result<NodeDuties> {
+fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
     debug!("Evaluating section message: {:?}", msg);
 
     match &msg {
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis { credit, sig }),
             ..
-        } => {
-            // TODO: Handle failure here;
-            return Ok(vec![NodeDuty::ReceiveGenesisProposal {
-                credit: credit.clone(),
-                sig: sig.clone(),
-            }]);
-        }
+        } => NodeDuty::ReceiveGenesisProposal {
+            credit: credit.clone(),
+            sig: sig.clone(),
+        },
 
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis { signed_credit, sig }),
             ..
-        } => {
-            return Ok(vec![NodeDuty::ReceiveGenesisAccumulation {
-                signed_credit: signed_credit.clone(),
-                sig: sig.clone(),
-            }])
-        }
+        } => NodeDuty::ReceiveGenesisAccumulation {
+            signed_credit: signed_credit.clone(),
+            sig: sig.clone(),
+        },
         // NodeDuty::ReceiveGenesisProposal {
         //     credit: credit.clone(),
         //     sig: sig.clone(),
@@ -327,11 +338,11 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> Result<NodeDuties> {
         //     user_wallets: user_wallets.to_owned(),
         // }
         // .into(),
-        _ => Ok(vec![]),
+        _ => NodeDuty::NoOp,
     }
 }
 
-fn match_node_msg(msg: Message, origin: SrcLocation) -> Result<NodeDuties> {
+fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
     debug!("Evaluating node msg: {:?}", msg);
 
     match &msg {
@@ -488,6 +499,6 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> Result<NodeDuties> {
         //     }
         //     .into()
         // }
-        _ => Ok(vec![]),
+        _ => NodeDuty::NoOp,
     }
 }

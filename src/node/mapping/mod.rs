@@ -18,11 +18,35 @@ use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
 
+#[derive(Debug)]
+pub enum Mapping {
+    Ok {
+        op: NodeDuty,
+        ctx: Option<MsgContext>,
+    },
+    Error(LazyError),
+}
+
+#[derive(Debug, Clone)]
+pub enum MsgContext {
+    Msg { msg: Message, src: SrcLocation },
+    Bytes { msg: bytes::Bytes, src: SrcLocation },
+}
+
+#[derive(Debug)]
+pub struct LazyError {
+    pub msg: MsgContext,
+    pub error: crate::Error,
+}
+
 /// Process any routing event
-pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Result<NodeDuties> {
+pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Mapping {
     trace!("Processing Routing Event: {:?}", event);
     match event {
-        RoutingEvent::Genesis => Ok(vec![NodeDuty::BeginFormingGenesisSection]),
+        RoutingEvent::Genesis => Mapping::Ok {
+            op: NodeDuty::BeginFormingGenesisSection,
+            ctx: None,
+        },
         RoutingEvent::MessageReceived { content, src, dst } => {
             info!(
                 "Received network message: {:8?}\n Sent from {:?} to {:?}",
@@ -30,14 +54,29 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Res
                 src,
                 dst
             );
-            map_node_msg(Message::from(content)?, src, dst)
+
+            let msg = match Message::from(content.clone()) {
+                Ok(msg) => msg,
+                Err(error) => {
+                    return Mapping::Error(LazyError {
+                        msg: MsgContext::Bytes { msg: content, src },
+                        error: crate::Error::Message(error),
+                    })
+                }
+            };
+
+            map_node_msg(msg, src, dst)
         }
         RoutingEvent::ClientMessageReceived { msg, user } => {
             info!(
                 "TODO: Received client message: {:8?}\n Sent from {:?}",
                 msg, user
             );
-            match_user_sent_msg(*msg, DstLocation::Node(network_api.our_name().await), user)
+            match_user_sent_msg(
+                *msg.clone(),
+                DstLocation::Node(network_api.our_name().await),
+                user,
+            )
         }
         RoutingEvent::EldersChanged {
             key,
@@ -61,24 +100,39 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Res
                     // }));
 
                     // Ok(duties)
-                    Ok(vec![])
+                    Mapping::Ok {
+                        op: NodeDuty::NoOp,
+                        ctx: None,
+                    }
                 }
                 NodeElderChange::Promoted => {
                     if is_forming_genesis(network_api).await {
-                        return Ok(vec![NodeDuty::BeginFormingGenesisSection]);
+                        Mapping::Ok {
+                            op: NodeDuty::BeginFormingGenesisSection,
+                            ctx: None,
+                        }
                     } else {
-                        return Ok(vec![NodeDuty::LevelUp]);
+                        Mapping::Ok {
+                            op: NodeDuty::LevelUp,
+                            ctx: None,
+                        }
                     }
                 }
-                NodeElderChange::Demoted => return Ok(vec![NodeDuty::LevelDown]),
+                NodeElderChange::Demoted => Mapping::Ok {
+                    op: NodeDuty::LevelDown,
+                    ctx: None,
+                },
             }
         }
         RoutingEvent::MemberLeft { name, age } => {
             debug!("A node has left the section. Node: {:?}", name);
-            Ok(vec![NodeDuty::ProcessLostMember {
-                name: XorName(name.0),
-                age,
-            }])
+            Mapping::Ok {
+                op: NodeDuty::ProcessLostMember {
+                    name: XorName(name.0),
+                    age,
+                },
+                ctx: None,
+            }
         }
         RoutingEvent::MemberJoined {
             name,
@@ -89,7 +143,10 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Res
             if is_forming_genesis(network_api).await {
                 // during formation of genesis we do not process this event
                 debug!("Forming genesis so ignore new member");
-                return Ok(vec![]);
+                return Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: None,
+                };
             }
 
             info!("New member has joined the section");
@@ -97,18 +154,22 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Res
             //self.log_node_counts().await;
             if let Some(prev_name) = previous_name {
                 trace!("The new member is a Relocated Node");
-                let first = NodeDuty::ProcessRelocatedMember {
-                    old_node_id: XorName(prev_name.0),
-                    new_node_id: XorName(name.0),
-                    age,
-                };
-
                 // Switch joins_allowed off a new adult joining.
                 //let second = NetworkDuty::from(SwitchNodeJoin(false));
-                Ok(vec![first]) // , second
+                Mapping::Ok {
+                    op: NodeDuty::ProcessRelocatedMember {
+                        old_node_id: XorName(prev_name.0),
+                        new_node_id: XorName(name.0),
+                        age,
+                    },
+                    ctx: None,
+                }
             } else {
                 //trace!("New node has just joined the network and is a fresh node.",);
-                Ok(vec![NodeDuty::ProcessNewMember(XorName(name.0))])
+                Mapping::Ok {
+                    op: NodeDuty::ProcessNewMember(XorName(name.0)),
+                    ctx: None,
+                }
             }
         }
         RoutingEvent::Relocated { .. } => {
@@ -120,10 +181,16 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Res
                 // return Ok(())
                 // Ok(NetworkDuties::from(NodeDuty::AssumeAdultDuties))
             }
-            Ok(vec![])
+            Mapping::Ok {
+                op: NodeDuty::NoOp,
+                ctx: None,
+            }
         }
         // Ignore all other events
-        _ => Ok(vec![]),
+        _ => Mapping::Ok {
+            op: NodeDuty::NoOp,
+            ctx: None,
+        },
     }
 }
 
