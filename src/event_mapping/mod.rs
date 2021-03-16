@@ -79,31 +79,23 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
             )
         }
         RoutingEvent::EldersChanged {
-            key,
             elders,
-            prefix,
+            sibling_elders,
             self_status_change,
-            sibling_key,
         } => {
             trace!("******Elders changed event!");
             match self_status_change {
                 NodeElderChange::None => {
-                    let mut sibling_pk = None;
-                    if let Some(pk) = sibling_key {
-                        sibling_pk = Some(PublicKey::Bls(pk));
-                    }
-                    // duties.push(NetworkDuty::from(NodeDuty::UpdateElderInfo {
-                    //     prefix,
-                    //     key: PublicKey::Bls(key),
-                    //     elders: elders.into_iter().map(|e| XorName(e.0)).collect(),
-                    //     sibling_key: sibling_pk,
-                    // }));
-
-                    // Ok(duties)
-                    Mapping::Ok {
-                        op: NodeDuty::NoOp,
-                        ctx: None,
-                    }
+                    // sync to others if we are elder
+                    let op = if network_api.is_elder().await {
+                        NodeDuty::ChurnMembers {
+                            elders,
+                            sibling_elders,
+                        }
+                    } else {
+                        NodeDuty::NoOp
+                    };
+                    Mapping::Ok { op, ctx: None }
                 }
                 NodeElderChange::Promoted => {
                     if is_forming_genesis(network_api).await {

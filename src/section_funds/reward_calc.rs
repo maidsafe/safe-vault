@@ -10,6 +10,7 @@ use sn_data_types::Token;
 use sn_routing::Prefix;
 
 /// Calculation of reward for nodes.
+#[derive(Clone)]
 pub struct RewardCalc {
     prefix: Prefix,
 }

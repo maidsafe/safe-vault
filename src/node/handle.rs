@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_data_types::WalletInfo;
+use sn_data_types::WalletHistory;
 use sn_messaging::MessageId;
 
 use super::{
@@ -20,7 +20,10 @@ use crate::{
     chunks::Chunks,
     metadata::Metadata,
     node_ops::{NodeDuties, NodeDuty},
-    section_funds::{reward_payout::RewardPayout, rewards::Rewards, SectionFunds},
+    section_funds::{
+        churn_process::ChurnProcess, reward_payout::RewardPayout, reward_stages::RewardStages,
+        rewards::Rewards, SectionFunds,
+    },
     transfers::Transfers,
     Error, Node, Result,
 };
@@ -30,34 +33,25 @@ impl Node {
     ///
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         match duty {
-            NodeDuty::CompleteWalletTransition {
+            NodeDuty::ChurnMembers {
+                elders,
+                sibling_elders,
+            } => self.churn(elders, sibling_elders).await,
+            // a remote section asks for the replicas of their wallet
+            NodeDuty::GetSectionElders { msg_id, origin } => {
+                Ok(vec![self.get_section_elders(msg_id, origin).await?])
+            }
+            // we get to know who our new wallet replicas are, thus continue the churn
+            NodeDuty::ContinueWalletChurn {
                 replicas,
                 msg_id,
                 origin,
-            } => Ok(vec![]),
-            // rewards
-            NodeDuty::SetNodeWallet {
-                wallet_id,
-                node_id,
-                msg_id,
-                origin,
             } => {
-                let rewards = self.get_rewards()?;
-                Ok(vec![rewards.set_node_wallet(node_id, wallet_id)?])
+                self.continue_wallet_churn(replicas).await?;
+                Ok(vec![])
             }
-            NodeDuty::GetNodeWalletKey {
-                old_node_id,
-                new_node_id,
-                msg_id,
-                origin,
-            } => {
-                let rewards = self.get_rewards()?;
-                Ok(vec![
-                    rewards
-                        .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
-                        .await?,
-                ])
-            }
+            //
+            // ------- reward payout -------
             NodeDuty::PayoutNodeRewards {
                 id,
                 node_id,
@@ -75,33 +69,131 @@ impl Node {
                 let rewards = self.get_rewards()?;
                 Ok(rewards.receive(validation).await?)
             }
+            //
+            // ------- reward reg -------
+            NodeDuty::SetNodeWallet {
+                wallet_id,
+                node_id,
+                msg_id,
+                origin,
+            } => {
+                let rewards = self.get_section_funds()?;
+                Ok(vec![rewards.set_node_wallet(node_id, wallet_id)?])
+            }
+            NodeDuty::GetNodeWalletKey {
+                old_node_id,
+                new_node_id,
+                msg_id,
+                origin,
+            } => {
+                let rewards = self.get_section_funds()?;
+                Ok(vec![
+                    rewards
+                        .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
+                        .await?,
+                ])
+            }
             NodeDuty::ProcessNewMember(node_id) => {
-                let rewards = self.get_rewards()?;
+                let rewards = self.get_section_funds()?;
                 rewards.add_new_node(node_id);
                 Ok(vec![])
             }
             NodeDuty::ProcessLostMember { name, age } => {
-                let mut duties = {
-                    let rewards = self.get_rewards()?;
-                    vec![rewards.deactivate(name)?]
-                };
+                let rewards = self.get_section_funds()?;
+                rewards.deactivate(name)?;
+
                 let metadata = self.get_metadata()?;
-                duties.extend(metadata.trigger_chunk_replication(name).await?);
-                Ok(duties)
+                Ok(metadata.trigger_chunk_replication(name).await?)
             }
             NodeDuty::ProcessRelocatedMember {
                 old_node_id,
                 new_node_id,
                 age,
             } => {
-                let rewards = self.get_rewards()?;
+                let rewards = self.get_section_funds()?;
                 Ok(vec![
                     rewards
                         .add_relocating_node(old_node_id, new_node_id, age)
                         .await?,
                 ])
             }
-            // transfers
+            //
+            // ----- Genesis ----------
+            NodeDuty::BeginFormingGenesisSection => {
+                self.genesis_stage =
+                    begin_forming_genesis_section(self.network_api.clone()).await?;
+                Ok(vec![])
+            }
+            NodeDuty::ReceiveGenesisProposal { credit, sig } => {
+                self.genesis_stage = receive_genesis_proposal(
+                    credit,
+                    sig,
+                    self.genesis_stage.clone(),
+                    self.network_api.clone(),
+                )
+                .await?;
+                Ok(vec![])
+            }
+            NodeDuty::ReceiveGenesisAccumulation { signed_credit, sig } => {
+                self.genesis_stage = receive_genesis_accumulation(
+                    signed_credit,
+                    sig,
+                    self.genesis_stage.clone(),
+                    self.network_api.clone(),
+                )
+                .await?;
+                let genesis_tx = match &self.genesis_stage {
+                    GenesisStage::Completed(genesis_tx) => genesis_tx.clone(),
+                    _ => return Ok(vec![]),
+                };
+                self.level_up(Some(genesis_tx)).await?;
+                Ok(vec![])
+            }
+            //
+            // ---------- Levelling --------------
+            NodeDuty::LevelUp => {
+                self.level_up(None).await?;
+                Ok(vec![])
+            }
+            NodeDuty::ContinueLevelUp {
+                node_rewards,
+                user_wallets,
+            } => {
+                self.continue_level_up(node_rewards, user_wallets).await?;
+                Ok(vec![])
+            }
+            NodeDuty::CompleteLevelUp(wallet) => {
+                self.complete_level_up(wallet).await?;
+                Ok(vec![])
+            }
+            NodeDuty::LevelDown => {
+                self.meta_data = None;
+                self.transfers = None;
+                self.section_funds = None;
+                self.chunks = Some(
+                    Chunks::new(
+                        self.node_info.node_name,
+                        self.node_info.root_dir.as_path(),
+                        self.used_space.clone(),
+                    )
+                    .await?,
+                );
+                Ok(vec![])
+            }
+            //
+            // -----------     -----------
+            NodeDuty::UpdateElderInfo {
+                prefix,
+                key,
+                elders,
+                sibling_key,
+            } => Ok(vec![]),
+            NodeDuty::CompleteElderChange {
+                previous_key,
+                new_key,
+            } => Ok(vec![]),
+            //
+            // ----------- Transfers -----------
             NodeDuty::GetTransferReplicaEvents { msg_id, origin } => {
                 let transfers = self.get_transfers()?;
                 Ok(vec![transfers.all_events(msg_id, origin).await?])
@@ -138,7 +230,8 @@ impl Node {
                     .register_reward_payout(&debit_agreement, msg_id, origin)
                     .await?)
             }
-            // immutable chunks
+            //
+            // -------- Immutable chunks --------
             NodeDuty::ReadChunk {
                 read,
                 msg_id,
@@ -155,79 +248,9 @@ impl Node {
                 let chunks = self.get_chunks()?;
                 Ok(vec![chunks.write(&write, msg_id, origin).await?])
             }
-            // ---------------------
-            NodeDuty::GetSectionElders { msg_id, origin } => {
-                Ok(vec![self.get_section_elders(msg_id, origin).await?])
-            }
-            NodeDuty::BeginFormingGenesisSection => {
-                self.genesis_stage =
-                    begin_forming_genesis_section(self.network_api.clone()).await?;
-                Ok(vec![])
-            }
-            NodeDuty::ReceiveGenesisProposal { credit, sig } => {
-                self.genesis_stage = receive_genesis_proposal(
-                    credit,
-                    sig,
-                    self.genesis_stage.clone(),
-                    self.network_api.clone(),
-                )
-                .await?;
-                Ok(vec![])
-            }
-            NodeDuty::ReceiveGenesisAccumulation { signed_credit, sig } => {
-                self.genesis_stage = receive_genesis_accumulation(
-                    signed_credit,
-                    sig,
-                    self.genesis_stage.clone(),
-                    self.network_api.clone(),
-                )
-                .await?;
-                let genesis_tx = match &self.genesis_stage {
-                    GenesisStage::Completed(genesis_tx) => genesis_tx.clone(),
-                    _ => return Ok(vec![]),
-                };
-                self.level_up(Some(genesis_tx)).await?;
-                Ok(vec![])
-            }
-            NodeDuty::LevelUp => {
-                self.level_up(None).await?;
-                Ok(vec![])
-            }
-            NodeDuty::CompleteLevelUp {
-                section_wallet,
-                node_rewards,
-                user_wallets,
-            } => {
-                self.complete_level_up(section_wallet, node_rewards, user_wallets)
-                    .await?;
-                Ok(vec![])
-            }
-            NodeDuty::LevelDown => {
-                self.meta_data = None;
-                self.transfers = None;
-                self.section_funds = None;
-                self.chunks = Some(
-                    Chunks::new(
-                        self.node_info.node_name,
-                        self.node_info.root_dir.as_path(),
-                        self.used_space.clone(),
-                    )
-                    .await?,
-                );
-                Ok(vec![])
-            }
-            NodeDuty::UpdateElderInfo {
-                prefix,
-                key,
-                elders,
-                sibling_key,
-            } => Ok(vec![]),
-            NodeDuty::CompleteElderChange {
-                previous_key,
-                new_key,
-            } => Ok(vec![]),
-            NodeDuty::InformNewElders => Ok(vec![]),
             NodeDuty::ReachingMaxCapacity => Ok(vec![]),
+            //
+            // ------- Misc ------------
             NodeDuty::IncrementFullNodeCount { node_id } => Ok(vec![]),
             NodeDuty::SwitchNodeJoin(_) => Ok(vec![]),
             NodeDuty::Send(msg) => {
@@ -238,6 +261,8 @@ impl Node {
                 send_to_nodes(targets, &msg, self.network_api.clone()).await?;
                 Ok(vec![])
             }
+            //
+            // ------- Data ------------
             NodeDuty::ProcessRead { query, id, origin } => {
                 let meta_data = self.get_metadata()?;
                 Ok(vec![meta_data.read(query, id, origin).await?])
@@ -336,16 +361,36 @@ impl Node {
             ))
         }
     }
+
+    fn get_section_funds(&mut self) -> Result<&mut SectionFunds> {
+        if let Some(section_funds) = &mut self.section_funds {
+            Ok(section_funds)
+        } else {
+            Err(Error::InvalidOperation(
+                "No section funds at this node".to_string(),
+            ))
+        }
+    }
+
+    fn get_churning_funds(&mut self) -> Result<(&mut Rewards, &mut ChurnProcess)> {
+        if let Some(SectionFunds::Churning { rewards, process }) = &mut self.section_funds {
+            Ok((rewards, process))
+        } else {
+            Err(Error::InvalidOperation(
+                "No section funds at this node".to_string(),
+            ))
+        }
+    }
 }
 
 // pub struct RewardsAndWallets {
-//     pub section_wallet: WalletInfo,
+//     pub section_wallet: WalletHistory,
 //     pub node_rewards: BTreeMap<XorName, NodeRewardStage>,
 //     pub user_wallets: BTreeMap<PublicKey, ActorHistory>,
 // }
 
 // impl RewardsAndWallets {
-//     fn new(section_wallet: WalletInfo) -> Self {
+//     fn new(section_wallet: WalletHistory) -> Self {
 //         Self {
 //             section_wallet: section_wallet,
 //             node_rewards: Default::default(),
@@ -491,7 +536,7 @@ impl Node {
     //             previous_key,
     //             new_key,
     //         } => self.complete_elder_change(previous_key, new_key).await,
-    //         InformNewElders => self.inform_new_elders().await,
+    //         ChurnMembers => self.synch_data_to_peers().await,
     //         ProcessMessaging(duty) => self.messaging.process_messaging_duty(duty).await,
     //         ProcessNetworkEvent(event) => {
     //             self.network_events
@@ -501,42 +546,6 @@ impl Node {
     //         NoOp => Ok(vec![]),
     //         StorageFull => self.notify_section_of_our_storage().await,
     //     }
-    // }
-
-    // async fn inform_new_elders(&mut self) -> Result<NetworkDuties> {
-    //     debug!("@@@@@@ INFORMING NEW ELDERS");
-    //     let duties = self
-    //         .elder_duties()
-    //         .ok_or_else(|| Error::Logic("Only valid on Elders".to_string()))?;
-
-    //     let peers = self.network_api.our_prefix().await.name();
-    //     let section_key = self
-    //         .network_api
-    //         .section_public_key()
-    //         .await
-    //         .ok_or_else(|| Error::Logic("Section public key is missing".to_string()))?;
-
-    //     let msg_id = MessageId::combine(vec![peers, section_key.into()]);
-
-    //     let section_wallet = duties.section_wallet();
-    //     let node_rewards = duties.node_rewards();
-    //     let user_wallets = duties.user_wallets();
-
-    //     Ok(NetworkDuties::from(NodeMessagingDuty::Send(OutgoingMsg {
-    //         msg: Message::NodeEvent {
-    //             event: NodeEvent::PromotedToElder {
-    //                 section_wallet,
-    //                 node_rewards,
-    //                 user_wallets,
-    //             },
-    //             correlation_id: msg_id,
-    //             id: MessageId::in_response_to(&msg_id),
-    //             target_section_pk: None,
-    //         },
-    //         section_source: false, // strictly this is not correct, but we don't expect responses to an event..
-    //         dst: DstLocation::Section(peers), // swarming to our peers, if splitting many will be needing this, otherwise only one..
-    //         aggregation: Aggregation::AtDestination,
-    //     })))
     // }
 
     // async fn notify_section_of_our_storage(&mut self) -> Result<NetworkDuties> {

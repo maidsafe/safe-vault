@@ -26,13 +26,15 @@ use crate::{
 };
 use itertools::Itertools;
 use log::info;
-use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, TransferPropagated, WalletInfo};
+use sn_data_types::{
+    ActorHistory, NodeRewardStage, PublicKey, SectionElders, TransferPropagated, WalletHistory,
+};
 use sn_routing::XorName;
 use sn_transfers::TransferActor;
 use std::collections::BTreeMap;
 
 pub struct NextLevelInfo {
-    pub section_wallet: WalletInfo,
+    pub section_wallet: WalletHistory,
     pub node_rewards: BTreeMap<XorName, NodeRewardStage>,
     pub user_wallets: BTreeMap<PublicKey, ActorHistory>,
 }
@@ -75,10 +77,9 @@ impl Node {
         Ok(())
     }
 
-    /// Complete the level up and handle more responsibilities.
-    pub async fn complete_level_up(
+    /// Continue the level up and handle more responsibilities.
+    pub async fn continue_level_up(
         &mut self,
-        section_wallet: WalletInfo,
         node_rewards: BTreeMap<XorName, NodeRewardStage>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     ) -> Result<()> {
@@ -96,19 +97,48 @@ impl Node {
         } else if let Some(SectionFunds::TakingNodes(stages)) = &self.section_funds {
             let mut existing_stages = stages.node_rewards();
             existing_stages.extend(node_rewards); // TODO: fix this!
-
-            let signing = ElderSigning::new(self.network_api.clone()).await?;
-            let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
-            let payout = RewardPayout::new(actor);
-            let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
             let stages = RewardStages::new(existing_stages);
-            let rewards = Rewards::new(payout, stages, reward_calc);
-            self.section_funds = Some(SectionFunds::Rewarding(rewards));
+            self.section_funds = Some(SectionFunds::TakingNodes(stages));
             Ok(())
         } else {
             Err(Error::InvalidOperation(
                 "Invalid section funds stage, expected SectionFunds::TakingNodes".to_string(),
             ))
         }
+    }
+
+    /// Complete the level up and handle more responsibilities.
+    pub async fn complete_level_up(&mut self, section_wallet: WalletHistory) -> Result<()> {
+        if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
+            return Err(Error::InvalidOperation(
+                "Invalid section funds stage, expected SectionFunds::TakingNodes".to_string(),
+            ));
+        }
+        // start handling reward payouts
+        let node_rewards = if let Some(section_funds) = &self.section_funds {
+            section_funds.node_rewards()
+        } else if self.network_api.is_elder().await {
+            Default::default()
+        } else {
+            return Err(Error::InvalidOperation(
+                "No section funds at this replica".to_string(),
+            ));
+        };
+
+        /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
+        #[allow(clippy::eval_order_dependence)]
+        let members = SectionElders {
+            prefix: self.network_api.our_prefix().await,
+            names: self.network_api.our_elder_names().await,
+            key_set: self.network_api.our_public_key_set().await?,
+        };
+        let signing = ElderSigning::new(self.network_api.clone()).await?;
+        let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
+        let payout = RewardPayout::new(actor, members);
+        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
+        let stages = RewardStages::new(node_rewards);
+        let rewards = Rewards::new(payout, stages, reward_calc);
+        self.section_funds = Some(SectionFunds::Rewarding(rewards));
+        Ok(())
     }
 }

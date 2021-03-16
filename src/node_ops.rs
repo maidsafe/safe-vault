@@ -12,13 +12,13 @@ use sn_data_types::Transfer;
 use sn_data_types::{
     ActorHistory, Blob, BlobAddress, Credit, CreditAgreementProof, NodeRewardStage, PublicKey,
     ReplicaEvent, SectionElders, SignatureShare, SignedCredit, SignedTransfer, SignedTransferShare,
-    TransferAgreementProof, TransferValidated, WalletInfo,
+    Token, TransferAgreementProof, TransferValidated, WalletHistory,
 };
 use sn_messaging::{
     client::{BlobRead, BlobWrite, Message, NodeSystemCmd},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
-use sn_routing::Prefix;
+use sn_routing::{Elders, NodeElderChange, Prefix};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Formatter},
@@ -112,7 +112,7 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: EndUser,
     },
-    CompleteWalletTransition {
+    ContinueWalletChurn {
         replicas: SectionElders,
         msg_id: MessageId,
         origin: SrcLocation,
@@ -160,17 +160,26 @@ pub enum NodeDuty {
         /// The new section key.
         new_key: PublicKey,
     },
-    InformNewElders,
+    ChurnMembers {
+        /// The Elders of our section.
+        elders: Elders,
+        /// The Elders of the sibling section, if this event is fired during a split.
+        /// Otherwise `None`.
+        sibling_elders: Option<Elders>,
+    },
     /// When promoted, node levels up
     LevelUp,
     /// When demoted, node levels down
     LevelDown,
-    /// Initiates the section wallet.
-    CompleteLevelUp {
-        section_wallet: WalletInfo,
+    /// Initiates the node with state from peers.
+    ContinueLevelUp {
+        /// The registered wallet keys for nodes earning rewards
         node_rewards: BTreeMap<XorName, NodeRewardStage>,
+        /// The wallets of users on the network.
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },
+    /// Initiates the section wallet.
+    CompleteLevelUp(WalletHistory),
     ProcessNewMember(XorName),
     /// As members are lost for various reasons
     /// there are certain things nodes need
@@ -267,16 +276,18 @@ impl Debug for NodeDuty {
             Self::ValidateSectionPayout { .. } => write!(f, "ValidateSectionPayout"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
-            Self::CompleteWalletTransition { .. } => write!(f, "CompleteWalletTransition"),
+            Self::ContinueWalletChurn { .. } => write!(f, "ContinueWalletChurn"),
             // ------
             Self::LevelUp => write!(f, "LevelUp"),
             Self::LevelDown => write!(f, "LevelDown"),
-            Self::InformNewElders => write!(f, "InformNewElders"),
+            Self::ContinueLevelUp { .. } => write!(f, "ContinueLevelUp"),
+            Self::CompleteLevelUp { .. } => write!(f, "CompleteLevelUp"),
+            Self::ChurnMembers { .. } => write!(f, "ChurnMembers"),
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
             Self::BeginFormingGenesisSection => write!(f, "BeginFormingGenesisSection"),
-            Self::CompleteLevelUp { .. } => write!(f, "CompleteLevelUp"),
+
             Self::NoOp => write!(f, "No op."),
             Self::ReachingMaxCapacity => write!(f, "ReachingMaxCapacity"),
             Self::UpdateElderInfo { .. } => write!(f, "UpdateElderInfo"),
@@ -598,10 +609,10 @@ pub enum RewardDuty {
 pub enum RewardCmd {
     /// Initiates a new SectionActor with the
     /// state of existing Replicas in the group.
-    SynchHistory(WalletInfo),
+    SynchHistory(WalletHistory),
     /// Completes transition to a new SectionActor, i.e. new wallet,
     /// and sets it up with its replicas' public key set.
-    CompleteWalletTransition(PublicKeySet),
+    ContinueWalletChurn(PublicKeySet),
     /// With the node id.
     AddNewNode(XorName),
     /// Set the account for a node.

@@ -2250,7 +2250,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_data_types"
 version = "0.15.2"
-source = "git+https://github.com/oetyng/sn_data_types?branch=new-split-section-funds#f2575108c74fea4952f12924d6df76b90245d8b9"
+source = "git+https://github.com/oetyng/sn_data_types?branch=new-split-section-funds#92be7646a99f37225880be6e7238cb64a9791174"
 dependencies = [
  "bincode",
  "crdts",
@@ -2283,7 +2283,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "7.0.1"
-source = "git+https://github.com/oetyng/sn_messaging?branch=new-split-section-funds#27a725f5828270e7800a9d386fec52337ccf0d4b"
+source = "git+https://github.com/oetyng/sn_messaging?branch=new-split-section-funds#7d2ddc90c505001c8162b0700053474a45a59c02"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2351,7 +2351,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.48.1"
-source = "git+https://github.com/oetyng/sn_routing?branch=new-split-section-funds#fa509a810020f0b65fc8dbf021896504a2ab5b34"
+source = "git+https://github.com/oetyng/sn_routing?branch=new-split-section-funds#21044aca2f7188b11f736ee01c17d5bd83f1803f"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2380,7 +2380,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.4.2"
-source = "git+https://github.com/oetyng/sn_transfers?branch=new-split-section-funds#79377b239d0f708d051ccd012ff5982c2206faa5"
+source = "git+https://github.com/oetyng/sn_transfers?branch=new-split-section-funds#624d1a098aacd85c1892c536863fe0b493160cd1"
 dependencies = [
  "bincode",
  "crdts",

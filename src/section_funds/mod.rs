@@ -6,56 +6,138 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod churning_wallet;
+pub mod churn_process;
 pub mod elder_signing;
 mod reward_calc;
 pub mod reward_payout;
 pub mod reward_stages;
 pub mod rewards;
+mod section_wallet;
+pub mod wallet_stage;
+
+use std::collections::BTreeMap;
 
 use self::{
-    churning_wallet::{ChurningWallet, SectionWallet},
-    reward_payout::RewardPayout,
-    reward_stages::RewardStages,
-    rewards::Rewards,
+    churn_process::ChurnProcess, reward_payout::RewardPayout, reward_stages::RewardStages,
+    rewards::Rewards, section_wallet::SectionWallet,
 };
 use super::node_ops::{NodeDuty, OutgoingMsg};
-use sn_data_types::{PublicKey, Token};
+use crate::Result;
+use sn_data_types::{NodeRewardStage, PublicKey, Token};
 use sn_messaging::{
     client::{Message, NodeQuery, NodeSystemQuery},
-    Aggregation, DstLocation, MessageId,
+    Aggregation, DstLocation, MessageId, SrcLocation,
 };
+use sn_routing::XorName;
 
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
 #[allow(clippy::large_enum_variant)]
 pub enum SectionFunds {
-    // not yet able to do payouts
+    // initiating and not yet able to do payouts
     TakingNodes(RewardStages),
-    // can do payouts
+    // ready, can do payouts
     Rewarding(Rewards),
     // in transition and cannot do payouts
-    SoonChurning {
-        current: SectionWallet,
-        balance: Token,
+    Churning {
+        rewards: Rewards,
+        process: ChurnProcess,
     },
-    // in transition and cannot do payouts
-    Churning(ChurningWallet),
 }
 
-pub fn query_for_replicas(wallet: PublicKey) -> NodeDuty {
-    // deterministic msg id for aggregation
-    let msg_id = MessageId::combine(vec![wallet.into()]);
-    NodeDuty::Send(OutgoingMsg {
-        msg: Message::NodeQuery {
-            query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
-            id: msg_id,
-            target_section_pk: None,
-        },
-        section_source: true,
-        dst: DstLocation::Section(wallet.into()),
-        aggregation: Aggregation::AtDestination,
-    })
+impl SectionFunds {
+    /// Returns current stages of registered nodes.
+    pub fn node_rewards(&self) -> BTreeMap<XorName, NodeRewardStage> {
+        match &self {
+            Self::TakingNodes(stages) => stages.node_rewards(),
+            Self::Churning { rewards, .. } | Self::Rewarding(rewards) => rewards.node_rewards(),
+        }
+    }
+
+    /// 0. A brand new node has joined our section.
+    /// A new node always start at age 4.
+    /// It still hasn't registered a wallet id at
+    /// this point, but will as part of starting up.
+    /// At age 5 it gets its first reward payout.
+    pub fn add_new_node(&self, node_id: XorName) {
+        //info!("Rewards: New node added: {:?}", node_id);
+        match &self {
+            Self::TakingNodes(stages) => stages.add_new_node(node_id),
+            Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
+                rewards.add_new_node(node_id)
+            }
+        }
+    }
+
+    /// 1. A new node registers a wallet id for future reward payout.
+    /// ... or, an active node updates its wallet.
+    pub fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeDuty> {
+        //info!("Rewards: New node added: {:?}", node_id);
+        match &self {
+            Self::TakingNodes(stages) => stages.set_node_wallet(node_id, wallet),
+            Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
+                rewards.set_node_wallet(node_id, wallet)
+            }
+        }
+    }
+
+    /// 2. When a node is relocated to our section, we add the node id
+    /// and send a query to old section, for retreiving the wallet id.
+    pub async fn add_relocating_node(
+        &self,
+        old_node_id: XorName,
+        new_node_id: XorName,
+        age: u8,
+    ) -> Result<NodeDuty> {
+        match &self {
+            Self::TakingNodes(stages) => {
+                stages
+                    .add_relocating_node(old_node_id, new_node_id, age)
+                    .await
+            }
+            Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
+                rewards
+                    .add_relocating_node(old_node_id, new_node_id, age)
+                    .await
+            }
+        }
+    }
+
+    /// 4. When the section becomes aware that a node has left,
+    /// its account is deactivated.
+    pub fn deactivate(&self, node_id: XorName) -> Result<()> {
+        match &self {
+            Self::TakingNodes(stages) => stages.deactivate(node_id),
+            Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
+                rewards.deactivate(node_id)
+            }
+        }
+    }
+
+    /// 5. The section that received a relocated node,
+    /// will locally be executing `add_wallet(..)` of this very module,
+    /// thereby sending a query to the old section, leading to this method
+    /// here being called. A query response will be sent back with the wallet id.
+    pub async fn get_wallet_key(
+        &self,
+        old_node_id: XorName,
+        new_node_id: XorName,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    ) -> Result<NodeDuty> {
+        match &self {
+            Self::TakingNodes(stages) => {
+                stages
+                    .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
+                    .await
+            }
+            Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
+                rewards
+                    .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
+                    .await
+            }
+        }
+    }
 }
 
 //     let to_remove = self
@@ -66,16 +148,6 @@ pub fn query_for_replicas(wallet: PublicKey) -> NodeDuty {
 //         .collect();
 //     self.rewards.remove(to_remove);
 
-// ///
-// pub fn section_wallet(&self) -> WalletInfo {
-//     self.rewards.section_wallet()
-// }
-
-// ///
-// pub fn node_rewards(&self) -> BTreeMap<XorName, NodeRewardStage> {
-//     self.rewards.node_rewards()
-// }
-
 // /// Issues query to Elders of the section
 // /// as to catch up with the current state of the replicas.
 // pub async fn catchup_with_section(&mut self) -> Result<NetworkDuties> {
@@ -85,65 +157,10 @@ pub fn query_for_replicas(wallet: PublicKey) -> NodeDuty {
 //         .await
 // }
 
-// /// Transition the section funds account to the new key.
-// pub async fn initiate_elder_change(
-//     &mut self,
-//     rewards_and_wallets: RewardsAndWallets,
-//     sibling_key: Option<PublicKey>,
-// ) -> Result<NetworkDuties> {
-//     info!(">> Processing Elder change in data section");
-//     // TODO: Query sn_routing for info for [new_section_key]
-//     // specifically (regardless of how far back that was) - i.e. not the current info!
-
-//     // if we were demoted, we should not call this at all,
-//     // make sure demoted is handled properly first, so that
-//     // EldersChanged doesn't lead to calling this method..
-
-//     self.rewards
-//         .init_wallet_transition(rewards_and_wallets, sibling_key)
-//         .await
-// }
-
 // /// At section split, all Elders get their reward payout.
 // pub async fn reward_elders(&mut self, prefix: Prefix) -> Result<NetworkDuties> {
 // let elders = self.rewards_and_wallets.elder_names();
 // self.rewards.payout_rewards(elders).await
-// }
-
-// /// When a new node joins, it is registered for receiving rewards.
-// pub async fn new_node_joined(&mut self, id: XorName) -> Result<NetworkDuties> {
-//     let node_name = self.network.our_name().await;
-//     self.rewards
-//         .process_reward_duty(RewardDuty::ProcessCmd {
-//             cmd: RewardCmd::AddNewNode(id),
-//             msg_id: MessageId::new(),
-//             origin: SrcLocation::Node(node_name),
-//         })
-//         .await
-// }
-
-// /// When a relocated node joins, a DataSection
-// /// has a few different things to do, such as
-// /// pay out rewards and trigger chunk replication.
-// pub async fn relocated_node_joined(
-//     &mut self,
-//     old_node_id: XorName,
-//     new_node_id: XorName,
-//     age: u8,
-// ) -> Result<NetworkDuties> {
-//     // Adds the relocated account.
-//     let node_name = self.network.our_name().await;
-//     self.rewards
-//         .process_reward_duty(RewardDuty::ProcessCmd {
-//             cmd: RewardCmd::AddRelocatingNode {
-//                 old_node_id,
-//                 new_node_id,
-//                 age,
-//             },
-//             msg_id: MessageId::new(),
-//             origin: SrcLocation::Node(node_name),
-//         })
-//         .await
 // }
 
 // /// Name of the node

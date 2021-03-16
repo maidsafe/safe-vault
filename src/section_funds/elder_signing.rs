@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Network, Result};
+use crate::{Error, Network, Result};
 use bls::PublicKeySet;
 use sn_data_types::{OwnerType, Result as DtResult, SignatureShare, Signing};
 
@@ -22,6 +22,13 @@ impl ElderSigning {
             id: OwnerType::Multi(network.our_public_key_set().await?),
             network,
         })
+    }
+
+    pub async fn public_key_set(&self) -> Result<PublicKeySet> {
+        self.network
+            .our_public_key_set()
+            .await
+            .map_err(|_| Error::NoSectionPublicKeySet)
     }
 }
 

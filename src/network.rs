@@ -187,6 +187,11 @@ impl Network {
             .map_err(Error::Routing)
     }
 
+    /// Returns whether the node is Elder.
+    pub async fn is_elder(&self) -> bool {
+        self.routing.is_elder().await
+    }
+
     /// get our PKshare
     pub async fn our_public_key_share(&self) -> Result<PublicKey> {
         let index = self.our_index().await?;

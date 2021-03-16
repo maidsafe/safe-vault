@@ -129,6 +129,8 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             sig: sig.clone(),
         },
 
+        // ------ section funds -----
+
         // ------ metadata ------
         Message::NodeQuery {
             query: NodeQuery::Metadata { query, origin },
@@ -281,19 +283,21 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         //     new_key: *to,
         // }
         // .into(),
-        Message::NodeEvent {
-            event:
-                NodeEvent::PromotedToElder {
-                    section_wallet,
+        Message::NodeCmd {
+            cmd:
+                NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                     node_rewards,
                     user_wallets,
-                },
+                }),
             ..
-        } => NodeDuty::CompleteLevelUp {
-            section_wallet: section_wallet.to_owned(),
+        } => NodeDuty::ContinueLevelUp {
             node_rewards: node_rewards.to_owned(),
             user_wallets: user_wallets.to_owned(),
         },
+        Message::NodeEvent {
+            event: NodeEvent::SectionWalletCreated(wallet),
+            ..
+        } => NodeDuty::CompleteLevelUp(wallet.to_owned()),
         _ => NodeDuty::NoOp,
     }
 }
@@ -426,8 +430,8 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             id,
             ..
         } => {
-            debug!(">>>>> Should be handling CompleteWalletTransition, after GetSectionElders query response");
-            NodeDuty::CompleteWalletTransition {
+            debug!(">>>>> Should be handling ContinueWalletChurn, after GetSectionElders query response");
+            NodeDuty::ContinueWalletChurn {
                 replicas: replicas.to_owned(),
                 msg_id: *id,
                 origin,

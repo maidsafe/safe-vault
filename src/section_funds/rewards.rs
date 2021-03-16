@@ -9,8 +9,9 @@
 pub use super::reward_calc::RewardCalc;
 use super::{
     elder_signing::ElderSigning,
-    reward_payout::{Payout, RewardPayout},
+    reward_payout::{Payout, RewardPayout, Validator},
     reward_stages::RewardStages,
+    section_wallet::SectionWallet,
 };
 use crate::{
     node_ops::{NetworkDuties, NetworkDuty, NodeDuties, NodeDuty, OutgoingMsg},
@@ -19,7 +20,7 @@ use crate::{
 use log::{debug, info, warn};
 use sn_data_types::{
     ActorHistory, NodeRewardStage, PublicKey, SectionElders, SignedTransferShare, Token,
-    TransferValidated, WalletInfo,
+    TransferValidated, WalletHistory,
 };
 use sn_messaging::{
     client::{Message, NodeCmd, NodeTransferCmd},
@@ -31,8 +32,11 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use xor_name::XorName;
 use ActorEvent::*;
 
+type SectionActor = TransferActor<Validator, ElderSigning>;
+
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
+#[derive(Clone)]
 pub struct Rewards {
     payout: RewardPayout,
     stages: RewardStages,
@@ -46,6 +50,11 @@ impl Rewards {
             stages,
             reward_calc,
         }
+    }
+
+    pub fn set(&mut self, actor: SectionActor, members: SectionElders, reward_calc: RewardCalc) {
+        self.payout.set(actor, members);
+        self.reward_calc = reward_calc;
     }
 
     /// On section splits, we are paying out to Elders.
@@ -83,8 +92,21 @@ impl Rewards {
         self.payout.receive(validation).await
     }
 
-    pub fn section_wallet(&self) -> WalletInfo {
-        self.payout.section_wallet()
+    pub fn section_wallet_members(&self) -> SectionWallet {
+        self.payout.section_wallet_members()
+    }
+
+    pub fn section_wallet_history(&self) -> WalletHistory {
+        self.payout.section_wallet_history()
+    }
+
+    /// Balance
+    pub fn balance(&self) -> Token {
+        self.payout.balance()
+    }
+
+    pub fn has_payout_in_flight(&self) -> bool {
+        self.payout.has_payout_in_flight()
     }
 
     // ---------------------------------------------
@@ -160,7 +182,7 @@ impl Rewards {
 
     /// 4. When the section becomes aware that a node has left,
     /// its account is deactivated.
-    pub fn deactivate(&self, node_id: XorName) -> Result<NodeDuty> {
+    pub fn deactivate(&self, node_id: XorName) -> Result<()> {
         self.stages.deactivate(node_id)
     }
 

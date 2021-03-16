@@ -9,9 +9,9 @@
 pub mod genesis;
 pub mod genesis_stage;
 mod handle;
+mod interaction;
 mod level_up;
 mod messaging;
-mod queries;
 
 use self::genesis_stage::GenesisStage;
 use crate::{
@@ -32,7 +32,7 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use futures::lock::Mutex;
 use hex_fmt::HexFmt;
 use log::{debug, error, info, trace};
-use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, TransferPropagated, WalletInfo};
+use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, TransferPropagated, WalletHistory};
 use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};

@@ -12,7 +12,7 @@ use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
 use sn_data_types::{
-    Error as DtError, NodeRewardStage, PublicKey, Token, TransferValidated, WalletInfo,
+    Error as DtError, NodeRewardStage, PublicKey, Token, TransferValidated, WalletHistory,
 };
 use sn_messaging::{
     client::{
@@ -28,6 +28,7 @@ use xor_name::XorName;
 /// The accumulation and paying
 /// out of rewards to nodes for
 /// their work in the network.
+#[derive(Clone)]
 pub struct RewardStages {
     node_rewards: DashMap<XorName, NodeRewardStage>,
 }
@@ -192,7 +193,7 @@ impl RewardStages {
 
     /// 4. When the section becomes aware that a node has left,
     /// its account is deactivated.
-    pub fn deactivate(&self, node_id: XorName) -> Result<NodeDuty> {
+    pub fn deactivate(&self, node_id: XorName) -> Result<()> {
         debug!("Rewards: trying to deactivate {}", node_id);
         let entry = match self.node_rewards.get(&node_id) {
             Some(entry) => entry.clone(),
@@ -209,7 +210,7 @@ impl RewardStages {
             NodeRewardStage::Active { wallet, .. } => wallet,
             NodeRewardStage::AwaitingRelocation(_) => {
                 debug!("Rewards: {} is already awaiting relocation", node_id);
-                return Ok(NodeDuty::NoOp);
+                return Ok(());
             }
             NodeRewardStage::AwaitingActivation { .. } // hmm.. left when AwaitingActivation is a tricky case.. // Might be case for lazy messaging..
             | NodeRewardStage::NewNode => {
@@ -228,7 +229,7 @@ impl RewardStages {
             "Rewards: deactivated {}. It is now awaiting relocation.",
             node_id
         );
-        Ok(NodeDuty::NoOp)
+        Ok(())
     }
 
     /// 5. The section that received a relocated node,

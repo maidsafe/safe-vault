@@ -6,14 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{elder_signing::ElderSigning, reward_stages::RewardStages};
+use super::{
+    elder_signing::ElderSigning, reward_stages::RewardStages, section_wallet::SectionWallet,
+};
 use crate::node_ops::{NodeDuties, NodeDuty, OutgoingMsg};
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
 use sn_data_types::{
-    ActorHistory, Error as DtError, NodeRewardStage, PublicKey, SignedTransferShare, Token,
-    TransferValidated, WalletInfo,
+    ActorHistory, Error as DtError, NodeRewardStage, PublicKey, SectionElders, SignedTransferShare,
+    Token, TransferValidated, WalletHistory,
 };
 use sn_messaging::{
     client::{
@@ -32,8 +34,10 @@ type SectionActor = TransferActor<Validator, ElderSigning>;
 /// The accumulation and paying
 /// out of rewards to nodes for
 /// their work in the network.
+#[derive(Clone)]
 pub struct RewardPayout {
     actor: SectionActor,
+    members: SectionElders,
     state: State,
 }
 
@@ -47,8 +51,7 @@ pub struct Payout {
 #[derive(Clone)]
 struct State {
     /// Incoming payout requests are queued here.
-    /// It is queued when we already have a payout in flight,
-    /// or when we are transitioning to a new Actor.
+    /// It is queued when we already have a payout in flight.
     queued_payouts: VecDeque<Payout>,
     payout_in_flight: Option<Payout>,
     completed: BTreeSet<XorName>, // this set grows within acceptable bounds, since transitions do not happen that often, and at every section split, the set is cleared..
@@ -58,15 +61,21 @@ struct State {
 type Age = u8;
 
 impl RewardPayout {
-    pub fn new(actor: SectionActor) -> Self {
+    pub fn new(actor: SectionActor, members: SectionElders) -> Self {
         Self {
             actor,
+            members,
             state: State {
                 queued_payouts: Default::default(),
                 payout_in_flight: None,
                 completed: Default::default(),
             },
         }
+    }
+
+    pub fn set(&mut self, actor: SectionActor, members: SectionElders) {
+        self.actor = actor;
+        self.members = members;
     }
 
     /// Balance
@@ -80,14 +89,26 @@ impl RewardPayout {
     }
 
     /// Wallet info
-    pub fn section_wallet(&self) -> WalletInfo {
-        WalletInfo {
+    pub fn section_wallet_history(&self) -> WalletHistory {
+        WalletHistory {
             replicas: self.actor.replicas(),
             history: self.actor.history(),
         }
     }
 
-    pub async fn synch(&mut self, info: WalletInfo) -> Result<NodeDuty> {
+    /// Section wallet
+    pub fn section_wallet_members(&self) -> SectionWallet {
+        SectionWallet {
+            replicas: self.actor.replicas(),
+            members: self.members.clone(),
+        }
+    }
+
+    pub fn has_payout_in_flight(&self) -> bool {
+        self.state.payout_in_flight.is_some()
+    }
+
+    pub async fn synch(&mut self, info: WalletHistory) -> Result<NodeDuty> {
         if self.replicas() != PublicKey::Bls(info.replicas.key_set.public_key()) {
             error!("Section funds keys dont match");
             return Err(Error::Logic("crap..".to_string()));
@@ -236,10 +257,6 @@ impl RewardPayout {
 
     fn apply(&mut self, event: ActorEvent) -> Result<()> {
         self.actor.apply(event).map_err(Error::Transfer)
-    }
-
-    fn has_payout_in_flight(&self) -> bool {
-        self.state.payout_in_flight.is_some()
     }
 }
 
