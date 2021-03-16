@@ -7,15 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 pub mod churning_wallet;
-mod elder_signing;
+pub mod elder_signing;
 mod reward_calc;
 pub mod reward_payout;
-mod rewarding_wallet;
+pub mod reward_stages;
+pub mod rewards;
 
 use self::{
     churning_wallet::{ChurningWallet, SectionWallet},
     reward_payout::RewardPayout,
-    rewarding_wallet::{RewardingWallet, Validator},
+    reward_stages::RewardStages,
+    rewards::Rewards,
 };
 use super::node_ops::{NodeDuty, OutgoingMsg};
 use sn_data_types::{PublicKey, Token};
@@ -26,19 +28,20 @@ use sn_messaging::{
 
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
+#[allow(clippy::large_enum_variant)]
 pub enum SectionFunds {
-    Rewarding(RewardPayout),
+    // not yet able to do payouts
+    TakingNodes(RewardStages),
+    // can do payouts
+    Rewarding(Rewards),
+    // in transition and cannot do payouts
     SoonChurning {
         current: SectionWallet,
         balance: Token,
     },
+    // in transition and cannot do payouts
     Churning(ChurningWallet),
 }
-// Rewards
-//     let signing = ElderSigning::new(network.clone(), network.our_public_key_set().await?);
-//     let actor = TransferActor::from_info(signing, reward_data.section_wallet, Validator {})?;
-//     let reward_calc = RewardCalc::new(network.our_prefix().await);
-//     let rewards = Rewards::new(actor, reward_data.node_rewards, reward_calc);
 
 pub fn query_for_replicas(wallet: PublicKey) -> NodeDuty {
     // deterministic msg id for aggregation
@@ -62,11 +65,6 @@ pub fn query_for_replicas(wallet: PublicKey) -> NodeDuty {
 //         .filter(|c| !prefix.matches(&XorName(c.0)))
 //         .collect();
 //     self.rewards.remove(to_remove);
-
-// pub struct RewardData {
-//     pub section_wallet: WalletInfo,
-//     pub node_rewards: BTreeMap<XorName, NodeRewardStage>,
-// }
 
 // ///
 // pub fn section_wallet(&self) -> WalletInfo {

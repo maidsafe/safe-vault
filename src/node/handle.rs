@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use sn_data_types::WalletInfo;
+
 use super::{
     genesis::begin_forming_genesis_section,
     genesis::receive_genesis_accumulation,
@@ -17,7 +19,7 @@ use crate::{
     chunks::Chunks,
     metadata::Metadata,
     node_ops::{NodeDuties, NodeDuty},
-    section_funds::{reward_payout::RewardPayout, SectionFunds},
+    section_funds::{reward_payout::RewardPayout, rewards::Rewards, SectionFunds},
     transfers::Transfers,
     Error, Node, Result,
 };
@@ -26,6 +28,11 @@ impl Node {
     ///
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         match duty {
+            NodeDuty::CompleteWalletTransition {
+                replicas,
+                msg_id,
+                origin,
+            } => Ok(vec![]),
             // rewards
             NodeDuty::SetNodeWallet {
                 wallet_id,
@@ -49,35 +56,44 @@ impl Node {
                         .await?,
                 ])
             }
-            NodeDuty::ActivateNodeRewards {
+            NodeDuty::PayoutNodeRewards {
                 id,
                 node_id,
                 msg_id,
                 origin,
             } => {
                 let rewards = self.get_rewards()?;
-                Ok(vec![rewards.activate_node_rewards(id, node_id).await?])
+                Ok(vec![rewards.payout_node_rewards(id, node_id).await?])
             }
-            NodeDuty::CompleteWalletTransition {
-                replicas,
-                msg_id,
-                origin,
-            } => Ok(vec![]),
             NodeDuty::ReceivePayoutValidation {
                 validation,
                 msg_id,
                 origin,
             } => {
                 let rewards = self.get_rewards()?;
-                Ok(rewards.receive_validation(validation).await?)
+                Ok(rewards.receive(validation).await?)
             }
-            NodeDuty::ProcessNewMember(_) => Ok(vec![]),
-            NodeDuty::ProcessLostMember { name, age } => Ok(vec![]),
+            NodeDuty::ProcessNewMember(node_id) => {
+                let rewards = self.get_rewards()?;
+                rewards.add_new_node(node_id);
+                Ok(vec![])
+            }
+            NodeDuty::ProcessLostMember { name, age } => {
+                let rewards = self.get_rewards()?;
+                Ok(vec![rewards.deactivate(name)?])
+            }
             NodeDuty::ProcessRelocatedMember {
                 old_node_id,
                 new_node_id,
                 age,
-            } => Ok(vec![]),
+            } => {
+                let rewards = self.get_rewards()?;
+                Ok(vec![
+                    rewards
+                        .add_relocating_node(old_node_id, new_node_id, age)
+                        .await?,
+                ])
+            }
             // transfers
             NodeDuty::GetTransferReplicaEvents { msg_id, origin } => {
                 let transfers = self.get_transfers()?;
@@ -199,7 +215,11 @@ impl Node {
                 section_wallet,
                 node_rewards,
                 user_wallets,
-            } => Ok(vec![]),
+            } => {
+                self.top_level(section_wallet, node_rewards, user_wallets)
+                    .await?;
+                Ok(vec![])
+            }
             NodeDuty::ReachingMaxCapacity => Ok(vec![]),
             NodeDuty::IncrementFullNodeCount { node_id } => Ok(vec![]),
             NodeDuty::SwitchNodeJoin(_) => Ok(vec![]),
@@ -257,7 +277,7 @@ impl Node {
         }
     }
 
-    fn get_rewards(&mut self) -> Result<&mut RewardPayout> {
+    fn get_rewards(&mut self) -> Result<&mut Rewards> {
         if self.section_funds.is_none() {
             Err(Error::InvalidOperation(
                 "No section funds at this node".to_string(),

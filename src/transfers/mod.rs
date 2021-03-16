@@ -103,6 +103,10 @@ impl Transfers {
         self.replicas.user_wallets()
     }
 
+    pub fn merge(&mut self, user_wallets: BTreeMap<PublicKey, ActorHistory>) {
+        self.replicas.merge(user_wallets);
+    }
+
     /// When section splits, the Replicas in either resulting section
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that

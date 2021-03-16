@@ -72,6 +72,10 @@ impl<T: ReplicaSigning> Replicas<T> {
         Ok(instance)
     }
 
+    pub fn merge(&mut self, user_wallets: BTreeMap<PublicKey, ActorHistory>) {
+        self.setup(user_wallets); // TODO: fix this!!!! (this duplciates entries in db)
+    }
+
     async fn setup(&self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
         use ReplicaEvent::*;
         if user_wallets.is_empty() {

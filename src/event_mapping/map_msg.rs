@@ -255,7 +255,7 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
                 )))),
             id,
             ..
-        } => NodeDuty::ActivateNodeRewards {
+        } => NodeDuty::PayoutNodeRewards {
             id: *wallet_id,
             node_id: *new_node_id,
             msg_id: *id,

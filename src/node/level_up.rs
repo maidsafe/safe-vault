@@ -12,21 +12,39 @@ use crate::{
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty},
-    section_funds::SectionFunds,
+    section_funds::{
+        elder_signing::ElderSigning,
+        reward_payout::{RewardPayout, Validator},
+        reward_stages::RewardStages,
+        rewards::{RewardCalc, Rewards},
+        SectionFunds,
+    },
     state_db::store_new_reward_keypair,
     transfers::get_replicas::transfer_replicas,
     transfers::Transfers,
-    Node, Result,
+    Error, Node, Result,
 };
-use sn_data_types::{ActorHistory, PublicKey, TransferPropagated};
+use itertools::Itertools;
+use log::info;
+use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, TransferPropagated, WalletInfo};
+use sn_routing::XorName;
+use sn_transfers::TransferActor;
 use std::collections::BTreeMap;
+
+pub struct NextLevelInfo {
+    pub section_wallet: WalletInfo,
+    pub node_rewards: BTreeMap<XorName, NodeRewardStage>,
+    pub user_wallets: BTreeMap<PublicKey, ActorHistory>,
+}
 
 impl Node {
     /// Level up and handle more responsibilities.
     pub async fn level_up(&mut self, genesis_tx: Option<TransferPropagated>) -> Result<()> {
+        //
         // do not hande immutable chunks anymore
         self.chunks = None;
 
+        //
         // start handling metadata
         let dbs = ChunkHolderDbs::new(self.node_info.path())?;
         let reader = AdultReader::new(self.network_api.clone());
@@ -34,6 +52,7 @@ impl Node {
             Metadata::new(&self.node_info.path(), &self.used_space, dbs, reader).await?;
         self.meta_data = Some(meta_data);
 
+        //
         // start handling transfers
         let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
@@ -47,10 +66,49 @@ impl Node {
         }
         self.transfers = Some(transfers);
 
-        // start handling rewards
-        // let actor = TransferActor::from_info(signing, reward_data.section_wallet, Validator {})?;
-        // let wallet = RewardingWallet::new(actor);
-        // self.section_funds = Some(SectionFunds::Rewarding(wallet));
+        //
+        // start handling node reward stages
+        let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
+        let stages = RewardStages::new(node_rewards);
+        self.section_funds = Some(SectionFunds::TakingNodes(stages));
+
         Ok(())
+    }
+
+    /// Level up again and handle more responsibilities.
+    pub async fn top_level(
+        &mut self,
+        section_wallet: WalletInfo,
+        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+        user_wallets: BTreeMap<PublicKey, ActorHistory>,
+    ) -> Result<()> {
+        // merge in provided user wallets
+        if let Some(transfers) = &mut self.transfers {
+            transfers.merge(user_wallets)
+        }
+
+        //
+        // start handling reward payouts
+        if let Some(SectionFunds::Rewarding(rewards)) = &mut self.section_funds {
+            // TODO: more needed here
+            rewards.merge(node_rewards);
+            Ok(())
+        } else if let Some(SectionFunds::TakingNodes(stages)) = &self.section_funds {
+            let mut existing_stages = stages.node_rewards();
+            existing_stages.extend(node_rewards); // TODO: fix this!
+
+            let signing = ElderSigning::new(self.network_api.clone()).await?;
+            let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
+            let payout = RewardPayout::new(actor);
+            let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
+            let stages = RewardStages::new(existing_stages);
+            let rewards = Rewards::new(payout, stages, reward_calc);
+            self.section_funds = Some(SectionFunds::Rewarding(rewards));
+            Ok(())
+        } else {
+            Err(Error::InvalidOperation(
+                "Invalid section funds stage, expected SectionFunds::TakingNodes".to_string(),
+            ))
+        }
     }
 }

@@ -66,7 +66,7 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
-    ActivateNodeRewards {
+    PayoutNodeRewards {
         id: PublicKey,
         node_id: XorName,
         msg_id: MessageId,
@@ -234,7 +234,7 @@ impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GetNodeWalletKey { .. } => write!(f, "GetNodeWalletKey"),
-            Self::ActivateNodeRewards { .. } => write!(f, "ActivateNodeRewards"),
+            Self::PayoutNodeRewards { .. } => write!(f, "PayoutNodeRewards"),
             Self::PropagateTransfer { .. } => write!(f, "PropagateTransfer"),
             Self::RegisterSectionPayout { .. } => write!(f, "RegisterSectionPayout"),
             Self::SetNodeWallet { .. } => write!(f, "SetNodeWallet"),
