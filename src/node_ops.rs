@@ -166,14 +166,14 @@ pub enum NodeDuty {
     /// When demoted, node levels down
     LevelDown,
     /// Initiates the section wallet.
-    CompleteTransitionToElder {
+    CompleteLevelUp {
         section_wallet: WalletInfo,
         node_rewards: BTreeMap<XorName, NodeRewardStage>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },
     ProcessNewMember(XorName),
     /// As members are lost for various reasons
-    /// there are certain things the Elders need
+    /// there are certain things nodes need
     /// to do, to update for that.
     ProcessLostMember {
         name: XorName,
@@ -254,7 +254,7 @@ impl Debug for NodeDuty {
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
             Self::BeginFormingGenesisSection => write!(f, "BeginFormingGenesisSection"),
-            Self::CompleteTransitionToElder { .. } => write!(f, "CompleteTransitionToElder"),
+            Self::CompleteLevelUp { .. } => write!(f, "CompleteLevelUp"),
             Self::NoOp => write!(f, "No op."),
             Self::ReachingMaxCapacity => write!(f, "ReachingMaxCapacity"),
             Self::UpdateElderInfo { .. } => write!(f, "UpdateElderInfo"),

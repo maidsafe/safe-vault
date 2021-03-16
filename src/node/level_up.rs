@@ -75,8 +75,8 @@ impl Node {
         Ok(())
     }
 
-    /// Level up again and handle more responsibilities.
-    pub async fn top_level(
+    /// Complete the level up and handle more responsibilities.
+    pub async fn complete_level_up(
         &mut self,
         section_wallet: WalletInfo,
         node_rewards: BTreeMap<XorName, NodeRewardStage>,

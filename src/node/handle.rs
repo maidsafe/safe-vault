@@ -186,6 +186,15 @@ impl Node {
                 self.level_up(None).await?;
                 Ok(vec![])
             }
+            NodeDuty::CompleteLevelUp {
+                section_wallet,
+                node_rewards,
+                user_wallets,
+            } => {
+                self.complete_level_up(section_wallet, node_rewards, user_wallets)
+                    .await?;
+                Ok(vec![])
+            }
             NodeDuty::LevelDown => {
                 self.meta_data = None;
                 self.transfers = None;
@@ -211,15 +220,6 @@ impl Node {
                 new_key,
             } => Ok(vec![]),
             NodeDuty::InformNewElders => Ok(vec![]),
-            NodeDuty::CompleteTransitionToElder {
-                section_wallet,
-                node_rewards,
-                user_wallets,
-            } => {
-                self.top_level(section_wallet, node_rewards, user_wallets)
-                    .await?;
-                Ok(vec![])
-            }
             NodeDuty::ReachingMaxCapacity => Ok(vec![]),
             NodeDuty::IncrementFullNodeCount { node_id } => Ok(vec![]),
             NodeDuty::SwitchNodeJoin(_) => Ok(vec![]),
@@ -427,7 +427,7 @@ impl Node {
     //             self.receive_genesis_accumulation(signed_credit, sig).await
     //         }
     //         AssumeAdultDuties => self.assume_adult_duties().await,
-    //         CompleteTransitionToElder {
+    //         CompleteLevelUp {
     //             section_wallet,
     //             node_rewards,
     //             user_wallets,

@@ -311,7 +311,7 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
                     user_wallets,
                 },
             ..
-        } => NodeDuty::CompleteTransitionToElder {
+        } => NodeDuty::CompleteLevelUp {
             section_wallet: section_wallet.to_owned(),
             node_rewards: node_rewards.to_owned(),
             user_wallets: user_wallets.to_owned(),
