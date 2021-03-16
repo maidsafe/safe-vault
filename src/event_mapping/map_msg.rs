@@ -22,8 +22,6 @@ use sn_messaging::{
 };
 
 pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> Mapping {
-    let msg_id = msg.id();
-
     match msg.to_owned() {
         Message::Query {
             query: Query::Data(query),
@@ -68,27 +66,23 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
         //     msg_id: id,
         //     origin: SrcLocation::EndUser(origin),
         // }),
-        _ => {
-            let info = format!("Unknown user msg: {:?}", msg);
-            Mapping::Error(LazyError {
-                msg: MsgContext::Msg {
-                    msg,
-                    src: SrcLocation::EndUser(origin),
-                },
-                error: Error::InvalidMessage(msg_id, info),
-            })
-        }
+        _ => Mapping::Error(LazyError {
+            error: Error::InvalidMessage(msg.id(), format!("Unknown user msg: {:?}", msg)),
+            msg: MsgContext::Msg {
+                msg,
+                src: SrcLocation::EndUser(origin),
+            },
+        }),
     }
 }
 
 pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping {
     debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
-    let msg_id = msg.id();
 
     match &dst {
         DstLocation::Section(_name) => match match_section_msg(msg.clone(), src) {
             NodeDuty::NoOp => Mapping::Error(LazyError {
-                error: Error::InvalidMessage(msg_id, format!("Unknown msg: {:?}", msg)),
+                error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
                 msg: MsgContext::Msg { msg, src },
             }),
             op => Mapping::Ok {
@@ -98,7 +92,7 @@ pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping
         },
         DstLocation::Node(_name) => match match_node_msg(msg.clone(), src) {
             NodeDuty::NoOp => Mapping::Error(LazyError {
-                error: Error::InvalidMessage(msg_id, format!("Unknown msg: {:?}", msg)),
+                error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
                 msg: MsgContext::Msg { msg, src },
             }),
             op => Mapping::Ok {
@@ -106,13 +100,10 @@ pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping
                 ctx: Some(MsgContext::Msg { msg, src }),
             },
         },
-        _ => {
-            let info = format!("Invalid dst: {:?}", msg);
-            Mapping::Error(LazyError {
-                msg: MsgContext::Msg { msg, src },
-                error: Error::InvalidMessage(msg_id, info),
-            })
-        }
+        _ => Mapping::Error(LazyError {
+            error: Error::InvalidMessage(msg.id(), format!("Invalid dst: {:?}", msg)),
+            msg: MsgContext::Msg { msg, src },
+        }),
     }
 }
 
