@@ -75,13 +75,11 @@ impl Chunks {
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
-        //section_authority: MsgSender,
-        _msg_id: MessageId,
-        //origin: MsgSender,
+        msg_id: MessageId,
     ) -> Result<NodeDuty> {
         info!("Creating new Message for acquiring chunk from current_holders");
         self.chunk_storage
-            .replicate_chunk(address, current_holders)//section_authority, msg_id, origin)
+            .replicate_chunk(address, current_holders, msg_id)
             .await
     }
 
@@ -90,11 +88,11 @@ impl Chunks {
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: SrcLocation,
+        new_holder: XorName,
     ) -> Result<NodeDuty> {
         info!("Send blob for replication to the new holder.");
         self.chunk_storage
-            .get_for_replication(address, msg_id, origin)
+            .get_for_replication(address, msg_id, new_holder)
             .await
     }
 

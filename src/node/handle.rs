@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_data_types::WalletInfo;
+use sn_messaging::MessageId;
 
 use super::{
     genesis::begin_forming_genesis_section,
@@ -23,6 +24,7 @@ use crate::{
     transfers::Transfers,
     Error, Node, Result,
 };
+use xor_name::XorName;
 
 impl Node {
     ///
@@ -79,8 +81,13 @@ impl Node {
                 Ok(vec![])
             }
             NodeDuty::ProcessLostMember { name, age } => {
-                let rewards = self.get_rewards()?;
-                Ok(vec![rewards.deactivate(name)?])
+                let mut duties = {
+                    let rewards = self.get_rewards()?;
+                    vec![rewards.deactivate(name)?]
+                };
+                let metadata = self.get_metadata()?;
+                duties.extend(metadata.trigger_chunk_replication(name).await?);
+                Ok(duties)
             }
             NodeDuty::ProcessRelocatedMember {
                 old_node_id,
@@ -242,6 +249,45 @@ impl Node {
             NodeDuty::ProcessDataPayment { msg, origin } => {
                 let transfers = self.get_transfers()?;
                 Ok(vec![transfers.process_payment(&msg, origin).await?])
+            }
+            NodeDuty::ReplicateChunk {
+                current_holders,
+                address,
+                id,
+            } => {
+                let chunks = self.get_chunks()?;
+                Ok(vec![
+                    chunks.replicate_chunk(address, current_holders, id).await?,
+                ])
+            }
+            NodeDuty::GetChunkForReplication {
+                address,
+                new_holder,
+                id,
+            } => {
+                let chunks = self.get_chunks()?;
+                Ok(vec![
+                    chunks
+                        .get_chunk_for_replication(address, id, new_holder)
+                        .await?,
+                ])
+            }
+            NodeDuty::StoreChunkForReplication {
+                data,
+                correlation_id,
+            } => {
+                // Recreate original MessageId from Section
+                let msg_id = MessageId::combine(vec![
+                    *data.address().name(),
+                    self.network_api.our_name().await,
+                ]);
+                if msg_id == correlation_id {
+                    let chunks = self.get_chunks()?;
+                    Ok(vec![chunks.store_replicated_chunk(data).await?])
+                } else {
+                    log::warn!("Invalid message ID");
+                    Ok(vec![])
+                }
             }
             NodeDuty::NoOp => Ok(vec![]),
         }

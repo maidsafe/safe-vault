@@ -15,7 +15,7 @@ use sn_data_types::{
     TransferAgreementProof, TransferValidated, WalletInfo,
 };
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, Message},
+    client::{BlobRead, BlobWrite, Message, NodeSystemCmd},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::Prefix;
@@ -219,6 +219,28 @@ pub enum NodeDuty {
         msg: Message,
         origin: EndUser,
     },
+    /// Process replication of a chunk on `MemberLeft`
+    /// This is run at the node which is the new holder
+    /// of a chunk
+    ReplicateChunk {
+        address: BlobAddress,
+        current_holders: BTreeSet<XorName>,
+        id: MessageId,
+    },
+    /// Process a GetChunk operation
+    /// and send it back to to the requesting node
+    /// for replication
+    GetChunkForReplication {
+        address: BlobAddress,
+        new_holder: XorName,
+        id: MessageId,
+    },
+    /// Store a chunk that is a result of data replication
+    /// on `MemberLeft`
+    StoreChunkForReplication {
+        data: Blob,
+        correlation_id: MessageId,
+    },
     NoOp,
 }
 
@@ -271,6 +293,9 @@ impl Debug for NodeDuty {
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
             Self::ProcessDataPayment { .. } => write!(f, "ProcessDataPayment"),
+            Self::ReplicateChunk { .. } => write!(f, "ReplicateChunk"),
+            Self::GetChunkForReplication { .. } => write!(f, "GetChunkForReplication"),
+            Self::StoreChunkForReplication { .. } => write!(f, "StoreChunkForReplication"),
         }
     }
 }

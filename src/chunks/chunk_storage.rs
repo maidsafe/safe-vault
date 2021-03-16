@@ -10,6 +10,7 @@ use crate::{
     chunk_store::{BlobChunkStore, UsedSpace},
     error::convert_to_error_message,
     node_ops::{NodeDuty, OutgoingMsg},
+    section_funds::elder_signing,
     Error, NodeInfo, Result,
 };
 use log::{error, info};
@@ -23,6 +24,7 @@ use sn_messaging::{
 };
 use std::{
     collections::BTreeSet,
+    env::current_dir,
     fmt::{self, Display, Formatter},
     path::Path,
 };
@@ -120,17 +122,15 @@ impl ChunkStorage {
         &self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
-        //section_authority: MsgSender,
-        //_msg_id: MessageId,
-        //_origin: MsgSender,
+        msg_id: MessageId,
     ) -> Result<NodeDuty> {
         let msg = Message::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetChunk {
                 address,
                 new_holder: self.node_name,
-                current_holders: current_holders.clone(),
+                current_holders: BTreeSet::default(), //TODO: remove this in sn_messaging
             }),
-            id: MessageId::new(),
+            id: msg_id,
             target_section_pk: None,
         };
         info!("Sending NodeSystemQuery::GetChunk to existing holders");
@@ -146,24 +146,29 @@ impl ChunkStorage {
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: SrcLocation,
+        new_holder: XorName,
     ) -> Result<NodeDuty> {
         let result = match self.chunks.get(&address) {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)?),
         };
 
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeQueryResponse {
-                response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // sent as single node
-            dst: origin.to_dst(),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        if let Ok(data) = result {
+            Ok(NodeDuty::Send(OutgoingMsg {
+                msg: Message::NodeQueryResponse {
+                    response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(Ok(data))),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                    target_section_pk: None,
+                },
+                section_source: false, // sent as single node
+                dst: DstLocation::Node(new_holder),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            }))
+        } else {
+            log::warn!("Could not read chunk for replication: {:?}", result);
+            Ok(NodeDuty::NoOp)
+        }
     }
 
     ///

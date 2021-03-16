@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::thread::current;
+
 use super::{LazyError, Mapping, MsgContext};
 use crate::{
     node_ops::{NodeDuties, NodeDuty},
@@ -14,9 +16,10 @@ use crate::{
 use log::debug;
 use sn_messaging::{
     client::{
-        Cmd, Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery,
-        NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
-        NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
+        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
+        NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery,
+        NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse,
+        Query,
     },
     DstLocation, EndUser, SrcLocation,
 };
@@ -165,63 +168,38 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin: *origin,
         },
-        // //
-        // // ------ chunk replication ------
-        // Message::NodeQuery {
-        //     query:
-        //         NodeQuery::System(NodeSystemQuery::GetChunk {
-        //             //section_authority,
-        //             new_holder,
-        //             address,
-        //             current_holders,
-        //         }),
-        //     ..
-        // } => {
-        //     info!("Verifying GetChunk query!");
-        //     let _proof_chain = self.adult_state()?.section_chain();
-
-        //     // Recreate original MessageId from Section
-        //     let msg_id = MessageId::combine(vec![*address.name(), *new_holder]);
-
-        //     // Recreate cmd that was sent by the section.
-        //     let _message = Message::NodeCmd {
-        //         cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk {
-        //             new_holder: *new_holder,
-        //             address: *address,
-        //             current_holders: current_holders.clone(),
-        //         }),
-        //         id: msg_id,
-        //         target_section_pk: None,
-        //     };
-
-        //     info!("Internal ChunkReplicationQuery ProcessQuery");
-        //     AdultDuty::RunAsChunkReplication(ChunkReplicationDuty::ProcessQuery {
-        //         query: ChunkReplicationQuery::GetChunk(*address),
-        //         msg_id,
-        //         origin,
-        //     })
-        //     .into()
-        // }
-        // // this cmd is accumulated, thus has authority
-        // Message::NodeCmd {
-        //     cmd:
-        //         NodeCmd::System(NodeSystemCmd::ReplicateChunk {
-        //             address,
-        //             current_holders,
-        //             ..
-        //         }),
-        //     id,
-        //     ..
-        // } => AdultDuty::RunAsChunkReplication(ChunkReplicationDuty::ProcessCmd {
-        //     cmd: ChunkReplicationCmd::ReplicateChunk {
-        //         current_holders: current_holders.clone(),
-        //         address: *address,
-        //     },
-        //     msg_id: *id,
-        //     origin,
-        // })
-        // .into(),
-        // //
+        //
+        // ------ chunk replication ------
+        Message::NodeQuery {
+            query:
+                NodeQuery::System(NodeSystemQuery::GetChunk {
+                    new_holder,
+                    address,
+                    current_holders,
+                }),
+            id,
+            ..
+        } => NodeDuty::GetChunkForReplication {
+            address: *address,
+            new_holder: *new_holder,
+            id: *id,
+        },
+        // this cmd is accumulated, thus has authority
+        Message::NodeCmd {
+            cmd:
+                NodeCmd::System(NodeSystemCmd::ReplicateChunk {
+                    address,
+                    current_holders,
+                    ..
+                }),
+            id,
+            ..
+        } => NodeDuty::ReplicateChunk {
+            address: *address,
+            current_holders: current_holders.clone(),
+            id: *id,
+        },
+        //
         // ------ Rewards ------
         Message::NodeQuery {
             query:
@@ -357,31 +335,25 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             signed_credit: signed_credit.clone(),
             sig: sig.clone(),
         },
-        // //
-        // // ------ chunk replication ------
-        // // query response from adult cannot be accumulated
-        // Message::NodeQueryResponse {
-        //     response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
-        //     correlation_id,
-        //     ..
-        // } => {
-        //     let blob = result.to_owned()?;
-        //     info!("Verifying GetChunk NodeQueryResponse!");
-        //     // Recreate original MessageId from Section
-        //     let msg_id =
-        //         MessageId::combine(vec![*blob.address().name(), self.state.node_name()]);
-        //     if msg_id == *correlation_id {
-        //         AdultDuty::RunAsChunkReplication(ChunkReplicationDuty::ProcessCmd {
-        //             cmd: ChunkReplicationCmd::StoreReplicatedBlob(blob),
-        //             msg_id,
-        //             origin,
-        //         })
-        //         .into()
-        //     } else {
-        //         info!("Given blob is incorrect.");
-        //         panic!()
-        //     }
-        // }
+        //
+        // ------ chunk replication ------
+        // query response from adult cannot be accumulated
+        Message::NodeQueryResponse {
+            response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
+            correlation_id,
+            ..
+        } => {
+            log::info!("Verifying GetChunk NodeQueryResponse!");
+            if let Ok(data) = result {
+                NodeDuty::StoreChunkForReplication {
+                    data: data.clone(),
+                    correlation_id: *correlation_id,
+                }
+            } else {
+                log::warn!("Got error when reading chunk for replication: {:?}", result);
+                NodeDuty::NoOp
+            }
+        }
         //
         // ------ nonacc rewards ------
         // validated event cannot be accumulated at routing, since it has sig shares
