@@ -239,7 +239,7 @@ impl Node {
                 let meta_data = self.get_metadata()?;
                 Ok(vec![meta_data.write(cmd, id, origin).await?])
             }
-            NodeDuty::ProcessPaymentForDataCmd { msg, origin } => {
+            NodeDuty::ProcessDataPayment { msg, origin } => {
                 let transfers = self.get_transfers()?;
                 Ok(vec![transfers.process_payment(&msg, origin).await?])
             }

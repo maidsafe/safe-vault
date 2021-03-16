@@ -202,18 +202,20 @@ pub enum NodeDuty {
         targets: BTreeSet<XorName>,
         msg: Message,
     },
+    /// Process read of data
     ProcessRead {
         query: sn_messaging::client::DataQuery,
         id: MessageId,
         origin: EndUser,
     },
+    /// Process write of data
     ProcessWrite {
         cmd: sn_messaging::client::DataCmd,
         id: MessageId,
         origin: EndUser,
     },
     /// Process Payment for a DataCmd
-    ProcessPaymentForDataCmd {
+    ProcessDataPayment {
         msg: Message,
         origin: EndUser,
     },
@@ -268,7 +270,7 @@ impl Debug for NodeDuty {
             }
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
-            Self::ProcessPaymentForDataCmd { .. } => write!(f, "ProcessPaymentForDataCmd"),
+            Self::ProcessDataPayment { .. } => write!(f, "ProcessDataPayment"),
         }
     }
 }

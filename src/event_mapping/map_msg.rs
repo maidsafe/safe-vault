@@ -39,7 +39,7 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
             id,
             ..
         } => Mapping::Ok {
-            op: NodeDuty::ProcessPaymentForDataCmd {
+            op: NodeDuty::ProcessDataPayment {
                 msg: msg.clone(),
                 origin,
             },
