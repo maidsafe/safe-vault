@@ -136,48 +136,44 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         },
 
         // ------ metadata ------
-        // Message::NodeQuery {
-        //     query: NodeQuery::Metadata { query, origin },
-        //     id,
-        //     ..
-        // } => MetadataDuty::ProcessRead {
-        //     query: query.clone(),
-        //     id: *id,
-        //     origin: *origin,
-        // }
-        // .into(),
-        // Message::NodeCmd {
-        //     cmd: NodeCmd::Metadata { cmd, origin },
-        //     id,
-        //     ..
-        // } => MetadataDuty::ProcessWrite {
-        //     cmd: cmd.clone(),
-        //     id: *id,
-        //     origin: *origin,
-        // }
-        // .into(),
-        // //
-        // // ------ adult ------
-        // Message::NodeQuery {
-        //     query: NodeQuery::Chunks { query, origin },
-        //     id,
-        //     ..
-        // } => AdultDuty::RunAsChunkStore(ChunkStoreDuty::ReadChunk {
-        //     read: query.clone(),
-        //     id: *id,
-        //     origin: *origin,
-        // })
-        // .into(),
-        // Message::NodeCmd {
-        //     cmd: NodeCmd::Chunks { cmd, origin },
-        //     id,
-        //     ..
-        // } => AdultDuty::RunAsChunkStore(ChunkStoreDuty::WriteChunk {
-        //     write: cmd.clone(),
-        //     id: *id,
-        //     origin: *origin,
-        // })
-        // .into(),
+        Message::NodeQuery {
+            query: NodeQuery::Metadata { query, origin },
+            id,
+            ..
+        } => NodeDuty::ProcessRead {
+            query: query.clone(),
+            id: *id,
+            origin: *origin,
+        },
+        Message::NodeCmd {
+            cmd: NodeCmd::Metadata { cmd, origin },
+            id,
+            ..
+        } => NodeDuty::ProcessWrite {
+            cmd: cmd.clone(),
+            id: *id,
+            origin: *origin,
+        },
+        //
+        // ------ adult ------
+        Message::NodeQuery {
+            query: NodeQuery::Chunks { query, origin },
+            id,
+            ..
+        } => NodeDuty::ReadChunk {
+            read: query.clone(),
+            msg_id: *id,
+            origin: *origin,
+        },
+        Message::NodeCmd {
+            cmd: NodeCmd::Chunks { cmd, origin },
+            id,
+            ..
+        } => NodeDuty::WriteChunk {
+            write: cmd.clone(),
+            msg_id: *id,
+            origin: *origin,
+        },
         // //
         // // ------ chunk replication ------
         // Message::NodeQuery {
