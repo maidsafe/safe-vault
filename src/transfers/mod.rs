@@ -163,17 +163,8 @@ impl Transfers {
     /// Makes sure the payment contained
     /// within a data write, is credited
     /// to the section funds.
-    pub async fn process_payment(&self, msg: &Message, origin: SrcLocation) -> Result<NodeDuty> {
+    pub async fn process_payment(&self, msg: &Message, origin: EndUser) -> Result<NodeDuty> {
         debug!(">>>> processing payment");
-        let origin = match origin {
-            SrcLocation::EndUser(enduser) => enduser,
-            _ => {
-                return Err(Error::InvalidMessage(
-                    msg.id(),
-                    format!("This source can only be an enduser.. : {:?}", msg),
-                ))
-            }
-        };
         let (payment, data_cmd, num_bytes, dst_address) = match &msg {
             Message::Cmd {
                 cmd: Cmd::Data { payment, cmd },

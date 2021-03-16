@@ -212,6 +212,11 @@ pub enum NodeDuty {
         id: MessageId,
         origin: EndUser,
     },
+    /// Process Payment for a DataCmd
+    ProcessPaymentForDataCmd {
+        msg: Message,
+        origin: EndUser,
+    },
     NoOp,
 }
 
@@ -263,6 +268,7 @@ impl Debug for NodeDuty {
             }
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
+            Self::ProcessPaymentForDataCmd { .. } => write!(f, "ProcessPaymentForDataCmd"),
         }
     }
 }

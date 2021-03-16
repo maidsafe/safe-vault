@@ -14,7 +14,7 @@ use crate::{
 use log::debug;
 use sn_messaging::{
     client::{
-        Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery,
+        Cmd, Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery,
         NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse,
         NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query,
     },
@@ -36,15 +36,20 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
                 src: SrcLocation::EndUser(origin),
             }),
         },
-        // Message::Cmd {
-        //     cmd: Cmd::Data { .. },
-        //     id,
-        //     ..
-        // } => NetworkDuties::from(TransferDuty::ProcessCmd {
-        //     cmd: TransferCmd::ProcessPayment(msg.clone()),
-        //     msg_id: id,
-        //     origin: SrcLocation::EndUser(origin),
-        // }),
+        Message::Cmd {
+            cmd: Cmd::Data { .. },
+            id,
+            ..
+        } => Mapping::Ok {
+            op: NodeDuty::ProcessPaymentForDataCmd {
+                msg: msg.clone(),
+                origin,
+            },
+            ctx: Some(MsgContext::Msg {
+                msg,
+                src: SrcLocation::EndUser(origin),
+            }),
+        },
         // Message::Cmd {
         //     cmd: Cmd::Transfer(cmd),
         //     id,
