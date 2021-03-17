@@ -197,7 +197,7 @@ impl Node {
         mut rewards: Rewards,
         replicas: SectionElders,
         credit_proof: CreditAgreementProof,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let section_wallet = WalletHistory {
             replicas,
             history: ActorHistory {
@@ -223,18 +223,18 @@ impl Node {
         let mut rewards = rewards.clone();
         rewards.set(actor, members, reward_calc);
         self.section_funds = Some(SectionFunds::Rewarding(rewards));
-        Ok(())
-        // Ok(NodeDuty::Send(OutgoingMsg {
-        //     msg: Message::NodeEvent {
-        //         event: NodeEvent::SectionWalletCreated(section_wallet),
-        //         id: MessageId::in_response_to(&msg_id),
-        //         correlation_id: msg_id,
-        //         target_section_pk: None,
-        //     },
-        //     dst: DstLocation::Section(our_section_address),
-        //     section_source: false,
-        //     aggregation: Aggregation::AtDestination,
-        // }))
+        //Ok(())
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::NodeEvent {
+                event: NodeEvent::SectionWalletCreated(section_wallet),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            dst: DstLocation::Section(our_section_address),
+            section_source: false,
+            aggregation: Aggregation::None, // swarm this
+        }))
     }
 
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence

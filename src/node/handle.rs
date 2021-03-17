@@ -71,9 +71,11 @@ impl Node {
                         WalletStage::Completed(credit_proof) => {
                             let recipient = credit_proof.recipient();
                             let mut rewards = rewards.clone();
-                            self.create_section_wallet(rewards, replicas, credit_proof)
+                            let op = self
+                                .create_section_wallet(rewards, replicas, credit_proof)
                                 .await?;
                             info!("COMPLETED({}): We have our new section wallet! (credit came before replicas)", recipient);
+                            return Ok(vec![op]);
                         }
                         WalletStage::None => return Err(Error::InvalidGenesisStage),
                     }
@@ -100,17 +102,24 @@ impl Node {
                         if let Some(replicas) = replicas.clone() {
                             let recipient = credit_proof.recipient();
                             let mut rewards = rewards.clone();
-                            self.create_section_wallet(
-                                rewards,
-                                replicas.clone(),
-                                credit_proof.clone(),
-                            )
-                            .await?;
+                            let op = self
+                                .create_section_wallet(
+                                    rewards,
+                                    replicas.clone(),
+                                    credit_proof.clone(),
+                                )
+                                .await?;
                             info!("COMPLETED({}): We have our new section wallet! (replicas came before credit)", recipient);
+                            return Ok(vec![op]);
                         }
                     }
                 } // else we are an adult, so ignore this msg
 
+                Ok(vec![])
+            }
+            NodeDuty::SynchSectionWallet(wallet) => {
+                debug!(">>>>>>>>>>>> SynchSectionWallet..");
+                self.synch_section_wallet(wallet).await?;
                 Ok(vec![])
             }
             //

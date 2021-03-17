@@ -66,16 +66,8 @@ impl Node {
             },
         };
         let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
-        let members = section_elders(&self.network_api).await?;
-        let signing = ElderSigning::new(self.network_api.clone()).await?;
-        let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
-        let payout = RewardPayout::new(actor, members);
-        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
-        let stages = RewardStages::new(node_rewards);
-        let rewards = Rewards::new(payout, stages, reward_calc);
-        self.section_funds = Some(SectionFunds::Rewarding(rewards));
 
-        Ok(())
+        self.set_as_rewarding(section_wallet, node_rewards).await
     }
 
     /// Level up on promotion
@@ -128,42 +120,46 @@ impl Node {
         }
     }
 
-    // /// Complete the level up and handle more responsibilities.
-    // pub async fn complete_level_up(&mut self, section_wallet: WalletHistory) -> Result<()> {
-    //     if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
-    //         return Err(Error::InvalidOperation(
-    //             "Invalid section funds stage, expected SectionFunds::TakingNodes".to_string(),
-    //         ));
-    //     }
-    //     // start handling reward payouts
-    //     let node_rewards = if let Some(section_funds) = &self.section_funds {
-    //         section_funds.node_rewards()
-    //     } else if self.network_api.is_elder().await {
-    //         Default::default()
-    //     } else {
-    //         return Err(Error::InvalidOperation(
-    //             "No section funds at this replica".to_string(),
-    //         ));
-    //     };
+    /// When a newbie didn't complete the wallet churn, it can still receive it here.
+    pub async fn synch_section_wallet(&mut self, section_wallet: WalletHistory) -> Result<()> {
+        if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
+            return Err(Error::InvalidOperation(
+                "Invalid section funds stage, expected SectionFunds::TakingNodes".to_string(),
+            ));
+        }
+        // start handling reward payouts
+        let node_rewards = if let Some(section_funds) = &self.section_funds {
+            section_funds.node_rewards()
+        } else if self.network_api.is_elder().await {
+            Default::default()
+        } else {
+            return Err(Error::InvalidOperation(
+                "No section funds at this replica".to_string(),
+            ));
+        };
 
-    //     self.set_as_rewarding(section_wallet, node_rewards).await
-    // }
+        self.set_as_rewarding(section_wallet, node_rewards).await
+    }
 
-    // async fn set_as_rewarding(
-    //     &mut self,
-    //     section_wallet: WalletHistory,
-    //     node_rewards: BTreeMap<XorName, NodeRewardStage>,
-    // ) -> Result<()> {
-    //     let members = section_elders(&self.network_api).await?;
-    //     let signing = ElderSigning::new(self.network_api.clone()).await?;
-    //     let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
-    //     let payout = RewardPayout::new(actor, members);
-    //     let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
-    //     let stages = RewardStages::new(node_rewards);
-    //     let rewards = Rewards::new(payout, stages, reward_calc);
-    //     self.section_funds = Some(SectionFunds::Rewarding(rewards));
-    //     Ok(())
-    // }
+    async fn set_as_rewarding(
+        &mut self,
+        section_wallet: WalletHistory,
+        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+    ) -> Result<()> {
+        let members = section_elders(&self.network_api).await?;
+        let signing = ElderSigning::new(self.network_api.clone()).await?;
+        let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
+        info!(
+            "COMPLETED({}): We got our new section wallet synched to us!",
+            PublicKey::Bls(members.key())
+        );
+        let payout = RewardPayout::new(actor, members);
+        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
+        let stages = RewardStages::new(node_rewards);
+        let rewards = Rewards::new(payout, stages, reward_calc);
+        self.section_funds = Some(SectionFunds::Rewarding(rewards));
+        Ok(())
+    }
 }
 
 pub async fn section_elders(network_api: &crate::Network) -> Result<SectionElders> {

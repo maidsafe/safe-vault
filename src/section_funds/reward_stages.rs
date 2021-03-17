@@ -78,7 +78,6 @@ impl RewardStages {
     /// this point, but will as part of starting up.
     /// At age 5 it gets its first reward payout.
     pub fn add_new_node(&self, node_id: XorName) {
-        info!("Rewards: New node added: {:?}", node_id);
         let _ = self.node_rewards.insert(node_id, NodeRewardStage::NewNode);
     }
 

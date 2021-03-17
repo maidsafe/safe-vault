@@ -192,8 +192,8 @@ pub enum NodeDuty {
         /// The wallets of users on the network.
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },
-    // /// Initiates the section wallet.
-    // CreateSectionWallet(WalletHistory),
+    /// Synchs the section wallet.
+    SynchSectionWallet(WalletHistory),
     ProcessNewMember(XorName),
     /// As members are lost for various reasons
     /// there are certain things nodes need
@@ -296,6 +296,7 @@ impl Debug for NodeDuty {
             // ------
             Self::LevelDown => write!(f, "LevelDown"),
             Self::SynchState { .. } => write!(f, "SynchState"),
+            Self::SynchSectionWallet { .. } => write!(f, "SynchSectionWallet"),
             Self::ChurnMembers { .. } => write!(f, "ChurnMembers"),
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
