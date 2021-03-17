@@ -58,8 +58,6 @@ impl WalletProposal {
                     .map_err(|_| Error::CouldNotCombineSignatures)?,
             );
 
-            info!("We got a sig");
-
             self.signatures = signatures;
 
             self.pending_agreement = Some(SignedCredit {

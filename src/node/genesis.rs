@@ -37,8 +37,7 @@ pub async fn begin_forming_genesis_section(network_api: Network) -> Result<Genes
     let is_genesis_section = network_api.our_prefix().await.is_empty();
     let elder_count = network_api.our_elder_names().await.len();
     let section_chain_len = network_api.section_chain().await.len();
-    let our_pk_share = network_api.our_public_key_share().await?;
-    let our_index = network_api.our_index().await?;
+    let our_pk_set = network_api.our_public_key_set().await?;
 
     debug!(
         "begin_transition_to_elder. is_genesis_section: {}, elder_count: {}, section_chain_len: {}",
@@ -62,18 +61,22 @@ pub async fn begin_forming_genesis_section(network_api: Network) -> Result<Genes
                 .ok_or(Error::NoSectionPublicKey)?,
             msg: "genesis".to_string(),
         };
-        let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-        let credit_sig_share = network_api.sign_as_elder(&credit).await?;
-        let _ = signatures.insert(our_index, credit_sig_share.clone());
+
+        let mut bootstrap = GenesisProposal {
+            proposal: credit.clone(),
+            pk_set: our_pk_set,
+            signatures: Default::default(),
+            pending_agreement: None,
+        };
+
+        let our_sig = network_api.sign_as_elder(&credit).await?;
+        bootstrap.add(our_sig.clone())?;
 
         let msg = OutgoingMsg {
             msg: Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
                     credit: credit.clone(),
-                    sig: SignatureShare {
-                        share: credit_sig_share,
-                        index: our_index,
-                    },
+                    sig: our_sig,
                 }),
                 id: MessageId::new(),
                 target_section_pk: None,
@@ -85,11 +88,7 @@ pub async fn begin_forming_genesis_section(network_api: Network) -> Result<Genes
 
         send(msg, network_api).await?;
 
-        Ok(GenesisStage::ProposingGenesis(GenesisProposal {
-            proposal: credit.clone(),
-            signatures,
-            pending_agreement: None,
-        }))
+        Ok(GenesisStage::ProposingGenesis(bootstrap))
     } else if is_genesis_section
         && elder_count < GENESIS_ELDER_COUNT
         && section_chain_len <= GENESIS_ELDER_COUNT
@@ -111,100 +110,87 @@ pub async fn receive_genesis_proposal(
     stage: GenesisStage,
     network_api: Network,
 ) -> Result<GenesisStage> {
-    let our_index = network_api.our_index().await?;
+    if matches!(stage, GenesisStage::AccumulatingGenesis(_)) {
+        return Ok(stage);
+    }
+    let our_prefix = network_api.our_prefix().await;
     match stage {
         GenesisStage::AwaitingGenesisThreshold => {
-            let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-            let _ = signatures.insert(sig.index, sig.share);
+            let mut bootstrap = GenesisProposal {
+                proposal: credit.clone(),
+                pk_set: network_api.our_public_key_set().await?,
+                signatures: Default::default(),
+                pending_agreement: None,
+            };
+            bootstrap.add(sig)?;
 
-            let credit_sig_share = network_api.sign_as_elder(&credit).await?;
-            let _ = signatures.insert(our_index, credit_sig_share.clone());
-
-            let dst = DstLocation::Section(XorName::from(
-                network_api
-                    .section_public_key()
-                    .await
-                    .ok_or(Error::NoSectionPublicKey)?,
-            ));
+            let our_sig = network_api.sign_as_elder(&credit).await?;
+            bootstrap.add(our_sig.clone())?;
 
             let msg = OutgoingMsg {
                 msg: Message::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
                         credit: credit.clone(),
-                        sig: SignatureShare {
-                            share: credit_sig_share,
-                            index: our_index,
-                        },
+                        sig: our_sig,
                     }),
                     id: MessageId::new(),
                     target_section_pk: None,
                 },
                 section_source: false, // sent as single node
-                dst,
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                dst: DstLocation::Section(our_prefix.name()),
+                aggregation: Aggregation::None,
             };
 
             send(msg, network_api).await?;
 
-            Ok(GenesisStage::ProposingGenesis(GenesisProposal {
-                proposal: credit.clone(),
-                signatures,
-                pending_agreement: None,
-            }))
+            Ok(GenesisStage::ProposingGenesis(bootstrap))
         }
         GenesisStage::ProposingGenesis(mut bootstrap) => {
             debug!("Adding incoming genesis proposal.");
-            let section_pk_set = network_api
-                .our_public_key_set()
-                .await
-                .map_err(|_| Error::NoSectionPublicKeySet)?;
-            let section_pk = PublicKey::Bls(section_pk_set.public_key());
-            bootstrap.add(sig, section_pk_set)?;
+            bootstrap.add(sig)?;
+
             if let Some(signed_credit) = &bootstrap.pending_agreement {
-                info!("******* there is an agreement");
+                info!("******* there is a genesis proposal agreement");
                 // replicas signatures over > signed_credit <
-                let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-                let credit_sig_share = network_api.sign_as_elder(&signed_credit).await?;
-                let _ = signatures.insert(our_index, credit_sig_share.clone());
+                let mut bootstrap = GenesisAccumulation {
+                    agreed_proposal: signed_credit.clone(),
+                    pk_set: bootstrap.pk_set,
+                    signatures: Default::default(),
+                    pending_agreement: None,
+                };
+                let our_sig = network_api.sign_as_elder(&signed_credit).await?;
+                bootstrap.add(our_sig.clone())?;
 
                 let msg = OutgoingMsg {
                     msg: Message::NodeCmd {
                         cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
                             signed_credit: signed_credit.clone(),
-                            sig: SignatureShare {
-                                share: credit_sig_share,
-                                index: our_index,
-                            },
+                            sig: our_sig,
                         }),
                         id: MessageId::new(),
                         target_section_pk: None,
                     },
                     section_source: false, // sent as single node
-                    dst: DstLocation::Section(XorName::from(section_pk)),
-                    aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                    dst: DstLocation::Section(our_prefix.name()),
+                    aggregation: Aggregation::None,
                 };
 
                 send(msg, network_api).await?;
 
-                Ok(GenesisStage::AccumulatingGenesis(GenesisAccumulation {
-                    agreed_proposal: signed_credit.clone(),
-                    signatures,
-                    pending_agreement: None,
-                }))
+                Ok(GenesisStage::AccumulatingGenesis(bootstrap))
             } else {
                 Ok(GenesisStage::ProposingGenesis(bootstrap))
             }
         }
-        _ => {
-            warn!("Recevied an out of order proposal for genesis.");
-            warn!(
-                "We may already have seen + verified genesis, in which case this can be ignored."
-            );
-
-            // TODO: do we want to Lazy err here?
-
+        GenesisStage::AccumulatingGenesis(_) => {
+            info!("Already accumulating, no need to handle proposal for genesis.");
             Ok(stage)
         }
+        GenesisStage::Completed(_) => {
+            info!("Already completed, no need to handle proposal for genesis.");
+            Ok(stage)
+        }
+        GenesisStage::None => Err(Error::InvalidGenesisStage),
     }
 }
 
@@ -216,34 +202,43 @@ pub async fn receive_genesis_accumulation(
     network_api: Network,
 ) -> Result<GenesisStage> {
     match stage {
-        GenesisStage::ProposingGenesis(_) => {
-            // replicas signatures over > signed_credit <
-            let mut signatures: BTreeMap<usize, bls::SignatureShare> = Default::default();
-            let _ = signatures.insert(sig.index, sig.share);
-            let our_sig_index = network_api.our_index().await?;
-
-            let credit_sig_share = network_api.sign_as_elder(&signed_credit).await?;
-            let _ = signatures.insert(our_sig_index, credit_sig_share);
-
-            Ok(GenesisStage::AccumulatingGenesis(GenesisAccumulation {
-                agreed_proposal: signed_credit,
-                signatures,
+        GenesisStage::AwaitingGenesisThreshold => {
+            let mut bootstrap = GenesisAccumulation {
+                agreed_proposal: signed_credit.clone(),
+                pk_set: network_api.our_public_key_set().await?,
+                signatures: Default::default(),
                 pending_agreement: None,
-            }))
+            };
+            bootstrap.add(sig)?;
+
+            // replicas' signatures over > signed_credit <
+            let our_sig = network_api.sign_as_elder(&signed_credit).await?;
+            bootstrap.add(our_sig)?;
+
+            Ok(GenesisStage::AccumulatingGenesis(bootstrap))
+        }
+        GenesisStage::ProposingGenesis(bootstrap) => {
+            let mut bootstrap = GenesisAccumulation {
+                agreed_proposal: signed_credit.clone(),
+                pk_set: bootstrap.pk_set,
+                signatures: Default::default(),
+                pending_agreement: None,
+            };
+            bootstrap.add(sig)?;
+
+            // replicas' signatures over > signed_credit <
+            let our_sig = network_api.sign_as_elder(&signed_credit).await?;
+            bootstrap.add(our_sig)?;
+
+            Ok(GenesisStage::AccumulatingGenesis(bootstrap))
         }
         GenesisStage::AccumulatingGenesis(mut bootstrap) => {
-            let section_pk_set = network_api
-                .our_public_key_set()
-                .await
-                .map_err(|_| Error::NoSectionPublicKeySet)?;
-            bootstrap.add(sig, section_pk_set)?;
-
+            bootstrap.add(sig)?;
             if let Some(genesis) = bootstrap.pending_agreement.take() {
                 // TODO: do not take this? (in case of fail further blow)
-                let our_sig_index = network_api.our_index().await?;
-                let credit_sig_share = network_api.sign_as_elder(&genesis).await?;
-                let _ = bootstrap.signatures.insert(our_sig_index, credit_sig_share);
-
+                let our_sig = network_api.sign_as_elder(&genesis).await?;
+                bootstrap.add(our_sig)?;
+                debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENESIS AGREEMENT PRODUCED!!!!");
                 Ok(GenesisStage::Completed(TransferPropagated {
                     credit_proof: genesis.clone(),
                 }))
@@ -251,13 +246,12 @@ pub async fn receive_genesis_accumulation(
                 Ok(GenesisStage::AccumulatingGenesis(bootstrap))
             }
         }
-        _ => Err(Error::InvalidGenesisStage),
+        GenesisStage::Completed(_) => {
+            info!("Already completed, no need to handle proposal for genesis.");
+            Ok(stage)
+        }
+        GenesisStage::None => Err(Error::InvalidGenesisStage),
     }
-
-    // if genesis_tx.is_some() {
-    //     debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENSIS AGREEMENT PROVED!!!!");
-    //     return complete_elder_setup(genesis_tx, network_api).await;
-    // }
 }
 
 /// Wallet info of our constellation is supplied here
@@ -305,13 +299,10 @@ pub async fn complete_elder_setup(
     //     rewards_and_wallets.clone(),
     // )));
 
-    info!("Successfully assumed Elder duties!");
-
     if no_wallet_found {
         register_wallet(node_info.reward_key, network_api).await?
     }
 
-    debug!(">>>> I AM ELDER");
     Ok(())
 }
 

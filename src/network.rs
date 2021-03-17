@@ -16,7 +16,7 @@ use bls::{PublicKeySet, PublicKeyShare as BlsPublicKeyShare};
 
 use log::{debug, error};
 use serde::Serialize;
-use sn_data_types::{Error as DtError, PublicKey, Result as DtResult, Signature};
+use sn_data_types::{Error as DtError, PublicKey, Result as DtResult, Signature, SignatureShare};
 use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
@@ -59,24 +59,36 @@ impl Network {
     }
 
     /// Sign with our BLS PK Share
-    pub async fn sign_as_elder<T: Serialize>(
-        &self,
-        data: &T,
-        // public_key_share: PublicKey,
-    ) -> Result<bls::SignatureShare> {
-        //TODO: just use PKshare from routing direct here?
-        // This has to be a Dt error for signing trait
-
+    pub async fn sign_as_elder<T: Serialize>(&self, data: &T) -> Result<SignatureShare> {
         let bls_pk = self
-            .section_public_key()
+            .routing
+            .public_key_set()
             .await
-            .ok_or(Error::NoSectionPublicKey)?
-            .bls()
-            .ok_or(Error::ProvidedPkIsNotBlsShare)?;
-        // debug!("pre-sign-as-elder {:?}", public_key_share);
-        // let bls_pk = public_key_share.bls_share().ok_or(DtError::InvalidOperation)?;
-        debug!("post-sign-as-elder");
+            .map_err(|_| Error::NoSectionPublicKey)?
+            .public_key();
+        let share = self
+            .routing
+            .sign_as_elder(&utils::serialise(data)?, &bls_pk)
+            .await
+            .map_err(Error::Routing)?;
+        Ok(SignatureShare {
+            share,
+            index: self
+                .routing
+                .our_index()
+                .await
+                .map_err(|_| Error::NoSectionPublicKey)?,
+        })
+    }
 
+    /// Sign with our BLS PK Share
+    pub async fn sign_as_elder_raw<T: Serialize>(&self, data: &T) -> Result<bls::SignatureShare> {
+        let bls_pk = self
+            .routing
+            .public_key_set()
+            .await
+            .map_err(|_| Error::NoSectionPublicKey)?
+            .public_key();
         let data = utils::serialise(data)?;
         let share = self
             .routing

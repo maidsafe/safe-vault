@@ -74,23 +74,14 @@ impl ReplicaSigning for ReplicaSigningImpl {
 
     // TODO is this not the same as our elder signing?
     async fn sign_validated_debit(&self, debit: &SignedDebit) -> Result<SignatureShare> {
-        let index = self.network.our_index().await?;
-        let share = self.network.sign_as_elder(&debit).await?;
-
-        Ok(SignatureShare { share, index })
+        Ok(self.network.sign_as_elder(&debit).await?)
     }
 
     async fn sign_validated_credit(&self, credit: &SignedCredit) -> Result<SignatureShare> {
-        let index = self.network.our_index().await?;
-        let share = self.network.sign_as_elder(&credit).await?;
-
-        Ok(SignatureShare { share, index })
+        Ok(self.network.sign_as_elder(&credit).await?)
     }
 
     async fn sign_credit_proof(&self, proof: &CreditAgreementProof) -> Result<SignatureShare> {
-        let index = self.network.our_index().await?;
-        let share = self.network.sign_as_elder(&proof).await?;
-
-        Ok(SignatureShare { share, index })
+        Ok(self.network.sign_as_elder(&proof).await?)
     }
 }

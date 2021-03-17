@@ -30,7 +30,7 @@ pub async fn get_genesis(balance: u64, network: Network) -> Result<CreditAgreeme
     let our_pk_share = network.our_public_key_share().await?;
     let index = network.our_index().await?;
 
-    let credit_sig_share = network.sign_as_elder(&credit).await?;
+    let credit_sig_share = network.sign_as_elder_raw(&credit).await?;
     let _ = credit_sig_shares.insert(index, credit_sig_share);
 
     // Combine shares to produce the main signature.
@@ -48,7 +48,7 @@ pub async fn get_genesis(balance: u64, network: Network) -> Result<CreditAgreeme
     // replicas signatures over > signed_credit <
 
     let mut credit_sig_shares = BTreeMap::new();
-    let credit_sig_share = network.sign_as_elder(&signed_credit).await?;
+    let credit_sig_share = network.sign_as_elder_raw(&signed_credit).await?;
     let _ = credit_sig_shares.insert(index, credit_sig_share);
 
     let debiting_replicas_sig = sn_data_types::Signature::Bls(

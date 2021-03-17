@@ -8,6 +8,7 @@
 
 use crate::{Error, Network, Result};
 use bls::PublicKeySet;
+use futures::executor::block_on as block;
 use sn_data_types::{OwnerType, Result as DtResult, SignatureShare, Signing};
 
 #[derive(Clone)]
@@ -39,12 +40,9 @@ impl Signing for ElderSigning {
 
     fn sign<T: serde::Serialize>(&self, data: &T) -> DtResult<sn_data_types::Signature> {
         use sn_data_types::Error as DtError;
-        Ok(sn_data_types::Signature::BlsShare(SignatureShare {
-            share: futures::executor::block_on(self.network.sign_as_elder(data))
-                .map_err(|_| DtError::InvalidOperation)?,
-            index: futures::executor::block_on(self.network.our_index())
-                .map_err(|_| DtError::InvalidOperation)?,
-        }))
+        Ok(sn_data_types::Signature::BlsShare(
+            block(self.network.sign_as_elder(data)).map_err(|_| DtError::InvalidOperation)?,
+        ))
     }
 
     fn verify<T: serde::Serialize>(&self, sig: &sn_data_types::Signature, data: &T) -> bool {
