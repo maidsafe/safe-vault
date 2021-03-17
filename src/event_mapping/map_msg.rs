@@ -130,7 +130,20 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         },
 
         // ------ section funds -----
-
+        Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::ProposeNewWallet { credit, sig }),
+            ..
+        } => NodeDuty::ReceiveWalletProposal {
+            credit: credit.clone(),
+            sig: sig.clone(),
+        },
+        Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::AccumulateNewWallet { signed_credit, sig }),
+            ..
+        } => NodeDuty::ReceiveWalletAccumulation {
+            signed_credit: signed_credit.clone(),
+            sig: sig.clone(),
+        },
         // ------ metadata ------
         Message::NodeQuery {
             query: NodeQuery::Metadata { query, origin },

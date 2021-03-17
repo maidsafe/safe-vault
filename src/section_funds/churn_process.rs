@@ -31,6 +31,7 @@ use super::{
 };
 
 ///
+#[derive(Clone)]
 pub struct ChurnProcess {
     balance: Token,
     churn: Churn,
@@ -159,7 +160,7 @@ impl ChurnProcess {
                 id: MessageId::new(),
                 target_section_pk: None,
             },
-            dst: DstLocation::Section(credit.recipient.into()),
+            dst: DstLocation::Section(new_wallet_ctx.name()),
             section_source: false, // sent as single node
             aggregation: Aggregation::None,
         }))
@@ -249,13 +250,15 @@ impl ChurnProcess {
                     Ok(NodeDuty::NoOp)
                 }
             }
-            _ => {
-                warn!("Recevied an out of order proposal for Wallet.");
-                warn!(
-                    "We may already have seen + verified Wallet, in which case this can be ignored."
-                );
+            WalletStage::AccumulatingWallet(_) => {
+                info!("Already accumulating, no need to handle proposal for wallet.");
                 Ok(NodeDuty::NoOp)
             }
+            WalletStage::Completed(_) => {
+                info!("Already completed, no need to handle proposal for wallet.");
+                Ok(NodeDuty::NoOp)
+            }
+            WalletStage::None => Err(Error::InvalidGenesisStage),
         }
     }
 
@@ -266,6 +269,24 @@ impl ChurnProcess {
         sig: SignatureShare,
     ) -> Result<()> {
         match self.stage.clone() {
+            WalletStage::AwaitingWalletThreshold => {
+                // replicas signatures over > signed_credit <
+                let mut bootstrap = WalletAccumulation {
+                    agreed_proposal: signed_credit.clone(),
+                    signatures: Default::default(),
+                    pending_agreement: None,
+                    pk_set: self.signing.public_key_set().await?,
+                };
+
+                bootstrap.add(sig)?;
+
+                match self.signing.sign(&signed_credit)? {
+                    Signature::BlsShare(share) => bootstrap.add(share)?,
+                    _ => return Err(Error::Logic("aarrgh".to_string())),
+                };
+
+                self.stage = WalletStage::AccumulatingWallet(bootstrap);
+            }
             WalletStage::ProposingWallet(bootstrap) => {
                 // replicas signatures over > signed_credit <
                 let mut bootstrap = WalletAccumulation {
@@ -279,7 +300,7 @@ impl ChurnProcess {
 
                 match self.signing.sign(&signed_credit)? {
                     Signature::BlsShare(share) => bootstrap.add(share)?,
-                    _ => return Err(Error::InvalidOperation("".to_string())),
+                    _ => return Err(Error::Logic("aarrgh".to_string())),
                 };
 
                 self.stage = WalletStage::AccumulatingWallet(bootstrap);
@@ -287,12 +308,15 @@ impl ChurnProcess {
             WalletStage::AccumulatingWallet(mut bootstrap) => {
                 bootstrap.add(sig)?;
                 if let Some(credit_proof) = bootstrap.pending_agreement {
-                    self.stage = WalletStage::Completed(TransferPropagated { credit_proof });
+                    self.stage = WalletStage::Completed(credit_proof);
                 } else {
                     self.stage = WalletStage::AccumulatingWallet(bootstrap);
                 }
             }
-            _ => return Err(Error::Logic("aarrgh".to_string())),
+            WalletStage::Completed(_) => {
+                info!("Already completed, no need to handle proposal for wallet.");
+            }
+            WalletStage::None => return Err(Error::InvalidGenesisStage),
         };
         Ok(())
     }

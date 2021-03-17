@@ -29,7 +29,7 @@ pub enum WalletStage {
     AwaitingWalletThreshold,
     ProposingWallet(WalletProposal),
     AccumulatingWallet(WalletAccumulation),
-    Completed(TransferPropagated),
+    Completed(CreditAgreementProof),
 }
 
 #[derive(Clone)]

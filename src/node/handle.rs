@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_data_types::WalletHistory;
+use sn_data_types::{SectionElders, WalletHistory};
 use sn_messaging::MessageId;
 
 use super::{
@@ -22,7 +22,7 @@ use crate::{
     node_ops::{NodeDuties, NodeDuty},
     section_funds::{
         churn_process::ChurnProcess, reward_payout::RewardPayout, reward_stages::RewardStages,
-        rewards::Rewards, SectionFunds,
+        rewards::Rewards, wallet_stage::WalletStage, SectionFunds,
     },
     transfers::Transfers,
     Error, Node, Result,
@@ -36,7 +36,7 @@ impl Node {
             NodeDuty::ChurnMembers {
                 elders,
                 sibling_elders,
-            } => self.churn(elders, sibling_elders).await,
+            } => self.begin_churn(elders, sibling_elders).await,
             // a remote section asks for the replicas of their wallet
             NodeDuty::GetSectionElders { msg_id, origin } => {
                 Ok(vec![self.get_section_elders(msg_id, origin).await?])
@@ -47,7 +47,48 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                self.continue_wallet_churn(replicas).await?;
+                let (rewards, churn_process, existing_replicas) = self.get_churning_funds()?;
+                if existing_replicas.is_none() {
+                    match churn_process.stage().clone() {
+                        WalletStage::AwaitingWalletThreshold
+                        | WalletStage::ProposingWallet(_)
+                        | WalletStage::AccumulatingWallet(_) => {
+                            self.section_funds = Some(SectionFunds::Churning {
+                                process: churn_process.clone(),
+                                rewards: rewards.clone(),
+                                replicas: Some(replicas),
+                            });
+                        }
+                        WalletStage::Completed(credit_proof) => {
+                            let mut rewards = rewards.clone();
+                            self.set_section_funds(rewards, replicas, credit_proof)
+                                .await?;
+                        }
+                        WalletStage::None => return Err(Error::InvalidGenesisStage),
+                    }
+                }
+                Ok(vec![])
+            }
+            NodeDuty::ReceiveWalletProposal { credit, sig } => {
+                let (_, churn_process, _) = self.get_churning_funds()?;
+                Ok(vec![
+                    churn_process.receive_wallet_proposal(credit, sig).await?,
+                ])
+            }
+            NodeDuty::ReceiveWalletAccumulation { signed_credit, sig } => {
+                let (rewards, churn_process, replicas) = self.get_churning_funds()?;
+                churn_process
+                    .receive_wallet_accumulation(signed_credit, sig)
+                    .await?;
+
+                if let WalletStage::Completed(credit_proof) = churn_process.stage().clone() {
+                    if let Some(replicas) = replicas.clone() {
+                        let mut rewards = rewards.clone();
+                        self.set_section_funds(rewards, replicas.clone(), credit_proof.clone())
+                            .await?;
+                    }
+                }
+
                 Ok(vec![])
             }
             //
@@ -372,9 +413,16 @@ impl Node {
         }
     }
 
-    fn get_churning_funds(&mut self) -> Result<(&mut Rewards, &mut ChurnProcess)> {
-        if let Some(SectionFunds::Churning { rewards, process }) = &mut self.section_funds {
-            Ok((rewards, process))
+    fn get_churning_funds(
+        &mut self,
+    ) -> Result<(&mut Rewards, &mut ChurnProcess, &mut Option<SectionElders>)> {
+        if let Some(SectionFunds::Churning {
+            rewards,
+            process,
+            replicas,
+        }) = &mut self.section_funds
+        {
+            Ok((rewards, process, replicas))
         } else {
             Err(Error::InvalidOperation(
                 "No section funds at this node".to_string(),

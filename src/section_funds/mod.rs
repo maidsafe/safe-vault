@@ -23,7 +23,7 @@ use self::{
 };
 use super::node_ops::{NodeDuty, OutgoingMsg};
 use crate::Result;
-use sn_data_types::{NodeRewardStage, PublicKey, Token};
+use sn_data_types::{NodeRewardStage, PublicKey, SectionElders, Token};
 use sn_messaging::{
     client::{Message, NodeQuery, NodeSystemQuery},
     Aggregation, DstLocation, MessageId, SrcLocation,
@@ -42,6 +42,7 @@ pub enum SectionFunds {
     Churning {
         rewards: Rewards,
         process: ChurnProcess,
+        replicas: Option<SectionElders>,
     },
 }
 

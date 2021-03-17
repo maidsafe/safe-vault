@@ -139,6 +139,20 @@ pub enum NodeDuty {
         /// An individual elder's sig over the credit.
         sig: SignatureShare,
     },
+    /// Transition of section actor.
+    ReceiveWalletProposal {
+        /// The genesis credit.
+        credit: Credit,
+        /// An individual elder's sig over the credit.
+        sig: SignatureShare,
+    },
+    /// Bootstrap of genesis section actor.
+    ReceiveWalletAccumulation {
+        /// The genesis credit.
+        signed_credit: SignedCredit,
+        /// An individual elder's sig over the credit.
+        sig: SignatureShare,
+    },
     /// Elder changes means the section public key
     /// changes as well, which leads to necessary updates
     /// of various places using the multisig of the section.
@@ -277,6 +291,8 @@ impl Debug for NodeDuty {
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
             Self::ContinueWalletChurn { .. } => write!(f, "ContinueWalletChurn"),
+            Self::ReceiveWalletProposal { .. } => write!(f, "ReceiveWalletProposal"),
+            Self::ReceiveWalletAccumulation { .. } => write!(f, "ReceiveWalletAccumulation"),
             // ------
             Self::LevelUp => write!(f, "LevelUp"),
             Self::LevelDown => write!(f, "LevelDown"),

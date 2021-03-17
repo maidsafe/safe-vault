@@ -8,7 +8,7 @@
 
 use crate::{
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    section_funds::{self, reward_payout::Validator, SectionFunds},
+    section_funds::{self, reward_payout::Validator, rewards::Rewards, SectionFunds},
     Error, Node, Result,
 };
 use log::debug;
@@ -18,7 +18,7 @@ use section_funds::{
     rewards::RewardCalc,
     wallet_stage::WalletStage,
 };
-use sn_data_types::{ActorHistory, PublicKey, SectionElders, WalletHistory};
+use sn_data_types::{ActorHistory, CreditAgreementProof, PublicKey, SectionElders, WalletHistory};
 use sn_messaging::{
     client::{
         Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeSystemCmd, NodeSystemQuery,
@@ -30,39 +30,8 @@ use sn_routing::Elders;
 use sn_transfers::TransferActor;
 
 impl Node {
-    /// Churn started with asking for replicas of our new wallet.
-    /// Here we receive the response to that query, and so we continue with the churn.
-    pub async fn continue_wallet_churn(&mut self, replicas: SectionElders) -> Result<()> {
-        if let Some(SectionFunds::Churning { process, rewards }) = &self.section_funds {
-            if let WalletStage::Completed(e) = process.stage() {
-                let section_wallet = WalletHistory {
-                    replicas,
-                    history: ActorHistory {
-                        credits: vec![e.credit_proof.clone()],
-                        debits: vec![],
-                    },
-                };
-
-                /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
-                #[allow(clippy::eval_order_dependence)]
-                let members = SectionElders {
-                    prefix: self.network_api.our_prefix().await,
-                    names: self.network_api.our_elder_names().await,
-                    key_set: self.network_api.our_public_key_set().await?,
-                };
-                let reward_calc = RewardCalc::new(members.prefix);
-                let signing = ElderSigning::new(self.network_api.clone()).await?;
-                let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
-                let mut rewards = rewards.clone();
-                rewards.set(actor, members, reward_calc);
-                self.section_funds = Some(SectionFunds::Rewarding(rewards));
-            }
-        }
-        Ok(())
-    }
-
     /// Called on ElderChanged event from routing layer.
-    pub async fn churn(
+    pub async fn begin_churn(
         &mut self,
         our_elders: Elders,
         sibling_elders: Option<Elders>,
@@ -110,6 +79,7 @@ impl Node {
         self.section_funds = Some(SectionFunds::Churning {
             process,
             rewards: rewards.clone(),
+            replicas: None,
         });
 
         // query the network for the section elders of the new wallet
@@ -153,7 +123,42 @@ impl Node {
             }));
         }
 
+        for op in &ops {
+            debug!("Churn msgs: {:?}", op)
+        }
+
         Ok(ops)
+    }
+
+    /// set funds to Rewarding stage
+    pub async fn set_section_funds(
+        &mut self,
+        mut rewards: Rewards,
+        replicas: SectionElders,
+        credit_proof: CreditAgreementProof,
+    ) -> Result<()> {
+        let section_wallet = WalletHistory {
+            replicas,
+            history: ActorHistory {
+                credits: vec![credit_proof.clone()],
+                debits: vec![],
+            },
+        };
+
+        /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
+        #[allow(clippy::eval_order_dependence)]
+        let members = SectionElders {
+            prefix: self.network_api.our_prefix().await,
+            names: self.network_api.our_elder_names().await,
+            key_set: self.network_api.our_public_key_set().await?,
+        };
+        let reward_calc = RewardCalc::new(members.prefix);
+        let signing = ElderSigning::new(self.network_api.clone()).await?;
+        let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
+        let mut rewards = rewards.clone();
+        rewards.set(actor, members, reward_calc);
+        self.section_funds = Some(SectionFunds::Rewarding(rewards));
+        Ok(())
     }
 
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
