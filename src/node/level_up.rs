@@ -24,6 +24,7 @@ use crate::{
     transfers::Transfers,
     Error, Node, Result,
 };
+use crdts::Actor;
 use itertools::Itertools;
 use log::info;
 use sn_data_types::{
@@ -63,7 +64,7 @@ impl Node {
             transfer_replicas(&self.node_info, self.network_api.clone(), user_wallets).await?;
         let transfers = Transfers::new(replicas, rate_limit);
         // does local init, with no roundrip via network messaging
-        if let Some(genesis_tx) = genesis_tx {
+        if let Some(genesis_tx) = &genesis_tx {
             transfers.genesis(genesis_tx.clone()).await?;
         }
         self.transfers = Some(transfers);
@@ -71,10 +72,20 @@ impl Node {
         //
         // start handling node reward stages
         let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
-        let stages = RewardStages::new(node_rewards);
-        self.section_funds = Some(SectionFunds::TakingNodes(stages));
-
-        Ok(())
+        if let Some(genesis_tx) = genesis_tx {
+            self.set_rewards(
+                WalletHistory {
+                    replicas: section_elders(&self.network_api).await?,
+                    history: ActorHistory::empty(),
+                },
+                node_rewards,
+            )
+            .await
+        } else {
+            let stages = RewardStages::new(node_rewards);
+            self.section_funds = Some(SectionFunds::TakingNodes(stages));
+            Ok(())
+        }
     }
 
     /// Continue the level up and handle more responsibilities.
@@ -125,13 +136,15 @@ impl Node {
             ));
         };
 
-        /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
-        #[allow(clippy::eval_order_dependence)]
-        let members = SectionElders {
-            prefix: self.network_api.our_prefix().await,
-            names: self.network_api.our_elder_names().await,
-            key_set: self.network_api.our_public_key_set().await?,
-        };
+        self.set_rewards(section_wallet, node_rewards).await
+    }
+
+    async fn set_rewards(
+        &mut self,
+        section_wallet: WalletHistory,
+        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+    ) -> Result<()> {
+        let members = section_elders(&self.network_api).await?;
         let signing = ElderSigning::new(self.network_api.clone()).await?;
         let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
         let payout = RewardPayout::new(actor, members);
@@ -141,4 +154,14 @@ impl Node {
         self.section_funds = Some(SectionFunds::Rewarding(rewards));
         Ok(())
     }
+}
+
+async fn section_elders(network_api: &crate::Network) -> Result<SectionElders> {
+    /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
+    #[allow(clippy::eval_order_dependence)]
+    Ok(SectionElders {
+        prefix: network_api.our_prefix().await,
+        names: network_api.our_elder_names().await,
+        key_set: network_api.our_public_key_set().await?,
+    })
 }
