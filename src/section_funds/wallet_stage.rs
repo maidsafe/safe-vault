@@ -43,22 +43,20 @@ pub struct WalletAccumulation {
 impl WalletProposal {
     pub(crate) fn add(&mut self, sig: SignatureShare) -> Result<()> {
         if self.signatures.contains_key(&sig.index) {
+            info!("WalletProposal add already contains {}..", sig.index);
             return Ok(());
         }
-        let mut signatures = self.signatures.clone();
-        let _ = signatures.insert(sig.index, sig.share);
+        let _ = self.signatures.insert(sig.index, sig.share);
         let min_count = 1 + self.pk_set.threshold();
-        if signatures.len() >= min_count {
+        if self.signatures.len() >= min_count {
             info!("Aggregating actor signature..");
 
             // Combine shares to produce the main signature.
             let actor_signature = sn_data_types::Signature::Bls(
                 self.pk_set
-                    .combine_signatures(&signatures)
+                    .combine_signatures(&self.signatures)
                     .map_err(|_| Error::CouldNotCombineSignatures)?,
             );
-
-            self.signatures = signatures;
 
             self.pending_agreement = Some(SignedCredit {
                 credit: self.proposal.clone(),
@@ -73,21 +71,19 @@ impl WalletProposal {
 impl WalletAccumulation {
     pub(crate) fn add(&mut self, sig: SignatureShare) -> Result<()> {
         if self.signatures.contains_key(&sig.index) {
+            info!("WalletAccumulation add already contains {}..", sig.index);
             return Ok(());
         }
-        let mut signatures = self.signatures.clone();
-        let _ = signatures.insert(sig.index, sig.share);
+        let _ = self.signatures.insert(sig.index, sig.share);
         let min_count = 1 + self.pk_set.threshold();
-        if signatures.len() >= min_count {
+        if self.signatures.len() >= min_count {
             info!("Aggregating replica signature..");
             // Combine shares to produce the main signature.
             let debiting_replicas_sig = sn_data_types::Signature::Bls(
                 self.pk_set
-                    .combine_signatures(&signatures)
+                    .combine_signatures(&self.signatures)
                     .map_err(|_| Error::CouldNotCombineSignatures)?,
             );
-
-            self.signatures = signatures;
 
             self.pending_agreement = Some(CreditAgreementProof {
                 signed_credit: self.agreed_proposal.clone(),
