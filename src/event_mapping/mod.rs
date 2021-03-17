@@ -89,11 +89,13 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                     // sync to others if we are elder
                     let op = if network_api.is_elder().await {
                         let mut sanity_counter = 0;
-                        while sanity_counter < 30 {
+                        while sanity_counter < 240 {
                             match network_api.our_public_key_set().await {
                                 Ok(pk_set) => {
                                     if elders.key == pk_set.public_key() {
                                         break;
+                                    } else {
+                                        trace!("******Elders changed, we are still Elder but we seem to be lagging the DKG...");
                                     }
                                 }
                                 Err(e) => {
@@ -118,7 +120,16 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                     Mapping::Ok { op, ctx: None }
                 }
                 NodeElderChange::Promoted => {
+                    let mut sanity_counter = 0;
                     while network_api.our_public_key_set().await.is_err() {
+                        if sanity_counter > 240 {
+                            trace!("******Elders changed, we were promoted, but no key share found, so skip this..");
+                            return Mapping::Ok {
+                                op: NodeDuty::NoOp,
+                                ctx: None,
+                            };
+                        }
+                        sanity_counter += 1;
                         trace!("******Elders changed, we are promoted, but still no key share..");
                         sleep(Duration::from_millis(500))
                     }
