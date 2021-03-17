@@ -44,7 +44,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "3";
+const INTERVAL: &str = "2";
 const RUST_LOG: &str = "RUST_LOG";
 
 #[tokio::main]
@@ -126,7 +126,7 @@ pub async fn run_network() -> Result<(), String> {
         &INTERVAL,
         "--local",
         "--num-nodes",
-        "50",
+        "60",
     ];
 
     // If RUST_LOG was set we pass it down to the launch tool

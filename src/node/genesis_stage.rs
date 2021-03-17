@@ -29,7 +29,7 @@ pub enum GenesisStage {
     AwaitingGenesisThreshold,
     ProposingGenesis(GenesisProposal),
     AccumulatingGenesis(GenesisAccumulation),
-    Completed(TransferPropagated),
+    Completed(CreditAgreementProof),
 }
 
 #[derive(Clone)]

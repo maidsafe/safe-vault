@@ -111,8 +111,6 @@ pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping
 }
 
 fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
-    debug!("Evaluating section message: {:?}", msg);
-
     match &msg {
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis { credit, sig }),
@@ -311,13 +309,24 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             event: NodeEvent::SectionWalletCreated(wallet),
             ..
         } => NodeDuty::CompleteLevelUp(wallet.to_owned()),
+        // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
+        Message::NodeQueryResponse {
+            response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(replicas)),
+            id,
+            ..
+        } => {
+            debug!(">>>>> Should be handling ContinueWalletChurn, after GetSectionElders query response");
+            NodeDuty::ContinueWalletChurn {
+                replicas: replicas.to_owned(),
+                msg_id: *id,
+                origin,
+            }
+        }
         _ => NodeDuty::NoOp,
     }
 }
 
 fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
-    debug!("Evaluating node msg: {:?}", msg);
-
     match &msg {
         // ------ wallet register ------
         Message::NodeCmd {
@@ -437,19 +446,6 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin: *origin,
         },
-        // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
-        Message::NodeQueryResponse {
-            response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(replicas)),
-            id,
-            ..
-        } => {
-            debug!(">>>>> Should be handling ContinueWalletChurn, after GetSectionElders query response");
-            NodeDuty::ContinueWalletChurn {
-                replicas: replicas.to_owned(),
-                msg_id: *id,
-                origin,
-            }
-        }
         _ => NodeDuty::NoOp,
     }
 }

@@ -26,9 +26,10 @@ use crate::{
 };
 use crdts::Actor;
 use itertools::Itertools;
-use log::info;
+use log::{debug, info};
 use sn_data_types::{
-    ActorHistory, NodeRewardStage, PublicKey, SectionElders, TransferPropagated, WalletHistory,
+    ActorHistory, CreditAgreementProof, NodeRewardStage, PublicKey, SectionElders,
+    TransferPropagated, WalletHistory,
 };
 use sn_routing::XorName;
 use sn_transfers::TransferActor;
@@ -42,7 +43,7 @@ pub struct NextLevelInfo {
 
 impl Node {
     /// Level up and handle more responsibilities.
-    pub async fn level_up(&mut self, genesis_tx: Option<TransferPropagated>) -> Result<()> {
+    pub async fn level_up(&mut self, genesis_tx: Option<CreditAgreementProof>) -> Result<()> {
         //
         // do not hande immutable chunks anymore
         self.chunks = None;
@@ -64,19 +65,24 @@ impl Node {
             transfer_replicas(&self.node_info, self.network_api.clone(), user_wallets).await?;
         let transfers = Transfers::new(replicas, rate_limit);
         // does local init, with no roundrip via network messaging
-        if let Some(genesis_tx) = &genesis_tx {
-            transfers.genesis(genesis_tx.clone()).await?;
+        if let Some(credit_proof) = genesis_tx.clone() {
+            transfers
+                .genesis(TransferPropagated { credit_proof })
+                .await?;
         }
         self.transfers = Some(transfers);
 
         //
         // start handling node reward stages
         let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
-        if let Some(genesis_tx) = genesis_tx {
+        if let Some(credit_proof) = genesis_tx {
             self.set_rewards(
                 WalletHistory {
                     replicas: section_elders(&self.network_api).await?,
-                    history: ActorHistory::empty(),
+                    history: ActorHistory {
+                        credits: vec![credit_proof],
+                        debits: vec![],
+                    },
                 },
                 node_rewards,
             )
@@ -105,7 +111,11 @@ impl Node {
             // TODO: more needed here
             rewards.merge(node_rewards);
             Ok(())
+        } else if let Some(SectionFunds::Churning { .. }) = &mut self.section_funds {
+            // TODO: probably best to merge here as well..
+            Ok(())
         } else if let Some(SectionFunds::TakingNodes(stages)) = &self.section_funds {
+            debug!("continue_level_up: TakingNodes, updating state..");
             let mut existing_stages = stages.node_rewards();
             existing_stages.extend(node_rewards); // TODO: fix this!
             let stages = RewardStages::new(existing_stages);

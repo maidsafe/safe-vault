@@ -6,9 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_data_types::{SectionElders, WalletHistory};
-use sn_messaging::MessageId;
-
 use super::{
     genesis::begin_forming_genesis_section,
     genesis::receive_genesis_accumulation,
@@ -27,6 +24,9 @@ use crate::{
     transfers::Transfers,
     Error, Node, Result,
 };
+use log::{debug, info};
+use sn_data_types::{SectionElders, WalletHistory};
+use sn_messaging::MessageId;
 use xor_name::XorName;
 
 impl Node {
@@ -48,11 +48,13 @@ impl Node {
                 origin,
             } => {
                 let (rewards, churn_process, existing_replicas) = self.get_churning_funds()?;
+
                 if existing_replicas.is_none() {
                     match churn_process.stage().clone() {
                         WalletStage::AwaitingWalletThreshold
                         | WalletStage::ProposingWallet(_)
                         | WalletStage::AccumulatingWallet(_) => {
+                            debug!("handling ContinueWalletChurn: Setting SectionFunds::Churning");
                             self.section_funds = Some(SectionFunds::Churning {
                                 process: churn_process.clone(),
                                 rewards: rewards.clone(),
@@ -61,8 +63,11 @@ impl Node {
                         }
                         WalletStage::Completed(credit_proof) => {
                             let mut rewards = rewards.clone();
-                            self.set_section_funds(rewards, replicas, credit_proof)
+                            let op = self
+                                .create_section_wallet(rewards, replicas, credit_proof)
                                 .await?;
+                            info!("COMPLETED: We have our new section wallet! (credit came before replicas)");
+                            return Ok(vec![op]);
                         }
                         WalletStage::None => return Err(Error::InvalidGenesisStage),
                     }
@@ -84,8 +89,11 @@ impl Node {
                 if let WalletStage::Completed(credit_proof) = churn_process.stage().clone() {
                     if let Some(replicas) = replicas.clone() {
                         let mut rewards = rewards.clone();
-                        self.set_section_funds(rewards, replicas.clone(), credit_proof.clone())
+                        let op = self
+                            .create_section_wallet(rewards, replicas.clone(), credit_proof.clone())
                             .await?;
+                        info!("COMPLETED: We have our new section wallet! (replicas came before credit)");
+                        return Ok(vec![op]);
                     }
                 }
 
@@ -204,6 +212,7 @@ impl Node {
                 Ok(vec![])
             }
             NodeDuty::CompleteLevelUp(wallet) => {
+                debug!("handling CompleteLevelUp..");
                 self.complete_level_up(wallet).await?;
                 Ok(vec![])
             }

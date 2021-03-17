@@ -68,6 +68,8 @@ impl Node {
 
         let mut ops = vec![];
 
+        debug!("Current balance: {}", rewards.balance());
+
         // generate new wallet proposal
         let mut process = ChurnProcess::new(
             rewards.balance(),
@@ -96,12 +98,12 @@ impl Node {
                     node_rewards: rewards.node_rewards(),
                     user_wallets: user_wallets.clone(),
                 }),
-                id: MessageId::in_response_to(&msg_id),
+                id: MessageId::in_response_to(&msg_id), // MessageId::new(), //
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to an event..
             dst: DstLocation::Section(our_peers), // swarming to our peers, if splitting many will be needing this, otherwise only one..
-            aggregation: Aggregation::None,
+            aggregation: Aggregation::AtDestination,
         }));
 
         if let Some(sibling_elders) = &sibling_elders {
@@ -114,29 +116,25 @@ impl Node {
                         node_rewards: rewards.node_rewards(),
                         user_wallets: user_wallets.clone(),
                     }),
-                    id: MessageId::in_response_to(&msg_id),
+                    id: MessageId::in_response_to(&msg_id), // MessageId::new(), //
                     target_section_pk: None,
                 },
                 section_source: false, // strictly this is not correct, but we don't expect responses to an event..
                 dst: DstLocation::Section(our_sibling_peers), // swarming to our peers, if splitting many will be needing this, otherwise only one..
-                aggregation: Aggregation::None,
+                aggregation: Aggregation::AtDestination,
             }));
-        }
-
-        for op in &ops {
-            debug!("Churn msgs: {:?}", op)
         }
 
         Ok(ops)
     }
 
     /// set funds to Rewarding stage
-    pub async fn set_section_funds(
+    pub async fn create_section_wallet(
         &mut self,
         mut rewards: Rewards,
         replicas: SectionElders,
         credit_proof: CreditAgreementProof,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         let section_wallet = WalletHistory {
             replicas,
             history: ActorHistory {
@@ -152,13 +150,28 @@ impl Node {
             names: self.network_api.our_elder_names().await,
             key_set: self.network_api.our_public_key_set().await?,
         };
+
+        let our_section_address = members.address();
+        let msg_id = MessageId::combine(vec![members.name(), our_section_address]);
+
         let reward_calc = RewardCalc::new(members.prefix);
         let signing = ElderSigning::new(self.network_api.clone()).await?;
-        let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
+        let actor = TransferActor::from_info(signing, section_wallet.clone(), Validator {})?;
         let mut rewards = rewards.clone();
         rewards.set(actor, members, reward_calc);
         self.section_funds = Some(SectionFunds::Rewarding(rewards));
-        Ok(())
+
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::NodeEvent {
+                event: NodeEvent::SectionWalletCreated(section_wallet),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+                target_section_pk: None,
+            },
+            dst: DstLocation::Section(our_section_address),
+            section_source: false,
+            aggregation: Aggregation::AtDestination,
+        }))
     }
 
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
@@ -179,27 +192,28 @@ impl Node {
                     elders,
                 )),
                 correlation_id: msg_id,
-                id: MessageId::in_response_to(&msg_id),
+                id: MessageId::in_response_to(&msg_id), // MessageId::new(), //
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),  // this will be a single Node
-            aggregation: Aggregation::AtDestination,
+            aggregation: Aggregation::AtDestination, // None,
         }))
     }
 }
 
+// called by a subset of elders..
 pub fn get_wallet_replica_elders(wallet: PublicKey) -> NodeDuty {
     // deterministic msg id for aggregation
     let msg_id = MessageId::combine(vec![wallet.into()]);
     NodeDuty::Send(OutgoingMsg {
         msg: Message::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
-            id: msg_id,
+            id: msg_id, // MessageId::new(), //
             target_section_pk: None,
         },
         section_source: true,
         dst: DstLocation::Section(wallet.into()),
-        aggregation: Aggregation::AtDestination,
+        aggregation: Aggregation::AtDestination, // None,
     })
 }

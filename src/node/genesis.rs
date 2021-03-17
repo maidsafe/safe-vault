@@ -236,9 +236,7 @@ pub async fn receive_genesis_accumulation(
             bootstrap.add(sig)?;
             if let Some(genesis) = bootstrap.pending_agreement {
                 debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENESIS AGREEMENT PRODUCED!!!!");
-                Ok(GenesisStage::Completed(TransferPropagated {
-                    credit_proof: genesis,
-                }))
+                Ok(GenesisStage::Completed(genesis))
             } else {
                 Ok(GenesisStage::AccumulatingGenesis(bootstrap))
             }

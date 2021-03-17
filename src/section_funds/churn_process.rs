@@ -209,7 +209,6 @@ impl ChurnProcess {
             }
             WalletStage::ProposingWallet(mut bootstrap) => {
                 debug!("Adding incoming Wallet proposal.");
-                let section_pk = self.churn.wallet_key();
                 bootstrap.add(sig)?;
 
                 if let Some(signed_credit) = &bootstrap.pending_agreement {
