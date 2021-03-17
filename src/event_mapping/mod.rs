@@ -17,6 +17,7 @@ use sn_data_types::PublicKey;
 use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
+use std::{thread::sleep, time::Duration};
 
 #[derive(Debug)]
 pub enum Mapping {
@@ -87,6 +88,21 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                 NodeElderChange::None => {
                     // sync to others if we are elder
                     let op = if network_api.is_elder().await {
+                        let mut sanity_counter = 0;
+                        while sanity_counter < 30 {
+                            match network_api.our_public_key_set().await {
+                                Ok(pk_set) => {
+                                    if elders.key == pk_set.public_key() {
+                                        break;
+                                    }
+                                }
+                                Err(e) => {
+                                    trace!("******Elders changed, should NOT be an error here...!");
+                                    sanity_counter += 1;
+                                }
+                            }
+                            sleep(Duration::from_millis(500))
+                        }
                         trace!("******Elders changed, we are still Elder");
                         if are_we_part_of_genesis(network_api).await {
                             NodeDuty::BeginFormingGenesisSection
@@ -102,6 +118,10 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                     Mapping::Ok { op, ctx: None }
                 }
                 NodeElderChange::Promoted => {
+                    while network_api.our_public_key_set().await.is_err() {
+                        trace!("******Elders changed, we are promoted, but still no key share..");
+                        sleep(Duration::from_millis(500))
+                    }
                     trace!("******Elders changed, we are promoted");
                     if are_we_part_of_genesis(network_api).await {
                         Mapping::Ok {
