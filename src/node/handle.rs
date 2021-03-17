@@ -36,7 +36,14 @@ impl Node {
             NodeDuty::ChurnMembers {
                 elders,
                 sibling_elders,
-            } => self.begin_churn(elders, sibling_elders).await,
+                newbie,
+            } => {
+                if newbie {
+                    self.begin_churn_as_newbie(elders, sibling_elders).await
+                } else {
+                    self.begin_churn_as_oldie(elders, sibling_elders).await
+                }
+            }
             // a remote section asks for the replicas of their wallet
             NodeDuty::GetSectionElders { msg_id, origin } => {
                 Ok(vec![self.get_section_elders(msg_id, origin).await?])
@@ -62,12 +69,11 @@ impl Node {
                             });
                         }
                         WalletStage::Completed(credit_proof) => {
+                            let recipient = credit_proof.recipient();
                             let mut rewards = rewards.clone();
-                            let op = self
-                                .create_section_wallet(rewards, replicas, credit_proof)
+                            self.create_section_wallet(rewards, replicas, credit_proof)
                                 .await?;
-                            info!("COMPLETED: We have our new section wallet! (credit came before replicas)");
-                            return Ok(vec![op]);
+                            info!("COMPLETED({}): We have our new section wallet! (credit came before replicas)", recipient);
                         }
                         WalletStage::None => return Err(Error::InvalidGenesisStage),
                     }
@@ -75,27 +81,35 @@ impl Node {
                 Ok(vec![])
             }
             NodeDuty::ReceiveWalletProposal { credit, sig } => {
-                let (_, churn_process, _) = self.get_churning_funds()?;
-                Ok(vec![
-                    churn_process.receive_wallet_proposal(credit, sig).await?,
-                ])
+                if let Ok((_, churn_process, _)) = self.get_churning_funds() {
+                    Ok(vec![
+                        churn_process.receive_wallet_proposal(credit, sig).await?,
+                    ])
+                } else {
+                    // we are an adult, so ignore this msg
+                    Ok(vec![])
+                }
             }
             NodeDuty::ReceiveWalletAccumulation { signed_credit, sig } => {
-                let (rewards, churn_process, replicas) = self.get_churning_funds()?;
-                churn_process
-                    .receive_wallet_accumulation(signed_credit, sig)
-                    .await?;
+                if let Ok((rewards, churn_process, replicas)) = self.get_churning_funds() {
+                    churn_process
+                        .receive_wallet_accumulation(signed_credit, sig)
+                        .await?;
 
-                if let WalletStage::Completed(credit_proof) = churn_process.stage().clone() {
-                    if let Some(replicas) = replicas.clone() {
-                        let mut rewards = rewards.clone();
-                        let op = self
-                            .create_section_wallet(rewards, replicas.clone(), credit_proof.clone())
+                    if let WalletStage::Completed(credit_proof) = churn_process.stage().clone() {
+                        if let Some(replicas) = replicas.clone() {
+                            let recipient = credit_proof.recipient();
+                            let mut rewards = rewards.clone();
+                            self.create_section_wallet(
+                                rewards,
+                                replicas.clone(),
+                                credit_proof.clone(),
+                            )
                             .await?;
-                        info!("COMPLETED: We have our new section wallet! (replicas came before credit)");
-                        return Ok(vec![op]);
+                            info!("COMPLETED({}): We have our new section wallet! (replicas came before credit)", recipient);
+                        }
                     }
-                }
+                } // else we are an adult, so ignore this msg
 
                 Ok(vec![])
             }
@@ -195,25 +209,16 @@ impl Node {
                     GenesisStage::Completed(genesis_tx) => genesis_tx.clone(),
                     _ => return Ok(vec![]),
                 };
-                self.level_up(Some(genesis_tx)).await?;
+                self.genesis(genesis_tx).await?;
                 Ok(vec![])
             }
             //
             // ---------- Levelling --------------
-            NodeDuty::LevelUp => {
-                self.level_up(None).await?;
-                Ok(vec![])
-            }
-            NodeDuty::ContinueLevelUp {
+            NodeDuty::SynchState {
                 node_rewards,
                 user_wallets,
             } => {
-                self.continue_level_up(node_rewards, user_wallets).await?;
-                Ok(vec![])
-            }
-            NodeDuty::CompleteLevelUp(wallet) => {
-                debug!("handling CompleteLevelUp..");
-                self.complete_level_up(wallet).await?;
+                self.synch_state(node_rewards, user_wallets).await?;
                 Ok(vec![])
             }
             NodeDuty::LevelDown => {
@@ -575,7 +580,7 @@ impl Node {
     //             self.receive_genesis_accumulation(signed_credit, sig).await
     //         }
     //         AssumeAdultDuties => self.assume_adult_duties().await,
-    //         CompleteLevelUp {
+    //         CreateSectionWallet {
     //             section_wallet,
     //             node_rewards,
     //             user_wallets,

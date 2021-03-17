@@ -180,20 +180,20 @@ pub enum NodeDuty {
         /// The Elders of the sibling section, if this event is fired during a split.
         /// Otherwise `None`.
         sibling_elders: Option<Elders>,
+        /// oldie or newbie?
+        newbie: bool,
     },
-    /// When promoted, node levels up
-    LevelUp,
     /// When demoted, node levels down
     LevelDown,
     /// Initiates the node with state from peers.
-    ContinueLevelUp {
+    SynchState {
         /// The registered wallet keys for nodes earning rewards
         node_rewards: BTreeMap<XorName, NodeRewardStage>,
         /// The wallets of users on the network.
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },
-    /// Initiates the section wallet.
-    CompleteLevelUp(WalletHistory),
+    // /// Initiates the section wallet.
+    // CreateSectionWallet(WalletHistory),
     ProcessNewMember(XorName),
     /// As members are lost for various reasons
     /// there are certain things nodes need
@@ -294,10 +294,8 @@ impl Debug for NodeDuty {
             Self::ReceiveWalletProposal { .. } => write!(f, "ReceiveWalletProposal"),
             Self::ReceiveWalletAccumulation { .. } => write!(f, "ReceiveWalletAccumulation"),
             // ------
-            Self::LevelUp => write!(f, "LevelUp"),
             Self::LevelDown => write!(f, "LevelDown"),
-            Self::ContinueLevelUp { .. } => write!(f, "ContinueLevelUp"),
-            Self::CompleteLevelUp { .. } => write!(f, "CompleteLevelUp"),
+            Self::SynchState { .. } => write!(f, "SynchState"),
             Self::ChurnMembers { .. } => write!(f, "ChurnMembers"),
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),

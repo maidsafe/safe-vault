@@ -88,7 +88,8 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                 NodeElderChange::None => {
                     // sync to others if we are elder
                     let op = if network_api.is_elder().await {
-                        let mut sanity_counter = 0;
+                        // -- ugly temporary until fixed in routing --
+                        let mut sanity_counter = 0_i32;
                         while sanity_counter < 240 {
                             match network_api.our_public_key_set().await {
                                 Ok(pk_set) => {
@@ -105,6 +106,8 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                             }
                             sleep(Duration::from_millis(500))
                         }
+                        // -- ugly temporary until fixed in routing --
+
                         trace!("******Elders changed, we are still Elder");
                         if are_we_part_of_genesis(network_api).await {
                             NodeDuty::BeginFormingGenesisSection
@@ -112,6 +115,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                             NodeDuty::ChurnMembers {
                                 elders,
                                 sibling_elders,
+                                newbie: false,
                             }
                         }
                     } else {
@@ -120,7 +124,8 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                     Mapping::Ok { op, ctx: None }
                 }
                 NodeElderChange::Promoted => {
-                    let mut sanity_counter = 0;
+                    // -- ugly temporary until fixed in routing --
+                    let mut sanity_counter = 0_i32;
                     while network_api.our_public_key_set().await.is_err() {
                         if sanity_counter > 240 {
                             trace!("******Elders changed, we were promoted, but no key share found, so skip this..");
@@ -133,6 +138,8 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                         trace!("******Elders changed, we are promoted, but still no key share..");
                         sleep(Duration::from_millis(500))
                     }
+                    // -- ugly temporary until fixed in routing --
+
                     trace!("******Elders changed, we are promoted");
                     if are_we_part_of_genesis(network_api).await {
                         Mapping::Ok {
@@ -141,7 +148,11 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                         }
                     } else {
                         Mapping::Ok {
-                            op: NodeDuty::LevelUp,
+                            op: NodeDuty::ChurnMembers {
+                                elders,
+                                sibling_elders,
+                                newbie: true,
+                            },
                             ctx: None,
                         }
                     }
@@ -177,7 +188,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                 };
             }
 
-            info!("New member has joined the section");
+            // info!("New member has joined the section");
 
             //self.log_node_counts().await;
             if let Some(prev_name) = previous_name {

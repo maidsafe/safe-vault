@@ -80,7 +80,7 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
 }
 
 pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping {
-    debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
+    //debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
 
     match &dst {
         DstLocation::Section(_name) => match match_section_msg(msg.clone(), src) {
@@ -301,27 +301,20 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
                     user_wallets,
                 }),
             ..
-        } => NodeDuty::ContinueLevelUp {
+        } => NodeDuty::SynchState {
             node_rewards: node_rewards.to_owned(),
             user_wallets: user_wallets.to_owned(),
         },
-        Message::NodeEvent {
-            event: NodeEvent::SectionWalletCreated(wallet),
-            ..
-        } => NodeDuty::CompleteLevelUp(wallet.to_owned()),
         // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
         Message::NodeQueryResponse {
             response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(replicas)),
             id,
             ..
-        } => {
-            debug!(">>>>> Should be handling ContinueWalletChurn, after GetSectionElders query response");
-            NodeDuty::ContinueWalletChurn {
-                replicas: replicas.to_owned(),
-                msg_id: *id,
-                origin,
-            }
-        }
+        } => NodeDuty::ContinueWalletChurn {
+            replicas: replicas.to_owned(),
+            msg_id: *id,
+            origin,
+        },
         _ => NodeDuty::NoOp,
     }
 }

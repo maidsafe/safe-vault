@@ -208,11 +208,13 @@ impl ChurnProcess {
                 }))
             }
             WalletStage::ProposingWallet(mut bootstrap) => {
-                debug!("Adding incoming Wallet proposal.");
                 bootstrap.add(sig)?;
 
                 if let Some(signed_credit) = &bootstrap.pending_agreement {
-                    info!("******* there is an agreement for wallet proposal");
+                    info!(
+                        "******* there is an agreement for wallet proposal (newbie?: {}).",
+                        self.balance == Token::zero()
+                    );
                     // replicas signatures over > signed_credit <
                     let mut bootstrap = WalletAccumulation {
                         agreed_proposal: signed_credit.clone(),
@@ -249,14 +251,8 @@ impl ChurnProcess {
                     Ok(NodeDuty::NoOp)
                 }
             }
-            WalletStage::AccumulatingWallet(_) => {
-                info!("Already accumulating, no need to handle proposal for wallet.");
-                Ok(NodeDuty::NoOp)
-            }
-            WalletStage::Completed(_) => {
-                info!("Already completed, no need to handle proposal for wallet.");
-                Ok(NodeDuty::NoOp)
-            }
+            WalletStage::AccumulatingWallet(_) => Ok(NodeDuty::NoOp),
+            WalletStage::Completed(_) => Ok(NodeDuty::NoOp),
             WalletStage::None => Err(Error::InvalidGenesisStage),
         }
     }
@@ -308,13 +304,14 @@ impl ChurnProcess {
                 bootstrap.add(sig)?;
                 if let Some(credit_proof) = bootstrap.pending_agreement {
                     self.stage = WalletStage::Completed(credit_proof);
+                    if self.balance == Token::zero() {
+                        debug!("Newbie reached WalletStage::Completed !!!!");
+                    }
                 } else {
                     self.stage = WalletStage::AccumulatingWallet(bootstrap);
                 }
             }
-            WalletStage::Completed(_) => {
-                info!("Already completed, no need to handle proposal for wallet.");
-            }
+            WalletStage::Completed(_) => {}
             WalletStage::None => return Err(Error::InvalidGenesisStage),
         };
         Ok(())

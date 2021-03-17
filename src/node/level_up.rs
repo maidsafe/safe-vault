@@ -43,7 +43,43 @@ pub struct NextLevelInfo {
 
 impl Node {
     /// Level up and handle more responsibilities.
-    pub async fn level_up(&mut self, genesis_tx: Option<CreditAgreementProof>) -> Result<()> {
+    pub async fn genesis(&mut self, genesis_tx: CreditAgreementProof) -> Result<()> {
+        //
+        self.level_up().await?;
+
+        // does local init, with no roundrip via network messaging
+        if let Some(transfers) = &mut self.transfers {
+            transfers
+                .genesis(TransferPropagated {
+                    credit_proof: genesis_tx.clone(),
+                })
+                .await?;
+        }
+
+        //
+        // start handling node reward
+        let section_wallet = WalletHistory {
+            replicas: section_elders(&self.network_api).await?,
+            history: ActorHistory {
+                credits: vec![genesis_tx],
+                debits: vec![],
+            },
+        };
+        let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
+        let members = section_elders(&self.network_api).await?;
+        let signing = ElderSigning::new(self.network_api.clone()).await?;
+        let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
+        let payout = RewardPayout::new(actor, members);
+        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
+        let stages = RewardStages::new(node_rewards);
+        let rewards = Rewards::new(payout, stages, reward_calc);
+        self.section_funds = Some(SectionFunds::Rewarding(rewards));
+
+        Ok(())
+    }
+
+    /// Level up on promotion
+    pub async fn level_up(&mut self) -> Result<()> {
         //
         // do not hande immutable chunks anymore
         self.chunks = None;
@@ -63,39 +99,12 @@ impl Node {
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
         let replicas =
             transfer_replicas(&self.node_info, self.network_api.clone(), user_wallets).await?;
-        let transfers = Transfers::new(replicas, rate_limit);
-        // does local init, with no roundrip via network messaging
-        if let Some(credit_proof) = genesis_tx.clone() {
-            transfers
-                .genesis(TransferPropagated { credit_proof })
-                .await?;
-        }
-        self.transfers = Some(transfers);
-
-        //
-        // start handling node reward stages
-        let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
-        if let Some(credit_proof) = genesis_tx {
-            self.set_rewards(
-                WalletHistory {
-                    replicas: section_elders(&self.network_api).await?,
-                    history: ActorHistory {
-                        credits: vec![credit_proof],
-                        debits: vec![],
-                    },
-                },
-                node_rewards,
-            )
-            .await
-        } else {
-            let stages = RewardStages::new(node_rewards);
-            self.section_funds = Some(SectionFunds::TakingNodes(stages));
-            Ok(())
-        }
+        self.transfers = Some(Transfers::new(replicas, rate_limit));
+        Ok(())
     }
 
     /// Continue the level up and handle more responsibilities.
-    pub async fn continue_level_up(
+    pub async fn synch_state(
         &mut self,
         node_rewards: BTreeMap<XorName, NodeRewardStage>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
@@ -105,68 +114,59 @@ impl Node {
             transfers.merge(user_wallets)
         }
 
-        //
-        // start handling reward payouts
-        if let Some(SectionFunds::Rewarding(rewards)) = &mut self.section_funds {
-            // TODO: more needed here
-            rewards.merge(node_rewards);
-            Ok(())
-        } else if let Some(SectionFunds::Churning { .. }) = &mut self.section_funds {
-            // TODO: probably best to merge here as well..
-            Ok(())
-        } else if let Some(SectionFunds::TakingNodes(stages)) = &self.section_funds {
-            debug!("continue_level_up: TakingNodes, updating state..");
-            let mut existing_stages = stages.node_rewards();
-            existing_stages.extend(node_rewards); // TODO: fix this!
-            let stages = RewardStages::new(existing_stages);
-            self.section_funds = Some(SectionFunds::TakingNodes(stages));
-            Ok(())
-        } else {
-            Err(Error::InvalidOperation(
-                "Invalid section funds stage, expected SectionFunds::TakingNodes".to_string(),
-            ))
+        //  merge in provided node reward stages
+        match &mut self.section_funds {
+            Some(SectionFunds::Rewarding(rewards))
+            | Some(SectionFunds::Churning { rewards, .. }) => {
+                // TODO: more needed here
+                rewards.merge(node_rewards);
+                Ok(())
+            }
+            None => Err(Error::InvalidOperation(
+                "Invalid section funds stage".to_string(),
+            )),
         }
     }
 
-    /// Complete the level up and handle more responsibilities.
-    pub async fn complete_level_up(&mut self, section_wallet: WalletHistory) -> Result<()> {
-        if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
-            return Err(Error::InvalidOperation(
-                "Invalid section funds stage, expected SectionFunds::TakingNodes".to_string(),
-            ));
-        }
-        // start handling reward payouts
-        let node_rewards = if let Some(section_funds) = &self.section_funds {
-            section_funds.node_rewards()
-        } else if self.network_api.is_elder().await {
-            Default::default()
-        } else {
-            return Err(Error::InvalidOperation(
-                "No section funds at this replica".to_string(),
-            ));
-        };
+    // /// Complete the level up and handle more responsibilities.
+    // pub async fn complete_level_up(&mut self, section_wallet: WalletHistory) -> Result<()> {
+    //     if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
+    //         return Err(Error::InvalidOperation(
+    //             "Invalid section funds stage, expected SectionFunds::TakingNodes".to_string(),
+    //         ));
+    //     }
+    //     // start handling reward payouts
+    //     let node_rewards = if let Some(section_funds) = &self.section_funds {
+    //         section_funds.node_rewards()
+    //     } else if self.network_api.is_elder().await {
+    //         Default::default()
+    //     } else {
+    //         return Err(Error::InvalidOperation(
+    //             "No section funds at this replica".to_string(),
+    //         ));
+    //     };
 
-        self.set_rewards(section_wallet, node_rewards).await
-    }
+    //     self.set_as_rewarding(section_wallet, node_rewards).await
+    // }
 
-    async fn set_rewards(
-        &mut self,
-        section_wallet: WalletHistory,
-        node_rewards: BTreeMap<XorName, NodeRewardStage>,
-    ) -> Result<()> {
-        let members = section_elders(&self.network_api).await?;
-        let signing = ElderSigning::new(self.network_api.clone()).await?;
-        let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
-        let payout = RewardPayout::new(actor, members);
-        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
-        let stages = RewardStages::new(node_rewards);
-        let rewards = Rewards::new(payout, stages, reward_calc);
-        self.section_funds = Some(SectionFunds::Rewarding(rewards));
-        Ok(())
-    }
+    // async fn set_as_rewarding(
+    //     &mut self,
+    //     section_wallet: WalletHistory,
+    //     node_rewards: BTreeMap<XorName, NodeRewardStage>,
+    // ) -> Result<()> {
+    //     let members = section_elders(&self.network_api).await?;
+    //     let signing = ElderSigning::new(self.network_api.clone()).await?;
+    //     let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
+    //     let payout = RewardPayout::new(actor, members);
+    //     let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
+    //     let stages = RewardStages::new(node_rewards);
+    //     let rewards = Rewards::new(payout, stages, reward_calc);
+    //     self.section_funds = Some(SectionFunds::Rewarding(rewards));
+    //     Ok(())
+    // }
 }
 
-async fn section_elders(network_api: &crate::Network) -> Result<SectionElders> {
+pub async fn section_elders(network_api: &crate::Network) -> Result<SectionElders> {
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
     #[allow(clippy::eval_order_dependence)]
     Ok(SectionElders {

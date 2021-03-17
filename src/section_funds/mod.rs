@@ -34,8 +34,8 @@ use sn_routing::XorName;
 /// via the usage of a distributed AT2 Actor.
 #[allow(clippy::large_enum_variant)]
 pub enum SectionFunds {
-    // initiating and not yet able to do payouts
-    TakingNodes(RewardStages),
+    // // initiating and not yet able to do payouts
+    // TakingNodes(RewardStages),
     // ready, can do payouts
     Rewarding(Rewards),
     // in transition and cannot do payouts
@@ -50,7 +50,7 @@ impl SectionFunds {
     /// Returns current stages of registered nodes.
     pub fn node_rewards(&self) -> BTreeMap<XorName, NodeRewardStage> {
         match &self {
-            Self::TakingNodes(stages) => stages.node_rewards(),
+            //Self::TakingNodes(stages) => stages.node_rewards(),
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => rewards.node_rewards(),
         }
     }
@@ -63,7 +63,7 @@ impl SectionFunds {
     pub fn add_new_node(&self, node_id: XorName) {
         //info!("Rewards: New node added: {:?}", node_id);
         match &self {
-            Self::TakingNodes(stages) => stages.add_new_node(node_id),
+            //Self::TakingNodes(stages) => stages.add_new_node(node_id),
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
                 rewards.add_new_node(node_id)
             }
@@ -75,7 +75,7 @@ impl SectionFunds {
     pub fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeDuty> {
         //info!("Rewards: New node added: {:?}", node_id);
         match &self {
-            Self::TakingNodes(stages) => stages.set_node_wallet(node_id, wallet),
+            //Self::TakingNodes(stages) => stages.set_node_wallet(node_id, wallet),
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
                 rewards.set_node_wallet(node_id, wallet)
             }
@@ -91,11 +91,11 @@ impl SectionFunds {
         age: u8,
     ) -> Result<NodeDuty> {
         match &self {
-            Self::TakingNodes(stages) => {
-                stages
-                    .add_relocating_node(old_node_id, new_node_id, age)
-                    .await
-            }
+            // Self::TakingNodes(stages) => {
+            //     stages
+            //         .add_relocating_node(old_node_id, new_node_id, age)
+            //         .await
+            // }
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
                 rewards
                     .add_relocating_node(old_node_id, new_node_id, age)
@@ -108,7 +108,7 @@ impl SectionFunds {
     /// its account is deactivated.
     pub fn deactivate(&self, node_id: XorName) -> Result<()> {
         match &self {
-            Self::TakingNodes(stages) => stages.deactivate(node_id),
+            //Self::TakingNodes(stages) => stages.deactivate(node_id),
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
                 rewards.deactivate(node_id)
             }
@@ -127,11 +127,11 @@ impl SectionFunds {
         origin: SrcLocation,
     ) -> Result<NodeDuty> {
         match &self {
-            Self::TakingNodes(stages) => {
-                stages
-                    .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
-                    .await
-            }
+            // Self::TakingNodes(stages) => {
+            //     stages
+            //         .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
+            //         .await
+            // }
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
                 rewards
                     .get_wallet_key(old_node_id, new_node_id, msg_id, origin)

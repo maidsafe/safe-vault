@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::collections::BTreeMap;
+
 use crate::{
+    node::level_up::section_elders,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{self, reward_payout::Validator, rewards::Rewards, SectionFunds},
     Error, Node, Result,
@@ -15,10 +18,15 @@ use log::debug;
 use section_funds::{
     churn_process::{Churn, ChurnProcess},
     elder_signing::ElderSigning,
+    reward_payout::RewardPayout,
+    reward_stages::RewardStages,
     rewards::RewardCalc,
     wallet_stage::WalletStage,
 };
-use sn_data_types::{ActorHistory, CreditAgreementProof, PublicKey, SectionElders, WalletHistory};
+use sn_data_types::{
+    ActorHistory, CreditAgreementProof, NodeRewardStage, PublicKey, SectionElders, Token,
+    WalletHistory,
+};
 use sn_messaging::{
     client::{
         Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeSystemCmd, NodeSystemQuery,
@@ -26,12 +34,67 @@ use sn_messaging::{
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
-use sn_routing::Elders;
+use sn_routing::{Elders, XorName};
 use sn_transfers::TransferActor;
 
 impl Node {
+    ///
+    pub async fn begin_churn_as_newbie(
+        &mut self,
+        our_elders: Elders,
+        sibling_elders: Option<Elders>,
+    ) -> Result<NodeDuties> {
+        debug!("begin_churn_as_newbie: Zero balance.");
+
+        self.level_up().await?;
+
+        let section_key = our_elders.key();
+        let our_elders_name = our_elders.name();
+        let churn = if let Some(sibling_elders) = &sibling_elders {
+            Churn::Split {
+                our_elders,
+                sibling_elders: sibling_elders.to_owned(),
+            }
+        } else {
+            Churn::Regular(our_elders)
+        };
+
+        let mut process = ChurnProcess::new(
+            Token::zero(),
+            churn,
+            ElderSigning::new(self.network_api.clone()).await?,
+        );
+
+        let members = section_elders(&self.network_api).await?;
+        if our_elders_name != members.name() {
+            return Err(Error::Logic(format!(
+                "Some failure.. our_elders_name: {:?}, members' name: {:?}",
+                our_elders_name,
+                members.name()
+            )));
+        }
+        let temp_section_wallet = WalletHistory {
+            replicas: members.clone(),
+            history: ActorHistory::empty(),
+        };
+        let signing = ElderSigning::new(self.network_api.clone()).await?;
+        let actor = TransferActor::from_info(signing, temp_section_wallet, Validator {})?;
+        let payout = RewardPayout::new(actor, members);
+        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
+        let stages = RewardStages::new(BTreeMap::<XorName, NodeRewardStage>::new());
+        let rewards = Rewards::new(payout, stages, reward_calc);
+
+        self.section_funds = Some(SectionFunds::Churning {
+            process,
+            rewards,
+            replicas: None,
+        });
+
+        Ok(vec![get_wallet_replica_elders(section_key)])
+    }
+
     /// Called on ElderChanged event from routing layer.
-    pub async fn begin_churn(
+    pub async fn begin_churn_as_oldie(
         &mut self,
         our_elders: Elders,
         sibling_elders: Option<Elders>,
@@ -98,7 +161,7 @@ impl Node {
                     node_rewards: rewards.node_rewards(),
                     user_wallets: user_wallets.clone(),
                 }),
-                id: MessageId::in_response_to(&msg_id), // MessageId::new(), //
+                id: MessageId::in_response_to(&msg_id), //MessageId::new(), //
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to an event..
@@ -134,7 +197,7 @@ impl Node {
         mut rewards: Rewards,
         replicas: SectionElders,
         credit_proof: CreditAgreementProof,
-    ) -> Result<NodeDuty> {
+    ) -> Result<()> {
         let section_wallet = WalletHistory {
             replicas,
             history: ActorHistory {
@@ -160,18 +223,18 @@ impl Node {
         let mut rewards = rewards.clone();
         rewards.set(actor, members, reward_calc);
         self.section_funds = Some(SectionFunds::Rewarding(rewards));
-
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeEvent {
-                event: NodeEvent::SectionWalletCreated(section_wallet),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            dst: DstLocation::Section(our_section_address),
-            section_source: false,
-            aggregation: Aggregation::AtDestination,
-        }))
+        Ok(())
+        // Ok(NodeDuty::Send(OutgoingMsg {
+        //     msg: Message::NodeEvent {
+        //         event: NodeEvent::SectionWalletCreated(section_wallet),
+        //         id: MessageId::in_response_to(&msg_id),
+        //         correlation_id: msg_id,
+        //         target_section_pk: None,
+        //     },
+        //     dst: DstLocation::Section(our_section_address),
+        //     section_source: false,
+        //     aggregation: Aggregation::AtDestination,
+        // }))
     }
 
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
@@ -196,7 +259,7 @@ impl Node {
                 target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: origin.to_dst(),  // this will be a single Node
+            dst: origin.to_dst(),  // this will be a section
             aggregation: Aggregation::AtDestination, // None,
         }))
     }
