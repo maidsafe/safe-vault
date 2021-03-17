@@ -41,7 +41,7 @@ pub struct LazyError {
 
 /// Process any routing event
 pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Mapping {
-    trace!("Processing Routing Event: {:?}", event);
+    //trace!("Processing Routing Event: {:?}", event);
     match event {
         RoutingEvent::Genesis => Mapping::Ok {
             op: NodeDuty::BeginFormingGenesisSection,
@@ -83,14 +83,18 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
             sibling_elders,
             self_status_change,
         } => {
-            trace!("******Elders changed event!");
             match self_status_change {
                 NodeElderChange::None => {
                     // sync to others if we are elder
                     let op = if network_api.is_elder().await {
-                        NodeDuty::ChurnMembers {
-                            elders,
-                            sibling_elders,
+                        trace!("******Elders changed, we are still Elder");
+                        if are_we_part_of_genesis(network_api).await {
+                            NodeDuty::BeginFormingGenesisSection
+                        } else {
+                            NodeDuty::ChurnMembers {
+                                elders,
+                                sibling_elders,
+                            }
                         }
                     } else {
                         NodeDuty::NoOp
@@ -98,6 +102,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                     Mapping::Ok { op, ctx: None }
                 }
                 NodeElderChange::Promoted => {
+                    trace!("******Elders changed, we are promoted");
                     if are_we_part_of_genesis(network_api).await {
                         Mapping::Ok {
                             op: NodeDuty::BeginFormingGenesisSection,
