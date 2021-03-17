@@ -81,7 +81,6 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
 
 pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping {
     //debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
-
     match &dst {
         DstLocation::Section(_name) => match match_section_msg(msg.clone(), src) {
             NodeDuty::NoOp => Mapping::Error(LazyError {
@@ -126,8 +125,29 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             signed_credit: signed_credit.clone(),
             sig: sig.clone(),
         },
-
-        // ------ section funds -----
+        // ------ wallet register ------
+        Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet)),
+            id,
+            ..
+        } => NodeDuty::SetNodeWallet {
+            wallet_id: *wallet,
+            node_id: origin.to_dst().name().unwrap(),
+            msg_id: *id,
+            origin,
+        },
+        // Churn synch
+        Message::NodeCmd {
+            cmd:
+                NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
+                    node_rewards,
+                    user_wallets,
+                }),
+            ..
+        } => NodeDuty::SynchState {
+            node_rewards: node_rewards.to_owned(),
+            user_wallets: user_wallets.to_owned(),
+        },
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeNewWallet { credit, sig }),
             ..
@@ -141,6 +161,72 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         } => NodeDuty::ReceiveWalletAccumulation {
             signed_credit: signed_credit.clone(),
             sig: sig.clone(),
+        },
+        Message::NodeEvent {
+            event: NodeEvent::SectionWalletCreated(wallet),
+            ..
+        } => NodeDuty::SynchSectionWallet(wallet.to_owned()),
+        // ------ section funds -----
+        Message::NodeCmd {
+            cmd: NodeCmd::Transfers(NodeTransferCmd::ValidateSectionPayout(signed_transfer)),
+            id,
+            ..
+        } => {
+            debug!(">>>> validating section payout to {:?}", signed_transfer);
+            NodeDuty::ValidateSectionPayout {
+                signed_transfer: signed_transfer.clone(),
+                msg_id: *id,
+                origin,
+            }
+        }
+        Message::NodeQuery {
+            query:
+                NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletId {
+                    old_node_id,
+                    new_node_id,
+                }),
+            id,
+            ..
+        } => NodeDuty::GetNodeWalletKey {
+            old_node_id: *old_node_id,
+            new_node_id: *new_node_id,
+            msg_id: *id,
+            origin,
+        },
+        // trivial to accumulate
+        Message::NodeQueryResponse {
+            response:
+                NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetNodeWalletId(Ok((
+                    wallet_id,
+                    new_node_id,
+                )))),
+            id,
+            ..
+        } => NodeDuty::PayoutNodeRewards {
+            id: *wallet_id,
+            node_id: *new_node_id,
+            msg_id: *id,
+            origin,
+        },
+        Message::NodeEvent {
+            event: NodeEvent::RewardPayoutValidated(validation),
+            id,
+            ..
+        } => NodeDuty::ReceivePayoutValidation {
+            validation: validation.clone(),
+            msg_id: *id,
+            origin,
+        },
+        //
+        // ------ transfers --------
+        Message::NodeCmd {
+            cmd: NodeCmd::Transfers(NodeTransferCmd::PropagateTransfer(proof)),
+            id,
+            ..
+        } => NodeDuty::PropagateTransfer {
+            proof: proof.credit_proof(),
+            msg_id: *id,
+            origin,
         },
         // ------ metadata ------
         Message::NodeQuery {
@@ -212,71 +298,6 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             current_holders: current_holders.clone(),
             id: *id,
         },
-        //
-        // ------ Rewards ------
-        Message::NodeQuery {
-            query:
-                NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletId {
-                    old_node_id,
-                    new_node_id,
-                }),
-            id,
-            ..
-        } => NodeDuty::GetNodeWalletKey {
-            old_node_id: *old_node_id,
-            new_node_id: *new_node_id,
-            msg_id: *id,
-            origin,
-        },
-        // trivial to accumulate
-        Message::NodeQueryResponse {
-            response:
-                NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetNodeWalletId(Ok((
-                    wallet_id,
-                    new_node_id,
-                )))),
-            id,
-            ..
-        } => NodeDuty::PayoutNodeRewards {
-            id: *wallet_id,
-            node_id: *new_node_id,
-            msg_id: *id,
-            origin,
-        },
-        //
-        // ------ transfers --------
-        // doesn't need to be accumulated, but makes it a bit slimmer..
-        Message::NodeCmd {
-            cmd: NodeCmd::Transfers(NodeTransferCmd::PropagateTransfer(proof)),
-            id,
-            ..
-        } => NodeDuty::PropagateTransfer {
-            proof: proof.credit_proof(),
-            msg_id: *id,
-            origin,
-        },
-        /// TODO: fix the result in the payload..
-        // // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
-        // Message::NodeQueryResponse {
-        //     response:
-        //         NodeQueryResponse::Transfers(NodeTransferQueryResponse::GetReplicaEvents(events)),
-        //     id,
-        //     ..
-        // } => NodeDuty::InitiateReplica {
-        //     events: events.clone()?,
-        //     msg_id: *id,
-        //     origin,
-        // }
-        // doesn't need to be accumulated, but makes it a bit slimmer..
-        Message::NodeCmd {
-            cmd: NodeCmd::Transfers(NodeTransferCmd::RegisterSectionPayout(debit_agreement)),
-            id,
-            ..
-        } => NodeDuty::RegisterSectionPayout {
-            debit_agreement: debit_agreement.clone(),
-            msg_id: *id,
-            origin,
-        },
         // Aggregated by us, for security
         Message::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
@@ -285,25 +306,6 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         } => NodeDuty::GetSectionElders {
             msg_id: *id,
             origin,
-        },
-        // Message::NodeEvent {
-        //     event: NodeEvent::SectionPayoutRegistered { from, to },
-        //     ..
-        // } => NodeDuty::CompleteElderChange {
-        //     previous_key: *from,
-        //     new_key: *to,
-        // }
-        // .into(),
-        Message::NodeCmd {
-            cmd:
-                NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
-                    node_rewards,
-                    user_wallets,
-                }),
-            ..
-        } => NodeDuty::SynchState {
-            node_rewards: node_rewards.to_owned(),
-            user_wallets: user_wallets.to_owned(),
         },
         // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
         Message::NodeQueryResponse {
@@ -321,40 +323,12 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
 
 fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
     match &msg {
-        // ------ wallet register ------
-        Message::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet)),
-            id,
-            ..
-        } => NodeDuty::SetNodeWallet {
-            wallet_id: *wallet,
-            node_id: origin.to_dst().name().unwrap(),
-            msg_id: *id,
-            origin,
-        },
         //
         // ------ system cmd ------
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::StorageFull { node_id, .. }),
             ..
         } => NodeDuty::IncrementFullNodeCount { node_id: *node_id },
-        //
-        // ------ node duties ------
-        Message::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis { credit, sig }),
-            ..
-        } => NodeDuty::ReceiveGenesisProposal {
-            credit: credit.clone(),
-            sig: sig.clone(),
-        },
-        Message::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis { signed_credit, sig }),
-            ..
-        } => NodeDuty::ReceiveGenesisAccumulation {
-            signed_credit: signed_credit.clone(),
-            sig: sig.clone(),
-        },
-        //
         // ------ chunk replication ------
         // query response from adult cannot be accumulated
         Message::NodeQueryResponse {
@@ -374,20 +348,18 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             }
         }
         //
-        // ------ nonacc rewards ------
-        // validated event cannot be accumulated at routing, since it has sig shares
-        Message::NodeEvent {
-            event: NodeEvent::RewardPayoutValidated(validation),
+        // ------ rewards ------
+        Message::NodeCmd {
+            cmd: NodeCmd::Transfers(NodeTransferCmd::RegisterSectionPayout(debit_agreement)),
             id,
             ..
-        } => NodeDuty::ReceivePayoutValidation {
-            validation: validation.clone(),
+        } => NodeDuty::RegisterSectionPayout {
+            debit_agreement: debit_agreement.clone(),
             msg_id: *id,
             origin,
         },
         //
-        // ------ nonacc transfers ------
-        // queries are from single source, so cannot be accumulated
+        // ------ transfers ------
         Message::NodeQuery {
             query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
             id,
@@ -396,30 +368,6 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin,
         },
-        // cannot be accumulated due to having sig share
-        Message::NodeCmd {
-            cmd: NodeCmd::Transfers(NodeTransferCmd::ValidateSectionPayout(signed_transfer)),
-            id,
-            ..
-        } => {
-            debug!(">>>> validating section payout to {:?}", signed_transfer);
-            NodeDuty::ValidateSectionPayout {
-                signed_transfer: signed_transfer.clone(),
-                msg_id: *id,
-                origin,
-            }
-        }
-        // // from a single src, so cannot be accumulated
-        // Message::NodeQuery {
-        //     query: NodeQuery::Rewards(NodeRewardQuery::GetSectionWalletHistory),
-        //     id,
-        //     ..
-        // } => RewardDuty::ProcessQuery {
-        //     query: RewardQuery::GetSectionWalletHistory,
-        //     msg_id: *id,
-        //     origin,
-        // }
-        // .into(),
         // --- Adult ---
         Message::NodeQuery {
             query: NodeQuery::Chunks { query, origin },

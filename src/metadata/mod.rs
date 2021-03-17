@@ -17,10 +17,7 @@ mod writing;
 use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
 use crate::{
-    capacity::ChunkHolderDbs,
-    chunk_store::UsedSpace,
-    node_ops::{MetadataDuty, NodeDuties},
-    Network, Result,
+    capacity::ChunkHolderDbs, chunk_store::UsedSpace, node_ops::NodeDuties, Network, Result,
 };
 use blob_register::BlobRegister;
 use elder_stores::ElderStores;

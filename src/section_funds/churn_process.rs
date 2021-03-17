@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    node_ops::{NetworkDuty, NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use log::{debug, info, warn};
@@ -316,37 +316,4 @@ impl ChurnProcess {
         };
         Ok(())
     }
-
-    // use NodeSystemCmd::InitSectionWalletCreation;
-    // let cmd = NodeCmd::System(InitSectionWalletCreation {
-    //     amount,
-    //     key: new_wallet_ctx.key(),
-    // });
-
-    // let mut ops = vec![];
-
-    // // send to new wallet replicas, they send back to our section
-    // ops.push(NodeDuty::Send(OutgoingMsg {
-    //     msg: Message::NodeCmd {
-    //         cmd: cmd.clone(),
-    //         id: MessageId::combine(vec![new_wallet.replicas_address(), new_wallet.name()]),
-    //         target_section_pk: None,
-    //     },
-    //     section_source: false,
-    //     dst: DstLocation::Section(new_wallet_ctx.name()), // the section closest to the name
-    //     aggregation: Aggregation::None, // we can't aggregate this, because we might not have quorum seeing this
-    //     // there is enough nodes holding this info, but they don't all share key anymore, so their sigs won't aggregate
-    // }));
-
-    // // send to our section
-    // ops.push(NodeDuty::Send(OutgoingMsg {
-    //     msg: Message::NodeCmd {
-    //         cmd,
-    //         id: MessageId::combine(vec![new_wallet_ctx.address(), new_wallet_ctx.name()]),
-    //         target_section_pk: None,
-    //     },
-    //     section_source: true,
-    //     dst: DstLocation::Section(new_wallet_ctx.address()),
-    //     aggregation: Aggregation::AtDestination,
-    // }));
 }

@@ -11,7 +11,7 @@ use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
-    node_ops::{NodeDuties, NodeDuty},
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
         elder_signing::ElderSigning,
         reward_payout::{RewardPayout, Validator},
@@ -31,19 +31,22 @@ use sn_data_types::{
     ActorHistory, CreditAgreementProof, NodeRewardStage, PublicKey, SectionElders,
     TransferPropagated, WalletHistory,
 };
+use sn_messaging::{
+    client::{Message, NodeCmd, NodeSystemCmd},
+    Aggregation, DstLocation, MessageId,
+};
 use sn_routing::XorName;
 use sn_transfers::TransferActor;
 use std::collections::BTreeMap;
 
-pub struct NextLevelInfo {
-    pub section_wallet: WalletHistory,
-    pub node_rewards: BTreeMap<XorName, NodeRewardStage>,
-    pub user_wallets: BTreeMap<PublicKey, ActorHistory>,
-}
-
 impl Node {
     /// Level up and handle more responsibilities.
     pub async fn genesis(&mut self, genesis_tx: CreditAgreementProof) -> Result<()> {
+        if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
+            // already had genesis..
+            return Ok(());
+        }
+
         //
         self.level_up().await?;
 
@@ -75,6 +78,7 @@ impl Node {
         //
         // do not hande immutable chunks anymore
         self.chunks = None;
+        self.used_space.reset().await;
 
         //
         // start handling metadata
@@ -100,7 +104,7 @@ impl Node {
         &mut self,
         node_rewards: BTreeMap<XorName, NodeRewardStage>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
         // merge in provided user wallets
         if let Some(transfers) = &mut self.transfers {
             transfers.merge(user_wallets)
@@ -111,21 +115,54 @@ impl Node {
             Some(SectionFunds::Rewarding(rewards))
             | Some(SectionFunds::Churning { rewards, .. }) => {
                 // TODO: more needed here
-                rewards.merge(node_rewards);
-                Ok(())
+                rewards.merge(node_rewards.clone());
             }
-            None => Err(Error::InvalidOperation(
-                "Invalid section funds stage".to_string(),
-            )),
+            None => {
+                return Err(Error::InvalidOperation(
+                    "Invalid section funds stage".to_string(),
+                ))
+            }
+        }
+
+        let node_id = self.network_api.our_name().await;
+        let no_wallet_found = match node_rewards.get(&node_id) {
+            None => true,
+            Some(stage) => match stage {
+                NodeRewardStage::NewNode | NodeRewardStage::AwaitingActivation(_) => true,
+                NodeRewardStage::Active { .. } | NodeRewardStage::AwaitingRelocation(_) => false,
+            },
+        };
+        if no_wallet_found {
+            let address = self.network_api.our_prefix().await.name();
+            info!("Registering wallet: {}", self.node_info.reward_key);
+            Ok(NodeDuty::Send(OutgoingMsg {
+                msg: Message::NodeCmd {
+                    cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(self.node_info.reward_key)),
+                    id: MessageId::new(),
+                    target_section_pk: None,
+                },
+                section_source: false, // sent as single node
+                dst: DstLocation::Section(address),
+                aggregation: Aggregation::None,
+            }))
+        } else {
+            Ok(NodeDuty::NoOp)
         }
     }
 
     /// When a newbie didn't complete the wallet churn, it can still receive it here.
     pub async fn synch_section_wallet(&mut self, section_wallet: WalletHistory) -> Result<()> {
         if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
-            return Err(Error::InvalidOperation(
-                "Invalid section funds stage, expected SectionFunds::TakingNodes".to_string(),
-            ));
+            // no need to synch
+            info!(
+                "Node {:?} of section {} is already in rewarding stage.",
+                self.network_api.our_name().await,
+                self.network_api
+                    .section_public_key()
+                    .await
+                    .ok_or(Error::NoSectionPublicKey)?
+            );
+            return Ok(());
         }
         // start handling reward payouts
         let node_rewards = if let Some(section_funds) = &self.section_funds {

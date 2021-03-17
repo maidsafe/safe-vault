@@ -73,9 +73,7 @@ impl SectionFunds {
     /// 1. A new node registers a wallet id for future reward payout.
     /// ... or, an active node updates its wallet.
     pub fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey) -> Result<NodeDuty> {
-        //info!("Rewards: New node added: {:?}", node_id);
         match &self {
-            //Self::TakingNodes(stages) => stages.set_node_wallet(node_id, wallet),
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
                 rewards.set_node_wallet(node_id, wallet)
             }
@@ -91,11 +89,6 @@ impl SectionFunds {
         age: u8,
     ) -> Result<NodeDuty> {
         match &self {
-            // Self::TakingNodes(stages) => {
-            //     stages
-            //         .add_relocating_node(old_node_id, new_node_id, age)
-            //         .await
-            // }
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
                 rewards
                     .add_relocating_node(old_node_id, new_node_id, age)
@@ -108,7 +101,6 @@ impl SectionFunds {
     /// its account is deactivated.
     pub fn deactivate(&self, node_id: XorName) -> Result<()> {
         match &self {
-            //Self::TakingNodes(stages) => stages.deactivate(node_id),
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
                 rewards.deactivate(node_id)
             }
@@ -127,11 +119,6 @@ impl SectionFunds {
         origin: SrcLocation,
     ) -> Result<NodeDuty> {
         match &self {
-            // Self::TakingNodes(stages) => {
-            //     stages
-            //         .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
-            //         .await
-            // }
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
                 rewards
                     .get_wallet_key(old_node_id, new_node_id, msg_id, origin)
@@ -149,33 +136,8 @@ impl SectionFunds {
 //         .collect();
 //     self.rewards.remove(to_remove);
 
-// /// Issues query to Elders of the section
-// /// as to catch up with the current state of the replicas.
-// pub async fn catchup_with_section(&mut self) -> Result<NetworkDuties> {
-//     let prefix_name = self.rewards_and_wallets().prefix().name();
-//     self.rewards
-//         .get_section_wallet_history(prefix_name)
-//         .await
-// }
-
 // /// At section split, all Elders get their reward payout.
 // pub async fn reward_elders(&mut self, prefix: Prefix) -> Result<NetworkDuties> {
 // let elders = self.rewards_and_wallets.elder_names();
 // self.rewards.payout_rewards(elders).await
-// }
-
-// /// Name of the node
-// /// Age of the node
-// pub async fn member_left(&mut self, node_id: XorName, _age: u8) -> Result<NetworkDuties> {
-//     let node_name = self.network.our_name().await;
-//     let mut duties = self
-//         .rewards
-//         .process_reward_duty(RewardDuty::ProcessCmd {
-//             cmd: RewardCmd::DeactivateNode(node_id),
-//             msg_id: MessageId::new(),
-//             origin: SrcLocation::Node(node_name),
-//         })
-//         .await?;
-//     duties.extend(self.metadata.trigger_chunk_replication(node_id).await?);
-//     Ok(duties)
 // }

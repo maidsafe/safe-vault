@@ -12,6 +12,7 @@ mod handle;
 mod interaction;
 mod level_up;
 mod messaging;
+mod update_transfers;
 
 use self::genesis_stage::GenesisStage;
 use crate::{

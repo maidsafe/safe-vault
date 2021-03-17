@@ -9,9 +9,13 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    node::level_up::section_elders,
+    node::{level_up::section_elders, update_transfers::update_transfers},
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{self, reward_payout::Validator, rewards::Rewards, SectionFunds},
+    transfers::{
+        replica_signing::ReplicaSigningImpl,
+        replicas::{ReplicaInfo, Replicas},
+    },
     Error, Node, Result,
 };
 use log::debug;
@@ -99,7 +103,8 @@ impl Node {
         our_elders: Elders,
         sibling_elders: Option<Elders>,
     ) -> Result<NodeDuties> {
-        let user_wallets = if let Some(transfers) = &self.transfers {
+        let user_wallets = if let Some(transfers) = &mut self.transfers {
+            update_transfers(self.node_info.path(), transfers, &self.network_api).await?;
             transfers.user_wallets()
         } else {
             return Err(Error::Logic("No transfers on this node".to_string()));
@@ -215,7 +220,7 @@ impl Node {
         };
 
         let our_section_address = members.address();
-        let msg_id = MessageId::combine(vec![members.name(), our_section_address]);
+        let correlation_id = MessageId::combine(vec![members.name(), our_section_address]);
 
         let reward_calc = RewardCalc::new(members.prefix);
         let signing = ElderSigning::new(self.network_api.clone()).await?;
@@ -227,8 +232,8 @@ impl Node {
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeEvent {
                 event: NodeEvent::SectionWalletCreated(section_wallet),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
+                id: MessageId::new(), // MessageId::in_response_to(&correlation_id),
+                correlation_id,
                 target_section_pk: None,
             },
             dst: DstLocation::Section(our_section_address),
@@ -261,6 +266,24 @@ impl Node {
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),  // this will be a section
             aggregation: Aggregation::AtDestination, // None,
+        }))
+    }
+
+    ///
+    pub async fn notify_section_of_our_storage(&mut self) -> Result<NodeDuty> {
+        let node_id = PublicKey::from(self.network_api.public_key().await);
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
+                    section: node_id.into(),
+                    node_id,
+                }),
+                id: MessageId::new(),
+                target_section_pk: None,
+            },
+            section_source: false, // sent as single node
+            dst: DstLocation::Section(node_id.into()),
+            aggregation: Aggregation::None,
         }))
     }
 }

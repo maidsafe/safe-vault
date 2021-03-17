@@ -14,7 +14,7 @@ use super::{
     section_wallet::SectionWallet,
 };
 use crate::{
-    node_ops::{NetworkDuties, NetworkDuty, NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use log::{debug, info, warn};
