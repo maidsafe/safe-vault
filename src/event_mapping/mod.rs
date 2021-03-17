@@ -98,7 +98,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
                     Mapping::Ok { op, ctx: None }
                 }
                 NodeElderChange::Promoted => {
-                    if is_forming_genesis(network_api).await {
+                    if are_we_part_of_genesis(network_api).await {
                         Mapping::Ok {
                             op: NodeDuty::BeginFormingGenesisSection,
                             ctx: None,
@@ -192,6 +192,17 @@ async fn is_forming_genesis(network_api: Network) -> bool {
     let elder_count = network_api.our_elder_names().await.len();
     let section_chain_len = network_api.section_chain().await.len();
     is_genesis_section
-        && elder_count <= GENESIS_ELDER_COUNT
+        && elder_count < GENESIS_ELDER_COUNT
         && section_chain_len <= GENESIS_ELDER_COUNT
+}
+
+/// Are we the conclusion of genesis?
+async fn are_we_part_of_genesis(network_api: Network) -> bool {
+    let is_genesis_section = network_api.our_prefix().await.is_empty();
+    let elder_count = network_api.our_elder_names().await.len();
+    let section_chain_len = network_api.section_chain().await.len();
+    is_forming_genesis(network_api).await
+        || (is_genesis_section
+            && elder_count == GENESIS_ELDER_COUNT
+            && section_chain_len <= GENESIS_ELDER_COUNT)
 }

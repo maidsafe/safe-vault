@@ -286,13 +286,7 @@ impl ChurnProcess {
             }
             WalletStage::AccumulatingWallet(mut bootstrap) => {
                 bootstrap.add(sig)?;
-
-                match self.signing.sign(&signed_credit)? {
-                    Signature::BlsShare(share) => bootstrap.add(share)?,
-                    _ => return Err(Error::InvalidOperation("".to_string())),
-                };
-
-                if let Some(credit_proof) = bootstrap.pending_agreement.take() {
+                if let Some(credit_proof) = bootstrap.pending_agreement {
                     self.stage = WalletStage::Completed(TransferPropagated { credit_proof });
                 } else {
                     self.stage = WalletStage::AccumulatingWallet(bootstrap);

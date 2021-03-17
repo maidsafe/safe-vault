@@ -234,13 +234,10 @@ pub async fn receive_genesis_accumulation(
         }
         GenesisStage::AccumulatingGenesis(mut bootstrap) => {
             bootstrap.add(sig)?;
-            if let Some(genesis) = bootstrap.pending_agreement.take() {
-                // TODO: do not take this? (in case of fail further blow)
-                let our_sig = network_api.sign_as_elder(&genesis).await?;
-                bootstrap.add(our_sig)?;
+            if let Some(genesis) = bootstrap.pending_agreement {
                 debug!(">>>>>>>>>>>>>>>>>>>>>>>>. GENESIS AGREEMENT PRODUCED!!!!");
                 Ok(GenesisStage::Completed(TransferPropagated {
-                    credit_proof: genesis.clone(),
+                    credit_proof: genesis,
                 }))
             } else {
                 Ok(GenesisStage::AccumulatingGenesis(bootstrap))
