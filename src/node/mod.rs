@@ -114,7 +114,6 @@ impl Node {
         .await;
 
         let reward_key = reward_key_task?;
-        debug!("NEW NODE after reward key");
         let (network_api, network_events) = Network::new(config).await?;
 
         // TODO: This should be general setup tbh..
@@ -180,15 +179,16 @@ impl Node {
     async fn process_while_any(&mut self, op: NodeDuty, ctx: Option<MsgContext>) {
         let mut next_ops = vec![op];
 
-        let mut pending_node_ops = Vec::new();
-
-        for duty in next_ops {
-            match self.handle(duty).await {
-                Ok(new_ops) => pending_node_ops.extend(new_ops),
-                Err(e) => try_handle_error(e, ctx.clone()),
-            };
+        while !next_ops.is_empty() {
+            let mut pending_node_ops: Vec<NodeDuty> = vec![];
+            for duty in next_ops {
+                match self.handle(duty).await {
+                    Ok(new_ops) => pending_node_ops.extend(new_ops),
+                    Err(e) => try_handle_error(e, ctx.clone()),
+                };
+            }
+            next_ops = pending_node_ops;
         }
-        next_ops = pending_node_ops;
     }
 }
 
