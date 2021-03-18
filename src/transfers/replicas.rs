@@ -616,7 +616,11 @@ impl<T: ReplicaSigning> Replicas<T> {
 
         // Access to the specific wallet is now serialised!
         let mut wallet = self.load_wallet(&store, actors.clone()).await?;
-        debug!(">>>> MultisigReplica wallet loaded: {:?}", id);
+        debug!(
+            ">>>> MultisigReplica wallet loaded: {:?}, balance: {}",
+            id,
+            wallet.balance()
+        );
         if let Some(proposal) = wallet.propose_validation(signed_transfer)? {
             debug!(">>>> TransferValidationProposed!");
             // apply the event

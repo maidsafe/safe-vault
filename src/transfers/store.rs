@@ -48,10 +48,6 @@ where
 
     ///
     pub fn get_all(&self) -> Vec<TEvent> {
-        trace!(
-            "Getting all events from transfer store w/id: {:?}",
-            self.id()
-        );
         let keys = self.db.get_all();
 
         let mut events: Vec<(usize, TEvent)> = keys
@@ -73,7 +69,6 @@ where
 
         let events: Vec<TEvent> = events.into_iter().map(|(_, val)| val).collect();
 
-        trace!("all events {:?} ", events);
         events
     }
 
