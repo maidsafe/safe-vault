@@ -84,8 +84,8 @@ impl Node {
         let signing = ElderSigning::new(self.network_api.clone()).await?;
         let actor = TransferActor::from_info(signing, temp_section_wallet, Validator {})?;
         let payout = RewardPayout::new(actor, members);
-        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
         let stages = RewardStages::new(BTreeMap::<XorName, NodeRewardStage>::new());
+        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
         let rewards = Rewards::new(payout, stages, reward_calc);
 
         self.section_funds = Some(SectionFunds::Churning {

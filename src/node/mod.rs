@@ -116,8 +116,6 @@ impl Node {
         let reward_key = reward_key_task?;
         let (network_api, network_events) = Network::new(config).await?;
 
-        // TODO: This should be general setup tbh..
-
         let node_info = NodeInfo {
             genesis: config.is_first(),
             root_dir: root_dir_buf,
@@ -162,10 +160,6 @@ impl Node {
     /// Blocks until the node is terminated, which is done
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
-        // TODO: setup all the bits we need here:
-
-        //let info = self.network_api.our_connection_info().await;
-        //info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
             match map_routing_event(event, &self.network_api).await {

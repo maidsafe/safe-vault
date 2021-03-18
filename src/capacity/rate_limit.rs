@@ -9,7 +9,6 @@
 use crate::Network;
 use crate::{
     capacity::Capacity,
-    // RewardsAndWallets,
     Result,
 };
 use log::info;
@@ -180,25 +179,25 @@ mod test {
     }
 
     #[test]
-    #[ignore] // these tests fail with the current implementation
-    fn rate_limit_single_store_is_cheaper_than_same_bytes_over_multiple() {
+    fn rate_limit_splitting_into_multiple_store_is_cheaper_than_same_bytes_in_single_store() {
+        // we encourage more granularity in data chunking
         // setup
         let one_mb_bytes = 1024 * 1024;
-        let prefix_len = 0;
+        let prefix_len = 2;
         let all_nodes = 8;
         let full_nodes = 7;
         let standard_rl =
             RateLimit::rate_limit(one_mb_bytes, full_nodes, all_nodes, prefix_len).as_nano();
-        // one big chunk is cheaper than the same bytes in many tiny chunks
+        // many tiny chunks is cheaper than the same bytes in one big chunk
         let one_kb_bytes = 1024;
         let reduced =
             RateLimit::rate_limit(one_kb_bytes, full_nodes, all_nodes, prefix_len).as_nano();
         let combined = 1024 * reduced;
         assert!(
-            standard_rl <= combined,
-            "one big chunk is not cheaper than many small ones, expect {} <= {}",
+            combined <= standard_rl,
+            "many small chunks is not cheaper than one big chunk, expect {} <= {}",
+            combined,
             standard_rl,
-            combined
         );
     }
 

@@ -118,12 +118,6 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
 
-        // let results: Vec<_> = (&target_holders)
-        //     .iter()
-        //     .map(|holder| self.set_chunk_holder(*data.address(), *holder, origin))
-        //     .filter(|res| res.is_err())
-        //     .collect();
-
         let mut results = vec![];
         for holder in &target_holders {
             results.push(
@@ -194,11 +188,6 @@ impl BlobRegister {
                     .await;
             }
         };
-
-        // let results: Vec<_> = (&metadata.holders)
-        //     .iter()
-        //     .map(|holder_name| self.remove_chunk_holder(address, *holder_name).await)
-        //     .collect();
 
         let mut results = vec![];
         for holder_name in &metadata.holders {

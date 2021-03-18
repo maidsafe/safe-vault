@@ -1,4 +1,4 @@
-// Copyright 2019 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -64,9 +64,7 @@ where
     pub async fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 
-        if fs::read(&dir).is_ok() {
-            // trace!("Loading ChunkStore at {}", dir.display());
-        } else {
+        if !fs::read(&dir).is_ok() {
             Self::create_new_root(&dir)?
         }
 
@@ -82,7 +80,6 @@ where
 
 impl<T: Chunk> ChunkStore<T> {
     fn create_new_root(root: &Path) -> Result<()> {
-        //trace!("Creating ChunkStore at {}", root.display());
         fs::create_dir_all(root)?;
 
         // Verify that chunk files can be created.

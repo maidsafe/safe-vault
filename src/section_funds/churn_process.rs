@@ -121,7 +121,6 @@ impl ChurnProcess {
     async fn propose_wallet_creation(
         &mut self,
         amount: Token,
-        //new_wallet_ctx: Elders,
     ) -> Result<NodeDuty> {
         let our_elders = self.churn.our_elders();
         let id = MessageId::combine(vec![our_elders.address(), our_elders.name()])
