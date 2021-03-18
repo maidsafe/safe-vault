@@ -108,6 +108,17 @@ impl RewardPayout {
         self.state.payout_in_flight.is_some()
     }
 
+    // When churning, we cannot continue handling an initiated payout
+    // since the sigs won't match. Therefore we pop it from pending and push it
+    // to our queue front. This queue is worked down right after the churn is completed.
+    // As the old actor is overwritten, it doesn't bother us that there might be TransferInitiated or
+    // TransferValidated events applied in it, as a result of this in-flight payout.
+    pub fn stash_payout_in_flight(&mut self) {
+        if let Some(payout) = self.state.payout_in_flight.take() {
+            self.state.queued_payouts.push_front(payout)
+        }
+    }
+
     pub async fn synch(&mut self, info: WalletHistory) -> Result<NodeDuty> {
         if self.replicas() != PublicKey::Bls(info.replicas.key_set.public_key()) {
             error!("Section funds keys dont match");
@@ -178,13 +189,12 @@ impl RewardPayout {
     /// As all Replicas have accumulated the distributed
     /// actor cmds and applied them, they'll send out the
     /// result, which each actor instance accumulates locally.
-    /// This validated transfer can be either a reward payout, or
-    /// a transition of section funds to a new section actor.
+    /// This validated transfer is a reward payout.
     pub async fn receive(&mut self, validation: TransferValidated) -> Result<NodeDuties> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
 
-        debug!(">>>>>>>>>>>>>> Receiving transfer validation");
+        debug!(">>>>>>>>>>>>>> Receiving validation of reward payout");
         if let Some(event) = self.actor.receive(validation)? {
             self.apply(TransferValidationReceived(event.clone()))?;
             let proof = if let Some(proof) = event.proof {
@@ -197,11 +207,17 @@ impl RewardPayout {
                 self.apply(TransferRegistrationSent(event))?;
             };
 
-            debug!(">>>>>>>> further in receive");
+            // The payout flow is completed,
+            // thus we have no payout in flight;
+            if let Some(payout) = self.state.payout_in_flight.take() {
+                let _ = self.state.completed.insert(payout.node_id);
+            }
 
+            debug!(">>>>>>>> Payout has been registered locally.");
+
+            /// send out the registration
             let msg_id = XorName::from_content(&[&bincode::serialize(&proof.credit_sig)?]);
-
-            let register_op: Vec<_> = self
+            let mut reward_ops: Vec<_> = self
                 .actor
                 .replicas()
                 .names
@@ -222,38 +238,40 @@ impl RewardPayout {
                 .flatten()
                 .collect();
 
-            debug!(">>> registering");
-            Ok(register_op)
+            // pop from queue if any
+            reward_ops.push(self.try_pop_queue().await?);
+
+            Ok(reward_ops)
         } else {
             Ok(vec![])
         }
     }
 
-    // // Can safely be called without overwriting any
-    // // payout in flight, since validations for that are made.
-    // async fn try_pop_queue(&mut self) -> Result<NodeDuty> {
-    //     if let Some(payout) = self.state.queued_payouts.pop_front() {
-    //         // Validation logic when inititating rewards prevents enqueueing a payout that is already
-    //         // in the completed set. Therefore, calling initiate here cannot return None because of
-    //         // the payout already being completed.
-    //         // For that reason it is safe to enqueue it again, if this call returns None.
-    //         // (we will not loop on that payout)
-    //         match self.initiate_reward_payout(payout.clone()).await? {
-    //             NodeDuty::NoOp => {
-    //                 if !self.state.completed.contains(&payout.node_id) {
-    //                     // buut.. just to prevent any future changes to
-    //                     // enable such a loop, we do the check above anyway :)
-    //                     // (NB: We put it at the front of the queue again,
-    //                     //  since that's where the other instances will expect it to be. (Unclear atm if this is necessary or not.))
-    //                     self.state.queued_payouts.insert(0, payout);
-    //                 }
-    //             }
-    //             op => return Ok(op),
-    //         }
-    //     }
+    // Can safely be called without overwriting any
+    // payout in flight, since validations for that are made.
+    async fn try_pop_queue(&mut self) -> Result<NodeDuty> {
+        if let Some(payout) = self.state.queued_payouts.pop_front() {
+            // Validation logic when inititating rewards prevents enqueueing a payout that is already
+            // in the completed set. Therefore, calling initiate here cannot return None because of
+            // the payout already being completed.
+            // For that reason it is safe to enqueue it again, if this call returns None.
+            // (we will not loop on that payout)
+            match self.initiate_reward_payout(payout.clone()).await? {
+                NodeDuty::NoOp => {
+                    if !self.state.completed.contains(&payout.node_id) {
+                        // buut.. just to prevent any future changes to
+                        // enable such a loop, we do the check above anyway :)
+                        // (NB: We put it at the front of the queue again,
+                        //  since that's where the other instances will expect it to be. (Unclear atm if this is necessary or not.))
+                        self.state.queued_payouts.insert(0, payout);
+                    }
+                }
+                op => return Ok(op),
+            }
+        }
 
-    //     Ok(NodeDuty::NoOp)
-    // }
+        Ok(NodeDuty::NoOp)
+    }
 
     fn apply(&mut self, event: ActorEvent) -> Result<()> {
         self.actor.apply(event).map_err(Error::Transfer)

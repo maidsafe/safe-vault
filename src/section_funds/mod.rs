@@ -15,8 +15,6 @@ pub mod rewards;
 mod section_wallet;
 pub mod wallet_stage;
 
-use std::collections::BTreeMap;
-
 use self::{
     churn_process::ChurnProcess, reward_payout::RewardPayout, reward_stages::RewardStages,
     rewards::Rewards, section_wallet::SectionWallet,
@@ -29,6 +27,7 @@ use sn_messaging::{
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use sn_routing::XorName;
+use std::collections::BTreeMap;
 
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
@@ -41,6 +40,7 @@ pub enum SectionFunds {
         rewards: Rewards,
         process: ChurnProcess,
         replicas: Option<SectionElders>,
+        reward_queue: BTreeMap<XorName, PublicKey>,
     },
 }
 

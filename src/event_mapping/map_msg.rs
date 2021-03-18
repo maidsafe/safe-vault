@@ -198,8 +198,8 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
                 )))),
             id,
             ..
-        } => NodeDuty::PayoutNodeRewards {
-            id: *wallet_id,
+        } => NodeDuty::PayoutNodeReward {
+            wallet: *wallet_id,
             node_id: *new_node_id,
             msg_id: *id,
             origin,
@@ -220,7 +220,7 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             id,
             ..
         } => NodeDuty::PropagateTransfer {
-            proof: proof.credit_proof(),
+            proof: proof.to_owned(),
             msg_id: *id,
             origin,
         },

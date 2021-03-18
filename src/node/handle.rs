@@ -6,11 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::collections::{BTreeMap, VecDeque};
+
 use super::{
     genesis::begin_forming_genesis_section,
     genesis::receive_genesis_accumulation,
     genesis::receive_genesis_proposal,
     genesis_stage::GenesisStage,
+    interaction::CompletedWalletChurn,
     messaging::{send, send_to_nodes},
 };
 use crate::{
@@ -25,7 +28,7 @@ use crate::{
     Error, Node, Result,
 };
 use log::{debug, info};
-use sn_data_types::{SectionElders, WalletHistory};
+use sn_data_types::{PublicKey, SectionElders, WalletHistory};
 use sn_messaging::MessageId;
 use xor_name::XorName;
 
@@ -54,7 +57,8 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let (rewards, churn_process, existing_replicas) = self.get_churning_funds()?;
+                let (rewards, churn_process, existing_replicas, reward_queue) =
+                    self.get_churning_funds()?;
 
                 if existing_replicas.is_none() {
                     match churn_process.stage().clone() {
@@ -66,14 +70,19 @@ impl Node {
                                 process: churn_process.clone(),
                                 rewards: rewards.clone(),
                                 replicas: Some(replicas),
+                                reward_queue: reward_queue.clone(),
                             });
                         }
                         WalletStage::Completed(credit_proof) => {
                             let recipient = credit_proof.recipient();
-                            let mut rewards = rewards.clone();
-                            self.create_section_wallet(rewards, replicas, credit_proof)
-                                .await?;
-                            info!("COMPLETED({}): We have our new section wallet! (credit came before replicas)", recipient);
+                            info!("Completing ({}): Credit came before replicas.", recipient);
+                            let info = CompletedWalletChurn {
+                                rewards: rewards.clone(),
+                                reward_queue: reward_queue.clone(),
+                                credit_proof: credit_proof.clone(),
+                                replicas: replicas.clone(),
+                            };
+                            return self.complete_wallet_churn(info).await;
                         }
                         WalletStage::None => return Err(Error::InvalidGenesisStage),
                     }
@@ -81,7 +90,7 @@ impl Node {
                 Ok(vec![])
             }
             NodeDuty::ReceiveWalletProposal { credit, sig } => {
-                if let Ok((_, churn_process, _)) = self.get_churning_funds() {
+                if let Ok((_, churn_process, _, _)) = self.get_churning_funds() {
                     Ok(vec![
                         churn_process.receive_wallet_proposal(credit, sig).await?,
                     ])
@@ -91,26 +100,33 @@ impl Node {
                 }
             }
             NodeDuty::ReceiveWalletAccumulation { signed_credit, sig } => {
-                if let Ok((rewards, churn_process, replicas)) = self.get_churning_funds() {
-                    let op = churn_process
-                        .receive_wallet_accumulation(signed_credit, sig)
-                        .await?;
+                if let Ok((rewards, churn_process, replicas, reward_queue)) =
+                    self.get_churning_funds()
+                {
+                    let mut ops = vec![];
+
+                    ops.push(
+                        churn_process
+                            .receive_wallet_accumulation(signed_credit, sig)
+                            .await?,
+                    );
 
                     if let WalletStage::Completed(credit_proof) = churn_process.stage().clone() {
+                        ops.push(Self::propagate_credit(credit_proof.clone())?);
                         if let Some(replicas) = replicas.clone() {
                             let recipient = credit_proof.recipient();
-                            let mut rewards = rewards.clone();
-                            self.create_section_wallet(
-                                rewards,
-                                replicas.clone(),
-                                credit_proof.clone(),
-                            )
-                            .await?;
-                            info!("COMPLETED({}): We have our new section wallet! (replicas came before credit)", recipient);
+                            info!("Completing ({}): Replicas came before credit.", recipient);
+                            let info = CompletedWalletChurn {
+                                rewards: rewards.clone(),
+                                reward_queue: reward_queue.clone(),
+                                credit_proof: credit_proof.clone(),
+                                replicas: replicas.clone(),
+                            };
+                            ops.extend(self.complete_wallet_churn(info).await?);
                         }
                     }
 
-                    Ok(vec![op])
+                    Ok(ops)
                 } else {
                     // else we are an adult, so ignore this msg
                     Ok(vec![])
@@ -118,15 +134,23 @@ impl Node {
             }
             //
             // ------- reward payout -------
-            NodeDuty::PayoutNodeRewards {
-                id,
+            NodeDuty::PayoutNodeReward {
+                wallet,
                 node_id,
                 msg_id,
                 origin,
-            } => {
-                let rewards = self.get_rewards()?;
-                Ok(vec![rewards.payout_node_rewards(id, node_id).await?])
-            }
+            } => match &mut self.section_funds {
+                Some(SectionFunds::Churning { reward_queue, .. }) => {
+                    let _ = reward_queue.insert(node_id, wallet);
+                    Ok(vec![])
+                }
+                Some(SectionFunds::Rewarding(rewards)) => {
+                    Ok(vec![rewards.payout_node_reward(wallet, node_id).await?])
+                }
+                None => Err(Error::InvalidOperation(
+                    "No section funds at this node".to_string(),
+                )),
+            },
             NodeDuty::ReceivePayoutValidation {
                 validation,
                 msg_id,
@@ -417,16 +441,23 @@ impl Node {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn get_churning_funds(
         &mut self,
-    ) -> Result<(&mut Rewards, &mut ChurnProcess, &mut Option<SectionElders>)> {
+    ) -> Result<(
+        &mut Rewards,
+        &mut ChurnProcess,
+        &mut Option<SectionElders>,
+        &mut BTreeMap<XorName, PublicKey>,
+    )> {
         if let Some(SectionFunds::Churning {
             rewards,
             process,
             replicas,
+            reward_queue,
         }) = &mut self.section_funds
         {
-            Ok((rewards, process, replicas))
+            Ok((rewards, process, replicas, reward_queue))
         } else {
             Err(Error::InvalidOperation(
                 "No section funds at this node".to_string(),

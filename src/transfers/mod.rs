@@ -147,12 +147,7 @@ impl Transfers {
     }
 
     ///
-    pub fn update_replica_info(
-        &mut self,
-        info: ReplicaInfo<ReplicaSigningImpl>,
-        rate_limit: RateLimit,
-    ) {
-        self.rate_limit = rate_limit;
+    pub fn update_replica_info(&mut self, info: ReplicaInfo<ReplicaSigningImpl>) {
         self.replicas.update_replica_info(info);
     }
 
@@ -513,7 +508,7 @@ impl Transfers {
                 let location = event.transfer_proof.recipient().into();
                 Ok(NodeDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmd {
-                        cmd: Transfers(PropagateTransfer(event.transfer_proof)),
+                        cmd: Transfers(PropagateTransfer(event.transfer_proof.credit_proof())),
                         id: MessageId::in_response_to(&msg_id),
                         target_section_pk: None,
                     },
@@ -560,7 +555,7 @@ impl Transfers {
                 let location = event.transfer_proof.recipient().into();
                 ops.push(NodeDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmd {
-                        cmd: Transfers(PropagateTransfer(event.transfer_proof)),
+                        cmd: Transfers(PropagateTransfer(event.transfer_proof.credit_proof())),
                         id: MessageId::in_response_to(&msg_id),
                         target_section_pk: None,
                     },

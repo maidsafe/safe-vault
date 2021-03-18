@@ -34,8 +34,6 @@ pub async fn update_transfers(
         signing,
         initiating: false,
     };
-    let dbs = ChunkHolderDbs::new(path)?;
-    let rate_limit = RateLimit::new(network_api.clone(), Capacity::new(dbs));
-    transfers.update_replica_info(info, rate_limit);
+    transfers.update_replica_info(info);
     Ok(())
 }

@@ -18,7 +18,7 @@ use crate::{
     },
     Error, Node, Result,
 };
-use log::debug;
+use log::{debug, info};
 use section_funds::{
     churn_process::{Churn, ChurnProcess},
     elder_signing::ElderSigning,
@@ -34,7 +34,7 @@ use sn_data_types::{
 use sn_messaging::{
     client::{
         Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeSystemCmd, NodeSystemQuery,
-        NodeSystemQueryResponse,
+        NodeSystemQueryResponse, NodeTransferCmd,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -43,7 +43,7 @@ use sn_transfers::TransferActor;
 
 impl Node {
     ///
-    pub async fn begin_churn_as_newbie(
+    pub(crate) async fn begin_churn_as_newbie(
         &mut self,
         our_elders: Elders,
         sibling_elders: Option<Elders>,
@@ -92,13 +92,14 @@ impl Node {
             process,
             rewards,
             replicas: None,
+            reward_queue: BTreeMap::new(),
         });
 
         Ok(vec![get_wallet_replica_elders(section_key)])
     }
 
     /// Called on ElderChanged event from routing layer.
-    pub async fn begin_churn_as_oldie(
+    pub(crate) async fn begin_churn_as_oldie(
         &mut self,
         our_elders: Elders,
         sibling_elders: Option<Elders>,
@@ -110,12 +111,8 @@ impl Node {
             return Err(Error::Logic("No transfers on this node".to_string()));
         };
 
-        let rewards = if let Some(SectionFunds::Rewarding(rewards)) = &self.section_funds {
-            if rewards.has_payout_in_flight() {
-                return Err(Error::Logic(
-                    "TODO: Fix this. Reward payout still in flight..".to_string(),
-                ));
-            }
+        let rewards = if let Some(SectionFunds::Rewarding(rewards)) = &mut self.section_funds {
+            rewards.stash_payout_in_flight(); // is picked up again after churn
             rewards.clone()
         } else {
             return Err(Error::Logic("No section funds on this node".to_string()));
@@ -126,6 +123,15 @@ impl Node {
         let section_key = our_elders.key();
 
         let churn = if let Some(sibling_elders) = &sibling_elders {
+            debug!(
+                "@@@@@@ SPLIT: Our prefix: {:?}, neighbour: {:?}",
+                our_elders.prefix, sibling_elders.prefix
+            );
+            debug!(
+                "@@@@@@ SPLIT: Our key: {:?}, neighbour: {:?}",
+                our_elders.key(),
+                sibling_elders.key()
+            );
             Churn::Split {
                 our_elders,
                 sibling_elders: sibling_elders.to_owned(),
@@ -148,12 +154,11 @@ impl Node {
             process,
             rewards: rewards.clone(),
             replicas: None,
+            reward_queue: BTreeMap::new(),
         });
 
         // query the network for the section elders of the new wallet
         ops.push(get_wallet_replica_elders(section_key));
-
-        debug!("@@@@@@ SYNCHING DATA TO PEERS");
 
         let msg_id = MessageId::combine(vec![our_peers, section_key.into()]);
 
@@ -194,13 +199,52 @@ impl Node {
         Ok(ops)
     }
 
-    /// set funds to Rewarding stage
-    pub async fn create_section_wallet(
+    pub(crate) fn propagate_credit(credit_proof: CreditAgreementProof) -> Result<NodeDuty> {
+        use NodeCmd::*;
+        use NodeTransferCmd::*;
+        let location = credit_proof.recipient().into();
+        let msg_id = MessageId::from_content(&credit_proof.debiting_replicas_sig)?;
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::NodeCmd {
+                cmd: Transfers(PropagateTransfer(credit_proof)),
+                id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: true, // i.e. errors go to our section
+            dst: DstLocation::Section(location),
+            aggregation: Aggregation::AtDestination, // not necessary, but will be slimmer
+        }))
+    }
+
+    /// Completes the section wallet churn.
+    pub(crate) async fn complete_wallet_churn(
         &mut self,
-        mut rewards: Rewards,
+        info: CompletedWalletChurn,
+    ) -> Result<NodeDuties> {
+        let recipient = info.credit_proof.recipient();
+        let mut rewards = self
+            .setup_section_wallet(
+                info.rewards.clone(),
+                info.replicas.clone(),
+                info.credit_proof.clone(),
+            )
+            .await?;
+        info!("COMPLETED({}): We have our new section wallet!", recipient);
+        // get ops from enqueued rewards
+        let reward_ops = rewards.payout_node_rewards(info.reward_queue.clone()).await;
+        // insert our rewards instance to state
+        self.section_funds = Some(SectionFunds::Rewarding(rewards));
+        // return ops
+        reward_ops
+    }
+
+    /// set funds to Rewarding stage
+    async fn setup_section_wallet(
+        &self,
+        rewards: Rewards,
         replicas: SectionElders,
         credit_proof: CreditAgreementProof,
-    ) -> Result<()> {
+    ) -> Result<Rewards> {
         let section_wallet = WalletHistory {
             replicas,
             history: ActorHistory {
@@ -223,15 +267,15 @@ impl Node {
         let reward_calc = RewardCalc::new(members.prefix);
         let signing = ElderSigning::new(self.network_api.clone()).await?;
         let actor = TransferActor::from_info(signing, section_wallet.clone(), Validator {})?;
-        let mut rewards = rewards.clone();
+        let mut rewards = rewards;
         rewards.set(actor, members, reward_calc);
-        self.section_funds = Some(SectionFunds::Rewarding(rewards));
-        Ok(())
+
+        Ok(rewards)
     }
 
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
     #[allow(clippy::eval_order_dependence)]
-    pub async fn get_section_elders(
+    pub(crate) async fn get_section_elders(
         &self,
         msg_id: MessageId,
         origin: SrcLocation,
@@ -257,7 +301,7 @@ impl Node {
     }
 
     ///
-    pub async fn notify_section_of_our_storage(&mut self) -> Result<NodeDuty> {
+    pub(crate) async fn notify_section_of_our_storage(&mut self) -> Result<NodeDuty> {
         let node_id = PublicKey::from(self.network_api.public_key().await);
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeCmd {
@@ -275,7 +319,7 @@ impl Node {
     }
 
     ///
-    pub async fn register_wallet(&self) -> OutgoingMsg {
+    pub(crate) async fn register_wallet(&self) -> OutgoingMsg {
         let address = self.network_api.our_prefix().await.name();
         OutgoingMsg {
             msg: Message::NodeCmd {
@@ -291,7 +335,7 @@ impl Node {
 }
 
 // called by both newbies and oldies, which means it will accumulate at dst
-pub fn get_wallet_replica_elders(wallet: PublicKey) -> NodeDuty {
+pub(crate) fn get_wallet_replica_elders(wallet: PublicKey) -> NodeDuty {
     // deterministic msg id for aggregation
     let msg_id = MessageId::combine(vec![wallet.into()]);
     NodeDuty::Send(OutgoingMsg {
@@ -304,4 +348,11 @@ pub fn get_wallet_replica_elders(wallet: PublicKey) -> NodeDuty {
         dst: DstLocation::Section(wallet.into()),
         aggregation: Aggregation::AtDestination,
     })
+}
+
+pub(crate) struct CompletedWalletChurn {
+    pub rewards: Rewards,
+    pub reward_queue: BTreeMap<XorName, PublicKey>,
+    pub credit_proof: CreditAgreementProof,
+    pub replicas: SectionElders,
 }

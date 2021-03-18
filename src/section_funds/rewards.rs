@@ -109,6 +109,10 @@ impl Rewards {
         self.payout.has_payout_in_flight()
     }
 
+    pub fn stash_payout_in_flight(&mut self) {
+        self.payout.stash_payout_in_flight()
+    }
+
     // ---------------------------------------------
     //   ----------------- STAGES ---------------
     // ---------------------------------------------
@@ -159,10 +163,23 @@ impl Rewards {
             .await
     }
 
+    /// If relocations queued up during a churn.
+    pub async fn payout_node_rewards(
+        &mut self,
+        reward_queue: BTreeMap<XorName, PublicKey>,
+    ) -> Result<Vec<NodeDuty>> {
+        let mut ops = vec![];
+        for (node_id, wallet) in reward_queue {
+            ops.push(self.payout_node_reward(wallet, node_id).await?);
+        }
+
+        Ok(ops)
+    }
+
     /// 3. The old section will send back the wallet id, which allows us to activate it.
     /// At this point, we payout a standard reward based on the node age,
     /// which represents the work performed in its previous section.
-    pub async fn payout_node_rewards(
+    pub async fn payout_node_reward(
         &mut self,
         wallet: PublicKey,
         node_id: XorName,

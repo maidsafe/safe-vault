@@ -21,23 +21,14 @@ const MAX_NETWORK_STORAGE_RATIO: f64 = 0.5;
 /// Calculation of rate limit for writes.
 #[derive(Clone)]
 pub struct RateLimit {
-    // rewards_and_wallets: RewardsAndWallets,
     capacity: Capacity,
     network: Network,
 }
 
 impl RateLimit {
     /// gets a new instance of rate limit
-    pub fn new(
-        network: Network,
-        // rewards_and_wallets: RewardsAndWallets,
-        capacity: Capacity,
-    ) -> RateLimit {
-        Self {
-            network,
-            // rewards_and_wallets,
-            capacity,
-        }
+    pub fn new(network: Network, capacity: Capacity) -> RateLimit {
+        Self { network, capacity }
     }
 
     /// Calculates the rate limit of write operations,
