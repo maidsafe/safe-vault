@@ -227,17 +227,6 @@ impl Node {
         rewards.set(actor, members, reward_calc);
         self.section_funds = Some(SectionFunds::Rewarding(rewards));
         Ok(())
-        // Ok(NodeDuty::Send(OutgoingMsg {
-        //     msg: Message::NodeEvent {
-        //         event: NodeEvent::SectionWalletCreated(section_wallet),
-        //         id: MessageId::new(), // MessageId::in_response_to(&correlation_id),
-        //         correlation_id,
-        //         target_section_pk: None,
-        //     },
-        //     dst: DstLocation::Section(our_section_address),
-        //     section_source: false,
-        //     aggregation: Aggregation::None, // swarm this
-        // }))
     }
 
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
@@ -301,18 +290,18 @@ impl Node {
     }
 }
 
-// called by a subset of elders..
+// called by both newbies and oldies, which means it will accumulate at dst
 pub fn get_wallet_replica_elders(wallet: PublicKey) -> NodeDuty {
     // deterministic msg id for aggregation
     let msg_id = MessageId::combine(vec![wallet.into()]);
     NodeDuty::Send(OutgoingMsg {
         msg: Message::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
-            id: msg_id, //MessageId::new(), //
+            id: msg_id,
             target_section_pk: None,
         },
         section_source: true,
         dst: DstLocation::Section(wallet.into()),
-        aggregation: Aggregation::AtDestination, // None,
+        aggregation: Aggregation::AtDestination,
     })
 }
