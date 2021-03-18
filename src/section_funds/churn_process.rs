@@ -93,7 +93,7 @@ impl ChurnProcess {
     /// Move Wallet
     pub async fn move_wallet(&mut self) -> Result<NodeDuty> {
         match self.churn.clone() {
-            Churn::Regular(next) => self.propose_wallet_creation(self.balance, next).await,
+            Churn::Regular(_next) => self.propose_wallet_creation(self.balance).await,
             Churn::Split {
                 our_elders,
                 sibling_elders,
@@ -109,9 +109,9 @@ impl ChurnProcess {
                 // Determine which transfer is first
                 // (deterministic order is important for reaching consensus)
                 if our_elders.key() > sibling_elders.key() {
-                    self.propose_wallet_creation(t1_amount, our_elders).await
+                    self.propose_wallet_creation(t1_amount).await
                 } else {
-                    self.propose_wallet_creation(t2_amount, our_elders).await
+                    self.propose_wallet_creation(t2_amount).await
                 }
             }
         }
@@ -121,16 +121,17 @@ impl ChurnProcess {
     async fn propose_wallet_creation(
         &mut self,
         amount: Token,
-        new_wallet_ctx: Elders,
+        //new_wallet_ctx: Elders,
     ) -> Result<NodeDuty> {
-        let id = MessageId::combine(vec![new_wallet_ctx.address(), new_wallet_ctx.name()])
+        let our_elders = self.churn.our_elders();
+        let id = MessageId::combine(vec![our_elders.address(), our_elders.name()])
             .0
              .0;
 
         let credit = Credit {
             id,
             amount,
-            recipient: new_wallet_ctx.key(),
+            recipient: our_elders.key(),
             msg: "New section wallet".to_string(),
         };
 
@@ -151,19 +152,11 @@ impl ChurnProcess {
 
         self.stage = WalletStage::ProposingWallet(bootstrap);
 
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ProposeNewWallet {
-                    credit: credit.clone(),
-                    sig: share,
-                }),
-                id: MessageId::new(),
-                target_section_pk: None,
-            },
-            dst: DstLocation::Section(new_wallet_ctx.name()),
-            section_source: false, // sent as single node
-            aggregation: Aggregation::None,
-        }))
+        Ok(send_prop_msg(
+            credit.clone(),
+            share,
+            self.churn.our_elders().address(),
+        ))
     }
 
     // TODO: validate the credit...
@@ -172,6 +165,12 @@ impl ChurnProcess {
         credit: Credit,
         sig: SignatureShare,
     ) -> Result<NodeDuty> {
+        if credit.recipient() != self.churn.wallet_key() {
+            return Err(Error::Transfer(sn_transfers::Error::CreditDoesNotBelong(
+                self.churn.wallet_key(),
+                credit,
+            )));
+        }
         match self.stage.clone() {
             WalletStage::None | WalletStage::AwaitingWalletThreshold => {
                 let mut bootstrap = WalletProposal {
@@ -193,19 +192,11 @@ impl ChurnProcess {
 
                 self.stage = WalletStage::ProposingWallet(bootstrap);
 
-                Ok(NodeDuty::Send(OutgoingMsg {
-                    msg: Message::NodeCmd {
-                        cmd: NodeCmd::System(NodeSystemCmd::ProposeNewWallet {
-                            credit: credit.clone(),
-                            sig: share,
-                        }),
-                        id: MessageId::new(),
-                        target_section_pk: None,
-                    },
-                    section_source: false, // sent as single node
-                    dst: DstLocation::Section(self.churn.wallet_name()),
-                    aggregation: Aggregation::None,
-                }))
+                Ok(send_prop_msg(
+                    credit.clone(),
+                    share,
+                    self.churn.our_elders().address(),
+                ))
             }
             WalletStage::ProposingWallet(mut bootstrap) => {
                 bootstrap.add(sig)?;
@@ -223,7 +214,7 @@ impl ChurnProcess {
                         pk_set: bootstrap.pk_set,
                     };
 
-                    let share = match self.signing.sign(&signed_credit)? {
+                    let share = match self.signing.sign(signed_credit)? {
                         Signature::BlsShare(share) => {
                             bootstrap.add(share.clone())?;
                             share
@@ -233,19 +224,11 @@ impl ChurnProcess {
 
                     self.stage = WalletStage::AccumulatingWallet(bootstrap);
 
-                    Ok(NodeDuty::Send(OutgoingMsg {
-                        msg: Message::NodeCmd {
-                            cmd: NodeCmd::System(NodeSystemCmd::AccumulateNewWallet {
-                                signed_credit: signed_credit.clone(),
-                                sig: share,
-                            }),
-                            id: MessageId::new(),
-                            target_section_pk: None,
-                        },
-                        section_source: false, // sent as single node
-                        dst: DstLocation::Section(self.churn.wallet_name()),
-                        aggregation: Aggregation::None,
-                    }))
+                    Ok(send_acc_msg(
+                        signed_credit.clone(),
+                        share,
+                        self.churn.our_elders().address(),
+                    ))
                 } else {
                     self.stage = WalletStage::ProposingWallet(bootstrap);
                     Ok(NodeDuty::NoOp)
@@ -262,7 +245,13 @@ impl ChurnProcess {
         &mut self,
         signed_credit: SignedCredit,
         sig: SignatureShare,
-    ) -> Result<()> {
+    ) -> Result<NodeDuty> {
+        if signed_credit.recipient() != self.churn.wallet_key() {
+            return Err(Error::Transfer(sn_transfers::Error::CreditDoesNotBelong(
+                self.churn.wallet_key(),
+                signed_credit.credit,
+            )));
+        }
         match self.stage.clone() {
             WalletStage::AwaitingWalletThreshold => {
                 // replicas signatures over > signed_credit <
@@ -275,12 +264,21 @@ impl ChurnProcess {
 
                 bootstrap.add(sig)?;
 
-                match self.signing.sign(&signed_credit)? {
-                    Signature::BlsShare(share) => bootstrap.add(share)?,
-                    _ => return Err(Error::Logic("aarrgh".to_string())),
+                let share = match self.signing.sign(&signed_credit)? {
+                    Signature::BlsShare(share) => {
+                        bootstrap.add(share.clone())?;
+                        share
+                    }
+                    _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
                 };
 
                 self.stage = WalletStage::AccumulatingWallet(bootstrap);
+
+                Ok(send_acc_msg(
+                    signed_credit,
+                    share,
+                    self.churn.our_elders().address(),
+                ))
             }
             WalletStage::ProposingWallet(bootstrap) => {
                 // replicas signatures over > signed_credit <
@@ -293,27 +291,63 @@ impl ChurnProcess {
 
                 bootstrap.add(sig)?;
 
-                match self.signing.sign(&signed_credit)? {
-                    Signature::BlsShare(share) => bootstrap.add(share)?,
-                    _ => return Err(Error::Logic("aarrgh".to_string())),
+                let share = match self.signing.sign(&signed_credit)? {
+                    Signature::BlsShare(share) => {
+                        bootstrap.add(share.clone())?;
+                        share
+                    }
+                    _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
                 };
 
                 self.stage = WalletStage::AccumulatingWallet(bootstrap);
+
+                Ok(send_acc_msg(
+                    signed_credit,
+                    share,
+                    self.churn.our_elders().address(),
+                ))
             }
             WalletStage::AccumulatingWallet(mut bootstrap) => {
                 bootstrap.add(sig)?;
                 if let Some(credit_proof) = bootstrap.pending_agreement {
+                    info!(
+                        "******* there is an agreement for wallet accumulation (newbie?: {}).",
+                        self.balance == Token::zero()
+                    );
                     self.stage = WalletStage::Completed(credit_proof);
-                    if self.balance == Token::zero() {
-                        debug!("Newbie reached WalletStage::Completed !!!!");
-                    }
                 } else {
                     self.stage = WalletStage::AccumulatingWallet(bootstrap);
                 }
+                Ok(NodeDuty::NoOp)
             }
-            WalletStage::Completed(_) => {}
-            WalletStage::None => return Err(Error::InvalidGenesisStage),
-        };
-        Ok(())
+            WalletStage::Completed(_) => Ok(NodeDuty::NoOp),
+            WalletStage::None => Err(Error::InvalidGenesisStage),
+        }
     }
+}
+
+fn send_prop_msg(credit: Credit, sig: SignatureShare, our_elders: XorName) -> NodeDuty {
+    NodeDuty::Send(OutgoingMsg {
+        msg: Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::ProposeNewWallet { credit, sig }),
+            id: MessageId::new(),
+            target_section_pk: None,
+        },
+        section_source: false,                 // sent as single node
+        dst: DstLocation::Section(our_elders), // send this msg to our elders!
+        aggregation: Aggregation::None,
+    })
+}
+
+fn send_acc_msg(signed_credit: SignedCredit, sig: SignatureShare, our_elders: XorName) -> NodeDuty {
+    NodeDuty::Send(OutgoingMsg {
+        msg: Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::AccumulateNewWallet { signed_credit, sig }),
+            id: MessageId::new(),
+            target_section_pk: None,
+        },
+        section_source: false,                 // sent as single node
+        dst: DstLocation::Section(our_elders), // send this msg to our elders!
+        aggregation: Aggregation::None,
+    })
 }

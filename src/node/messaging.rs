@@ -13,7 +13,7 @@ use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLoca
 use sn_routing::XorName;
 use std::collections::BTreeSet;
 
-pub(crate) async fn send(msg: OutgoingMsg, network: Network) -> Result<()> {
+pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
     let src = if msg.section_source {
         SrcLocation::Section(network.our_prefix().await.name())
     } else {
@@ -24,10 +24,7 @@ pub(crate) async fn send(msg: OutgoingMsg, network: Network) -> Result<()> {
         dst: msg.dst,
         aggregation: msg.aggregation,
     };
-    let result = network
-        .clone()
-        .send_message(itinerary, msg.msg.serialize()?)
-        .await;
+    let result = network.send_message(itinerary, msg.msg.serialize()?).await;
 
     result.map_or_else(
         |err| {
@@ -41,13 +38,12 @@ pub(crate) async fn send(msg: OutgoingMsg, network: Network) -> Result<()> {
 pub(crate) async fn send_to_nodes(
     targets: BTreeSet<XorName>,
     msg: &Message,
-    network: Network,
+    network: &Network,
 ) -> Result<()> {
     let name = network.our_name().await;
     let bytes = &msg.serialize()?;
     for target in targets {
         network
-            .clone()
             .send_message(
                 Itinerary {
                     src: SrcLocation::Node(name),

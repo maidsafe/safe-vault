@@ -60,7 +60,7 @@ impl ReplicaSigning for ReplicaSigningImpl {
     }
 
     async fn try_genesis(&self, balance: u64) -> Result<CreditAgreementProof> {
-        get_genesis(balance, self.network.clone()).await
+        get_genesis(balance, &self.network).await
     }
 
     async fn sign_transfer(

@@ -34,8 +34,6 @@ use sn_routing::XorName;
 /// via the usage of a distributed AT2 Actor.
 #[allow(clippy::large_enum_variant)]
 pub enum SectionFunds {
-    // // initiating and not yet able to do payouts
-    // TakingNodes(RewardStages),
     // ready, can do payouts
     Rewarding(Rewards),
     // in transition and cannot do payouts

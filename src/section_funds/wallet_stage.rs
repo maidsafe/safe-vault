@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{Error, Result};
-use log::info;
+use log::{info, warn};
 use sn_data_types::{
     Credit, CreditAgreementProof, ReplicaPublicKeySet, SignatureShare, SignedCredit,
     TransferPropagated,
@@ -42,8 +42,7 @@ pub struct WalletAccumulation {
 
 impl WalletProposal {
     pub(crate) fn add(&mut self, sig: SignatureShare) -> Result<()> {
-        if self.signatures.contains_key(&sig.index) {
-            info!("WalletProposal add already contains {}..", sig.index);
+        if let Some(true) = check(&sig, &self.signatures) {
             return Ok(());
         }
         let _ = self.signatures.insert(sig.index, sig.share);
@@ -68,10 +67,27 @@ impl WalletProposal {
     }
 }
 
+fn check(sig: &SignatureShare, signatures: &BTreeMap<usize, bls::SignatureShare>) -> Option<bool> {
+    match signatures.get(&sig.index) {
+        Some(share) => {
+            if share == &sig.share {
+                Some(true)
+            } else {
+                warn!(
+                    "####### WalletProposal adding different sig!?? contains {:?}, but adding {:?}..",
+                    share,
+                    sig.share,
+                );
+                Some(false)
+            }
+        }
+        None => None,
+    }
+}
+
 impl WalletAccumulation {
     pub(crate) fn add(&mut self, sig: SignatureShare) -> Result<()> {
-        if self.signatures.contains_key(&sig.index) {
-            info!("WalletAccumulation add already contains {}..", sig.index);
+        if let Some(true) = check(&sig, &self.signatures) {
             return Ok(());
         }
         let _ = self.signatures.insert(sig.index, sig.share);

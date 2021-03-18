@@ -82,30 +82,30 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
 pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping {
     //debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
     match &dst {
-        DstLocation::Section(_name) => match match_section_msg(msg.clone(), src) {
-            NodeDuty::NoOp => Mapping::Error(LazyError {
-                error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
-                msg: MsgContext::Msg { msg, src },
-            }),
-            op => Mapping::Ok {
-                op,
-                ctx: Some(MsgContext::Msg { msg, src }),
-            },
-        },
-        DstLocation::Node(_name) => match match_node_msg(msg.clone(), src) {
-            NodeDuty::NoOp => Mapping::Error(LazyError {
-                error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
-                msg: MsgContext::Msg { msg, src },
-            }),
-            op => Mapping::Ok {
-                op,
-                ctx: Some(MsgContext::Msg { msg, src }),
-            },
-        },
+        DstLocation::Section(_name) | DstLocation::Node(_name) => match_or_err(msg, src),
         _ => Mapping::Error(LazyError {
             error: Error::InvalidMessage(msg.id(), format!("Invalid dst: {:?}", msg)),
             msg: MsgContext::Msg { msg, src },
         }),
+    }
+}
+
+fn match_or_err(msg: Message, src: SrcLocation) -> Mapping {
+    match match_section_msg(msg.clone(), src) {
+        NodeDuty::NoOp => match match_node_msg(msg.clone(), src) {
+            NodeDuty::NoOp => Mapping::Error(LazyError {
+                error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
+                msg: MsgContext::Msg { msg, src },
+            }),
+            op => Mapping::Ok {
+                op,
+                ctx: Some(MsgContext::Msg { msg, src }),
+            },
+        },
+        op => Mapping::Ok {
+            op,
+            ctx: Some(MsgContext::Msg { msg, src }),
+        },
     }
 }
 
@@ -162,10 +162,6 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             signed_credit: signed_credit.clone(),
             sig: sig.clone(),
         },
-        Message::NodeEvent {
-            event: NodeEvent::SectionWalletCreated(wallet),
-            ..
-        } => NodeDuty::SynchSectionWallet(wallet.to_owned()),
         // ------ section funds -----
         Message::NodeCmd {
             cmd: NodeCmd::Transfers(NodeTransferCmd::ValidateSectionPayout(signed_transfer)),

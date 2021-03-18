@@ -92,7 +92,9 @@ impl RewardStages {
             Some(state) => {
                 match *state {
                     // ..and validate its state.
-                    NodeRewardStage::NewNode => NodeRewardStage::AwaitingRelocation(wallet),
+                    NodeRewardStage::NewNode | NodeRewardStage::AwaitingRelocation(_) => {
+                        NodeRewardStage::AwaitingRelocation(wallet)
+                    }
                     NodeRewardStage::Active { age, .. } => NodeRewardStage::Active { age, wallet },
                     _ => {
                         warn!("Cannot set node wallet unless active or new.");
@@ -106,7 +108,7 @@ impl RewardStages {
                 return Err(Error::NetworkData(DtError::NoSuchKey));
             }
         };
-        debug!("Node wallet set! {}, {:?}", node_id, state);
+        //debug!("Node wallet set! {}, {:?}", node_id, state);
         let _ = self.node_rewards.insert(node_id, state);
         Ok(NodeDuty::NoOp)
     }

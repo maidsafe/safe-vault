@@ -41,10 +41,10 @@ use std::collections::BTreeMap;
 
 impl Node {
     /// Level up and handle more responsibilities.
-    pub async fn genesis(&mut self, genesis_tx: CreditAgreementProof) -> Result<()> {
+    pub async fn genesis(&mut self, genesis_tx: CreditAgreementProof) -> Result<NodeDuty> {
         if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
             // already had genesis..
-            return Ok(());
+            return Ok(NodeDuty::NoOp);
         }
 
         //
@@ -69,8 +69,9 @@ impl Node {
             },
         };
         let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
+        self.set_as_rewarding(section_wallet, node_rewards).await?;
 
-        self.set_as_rewarding(section_wallet, node_rewards).await
+        Ok(NodeDuty::Send(self.register_wallet().await))
     }
 
     /// Level up on promotion
@@ -93,8 +94,7 @@ impl Node {
         let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
-        let replicas =
-            transfer_replicas(&self.node_info, self.network_api.clone(), user_wallets).await?;
+        let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
         self.transfers = Some(Transfers::new(replicas, rate_limit));
         Ok(())
     }
@@ -133,49 +133,14 @@ impl Node {
             },
         };
         if no_wallet_found {
-            let address = self.network_api.our_prefix().await.name();
-            info!("Registering wallet: {}", self.node_info.reward_key);
-            Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::NodeCmd {
-                    cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(self.node_info.reward_key)),
-                    id: MessageId::new(),
-                    target_section_pk: None,
-                },
-                section_source: false, // sent as single node
-                dst: DstLocation::Section(address),
-                aggregation: Aggregation::None,
-            }))
+            info!(
+                "Registering wallet of node: {} (since not found in {:?})",
+                node_id, node_rewards
+            );
+            Ok(NodeDuty::Send(self.register_wallet().await))
         } else {
             Ok(NodeDuty::NoOp)
         }
-    }
-
-    /// When a newbie didn't complete the wallet churn, it can still receive it here.
-    pub async fn synch_section_wallet(&mut self, section_wallet: WalletHistory) -> Result<()> {
-        if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
-            // no need to synch
-            info!(
-                "Node {:?} of section {} is already in rewarding stage.",
-                self.network_api.our_name().await,
-                self.network_api
-                    .section_public_key()
-                    .await
-                    .ok_or(Error::NoSectionPublicKey)?
-            );
-            return Ok(());
-        }
-        // start handling reward payouts
-        let node_rewards = if let Some(section_funds) = &self.section_funds {
-            section_funds.node_rewards()
-        } else if self.network_api.is_elder().await {
-            Default::default()
-        } else {
-            return Err(Error::InvalidOperation(
-                "No section funds at this replica".to_string(),
-            ));
-        };
-
-        self.set_as_rewarding(section_wallet, node_rewards).await
     }
 
     async fn set_as_rewarding(

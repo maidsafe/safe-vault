@@ -74,7 +74,7 @@ pub struct Node {
     network_events: EventStream,
     node_info: NodeInfo,
     used_space: UsedSpace,
-    prefix: Option<Prefix>,
+    prefix: Prefix,
     genesis_stage: GenesisStage,
     // immutable chunks
     chunks: Option<Chunks>,
@@ -96,7 +96,6 @@ impl Node {
         let root_dir = root_dir_buf.as_path();
         std::fs::create_dir_all(root_dir)?;
 
-        debug!("NEW NODE");
         let reward_key_task = async move {
             let res: Result<PublicKey>;
             match config.wallet_id() {
@@ -130,7 +129,7 @@ impl Node {
         let used_space = UsedSpace::new(config.max_capacity());
 
         let node = Self {
-            prefix: Some(network_api.our_prefix().await),
+            prefix: network_api.our_prefix().await,
             chunks: Some(
                 Chunks::new(
                     node_info.node_name,
@@ -148,6 +147,8 @@ impl Node {
             transfers: None,
             section_funds: None,
         };
+
+        messaging::send(node.register_wallet().await, &node.network_api).await;
 
         Ok(node)
     }
@@ -167,7 +168,7 @@ impl Node {
         //info!("Listening for routing events at: {}", info);
         while let Some(event) = self.network_events.next().await {
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
-            match map_routing_event(event, self.network_api.clone()).await {
+            match map_routing_event(event, &self.network_api).await {
                 Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,
                 Mapping::Error(error) => handle_error(error),
             }

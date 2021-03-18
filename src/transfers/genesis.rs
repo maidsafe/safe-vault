@@ -12,7 +12,7 @@ use sn_data_types::{ActorHistory, Credit, CreditAgreementProof, PublicKey, Signe
 use std::collections::BTreeMap;
 
 /// Produces a genesis balance for a new network.
-pub async fn get_genesis(balance: u64, network: Network) -> Result<CreditAgreementProof> {
+pub async fn get_genesis(balance: u64, network: &Network) -> Result<CreditAgreementProof> {
     let recipient = network
         .section_public_key()
         .await

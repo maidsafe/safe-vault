@@ -71,11 +71,9 @@ impl Node {
                         WalletStage::Completed(credit_proof) => {
                             let recipient = credit_proof.recipient();
                             let mut rewards = rewards.clone();
-                            let op = self
-                                .create_section_wallet(rewards, replicas, credit_proof)
+                            self.create_section_wallet(rewards, replicas, credit_proof)
                                 .await?;
                             info!("COMPLETED({}): We have our new section wallet! (credit came before replicas)", recipient);
-                            return Ok(vec![op]);
                         }
                         WalletStage::None => return Err(Error::InvalidGenesisStage),
                     }
@@ -94,7 +92,7 @@ impl Node {
             }
             NodeDuty::ReceiveWalletAccumulation { signed_credit, sig } => {
                 if let Ok((rewards, churn_process, replicas)) = self.get_churning_funds() {
-                    churn_process
+                    let op = churn_process
                         .receive_wallet_accumulation(signed_credit, sig)
                         .await?;
 
@@ -102,25 +100,21 @@ impl Node {
                         if let Some(replicas) = replicas.clone() {
                             let recipient = credit_proof.recipient();
                             let mut rewards = rewards.clone();
-                            let op = self
-                                .create_section_wallet(
-                                    rewards,
-                                    replicas.clone(),
-                                    credit_proof.clone(),
-                                )
-                                .await?;
+                            self.create_section_wallet(
+                                rewards,
+                                replicas.clone(),
+                                credit_proof.clone(),
+                            )
+                            .await?;
                             info!("COMPLETED({}): We have our new section wallet! (replicas came before credit)", recipient);
-                            return Ok(vec![op]);
                         }
                     }
-                } // else we are an adult, so ignore this msg
 
-                Ok(vec![])
-            }
-            NodeDuty::SynchSectionWallet(wallet) => {
-                debug!(">>>>>>>>>>>> SynchSectionWallet..");
-                self.synch_section_wallet(wallet).await?;
-                Ok(vec![])
+                    Ok(vec![op])
+                } else {
+                    // else we are an adult, so ignore this msg
+                    Ok(vec![])
+                }
             }
             //
             // ------- reward payout -------
@@ -192,8 +186,7 @@ impl Node {
             //
             // ----- Genesis ----------
             NodeDuty::BeginFormingGenesisSection => {
-                self.genesis_stage =
-                    begin_forming_genesis_section(self.network_api.clone()).await?;
+                self.genesis_stage = begin_forming_genesis_section(&self.network_api).await?;
                 Ok(vec![])
             }
             NodeDuty::ReceiveGenesisProposal { credit, sig } => {
@@ -201,7 +194,7 @@ impl Node {
                     credit,
                     sig,
                     self.genesis_stage.clone(),
-                    self.network_api.clone(),
+                    &self.network_api,
                 )
                 .await?;
                 Ok(vec![])
@@ -211,15 +204,14 @@ impl Node {
                     signed_credit,
                     sig,
                     self.genesis_stage.clone(),
-                    self.network_api.clone(),
+                    &self.network_api,
                 )
                 .await?;
                 let genesis_tx = match &self.genesis_stage {
                     GenesisStage::Completed(genesis_tx) => genesis_tx.clone(),
                     _ => return Ok(vec![]),
                 };
-                self.genesis(genesis_tx).await?;
-                Ok(vec![])
+                Ok(vec![self.genesis(genesis_tx).await?])
             }
             //
             // ---------- Levelling --------------
@@ -306,11 +298,11 @@ impl Node {
                 Ok(vec![])
             }
             NodeDuty::Send(msg) => {
-                send(msg, self.network_api.clone()).await?;
+                send(msg, &self.network_api).await?;
                 Ok(vec![])
             }
             NodeDuty::SendToNodes { targets, msg } => {
-                send_to_nodes(targets, &msg, self.network_api.clone()).await?;
+                send_to_nodes(targets, &msg, &self.network_api).await?;
                 Ok(vec![])
             }
             NodeDuty::SwitchNodeJoin(_) => Ok(vec![]),

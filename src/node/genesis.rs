@@ -33,7 +33,7 @@ use sn_routing::{XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
 use std::collections::BTreeMap;
 
 ///
-pub async fn begin_forming_genesis_section(network_api: Network) -> Result<GenesisStage> {
+pub async fn begin_forming_genesis_section(network_api: &Network) -> Result<GenesisStage> {
     let is_genesis_section = network_api.our_prefix().await.is_empty();
     let elder_count = network_api.our_elder_names().await.len();
     let section_chain_len = network_api.section_chain().await.len();
@@ -108,7 +108,7 @@ pub async fn receive_genesis_proposal(
     credit: Credit,
     sig: SignatureShare,
     stage: GenesisStage,
-    network_api: Network,
+    network_api: &Network,
 ) -> Result<GenesisStage> {
     if matches!(stage, GenesisStage::AccumulatingGenesis(_)) {
         return Ok(stage);
@@ -199,7 +199,7 @@ pub async fn receive_genesis_accumulation(
     signed_credit: SignedCredit,
     sig: SignatureShare,
     stage: GenesisStage,
-    network_api: Network,
+    network_api: &Network,
 ) -> Result<GenesisStage> {
     match stage {
         GenesisStage::AwaitingGenesisThreshold => {
@@ -251,7 +251,7 @@ pub async fn receive_genesis_accumulation(
 
 async fn transfer_replicas(
     node_info: &NodeInfo,
-    network: Network,
+    network: &Network,
     user_wallets: BTreeMap<PublicKey, ActorHistory>,
 ) -> Result<Replicas<ReplicaSigningImpl>> {
     let root_dir = node_info.root_dir.clone();

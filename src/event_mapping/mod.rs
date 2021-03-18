@@ -41,7 +41,7 @@ pub struct LazyError {
 }
 
 /// Process any routing event
-pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Mapping {
+pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
     //trace!("Processing Routing Event: {:?}", event);
     match event {
         RoutingEvent::Genesis => Mapping::Ok {
@@ -49,13 +49,6 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
             ctx: None,
         },
         RoutingEvent::MessageReceived { content, src, dst } => {
-            info!(
-                "Received network message: {:8?}\n Sent from {:?} to {:?}",
-                HexFmt(&content),
-                src,
-                dst
-            );
-
             let msg = match Message::from(content.clone()) {
                 Ok(msg) => msg,
                 Err(error) => {
@@ -234,7 +227,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: Network) -> Map
 }
 
 /// Are we forming the genesis?
-async fn is_forming_genesis(network_api: Network) -> bool {
+async fn is_forming_genesis(network_api: &Network) -> bool {
     let is_genesis_section = network_api.our_prefix().await.is_empty();
     let elder_count = network_api.our_elder_names().await.len();
     let section_chain_len = network_api.section_chain().await.len();
@@ -244,7 +237,7 @@ async fn is_forming_genesis(network_api: Network) -> bool {
 }
 
 /// Are we the conclusion of genesis?
-async fn are_we_part_of_genesis(network_api: Network) -> bool {
+async fn are_we_part_of_genesis(network_api: &Network) -> bool {
     let is_genesis_section = network_api.our_prefix().await.is_empty();
     let elder_count = network_api.our_elder_names().await.len();
     let section_chain_len = network_api.section_chain().await.len();

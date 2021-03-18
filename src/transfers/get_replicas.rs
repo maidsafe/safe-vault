@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 
 pub async fn transfer_replicas(
     node_info: &NodeInfo,
-    network: Network,
+    network: &Network,
     user_wallets: BTreeMap<PublicKey, ActorHistory>,
 ) -> Result<Replicas<ReplicaSigningImpl>> {
     let root_dir = node_info.root_dir.clone();
