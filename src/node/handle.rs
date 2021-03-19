@@ -316,6 +316,14 @@ impl Node {
                 let transfers = self.get_transfers()?;
                 Ok(vec![transfers.history(&at, msg_id, origin).await?])
             }
+            NodeDuty::GetBalance {
+                at,
+                msg_id,
+                origin,
+            } => {
+                let transfers = self.get_transfers()?;
+                Ok(vec![transfers.balance(at, msg_id, origin).await?])
+            }
             NodeDuty::RegisterSectionPayout {
                 debit_agreement,
                 msg_id,

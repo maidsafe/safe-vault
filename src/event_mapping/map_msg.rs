@@ -100,6 +100,21 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
                 src: SrcLocation::EndUser(origin),
             }),
         },
+        Message::Query {
+            query: Query::Transfer(TransferQuery::GetBalance(at )),
+            id,
+            ..
+        } => Mapping::Ok {
+            op: NodeDuty::GetBalance {
+                at,
+                origin: SrcLocation::EndUser(origin),
+                msg_id: id,
+            },
+            ctx: Some(MsgContext::Msg {
+                msg,
+                src: SrcLocation::EndUser(origin),
+            }),
+        },
         _ => Mapping::Error(LazyError {
             error: Error::InvalidMessage(msg.id(), format!("Unknown user msg: {:?}", msg)),
             msg: MsgContext::Msg {

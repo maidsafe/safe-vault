@@ -133,9 +133,12 @@ pub enum NodeDuty {
         origin: SrcLocation,
     },
 
-    // GetBalance{
-    //     at: PublicKey
-    // },
+    /// Get Balance at a specific key
+    GetBalance{
+        at: PublicKey,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
 
     // GetStoreCost {
     //     /// The requester's key.
@@ -286,6 +289,7 @@ impl Debug for NodeDuty {
             Self::GetTransferReplicaEvents { .. } => write!(f, "GetTransferReplicaEvents"),
             Self::ValidateSectionPayout { .. } => write!(f, "ValidateSectionPayout"),
             Self::ValidateClientTransfer { .. } => write!(f, "ValidateClientTransfer"),
+            Self::GetBalance { .. } => write!(f, "GetBalance"),
             Self::SimulatePayout { .. } => write!(f, "SimulatePayout"),
             Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
