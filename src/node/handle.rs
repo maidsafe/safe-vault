@@ -19,7 +19,7 @@ use super::{
 use crate::{
     chunks::Chunks,
     metadata::Metadata,
-    node_ops::{NodeDuties, NodeDuty},
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
         churn_process::ChurnProcess, reward_payout::RewardPayout, reward_stages::RewardStages,
         rewards::Rewards, wallet_stage::WalletStage, SectionFunds,
@@ -29,7 +29,10 @@ use crate::{
 };
 use log::{debug, info};
 use sn_data_types::{PublicKey, SectionElders, WalletHistory};
-use sn_messaging::MessageId;
+use sn_messaging::{
+    client::{Message, NodeCmd, NodeQuery, Query},
+    Aggregation, DstLocation, MessageId,
+};
 use xor_name::XorName;
 
 impl Node {
@@ -347,16 +350,59 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let chunks = self.get_chunks()?;
-                Ok(vec![chunks.read(&read, msg_id, origin).await?])
+                let data_section_addr = read.dst_address();
+                if self
+                    .network_api
+                    .our_prefix()
+                    .await
+                    .matches(&&data_section_addr)
+                {
+                    let chunks = self.get_chunks()?;
+                    Ok(vec![chunks.read(&read, msg_id, origin).await?])
+                } else {
+                    Ok(vec![NodeDuty::Send(OutgoingMsg {
+                        msg: Message::NodeQuery {
+                            query: NodeQuery::Chunks {
+                                query: read,
+                                origin,
+                            },
+                            id: msg_id,
+                            target_section_pk: None,
+                        },
+                        dst: DstLocation::Section(data_section_addr),
+                        // TBD
+                        section_source: false,
+                        aggregation: Aggregation::None,
+                    })])
+                }
             }
             NodeDuty::WriteChunk {
                 write,
                 msg_id,
                 origin,
             } => {
-                let chunks = self.get_chunks()?;
-                Ok(vec![chunks.write(&write, msg_id, origin).await?])
+                let data_section_addr = write.dst_address();
+                if self
+                    .network_api
+                    .our_prefix()
+                    .await
+                    .matches(&&data_section_addr)
+                {
+                    let chunks = self.get_chunks()?;
+                    Ok(vec![chunks.write(&write, msg_id, origin).await?])
+                } else {
+                    Ok(vec![NodeDuty::Send(OutgoingMsg {
+                        msg: Message::NodeCmd {
+                            cmd: NodeCmd::Chunks { cmd: write, origin },
+                            id: msg_id,
+                            target_section_pk: None,
+                        },
+                        dst: DstLocation::Section(data_section_addr),
+                        // TBD
+                        section_source: false,
+                        aggregation: Aggregation::None,
+                    })])
+                }
             }
             NodeDuty::ReachingMaxCapacity => Ok(vec![self.notify_section_of_our_storage().await?]),
             //
@@ -378,12 +424,52 @@ impl Node {
             //
             // ------- Data ------------
             NodeDuty::ProcessRead { query, id, origin } => {
-                let meta_data = self.get_metadata()?;
-                Ok(vec![meta_data.read(query, id, origin).await?])
+                let data_section_addr = query.dst_address();
+                if self
+                    .network_api
+                    .our_prefix()
+                    .await
+                    .matches(&data_section_addr)
+                {
+                    let meta_data = self.get_metadata()?;
+                    Ok(vec![meta_data.read(query, id, origin).await?])
+                } else {
+                    Ok(vec![NodeDuty::Send(OutgoingMsg {
+                        msg: Message::NodeQuery {
+                            query: NodeQuery::Metadata { query, origin },
+                            id,
+                            target_section_pk: None,
+                        },
+                        dst: DstLocation::Section(data_section_addr),
+                        // TBD
+                        section_source: false,
+                        aggregation: Aggregation::None,
+                    })])
+                }
             }
             NodeDuty::ProcessWrite { cmd, id, origin } => {
-                let meta_data = self.get_metadata()?;
-                Ok(vec![meta_data.write(cmd, id, origin).await?])
+                let data_section_addr = cmd.dst_address();
+                if self
+                    .network_api
+                    .our_prefix()
+                    .await
+                    .matches(&data_section_addr)
+                {
+                    let meta_data = self.get_metadata()?;
+                    Ok(vec![meta_data.write(cmd, id, origin).await?])
+                } else {
+                    Ok(vec![NodeDuty::Send(OutgoingMsg {
+                        msg: Message::NodeCmd {
+                            cmd: NodeCmd::Metadata { cmd, origin },
+                            id,
+                            target_section_pk: None,
+                        },
+                        dst: DstLocation::Section(data_section_addr),
+                        // TBD
+                        section_source: false,
+                        aggregation: Aggregation::None,
+                    })])
+                }
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
                 let transfers = self.get_transfers()?;
