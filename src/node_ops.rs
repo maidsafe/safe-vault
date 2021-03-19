@@ -81,12 +81,12 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
-    
+
     /// Validate a transfer from a client
-    ValidateClientTransfer{
+    ValidateClientTransfer {
         signed_transfer: SignedTransfer,
         msg_id: MessageId,
-        origin: SrcLocation
+        origin: SrcLocation,
     },
 
     ValidateSectionPayout {
@@ -136,7 +136,6 @@ pub enum NodeDuty {
     //     /// Number of bytes to write.
     //     bytes: u64,
     // },
-
     /// On being promoted, an Adult node becomes an Elder.
     BeginFormingGenesisSection,
     /// Bootstrap of genesis section actor.

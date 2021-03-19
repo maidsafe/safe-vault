@@ -14,7 +14,15 @@ use crate::{
     Error, Result,
 };
 use log::debug;
-use sn_messaging::{DstLocation, EndUser, SrcLocation, client::{Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query, TransferCmd, TransferQuery}};
+use sn_messaging::{
+    client::{
+        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
+        NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery,
+        NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse,
+        Query, TransferCmd, TransferQuery,
+    },
+    DstLocation, EndUser, SrcLocation,
+};
 
 pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> Mapping {
     match msg.to_owned() {
@@ -52,7 +60,7 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
             op: NodeDuty::ValidateClientTransfer {
                 signed_transfer,
                 origin: SrcLocation::EndUser(origin),
-                msg_id: id
+                msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
                 msg,
@@ -61,7 +69,7 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
         },
         // TODO: Map more transfer queries
         Message::Query {
-            query: Query::Transfer(TransferQuery::GetHistory{at, since_version}),
+            query: Query::Transfer(TransferQuery::GetHistory { at, since_version }),
             id,
             ..
         } => Mapping::Ok {
@@ -69,7 +77,7 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
                 at,
                 since_version,
                 origin: SrcLocation::EndUser(origin),
-                msg_id: id
+                msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
                 msg,

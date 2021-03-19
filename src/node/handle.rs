@@ -284,7 +284,7 @@ impl Node {
                         .validate_section_payout(signed_transfer, msg_id, origin)
                         .await?,
                 ])
-            },
+            }
             NodeDuty::ValidateClientTransfer {
                 signed_transfer,
                 msg_id,
@@ -292,24 +292,18 @@ impl Node {
             } => {
                 let transfers = self.get_transfers()?;
                 Ok(vec![
-                    transfers
-                        .validate(signed_transfer, msg_id, origin)
-                        .await?,
+                    transfers.validate(signed_transfer, msg_id, origin).await?,
                 ])
-            },
+            }
             NodeDuty::GetTransfersHistory {
-                at, 
-                since_version, 
-                msg_id, 
-                origin
+                at,
+                since_version,
+                msg_id,
+                origin,
             } => {
                 debug!(">>>> TODO: GET TRANSFER HISTORY, ADD limit with since_version....");
                 let transfers = self.get_transfers()?;
-                Ok(vec![
-                    transfers
-                        .history(&at, msg_id, origin)
-                        .await?,
-                ])
+                Ok(vec![transfers.history(&at, msg_id, origin).await?])
             }
             NodeDuty::RegisterSectionPayout {
                 debit_agreement,

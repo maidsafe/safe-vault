@@ -7,10 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::Network;
-use crate::{
-    capacity::Capacity,
-    Result,
-};
+use crate::{capacity::Capacity, Result};
 use log::info;
 use sn_data_types::{PublicKey, Token};
 const MAX_CHUNK_SIZE: u64 = 1_000_000;

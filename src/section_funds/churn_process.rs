@@ -118,10 +118,7 @@ impl ChurnProcess {
     }
 
     /// Generates msgs for creation of new section wallet.
-    async fn propose_wallet_creation(
-        &mut self,
-        amount: Token,
-    ) -> Result<NodeDuty> {
+    async fn propose_wallet_creation(&mut self, amount: Token) -> Result<NodeDuty> {
         let our_elders = self.churn.our_elders();
         let id = MessageId::combine(vec![our_elders.address(), our_elders.name()])
             .0
