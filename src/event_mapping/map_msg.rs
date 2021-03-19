@@ -67,6 +67,22 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
                 src: SrcLocation::EndUser(origin),
             }),
         },
+        // TODO: Map more transfer cmds
+        Message::Cmd {
+            cmd: Cmd::Transfer(TransferCmd::SimulatePayout(transfer)),
+            id,
+            ..
+        } => Mapping::Ok {
+            op: NodeDuty::SimulatePayout {
+                transfer,
+                origin: SrcLocation::EndUser(origin),
+                msg_id: id,
+            },
+            ctx: Some(MsgContext::Msg {
+                msg,
+                src: SrcLocation::EndUser(origin),
+            }),
+        },
         // TODO: Map more transfer queries
         Message::Query {
             query: Query::Transfer(TransferQuery::GetHistory { at, since_version }),

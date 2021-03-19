@@ -295,6 +295,17 @@ impl Node {
                     transfers.validate(signed_transfer, msg_id, origin).await?,
                 ])
             }
+            NodeDuty::SimulatePayout {
+                transfer,
+                msg_id,
+                origin,
+            } => {
+                let transfers = self.get_transfers()?;
+                Ok(vec![
+                    transfers.pay(transfer).await?,
+                    // transfers.validate(signed_transfer, msg_id, origin).await?,
+                ])
+            }
             NodeDuty::GetTransfersHistory {
                 at,
                 since_version,

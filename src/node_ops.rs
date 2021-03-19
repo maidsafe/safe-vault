@@ -89,6 +89,13 @@ pub enum NodeDuty {
         origin: SrcLocation,
     },
 
+    /// TEMP: Simulate a transfer from a client
+    SimulatePayout {
+        transfer: Transfer,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+
     ValidateSectionPayout {
         signed_transfer: SignedTransferShare,
         msg_id: MessageId,
@@ -279,6 +286,7 @@ impl Debug for NodeDuty {
             Self::GetTransferReplicaEvents { .. } => write!(f, "GetTransferReplicaEvents"),
             Self::ValidateSectionPayout { .. } => write!(f, "ValidateSectionPayout"),
             Self::ValidateClientTransfer { .. } => write!(f, "ValidateClientTransfer"),
+            Self::SimulatePayout { .. } => write!(f, "SimulatePayout"),
             Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),

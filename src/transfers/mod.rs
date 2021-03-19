@@ -632,10 +632,10 @@ impl Transfers {
         }))
     }
 
-    #[allow(unused)]
     #[cfg(feature = "simulated-payouts")]
-    pub async fn pay(&mut self, transfer: Transfer) -> Result<()> {
-        self.replicas.debit_without_proof(transfer).await
+    pub async fn pay(&mut self, transfer: Transfer) -> Result<NodeDuty> {
+        self.replicas.credit_without_proof(transfer).await
+        // self.replicas.debit_without_proof(transfer).await
     }
 }
 
