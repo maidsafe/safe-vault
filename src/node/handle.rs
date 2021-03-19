@@ -317,6 +317,15 @@ impl Node {
                 let transfers = self.get_transfers()?;
                 Ok(vec![transfers.balance(at, msg_id, origin).await?])
             }
+            NodeDuty::GetStoreCost {
+                requester,
+                bytes,
+                msg_id,
+                origin,
+            } => {
+                let transfers = self.get_transfers()?;
+                Ok(vec![transfers.get_store_cost(bytes, msg_id, origin).await])
+            }
             NodeDuty::RegisterTransfer { proof, msg_id } => {
                 let transfers = self.get_transfers()?;
                 Ok(vec![transfers.register(&proof, msg_id).await?])

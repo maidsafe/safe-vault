@@ -146,12 +146,15 @@ pub enum NodeDuty {
         origin: SrcLocation,
     },
 
-    // GetStoreCost {
-    //     /// The requester's key.
-    //     requester: PublicKey,
-    //     /// Number of bytes to write.
-    //     bytes: u64,
-    // },
+    GetStoreCost {
+        /// The requester's key.
+        requester: PublicKey,
+        /// Number of bytes to write.
+        bytes: u64,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+
     /// On being promoted, an Adult node becomes an Elder.
     BeginFormingGenesisSection,
     /// Bootstrap of genesis section actor.
@@ -297,6 +300,7 @@ impl Debug for NodeDuty {
             Self::ValidateClientTransfer { .. } => write!(f, "ValidateClientTransfer"),
             Self::RegisterTransfer { .. } => write!(f, "RegisterTransfer"),
             Self::GetBalance { .. } => write!(f, "GetBalance"),
+            Self::GetStoreCost { .. } => write!(f, "GetStoreCost"),
             Self::SimulatePayout { .. } => write!(f, "SimulatePayout"),
             Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
