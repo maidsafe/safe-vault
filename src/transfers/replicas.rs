@@ -559,7 +559,7 @@ impl<T: ReplicaSigning> Replicas<T> {
     }
 
     #[cfg(feature = "simulated-payouts")]
-    pub async fn debit_without_proof(&self, transfer: Transfer) -> Result<()> {
+    pub async fn debit_without_proof(&self, transfer: Transfer) -> Result<NodeDuty> {
         // Acquire lock of the wallet.
         let debit = transfer.debit();
         let id = debit.sender();
@@ -569,7 +569,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         // Access to the specific wallet is now serialised!
         let mut wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
         wallet.debit_without_proof(debit)?;
-        Ok(())
+        Ok(NodeDuty::NoOp)
     }
 
     /// For now, with test tokens there is no from wallet.., tokens is created from thin air.

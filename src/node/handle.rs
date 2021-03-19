@@ -301,10 +301,7 @@ impl Node {
                 origin,
             } => {
                 let transfers = self.get_transfers()?;
-                Ok(vec![
-                    transfers.pay(transfer).await?,
-                    // transfers.validate(signed_transfer, msg_id, origin).await?,
-                ])
+                Ok(vec![transfers.credit_without_proof(transfer).await?])
             }
             NodeDuty::GetTransfersHistory {
                 at,
@@ -316,13 +313,13 @@ impl Node {
                 let transfers = self.get_transfers()?;
                 Ok(vec![transfers.history(&at, msg_id, origin).await?])
             }
-            NodeDuty::GetBalance {
-                at,
-                msg_id,
-                origin,
-            } => {
+            NodeDuty::GetBalance { at, msg_id, origin } => {
                 let transfers = self.get_transfers()?;
                 Ok(vec![transfers.balance(at, msg_id, origin).await?])
+            }
+            NodeDuty::RegisterTransfer { proof, msg_id } => {
+                let transfers = self.get_transfers()?;
+                Ok(vec![transfers.register(&proof, msg_id).await?])
             }
             NodeDuty::RegisterSectionPayout {
                 debit_agreement,

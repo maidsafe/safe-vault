@@ -89,6 +89,12 @@ pub enum NodeDuty {
         origin: SrcLocation,
     },
 
+    /// Register a transfer from a client
+    RegisterTransfer {
+        proof: TransferAgreementProof,
+        msg_id: MessageId,
+    },
+
     /// TEMP: Simulate a transfer from a client
     SimulatePayout {
         transfer: Transfer,
@@ -134,7 +140,7 @@ pub enum NodeDuty {
     },
 
     /// Get Balance at a specific key
-    GetBalance{
+    GetBalance {
         at: PublicKey,
         msg_id: MessageId,
         origin: SrcLocation,
@@ -289,6 +295,7 @@ impl Debug for NodeDuty {
             Self::GetTransferReplicaEvents { .. } => write!(f, "GetTransferReplicaEvents"),
             Self::ValidateSectionPayout { .. } => write!(f, "ValidateSectionPayout"),
             Self::ValidateClientTransfer { .. } => write!(f, "ValidateClientTransfer"),
+            Self::RegisterTransfer { .. } => write!(f, "RegisterTransfer"),
             Self::GetBalance { .. } => write!(f, "GetBalance"),
             Self::SimulatePayout { .. } => write!(f, "SimulatePayout"),
             Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
