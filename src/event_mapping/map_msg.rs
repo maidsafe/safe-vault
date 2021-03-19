@@ -14,15 +14,7 @@ use crate::{
     Error, Result,
 };
 use log::debug;
-use sn_messaging::{
-    client::{
-        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery,
-        NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse,
-        Query,
-    },
-    DstLocation, EndUser, SrcLocation,
-};
+use sn_messaging::{DstLocation, EndUser, SrcLocation, client::{Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse, Query, TransferCmd, TransferQuery}};
 
 pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> Mapping {
     match msg.to_owned() {
@@ -51,24 +43,39 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
                 src: SrcLocation::EndUser(origin),
             }),
         },
-        // Message::Cmd {
-        //     cmd: Cmd::Transfer(cmd),
-        //     id,
-        //     ..
-        // } => NetworkDuties::from(TransferDuty::ProcessCmd {
-        //     cmd: cmd.into(),
-        //     msg_id: id,
-        //     origin: SrcLocation::EndUser(origin),
-        // }),
-        // Message::Query {
-        //     query: Query::Transfer(query),
-        //     id,
-        //     ..
-        // } => NetworkDuties::from(TransferDuty::ProcessQuery {
-        //     query: query.into(),
-        //     msg_id: id,
-        //     origin: SrcLocation::EndUser(origin),
-        // }),
+        // TODO: Map more transfer cmds
+        Message::Cmd {
+            cmd: Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer)),
+            id,
+            ..
+        } => Mapping::Ok {
+            op: NodeDuty::ValidateClientTransfer {
+                signed_transfer,
+                origin: SrcLocation::EndUser(origin),
+                msg_id: id
+            },
+            ctx: Some(MsgContext::Msg {
+                msg,
+                src: SrcLocation::EndUser(origin),
+            }),
+        },
+        // TODO: Map more transfer queries
+        Message::Query {
+            query: Query::Transfer(TransferQuery::GetHistory{at, since_version}),
+            id,
+            ..
+        } => Mapping::Ok {
+            op: NodeDuty::GetTransfersHistory {
+                at,
+                since_version,
+                origin: SrcLocation::EndUser(origin),
+                msg_id: id
+            },
+            ctx: Some(MsgContext::Msg {
+                msg,
+                src: SrcLocation::EndUser(origin),
+            }),
+        },
         _ => Mapping::Error(LazyError {
             error: Error::InvalidMessage(msg.id(), format!("Unknown user msg: {:?}", msg)),
             msg: MsgContext::Msg {

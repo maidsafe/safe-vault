@@ -81,6 +81,14 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
+    
+    /// Validate a transfer from a client
+    ValidateClientTransfer{
+        signed_transfer: SignedTransfer,
+        msg_id: MessageId,
+        origin: SrcLocation
+    },
+
     ValidateSectionPayout {
         signed_transfer: SignedTransferShare,
         msg_id: MessageId,
@@ -107,6 +115,28 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
+
+    /// Get key transfers since specified version.
+    GetTransfersHistory {
+        /// The wallet key.
+        at: PublicKey,
+        /// The last version of transfers we know of.
+        since_version: usize,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+
+    // GetBalance{
+    //     at: PublicKey
+    // },
+
+    // GetStoreCost {
+    //     /// The requester's key.
+    //     requester: PublicKey,
+    //     /// Number of bytes to write.
+    //     bytes: u64,
+    // },
+
     /// On being promoted, an Adult node becomes an Elder.
     BeginFormingGenesisSection,
     /// Bootstrap of genesis section actor.
@@ -249,6 +279,8 @@ impl Debug for NodeDuty {
             Self::ReceivePayoutValidation { .. } => write!(f, "ReceivePayoutValidation"),
             Self::GetTransferReplicaEvents { .. } => write!(f, "GetTransferReplicaEvents"),
             Self::ValidateSectionPayout { .. } => write!(f, "ValidateSectionPayout"),
+            Self::ValidateClientTransfer { .. } => write!(f, "ValidateClientTransfer"),
+            Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
             Self::ContinueWalletChurn { .. } => write!(f, "ContinueWalletChurn"),
