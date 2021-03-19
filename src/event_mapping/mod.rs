@@ -62,10 +62,6 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             map_node_msg(msg, src, dst)
         }
         RoutingEvent::ClientMessageReceived { msg, user } => {
-            info!(
-                "TODO: Received client message: {:8?}\n Sent from {:?}",
-                msg, user
-            );
             match_user_sent_msg(
                 *msg.clone(),
                 DstLocation::Node(network_api.our_name().await),

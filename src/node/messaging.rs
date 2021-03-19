@@ -8,12 +8,13 @@
 
 use crate::{node_ops::OutgoingMsg, Error};
 use crate::{Network, Result};
-use log::error;
+use log::{trace,error};
 use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::XorName;
 use std::collections::BTreeSet;
 
 pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
+    trace!("Sending msg: {:?}", msg);
     let src = if msg.section_source {
         SrcLocation::Section(network.our_prefix().await.name())
     } else {
@@ -40,6 +41,8 @@ pub(crate) async fn send_to_nodes(
     msg: &Message,
     network: &Network,
 ) -> Result<()> {
+    trace!("Sending msg to nodes: {:?}: {:?}", targets, msg);
+
     let name = network.our_name().await;
     let bytes = &msg.serialize()?;
     for target in targets {
