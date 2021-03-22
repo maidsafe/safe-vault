@@ -64,7 +64,7 @@ where
     pub async fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
         let dir = root.as_ref().join(CHUNK_STORE_DIR).join(Self::subdir());
 
-        if !fs::read(&dir).is_ok() {
+        if fs::read(&dir).is_err() {
             Self::create_new_root(&dir)?
         }
 

@@ -2311,8 +2311,9 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
-version = "0.16.0"
-source = "git+https://github.com/oetyng/sn_data_types?branch=split-section-wallet#f69ad519d65dbfa877b542ef4ec1c8e62399a6e3"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b14fbf4e66571eb9a9c6b05145cb987da92a9348a7e50f06df19dfbfab4d2ba1"
 dependencies = [
  "bincode",
  "crdts",
@@ -2344,8 +2345,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "8.0.0"
-source = "git+https://github.com/oetyng/sn_messaging?branch=split-section-wallet#28e2b3fad32e375b048e1029710f6a7f9c62db2a"
+version = "9.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df6ed29b873af8cd435021f4e1c57b4d308a5bda7955dcb9a4cd0533cc82e7e3"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2412,8 +2414,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.50.0"
-source = "git+https://github.com/oetyng/sn_routing?branch=split-section-wallet#fcb6f0886f4d3eb20c787c3c935b94bd1d4b96b2"
+version = "0.52.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de61e931371f8a549a003d265878a18b36a608b7524ef25c86ddec2590d8356a"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2441,8 +2444,9 @@ dependencies = [
 
 [[package]]
 name = "sn_transfers"
-version = "0.5.0"
-source = "git+https://github.com/oetyng/sn_transfers?branch=split-section-wallet#a42ab00e5a6adc9851143a3f32038cf85120883e"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e6c8b8ed1b1193424fe270d3365542986bb6c4d447c26944b7592fdbbb02772"
 dependencies = [
  "bincode",
  "crdts",

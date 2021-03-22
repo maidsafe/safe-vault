@@ -8,7 +8,7 @@
 
 use crate::{node_ops::OutgoingMsg, Error};
 use crate::{Network, Result};
-use log::{trace,error};
+use log::{error, trace};
 use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::XorName;
 use std::collections::BTreeSet;

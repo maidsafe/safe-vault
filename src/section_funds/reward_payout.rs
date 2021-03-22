@@ -129,7 +129,7 @@ impl RewardPayout {
         let event = match self.actor.from_history(info.history) {
             Ok(event) => Ok(event),
             Err(error) => match error {
-                sn_transfers::Error::InvalidActorHistory => Ok(None),
+                sn_transfers::Error::NoActorHistory => Ok(None),
                 _ => Err(Error::Transfer(error)),
             },
         }?;

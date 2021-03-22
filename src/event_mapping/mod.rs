@@ -61,13 +61,11 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 
             map_node_msg(msg, src, dst)
         }
-        RoutingEvent::ClientMessageReceived { msg, user } => {
-            match_user_sent_msg(
-                *msg.clone(),
-                DstLocation::Node(network_api.our_name().await),
-                user,
-            )
-        }
+        RoutingEvent::ClientMessageReceived { msg, user } => match_user_sent_msg(
+            *msg.clone(),
+            DstLocation::Node(network_api.our_name().await),
+            user,
+        ),
         RoutingEvent::EldersChanged {
             elders,
             sibling_elders,

@@ -121,6 +121,8 @@ impl Transfers {
         self.rate_limit.increase_full_node_count(node_id).await
     }
 
+    /// Get latest StoreCost for the given number of bytes.
+    /// Also check for Section storage capacity and report accordingly.
     pub async fn get_store_cost(
         &self,
         bytes: u64,
@@ -307,31 +309,6 @@ impl Transfers {
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: query_origin.to_dst(),
             aggregation: Aggregation::AtDestination,
-        }))
-    }
-
-    /// Get latest StoreCost for the given number of bytes.
-    /// Also check for Section storage capacity and report accordingly.
-
-    /// Get the PublicKeySet of our replicas
-    pub async fn get_replica_pks(
-        &self,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    ) -> Result<NodeDuty> {
-        // validate signature
-        let pk_set = self.replicas.replicas_pk_set();
-
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
-                response: QueryResponse::GetReplicaKeys(Ok(pk_set)),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: origin.to_dst(),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         }))
     }
 
