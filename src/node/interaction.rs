@@ -38,23 +38,33 @@ use sn_messaging::{
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
-use sn_routing::{Elders, XorName};
+use sn_routing::{EldersInfo, XorName};
 use sn_transfers::TransferActor;
 
 impl Node {
     ///
     pub(crate) async fn begin_churn_as_newbie(
         &mut self,
-        our_elders: Elders,
-        sibling_elders: Option<Elders>,
+        our_elders: EldersInfo,
+        sibling_elders: Option<EldersInfo>,
     ) -> Result<NodeDuties> {
         debug!("begin_churn_as_newbie: Zero balance.");
 
         self.level_up().await?;
 
-        let section_key = our_elders.key();
-        let our_elders_name = our_elders.name();
+        let our_elders_name = our_elders.prefix.name();
+        let section_key = self
+            .network_api
+            .get_section_pk_by_name(&our_elders_name)
+            .await?;
+
         let churn = if let Some(sibling_elders) = &sibling_elders {
+            let our_sibling_peers = sibling_elders.prefix.name();
+            let sibling_key = self
+                .network_api
+                .get_section_pk_by_name(&our_sibling_peers)
+                .await?;
+
             Churn::Split {
                 our_elders,
                 sibling_elders: sibling_elders.to_owned(),
@@ -101,8 +111,8 @@ impl Node {
     /// Called on ElderChanged event from routing layer.
     pub(crate) async fn begin_churn_as_oldie(
         &mut self,
-        our_elders: Elders,
-        sibling_elders: Option<Elders>,
+        our_elders: EldersInfo,
+        sibling_elders: Option<EldersInfo>,
     ) -> Result<NodeDuties> {
         let user_wallets = if let Some(transfers) = &mut self.transfers {
             update_transfers(self.node_info.path(), transfers, &self.network_api).await?;
@@ -120,17 +130,23 @@ impl Node {
 
         // extract some info before moving our_elders..
         let our_peers = our_elders.prefix.name();
-        let section_key = our_elders.key();
+
+        let section_key = self.network_api.get_section_pk_by_name(&our_peers).await?;
 
         let churn = if let Some(sibling_elders) = &sibling_elders {
+            let our_sibling_peers = sibling_elders.prefix.name();
+            let sibling_key = self
+                .network_api
+                .get_section_pk_by_name(&our_sibling_peers)
+                .await?;
+
             debug!(
                 "@@@@@@ SPLIT: Our prefix: {:?}, neighbour: {:?}",
                 our_elders.prefix, sibling_elders.prefix
             );
             debug!(
                 "@@@@@@ SPLIT: Our key: {:?}, neighbour: {:?}",
-                our_elders.key(),
-                sibling_elders.key()
+                section_key, sibling_key
             );
             Churn::Split {
                 our_elders,
@@ -179,7 +195,12 @@ impl Node {
         if let Some(sibling_elders) = &sibling_elders {
             // push out data to our sibling peers (i.e. our old peers, and new ones that were promoted)
             let our_sibling_peers = sibling_elders.prefix.name();
-            let msg_id = MessageId::combine(vec![our_sibling_peers, sibling_elders.key().into()]);
+            let sibling_key = self
+                .network_api
+                .get_section_pk_by_name(&our_sibling_peers)
+                .await?;
+
+            let msg_id = MessageId::combine(vec![our_sibling_peers, XorName::from(sibling_key)]);
             ops.push(NodeDuty::Send(OutgoingMsg {
                 msg: ProcessMsg::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {

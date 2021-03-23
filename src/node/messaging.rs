@@ -58,12 +58,15 @@ pub(crate) async fn send_to_nodes(
     trace!("Sending msg to nodes: {:?}: {:?}", targets, msg);
 
     let name = network.our_name().await;
-    let message = Message::Process(msg);
+    let message = Message::Process(msg.clone());
 
     for target in targets {
-        let target_section_pk = network.get_section_pk_by_name(target).await?;
-        let message = Message::Process(msg.msg);
-        let bytes = &message.serialize()?;
+        let target_section_pk = network
+            .get_section_pk_by_name(&target)
+            .await?
+            .bls()
+            .ok_or(Error::NoSectionPublicKeyKnown(target))?;
+        let bytes = &message.serialize(target, target_section_pk)?;
 
         network
             .send_message(
