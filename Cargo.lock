@@ -2346,8 +2346,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "9.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df6ed29b873af8cd435021f4e1c57b4d308a5bda7955dcb9a4cd0533cc82e7e3"
+source = "git+https://github.com/joshuef/sn_messaging?branch=Lazy#3be3a44dd52b40756d8a83a6d46fa1381253e7bb"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2371,7 +2370,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "async-log",
  "async-trait",
@@ -2414,9 +2413,8 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.52.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de61e931371f8a549a003d265878a18b36a608b7524ef25c86ddec2590d8356a"
+version = "0.49.1"
+source = "git+https://github.com/joshuef/sn_routing?branch=YogLz#7b61654000d5eb2bc7d664452d2b2fa40e77ca10"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2445,8 +2443,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e6c8b8ed1b1193424fe270d3365542986bb6c4d447c26944b7592fdbbb02772"
+source = "git+https://github.com/joshuef/sn_transfers?branch=Lazy#9cf4cac2b002d7caa36cdac4927700d663347e46"
 dependencies = [
  "bincode",
  "crdts",
