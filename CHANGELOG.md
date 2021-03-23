@@ -2,6 +2,81 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.31.0](https://github.com/maidsafe/sn_node/compare/v0.30.0...v0.31.0) (2021-03-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* messaging and DT udpates
+* **accumulation:** this changes uses a new version of sn_messaging with a
+breaking change
+* **messaging:** new version of sn_messaging includes a breaking change
+
+### Features
+
+* add get balance handling ([75cfeb0](https://github.com/maidsafe/sn_node/commit/75cfeb03f2c181372bcec8e53f8acab81488d4ec))
+* can register transfers again ([30156c5](https://github.com/maidsafe/sn_node/commit/30156c52ca1a54d96cf6481077109d803e1c0ff3))
+* enable client section payout and history query of balance ([0639a8f](https://github.com/maidsafe/sn_node/commit/0639a8fb3a9749259968d05eb46f1c79a6eee190))
+* simulated payout ([8293d03](https://github.com/maidsafe/sn_node/commit/8293d03beb2aea51be24d3462452dbcb0d410e7b))
+* storecost ([b7f49ad](https://github.com/maidsafe/sn_node/commit/b7f49ad686dd0c68b1afacdf2e443ece3dd45c75))
+* **accumulation:** accumulate elder to adult messages at destination ([12c2312](https://github.com/maidsafe/sn_node/commit/12c23122125f67eb7969366e7c49501677c562a8))
+* **aggregation:** set AtDestination where needed, and use section src ([814bb78](https://github.com/maidsafe/sn_node/commit/814bb785e5a1da79bdf0db6ec877df9c1293acb6))
+* **chunks:** handle read/write ([06b888d](https://github.com/maidsafe/sn_node/commit/06b888d1c2a303a1113d95d5176330f0d19bdc6b))
+* **chunks:** set chunks at start, reset when levelup, set when level down ([797a17b](https://github.com/maidsafe/sn_node/commit/797a17bf99c1dd6743202496f94a8d301fd93c6d))
+* **churn:** handle wallet churn msgs ([3413025](https://github.com/maidsafe/sn_node/commit/3413025e9a3f278ae48ddc022d9fa98121758bb4))
+* **churn:** put newbies into churn mode as well ([0162036](https://github.com/maidsafe/sn_node/commit/0162036af5e4ceb472b59bcc2d857fa91aea47cb))
+* **churning wallets:** simplify churn ([10485b8](https://github.com/maidsafe/sn_node/commit/10485b8b5bffe3835929e7d2422369396ef3f1ea))
+* **data_cmd:** process payment for data command ([888337d](https://github.com/maidsafe/sn_node/commit/888337dad29d3a96a4a156709982be56759e4fc0))
+* **funds_split:** use genesis flow for creating new wallet ([3810f29](https://github.com/maidsafe/sn_node/commit/3810f29270da05cc85f1bca692d0313af440ec02))
+* **lazy:** keep msg context for domain logic errors ([18edbf7](https://github.com/maidsafe/sn_node/commit/18edbf7e341bdb405738f8e7ff5c85c34295df7e))
+* **node:** handle promotion and demotion ([9a18633](https://github.com/maidsafe/sn_node/commit/9a186338b9b18d141bc4c80bcfb8c1ab67346c5a))
+* **node:** init transfers and metadata after genesis ([815b0d0](https://github.com/maidsafe/sn_node/commit/815b0d0370e016571371f4d4dce6a3e52d719d90))
+* **node_cmds:** enable mapping of node -> messages to process DataCmds ([3180519](https://github.com/maidsafe/sn_node/commit/31805191171c51998e90b2262be5fbd403805a15))
+* **node_duties:** rename get wallet query ([e1fff62](https://github.com/maidsafe/sn_node/commit/e1fff62e37f6184c5f7c3a2c5ebcbb8f2219c4bd))
+* **promotion:** allow Adult to receive Elder ops ([392f566](https://github.com/maidsafe/sn_node/commit/392f5664974844652553b3a5905c40e348b27c6c))
+* **replication:** enable chunk replication on member left ([fad76e1](https://github.com/maidsafe/sn_node/commit/fad76e112e37604eedb7a8471398e9da532e6cd8))
+* **rewards:** add reward payout mod ([d1e7e0f](https://github.com/maidsafe/sn_node/commit/d1e7e0f10ba42cc14cce558dcdac1227188bfdf2))
+* **rewards:** enable reward payout again ([e8298da](https://github.com/maidsafe/sn_node/commit/e8298da568392a5ef621553ac456d9f3941fff36))
+* chain payouts for section funds split ([f0e89c3](https://github.com/maidsafe/sn_node/commit/f0e89c3cc60f46a7be97f1cfe803f2de0cd6b5f8))
+* create two transfers on split ([10cca6f](https://github.com/maidsafe/sn_node/commit/10cca6f5d891932894a89ec52ca22c69ecf6fca3))
+* ElderPrep stage for adults ([0f3469e](https://github.com/maidsafe/sn_node/commit/0f3469e8ca63eda4d733f7f786986e814ea1d16e))
+* start new elders straight away, dont wait for data to come in ([bc3b736](https://github.com/maidsafe/sn_node/commit/bc3b736204187bafbde9d97861b931d9f8925e20))
+
+
+### Bug Fixes
+
+* **data:** redirect data requests to the correct section if it does not ([5c3c195](https://github.com/maidsafe/sn_node/commit/5c3c195d60d2d2d302a4a1513a5f715324ca4128))
+* post-rebase issues ([ce4f194](https://github.com/maidsafe/sn_node/commit/ce4f19451ed37622f2cafe9da012b0968b6ae8a6))
+* remove some unnecessary logs ([7ef9542](https://github.com/maidsafe/sn_node/commit/7ef9542c819829752ec93ca1b5d0d144fe13e13d))
+* **churn:** send prop and acc to our elders ([e0055c2](https://github.com/maidsafe/sn_node/commit/e0055c2d0b3497797257fbe894523b30aedc369b))
+* **churn:** swarm wallet when created ([401d04d](https://github.com/maidsafe/sn_node/commit/401d04d8146d02eb666c27b0348b700ad38fff0f))
+* add sibling key to constellation change ([d2551ac](https://github.com/maidsafe/sn_node/commit/d2551ac4566df4ff9d4b1e5b386d537d7133eedf))
+* genesis elder count must be at least 5 ([7ff3703](https://github.com/maidsafe/sn_node/commit/7ff3703393f2e378d11881d6636af8e0238dca71))
+* handle from_history error in transfers ([50c5c39](https://github.com/maidsafe/sn_node/commit/50c5c39e5692a298ad2394e2b12294344591d7da))
+* handle nothing to sync error ([e20d437](https://github.com/maidsafe/sn_node/commit/e20d437912650d408863d76f33dcaab90a1b38cd))
+* include remainder when splitting section funds ([f8094bb](https://github.com/maidsafe/sn_node/commit/f8094bb7975124c0138665a53cb55f2c843e300b))
+* initiate elder change after becoming elder ([015fdf1](https://github.com/maidsafe/sn_node/commit/015fdf10bc8f5ddf32e08cc094f7a2d60ed008e9))
+* pending transitions ([d30920a](https://github.com/maidsafe/sn_node/commit/d30920a0807e4a1555d51e64ff360a1f5a622fff))
+* post-rebase issues ([ab40c41](https://github.com/maidsafe/sn_node/commit/ab40c41cad0385e36508cae829f4109451051240))
+* pre aggregation commit changes ([5a3014f](https://github.com/maidsafe/sn_node/commit/5a3014f3feac4165ae4780994d82e14f71a812ed))
+* process resulting duties ([13f9590](https://github.com/maidsafe/sn_node/commit/13f9590f06a9d64b4e6672e9aea35fa1847914ee))
+* remove redundant origin field ([b341b00](https://github.com/maidsafe/sn_node/commit/b341b0002821cb1eb149b6b22e37f01083b0f768))
+* ugly temp fix for lagging dkg outcome.. ([5673093](https://github.com/maidsafe/sn_node/commit/5673093cdd76388c8b608fa5e27bbd17b82500f4))
+* wire up last stage of creating wallet ([4c01773](https://github.com/maidsafe/sn_node/commit/4c0177366c1b59eeac4f5b5e7bb67d1fe95e2773))
+* **elder:** query old key when new ([9a48bc2](https://github.com/maidsafe/sn_node/commit/9a48bc2f4112c91eb9a0bba51a65be34deae8c5d))
+* **genesis:** init full section funds at completed ([108265e](https://github.com/maidsafe/sn_node/commit/108265ec4b6c5859df3a7e40cc6869e501a5d841))
+* **genesis:** proper check if genesis ([fee55b8](https://github.com/maidsafe/sn_node/commit/fee55b8a39d244dc3139cd34933057465779abe5))
+* **genesis:** propose also when still elder ([b8c790c](https://github.com/maidsafe/sn_node/commit/b8c790c06e129b0c5367ed748566282dcbb8671b))
+* **section_funds:** reset transition after completed ([eba03da](https://github.com/maidsafe/sn_node/commit/eba03da2ac4af5f5d6c7ce97f07df13d7f5292ff))
+* **transition:** derive Clone for multiple structs ([335b93e](https://github.com/maidsafe/sn_node/commit/335b93e89156b53046963994030c34b513d0c86c))
+* **transition:** start transition after getting Section Wallet history ([f49ed54](https://github.com/maidsafe/sn_node/commit/f49ed54233a70d848051f21eb9ce6c8f2bc25983))
+* **walletstage:** actually add the signatures ([12cc467](https://github.com/maidsafe/sn_node/commit/12cc4673b0d77fb10db371a7fcba54a94f365460))
+* send wallet history query to our section ([ca58521](https://github.com/maidsafe/sn_node/commit/ca58521e8b24514f58923af93b072292b90b8d4d))
+
+
+* dep updates and changes for split ([10a291d](https://github.com/maidsafe/sn_node/commit/10a291d66856b914e6738d5e2e3d87374858ac82))
+* **messaging:** add expected aggregation scheme, and use an itinerary ([6d3d970](https://github.com/maidsafe/sn_node/commit/6d3d97025332a522bc0e2b0b94945406a358d7e0))
+
 ## [0.30.0](https://github.com/maidsafe/sn_node/compare/v0.29.0...v0.30.0) (2021-03-11)
 
 
