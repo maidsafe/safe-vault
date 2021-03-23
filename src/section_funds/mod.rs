@@ -23,7 +23,7 @@ use super::node_ops::{NodeDuty, OutgoingMsg};
 use crate::Result;
 use sn_data_types::{NodeRewardStage, PublicKey, SectionElders, Token};
 use sn_messaging::{
-    client::{Message, NodeQuery, NodeSystemQuery},
+    client::{NodeQuery, NodeSystemQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use sn_routing::XorName;

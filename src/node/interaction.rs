@@ -33,8 +33,8 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{
-        Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeSystemCmd, NodeSystemQuery,
-        NodeSystemQueryResponse, NodeTransferCmd,
+        NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeSystemCmd, NodeSystemQuery,
+        NodeSystemQueryResponse, NodeTransferCmd, ProcessMsg,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -164,13 +164,12 @@ impl Node {
 
         // push out data to our new (and old..) peers
         ops.push(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                     node_rewards: rewards.node_rewards(),
                     user_wallets: user_wallets.clone(),
                 }),
                 id: MessageId::new(), //MessageId::in_response_to(&msg_id), //
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to an event..
             dst: DstLocation::Section(our_peers), // swarming to our peers, if splitting many will be needing this, otherwise only one..
@@ -182,13 +181,12 @@ impl Node {
             let our_sibling_peers = sibling_elders.prefix.name();
             let msg_id = MessageId::combine(vec![our_sibling_peers, sibling_elders.key().into()]);
             ops.push(NodeDuty::Send(OutgoingMsg {
-                msg: Message::NodeCmd {
+                msg: ProcessMsg::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                         node_rewards: rewards.node_rewards(),
                         user_wallets: user_wallets.clone(),
                     }),
                     id: MessageId::new(), //MessageId::in_response_to(&msg_id), //
-                    target_section_pk: None,
                 },
                 section_source: false, // strictly this is not correct, but we don't expect responses to an event..
                 dst: DstLocation::Section(our_sibling_peers), // swarming to our peers, if splitting many will be needing this, otherwise only one..
@@ -205,10 +203,9 @@ impl Node {
         let location = credit_proof.recipient().into();
         let msg_id = MessageId::from_content(&credit_proof.debiting_replicas_sig)?;
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: Transfers(PropagateTransfer(credit_proof)),
                 id: msg_id,
-                target_section_pk: None,
             },
             section_source: true, // i.e. errors go to our section
             dst: DstLocation::Section(location),
@@ -286,13 +283,12 @@ impl Node {
             key_set: self.network_api.our_public_key_set().await?,
         };
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeQueryResponse {
+            msg: ProcessMsg::NodeQueryResponse {
                 response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(
                     elders,
                 )),
                 correlation_id: msg_id,
                 id: MessageId::in_response_to(&msg_id), // MessageId::new(), //
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),  // this will be a section
@@ -304,13 +300,12 @@ impl Node {
     pub(crate) async fn notify_section_of_our_storage(&mut self) -> Result<NodeDuty> {
         let node_id = PublicKey::from(self.network_api.public_key().await);
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
                     section: node_id.into(),
                     node_id,
                 }),
                 id: MessageId::new(),
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
             dst: DstLocation::Section(node_id.into()),
@@ -322,10 +317,9 @@ impl Node {
     pub(crate) async fn register_wallet(&self) -> OutgoingMsg {
         let address = self.network_api.our_prefix().await.name();
         OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(self.node_info.reward_key)),
                 id: MessageId::new(),
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
             dst: DstLocation::Section(address),
@@ -339,10 +333,9 @@ pub(crate) fn get_wallet_replica_elders(wallet: PublicKey) -> NodeDuty {
     // deterministic msg id for aggregation
     let msg_id = MessageId::combine(vec![wallet.into()]);
     NodeDuty::Send(OutgoingMsg {
-        msg: Message::NodeQuery {
+        msg: ProcessMsg::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
             id: msg_id,
-            target_section_pk: None,
         },
         section_source: true,
         dst: DstLocation::Section(wallet.into()),

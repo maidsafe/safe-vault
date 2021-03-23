@@ -26,7 +26,7 @@ use sn_data_types::{
     TransferPropagated,
 };
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeSystemCmd},
+    client::{NodeCmd, NodeSystemCmd, ProcessMsg},
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::{XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
@@ -73,13 +73,12 @@ pub async fn begin_forming_genesis_section(network_api: &Network) -> Result<Gene
         bootstrap.add(our_sig.clone())?;
 
         let msg = OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
                     credit: credit.clone(),
                     sig: our_sig,
                 }),
                 id: MessageId::new(),
-                target_section_pk: None,
             },
             dst: DstLocation::Section(credit.recipient.into()),
             section_source: false, // sent as single node
@@ -128,13 +127,12 @@ pub async fn receive_genesis_proposal(
             bootstrap.add(our_sig.clone())?;
 
             let msg = OutgoingMsg {
-                msg: Message::NodeCmd {
+                msg: ProcessMsg::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis {
                         credit: credit.clone(),
                         sig: our_sig,
                     }),
                     id: MessageId::new(),
-                    target_section_pk: None,
                 },
                 section_source: false, // sent as single node
                 dst: DstLocation::Section(our_prefix.name()),
@@ -162,13 +160,12 @@ pub async fn receive_genesis_proposal(
                 bootstrap.add(our_sig.clone())?;
 
                 let msg = OutgoingMsg {
-                    msg: Message::NodeCmd {
+                    msg: ProcessMsg::NodeCmd {
                         cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis {
                             signed_credit: signed_credit.clone(),
                             sig: our_sig,
                         }),
                         id: MessageId::new(),
-                        target_section_pk: None,
                     },
                     section_source: false, // sent as single node
                     dst: DstLocation::Section(our_prefix.name()),

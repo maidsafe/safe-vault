@@ -9,7 +9,7 @@
 use crate::{node_ops::OutgoingMsg, Error};
 use crate::{Network, Result};
 use log::{error, trace};
-use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
+use sn_messaging::{client::ProcessMsg, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::XorName;
 use std::collections::BTreeSet;
 
@@ -38,7 +38,7 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
 
 pub(crate) async fn send_to_nodes(
     targets: BTreeSet<XorName>,
-    msg: &Message,
+    msg: &ProcessMsg,
     network: &Network,
 ) -> Result<()> {
     trace!("Sending msg to nodes: {:?}: {:?}", targets, msg);

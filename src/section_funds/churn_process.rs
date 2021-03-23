@@ -18,7 +18,7 @@ use sn_data_types::{
     TransferPropagated,
 };
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeQuery, NodeSystemCmd, NodeSystemQuery},
+    client::{NodeCmd, NodeQuery, NodeSystemCmd, NodeSystemQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::Elders;
@@ -324,10 +324,9 @@ impl ChurnProcess {
 
 fn send_prop_msg(credit: Credit, sig: SignatureShare, our_elders: XorName) -> NodeDuty {
     NodeDuty::Send(OutgoingMsg {
-        msg: Message::NodeCmd {
+        msg: ProcessMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeNewWallet { credit, sig }),
             id: MessageId::new(),
-            target_section_pk: None,
         },
         section_source: false,                 // sent as single node
         dst: DstLocation::Section(our_elders), // send this msg to our elders!
@@ -337,10 +336,9 @@ fn send_prop_msg(credit: Credit, sig: SignatureShare, our_elders: XorName) -> No
 
 fn send_acc_msg(signed_credit: SignedCredit, sig: SignatureShare, our_elders: XorName) -> NodeDuty {
     NodeDuty::Send(OutgoingMsg {
-        msg: Message::NodeCmd {
+        msg: ProcessMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::AccumulateNewWallet { signed_credit, sig }),
             id: MessageId::new(),
-            target_section_pk: None,
         },
         section_source: false,                 // sent as single node
         dst: DstLocation::Section(our_elders), // send this msg to our elders!

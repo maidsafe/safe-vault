@@ -14,7 +14,7 @@ use hex_fmt::HexFmt;
 use log::{debug, info, trace};
 use map_msg::{map_node_msg, match_user_sent_msg};
 use sn_data_types::PublicKey;
-use sn_messaging::{client::Message, DstLocation, SrcLocation};
+use sn_messaging::{client::ProcessMsg, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
 use std::{thread::sleep, time::Duration};
@@ -30,7 +30,7 @@ pub enum Mapping {
 
 #[derive(Debug, Clone)]
 pub enum MsgContext {
-    Msg { msg: Message, src: SrcLocation },
+    Msg { msg: ProcessMsg, src: SrcLocation },
     Bytes { msg: bytes::Bytes, src: SrcLocation },
 }
 
@@ -49,7 +49,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             ctx: None,
         },
         RoutingEvent::MessageReceived { content, src, dst } => {
-            let msg = match Message::from(content.clone()) {
+            let msg = match ProcessMsg::from(content.clone()) {
                 Ok(msg) => msg,
                 Err(error) => {
                     return Mapping::Error(LazyError {

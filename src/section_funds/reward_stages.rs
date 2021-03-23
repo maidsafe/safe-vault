@@ -16,8 +16,8 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{
-        Error as ErrorMessage, Message, NodeQuery, NodeQueryResponse, NodeRewardQuery,
-        NodeRewardQueryResponse,
+        Error as ErrorMessage, NodeQuery, NodeQueryResponse, NodeRewardQuery,
+        NodeRewardQueryResponse, ProcessMsg,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -128,13 +128,12 @@ impl RewardStages {
         let state = AwaitingActivation(age);
         let _ = self.node_rewards.insert(new_node_id, state);
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeQuery {
+            msg: ProcessMsg::NodeQuery {
                 query: Rewards(GetNodeWalletId {
                     old_node_id,
                     new_node_id,
                 }),
                 id: MessageId::combine(vec![old_node_id, new_node_id]),
-                target_section_pk: None,
             },
             section_source: true, // i.e. responses go to our section
             dst: DstLocation::Section(old_node_id),
@@ -257,11 +256,10 @@ impl RewardStages {
                 // marked as relocating..
                 // (Could be a case for lazy messaging..)
                 return Ok(NodeDuty::Send(OutgoingMsg {
-                    msg: Message::NodeQueryResponse {
+                    msg: ProcessMsg::NodeQueryResponse {
                         response: Rewards(GetNodeWalletId(Err(ErrorMessage::NodeWasNotRelocated))),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
-                        target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                     dst: origin.to_dst(),
@@ -280,11 +278,10 @@ impl RewardStages {
         use NodeQueryResponse::*;
         use NodeRewardQueryResponse::*;
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeQueryResponse {
+            msg: ProcessMsg::NodeQueryResponse {
                 response: Rewards(GetNodeWalletId(Ok((wallet, new_node_id)))),
                 id: MessageId::in_response_to(&msg_id),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: DstLocation::Section(new_node_id),

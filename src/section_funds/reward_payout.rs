@@ -19,8 +19,8 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{
-        Error as ErrorMessage, Message, NodeCmd, NodeQuery, NodeQueryResponse, NodeRewardQuery,
-        NodeRewardQueryResponse, NodeTransferCmd,
+        Error as ErrorMessage, NodeCmd, NodeQuery, NodeQueryResponse, NodeRewardQuery,
+        NodeRewardQueryResponse, NodeTransferCmd, ProcessMsg,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -169,14 +169,13 @@ impl RewardPayout {
                 self.state.payout_in_flight = Some(payout);
                 // We ask of our Replicas to validate this transfer.
                 Ok(NodeDuty::Send(OutgoingMsg {
-                    msg: Message::NodeCmd {
+                    msg: ProcessMsg::NodeCmd {
                         cmd: Transfers(ValidateSectionPayout(SignedTransferShare::new(
                             event.signed_debit.as_share()?,
                             event.signed_credit.as_share()?,
                             self.actor.owner().public_key_set()?,
                         )?)),
                         id: MessageId::new(),
-                        target_section_pk: None,
                     },
                     section_source: false,
                     dst: DstLocation::Section(self.actor.id().into()),
@@ -225,10 +224,9 @@ impl RewardPayout {
                 .map(|elder| {
                     // We ask of our Replicas to validate this transfer.
                     Some(NodeDuty::Send(OutgoingMsg {
-                        msg: Message::NodeCmd {
+                        msg: ProcessMsg::NodeCmd {
                             cmd: Transfers(RegisterSectionPayout(proof.clone())),
                             id: MessageId(msg_id),
-                            target_section_pk: None,
                         },
                         section_source: false, // i.e. responses go to our section
                         dst: DstLocation::Node(elder), // a remote section transfers module will handle this (i.e. our replicas)

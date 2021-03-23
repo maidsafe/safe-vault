@@ -17,7 +17,7 @@ use bls::{PublicKeySet, PublicKeyShare as BlsPublicKeyShare};
 use log::{debug, error};
 use serde::Serialize;
 use sn_data_types::{Error as DtError, PublicKey, Result as DtResult, Signature, SignatureShare};
-use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
+use sn_messaging::{client::ProcessMsg, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
     SectionChain,
@@ -144,7 +144,7 @@ impl Network {
         self.routing.matches_our_prefix(&XorName(name.0)).await
     }
 
-    pub async fn send_to_nodes(&self, targets: BTreeSet<XorName>, msg: &Message) -> Result<()> {
+    pub async fn send_to_nodes(&self, targets: BTreeSet<XorName>, msg: &ProcessMsg) -> Result<()> {
         let name = self.our_name().await;
         let bytes = &msg.serialize()?;
         for target in targets {

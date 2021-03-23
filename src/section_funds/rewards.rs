@@ -23,7 +23,7 @@ use sn_data_types::{
     TransferValidated, WalletHistory,
 };
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeTransferCmd},
+    client::{NodeCmd, NodeTransferCmd, ProcessMsg},
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use sn_transfers::{ActorEvent, TransferActor};

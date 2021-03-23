@@ -17,8 +17,8 @@ use log::{error, info};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     client::{
-        CmdError, Error as ErrorMessage, Message, NodeDataQueryResponse, NodeQuery,
-        NodeQueryResponse, NodeSystemQuery, QueryResponse,
+        CmdError, Error as ErrorMessage, NodeDataQueryResponse, NodeQuery, NodeQueryResponse,
+        NodeSystemQuery, ProcessMsg, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
@@ -54,11 +54,10 @@ impl ChunkStorage {
     ) -> Result<NodeDuty> {
         if let Err(error) = self.try_store(data, origin).await {
             Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::CmdError {
+                msg: ProcessMsg::CmdError {
                     error: CmdError::Data(convert_to_error_message(error)?),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 },
                 section_source: false, // sent as single node
                 dst: DstLocation::EndUser(origin),
@@ -106,11 +105,10 @@ impl ChunkStorage {
             .get(address)
             .map_err(|_| ErrorMessage::NoSuchData);
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: ProcessMsg::QueryResponse {
                 id: MessageId::in_response_to(&msg_id),
                 response: QueryResponse::GetBlob(result),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
             dst: DstLocation::EndUser(origin),
@@ -124,14 +122,13 @@ impl ChunkStorage {
         current_holders: BTreeSet<XorName>,
         msg_id: MessageId,
     ) -> Result<NodeDuty> {
-        let msg = Message::NodeQuery {
+        let msg = ProcessMsg::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetChunk {
                 address,
                 new_holder: self.node_name,
                 current_holders: BTreeSet::default(), //TODO: remove this in sn_messaging
             }),
             id: msg_id,
-            target_section_pk: None,
         };
         info!("Sending NodeSystemQuery::GetChunk to existing holders");
 
@@ -155,11 +152,10 @@ impl ChunkStorage {
 
         if let Ok(data) = result {
             Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::NodeQueryResponse {
+                msg: ProcessMsg::NodeQueryResponse {
                     response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(Ok(data))),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 },
                 section_source: false, // sent as single node
                 dst: DstLocation::Node(new_holder),
@@ -225,11 +221,10 @@ impl ChunkStorage {
 
         if let Err(error) = result {
             return Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::CmdError {
+                msg: ProcessMsg::CmdError {
                     error: CmdError::Data(error),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 },
                 section_source: false, // sent as single node
                 dst: DstLocation::EndUser(origin),

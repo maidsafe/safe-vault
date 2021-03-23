@@ -32,7 +32,7 @@ use sn_data_types::{
     TransferPropagated, WalletHistory,
 };
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeSystemCmd},
+    client::{NodeCmd, NodeSystemCmd, ProcessMsg},
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::XorName;
