@@ -9,7 +9,9 @@
 use crate::{node_ops::OutgoingMsg, Error};
 use crate::{Network, Result};
 use log::{error, trace};
-use sn_messaging::{client::ProcessMsg, client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
+use sn_messaging::{
+    client::Message, client::ProcessMsg, Aggregation, DstLocation, Itinerary, SrcLocation,
+};
 use sn_routing::XorName;
 use std::collections::BTreeSet;
 
@@ -27,15 +29,17 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
     };
 
     let target_section_pk = match msg.dst {
-        DstLocation::EndUser(end_user ) => end_user.id(),
-        DstLocation::Node(node) => match network {
-            Z => {},
+        DstLocation::EndUser(end_user) => Ok(end_user.id()),
+        DstLocation::Section(name) | DstLocation::Node(name) => {
+            network.get_section_pk_by_name(name).await?
         }
-
-    }
+        Direct => Err(Error::CannotDirectMessage),
+    }?;
 
     let message = Message::Process(msg.msg);
-    let result = network.send_message(itinerary, message.serialize(msg.dst, )?).await;
+    let result = network
+        .send_message(itinerary, message.serialize(msg.dst, target_section_pk)?)
+        .await;
 
     result.map_or_else(
         |err| {
@@ -55,10 +59,12 @@ pub(crate) async fn send_to_nodes(
 
     let name = network.our_name().await;
     let message = Message::Process(msg);
-    let bytes = &message.serialize()?;
-
 
     for target in targets {
+        let target_section_pk = network.get_section_pk_by_name(target).await?;
+        let message = Message::Process(msg.msg);
+        let bytes = &message.serialize()?;
+
         network
             .send_message(
                 Itinerary {

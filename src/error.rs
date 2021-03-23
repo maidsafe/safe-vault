@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_data_types::{Error as DtError, PublicKey};
+use sn_data_types::{Error as DtError, PublicKey, XorName};
 use sn_messaging::{client::Error as ErrorMessage, MessageId};
 use std::io;
 use thiserror::Error;
@@ -25,6 +25,12 @@ pub enum Error {
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing")]
     NoSectionPublicKey,
+    /// Nodes cannot send direct messages
+    #[error("Node cannot send direct messages. This functionality will be deprecated in routing.")]
+    CannotDirectMessage,
+    /// Not Section PublicKey.
+    #[error("Not section public key returned from routing for xorname {0}")]
+    NoSectionPublicKeyKnown(XorName),
     /// Not a Section PublicKeyShare.
     #[error("PublicKey provided for signing as elder is not a BLS PublicKeyShare")]
     ProvidedPkIsNotBlsShare,
