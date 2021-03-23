@@ -17,7 +17,7 @@ use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     client::{
         CmdError, Error as ErrorMessage, Message, NodeDataQueryResponse, NodeQueryResponse,
-        QueryResponse,
+        ProcessMsg, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
@@ -46,11 +46,10 @@ impl ChunkStorage {
     ) -> Result<NodeDuty> {
         if let Err(error) = self.try_store(data, origin).await {
             Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::CmdError {
+                msg: ProcessMsg::CmdError {
                     error: CmdError::Data(convert_to_error_message(error)?),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 },
                 section_source: false, // sent as single node
                 dst: DstLocation::EndUser(origin),
@@ -98,11 +97,10 @@ impl ChunkStorage {
             .get(address)
             .map_err(|_| ErrorMessage::NoSuchData);
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::QueryResponse {
+            msg: ProcessMsg::QueryResponse {
                 id: MessageId::in_response_to(&msg_id),
                 response: QueryResponse::GetBlob(result),
                 correlation_id: msg_id,
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
             dst: DstLocation::EndUser(origin),
@@ -124,11 +122,10 @@ impl ChunkStorage {
 
         if let Ok(data) = result {
             Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::NodeQueryResponse {
+                msg: ProcessMsg::NodeQueryResponse {
                     response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(Ok(data))),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 },
                 section_source: false,              // sent as single node
                 dst: DstLocation::Section(section), // send it back to section Elders
@@ -194,11 +191,10 @@ impl ChunkStorage {
 
         if let Err(error) = result {
             return Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::CmdError {
+                msg: ProcessMsg::CmdError {
                     error: CmdError::Data(error),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
-                    target_section_pk: None,
                 },
                 section_source: false, // sent as single node
                 dst: DstLocation::EndUser(origin),

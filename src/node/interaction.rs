@@ -13,8 +13,8 @@ use crate::{
 use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
 use sn_messaging::{
     client::{
-        Message, NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
-        NodeTransferCmd,
+        NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse, NodeTransferCmd,
+        ProcessMsg,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -59,13 +59,12 @@ impl Node {
             key_set: self.network_api.our_public_key_set().await?,
         };
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeQueryResponse {
+            msg: ProcessMsg::NodeQueryResponse {
                 response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(
                     elders,
                 )),
                 correlation_id: msg_id,
                 id: MessageId::in_response_to(&msg_id), // MessageId::new(), //
-                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),  // this will be a section
@@ -77,13 +76,12 @@ impl Node {
     pub(crate) async fn notify_section_of_our_storage(&mut self) -> Result<NodeDuty> {
         let node_id = PublicKey::from(self.network_api.public_key().await);
         Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
                     section: node_id.into(),
                     node_id,
                 }),
                 id: MessageId::new(),
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
             dst: DstLocation::Section(node_id.into()),
@@ -95,10 +93,9 @@ impl Node {
     pub(crate) async fn register_wallet(&self) -> OutgoingMsg {
         let address = self.network_api.our_prefix().await.name();
         OutgoingMsg {
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(self.node_info.reward_key)),
                 id: MessageId::new(),
-                target_section_pk: None,
             },
             section_source: false, // sent as single node
             dst: DstLocation::Section(address),

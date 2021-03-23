@@ -28,8 +28,8 @@ use bls::SecretKey;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use log::{error, info};
 use sn_data_types::PublicKey;
-use sn_routing::EventStream;
-use sn_routing::{Prefix, XorName};
+use sn_messaging::client::ProcessMsg;
+use sn_routing::{EventStream, Prefix, XorName};
 use std::path::{Path, PathBuf};
 use std::{
     fmt::{self, Display, Formatter},

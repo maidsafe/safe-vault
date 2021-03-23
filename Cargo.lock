@@ -1641,9 +1641,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.11.8"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "604dbd98d1a4ed86f164e5e7182235e8c2ecdb6ee7fe751c9a1b113729e4ec1b"
+checksum = "caea181b4ebb5fe0c0b6f258567c7ea2214e2a1ae311069cc744e1db47cea207"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2214,6 +2214,27 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 
 [[package]]
 name = "sn_data_types"
+version = "0.17.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e87ce4a2079c422edc8687e03ae8077fb3d5714c966c805b27310748fabd6c6"
+dependencies = [
+ "bincode",
+ "crdts",
+ "ed25519-dalek",
+ "hex",
+ "multibase",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "serde",
+ "signature",
+ "thiserror",
+ "threshold_crypto",
+ "tiny-keccak 2.0.2",
+ "xor_name",
+]
+
+[[package]]
+name = "sn_data_types"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cac59b472fe0a6263dcf44d0c3573422e52dc4bc0488415a260dde26158eeb13"
@@ -2265,7 +2286,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "signature",
- "sn_data_types",
+ "sn_data_types 0.18.0",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
@@ -2302,9 +2323,9 @@ dependencies = [
  "serde",
  "serde_json",
  "signature",
- "sn_data_types",
+ "sn_data_types 0.18.0",
  "sn_launch_tool",
- "sn_messaging",
+ "sn_messaging 12.0.0",
  "sn_routing",
  "sn_transfers",
  "structopt",
@@ -2335,8 +2356,8 @@ dependencies = [
  "rand_chacha 0.2.2",
  "resource_proof",
  "serde",
- "sn_data_types",
- "sn_messaging",
+ "sn_data_types 0.17.2",
+ "sn_messaging 10.0.0",
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
@@ -2348,8 +2369,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bf908f1fd14518ecd9337dc2755e55799fdc5a6c9f6661726ace7715ee5bc64"
+source = "git+https://github.com/oetyng/sn_transfers?branch=anti-entropy#ae2719b7d0c89e64c1a8e91a772162257140926f"
 dependencies = [
  "bincode",
  "crdts",
@@ -2357,7 +2377,7 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "serde",
- "sn_data_types",
+ "sn_data_types 0.18.0",
  "thiserror",
  "threshold_crypto",
  "xor_name",

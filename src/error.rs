@@ -29,12 +29,21 @@ pub enum Error {
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
+    /// Target xorname could not be determined from DstLocation
+    #[error("No destination name found")]
+    NoDestinationName,
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing")]
     NoSectionPublicKey,
     /// Unknown as a Section PublicKey.
     #[error("PublicKey provided was not identified as a section {0}")]
     UnknownSectionKey(PublicKey),
+    /// Nodes cannot send direct messages
+    #[error("Node cannot send direct messages. This functionality will be deprecated in routing.")]
+    CannotDirectMessage,
+    /// Not Section PublicKey.
+    #[error("Not section public key returned from routing for xorname {0}")]
+    NoSectionPublicKeyKnown(XorName),
     /// Not a Section PublicKeyShare.
     #[error("PublicKey provided for signing as elder is not a BLS PublicKeyShare")]
     ProvidedPkIsNotBlsShare,
@@ -89,6 +98,9 @@ pub enum Error {
     /// Network message error.
     #[error("Client message error:: {0}")]
     ClientMessage(#[from] sn_messaging::client::Error),
+    /// Network processing error message.
+    #[error("Procesing error:: {0:?}")]
+    ProcessingError(sn_messaging::client::ProcessingError),
     /// Network message error.
     #[error("Network message error:: {0}")]
     Message(#[from] sn_messaging::Error),

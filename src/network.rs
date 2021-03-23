@@ -12,7 +12,7 @@ use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
-use sn_messaging::Itinerary;
+use sn_messaging::{client::ProcessMsg, Itinerary};
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
     SectionChain,
@@ -202,6 +202,11 @@ impl Network {
     pub async fn our_index(&self) -> Result<usize> {
         self.routing.our_index().await.map_err(Error::Routing)
     }
+
+    // /// BLS key index in routing for key shares
+    // pub async fn get_section_elders(&self, name: &XorName) -> Result<usize> {
+    //     self.routing.get
+    // }
 
     pub async fn our_elder_names(&self) -> BTreeSet<XorName> {
         self.routing

@@ -17,6 +17,7 @@ use crate::{Error, Result};
 use dashmap::DashMap;
 use log::info;
 use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, Token};
+use sn_messaging::client::ProcessMsg;
 use sn_routing::XorName;
 use std::collections::BTreeMap;
 
