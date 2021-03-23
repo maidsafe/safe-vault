@@ -27,6 +27,7 @@ use log::{debug, error, info, trace, warn};
 use replica_signing::ReplicaSigningImpl;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
+use sn_routing::XorName;
 use std::collections::{BTreeMap, HashSet};
 
 use futures::lock::Mutex;
@@ -205,7 +206,7 @@ impl Transfers {
         let result = match registration {
             Ok(_) => match self
                 .replicas
-                .receive_propagated(&payment.credit_proof())
+                .receive_propagated(payment.sender().into(), &payment.credit_proof())
                 .await
             {
                 Ok(_) => Ok(()),
@@ -574,7 +575,11 @@ impl Transfers {
     ) -> Result<NodeDuty> {
         use NodeTransferError::*;
         // We will just validate the proofs and then apply the event.
-        let msg = match self.replicas.receive_propagated(credit_proof).await {
+        let msg = match self
+            .replicas
+            .receive_propagated(origin.name(), credit_proof)
+            .await
+        {
             Ok(_) => return Ok(NodeDuty::NoOp),
             Err(Error::NetworkData(error)) => {
                 let message_error = convert_dt_error_to_error_message(error)?;
@@ -599,7 +604,7 @@ impl Transfers {
                     target_section_pk: None,
                 }
             }
-            Err(_e) => unimplemented!("receive_propagated"),
+            Err(e) => unimplemented!("receive_propagated: {}", e),
         };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg,

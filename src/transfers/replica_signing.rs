@@ -31,6 +31,12 @@ pub trait ReplicaSigning {
     async fn sign_validated_credit(&self, credit: &SignedCredit) -> Result<SignatureShare>;
 
     async fn sign_credit_proof(&self, proof: &CreditAgreementProof) -> Result<SignatureShare>;
+
+    async fn known_replicas(
+        &self,
+        wallet_name: &sn_routing::XorName,
+        section_key: bls::PublicKey,
+    ) -> bool;
 }
 
 /// The Replica is the part of an AT2 system
@@ -83,5 +89,19 @@ impl ReplicaSigning for ReplicaSigningImpl {
 
     async fn sign_credit_proof(&self, proof: &CreditAgreementProof) -> Result<SignatureShare> {
         Ok(self.network.sign_as_elder(&proof).await?)
+    }
+
+    /// Brittle validation of provided section key (once) being
+    /// a valid section, since the query returns the current key..
+    async fn known_replicas(
+        &self,
+        wallet_name: &sn_routing::XorName,
+        section_key: bls::PublicKey,
+    ) -> bool {
+        if let (Some(key), _) = self.network.matching_section(wallet_name).await {
+            key == section_key
+        } else {
+            false
+        }
     }
 }

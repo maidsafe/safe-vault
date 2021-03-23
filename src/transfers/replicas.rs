@@ -230,8 +230,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         if events.is_empty() {
             info!("Events are empty. Initiating Genesis replica.");
             let credit_proof = self.create_genesis().await?;
-            let genesis_source = Ok(PublicKey::Bls(credit_proof.replica_keys().public_key()));
-            return self.store_genesis(&credit_proof, || genesis_source).await;
+            return self.store_genesis(&credit_proof).await;
         }
         for e in events {
             let id = match e {
@@ -311,15 +310,24 @@ impl<T: ReplicaSigning> Replicas<T> {
         transfer_proof: &TransferAgreementProof,
     ) -> Result<TransferRegistered> {
         let id = transfer_proof.sender();
+
+        let known_key = self.exists_in_chain(&transfer_proof.replica_keys().public_key())
+            || self
+                .info
+                .signing
+                .known_replicas(&id.into(), transfer_proof.replica_keys().public_key())
+                .await;
+        if !known_key {
+            return Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted));
+        }
+
         // Acquire lock of the wallet.
         let key_lock = self.load_key_lock(id).await?;
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
-        match wallet.register(transfer_proof, || {
-            self.find_past_key(&transfer_proof.replica_keys())
-        })? {
+        match wallet.register(transfer_proof)? {
             None => {
                 info!("transfer already registered!");
                 Err(Error::TransferAlreadyRegistered)
@@ -339,10 +347,21 @@ impl<T: ReplicaSigning> Replicas<T> {
     /// (Since this leads to a credit, there is no requirement on order.)
     pub async fn receive_propagated(
         &self,
+        debiting_replicas_name: xor_name::XorName,
         credit_proof: &CreditAgreementProof,
     ) -> Result<TransferPropagated> {
         // Acquire lock of the wallet.
         let id = credit_proof.recipient();
+        let debiting_replicas_key = credit_proof.replica_keys().public_key();
+        let known_key = self.exists_in_chain(&debiting_replicas_key)
+            || self
+                .info
+                .signing
+                .known_replicas(&debiting_replicas_name, debiting_replicas_key)
+                .await;
+        if !known_key {
+            return Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted));
+        }
 
         // Only when propagated is there a risk that the store doesn't exist,
         // and that we want to create it. All other write operations require that
@@ -370,10 +389,7 @@ impl<T: ReplicaSigning> Replicas<T> {
 
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
-        let propagation_result = wallet.receive_propagated(credit_proof, || {
-            self.find_past_key(&credit_proof.replica_keys())
-        });
-
+        let propagation_result = wallet.receive_propagated(credit_proof);
         if propagation_result.is_ok() {
             // update state
             let event = TransferPropagated {
@@ -418,16 +434,11 @@ impl<T: ReplicaSigning> Replicas<T> {
         Ok(wallet)
     }
 
-    fn find_past_key(&self, keyset: &PublicKeySet) -> Result<PublicKey, TransfersError> {
-        let section_keys = self.info.section_chain.clone();
-        let key = section_keys
+    fn exists_in_chain(&self, key: &bls::PublicKey) -> bool {
+        self.info
+            .section_chain
             .keys()
-            .find(|&key_in_chain| key_in_chain == &keyset.public_key());
-        if let Some(key_in_chain) = key {
-            Ok(PublicKey::Bls(*key_in_chain))
-        } else {
-            Err(TransfersError::SectionKeyNeverExisted)
-        }
+            .any(|key_in_chain| key_in_chain == key)
     }
 
     async fn get_load_or_create_store(
@@ -467,11 +478,7 @@ impl<T: ReplicaSigning> Replicas<T> {
 
     /// This is the one and only infusion of tokens to the system. Ever.
     /// It is carried out by the first node in the network.
-    async fn store_genesis<F: FnOnce() -> Result<PublicKey, TransfersError>>(
-        &self,
-        credit_proof: &CreditAgreementProof,
-        past_key: F,
-    ) -> Result<()> {
+    async fn store_genesis(&self, credit_proof: &CreditAgreementProof) -> Result<()> {
         let id = credit_proof.recipient();
         // Acquire lock on self.
         let self_lock = self.self_lock.lock().await;
@@ -490,7 +497,7 @@ impl<T: ReplicaSigning> Replicas<T> {
 
         // Access to the specific wallet is now serialised!
         let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
-        let _ = wallet.genesis(credit_proof, past_key)?;
+        let _ = wallet.genesis(credit_proof)?;
 
         // update state
         // Q: are we locked on `info.signing` here? (we don't want to be)
@@ -734,8 +741,10 @@ mod test {
         match event.proof {
             Some(transfer_proof) => {
                 let _registered = run(genesis_replicas.register(&transfer_proof))?;
-                let _propagated =
-                    run(genesis_replicas.receive_propagated(&transfer_proof.credit_proof()))?;
+                let _propagated = run(genesis_replicas.receive_propagated(
+                    transfer_proof.sender().into(),
+                    &transfer_proof.credit_proof(),
+                ))?;
             }
             None => return Err(Error::Logic("We should have a proof here.".to_string())),
         }

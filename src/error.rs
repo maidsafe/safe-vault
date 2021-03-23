@@ -10,6 +10,7 @@ use sn_data_types::{Error as DtError, PublicKey};
 use sn_messaging::{client::Error as ErrorMessage, MessageId};
 use std::io;
 use thiserror::Error;
+use xor_name::XorName;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
@@ -34,6 +35,9 @@ pub enum Error {
     /// Not Section PublicKeySet.
     #[error("Not section public key set returned from routing")]
     NoSectionPublicKeySet,
+    /// Not Section PublicKey.
+    #[error("Not section public key returned from routing for xorname {0}")]
+    NoSectionPublicKeyKnown(XorName),
     /// Unable to parse genesis proposal.
     #[error("Cannot parse genesis proposal at this stage")]
     InvalidGenesisStage,
