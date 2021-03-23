@@ -28,23 +28,26 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
         aggregation: msg.aggregation,
     };
 
+    let msg_id = msg.id();
+
+    let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
     let target_section_pk = match msg.dst {
-        DstLocation::EndUser(end_user) => Ok(end_user.id()),
+        DstLocation::EndUser(end_user) => Ok(end_user.id().bls().ok_or(Error::ProvidedPkIsNotBls)?),
         DstLocation::Section(name) | DstLocation::Node(name) => {
-            network.get_section_pk_by_name(name).await?
+            Ok(network.get_section_pk_by_name(&name).await?)
         }
         Direct => Err(Error::CannotDirectMessage),
     }?;
 
     let message = Message::Process(msg.msg);
     let result = network
-        .send_message(itinerary, message.serialize(msg.dst, target_section_pk)?)
+        .send_message(itinerary, message.serialize(dst_name, target_section_pk)?)
         .await;
 
     result.map_or_else(
         |err| {
             error!("Unable to send msg: {:?}", err);
-            Err(Error::Logic(format!("Unable to send msg: {:?}", msg.id())))
+            Err(Error::Logic(format!("Unable to send msg: {:?}", msg_id)))
         },
         |()| Ok(()),
     )
@@ -63,9 +66,7 @@ pub(crate) async fn send_to_nodes(
     for target in targets {
         let target_section_pk = network
             .get_section_pk_by_name(&target)
-            .await?
-            .bls()
-            .ok_or(Error::NoSectionPublicKeyKnown(target))?;
+            .await?;
         let bytes = &message.serialize(target, target_section_pk)?;
 
         network

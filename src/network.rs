@@ -124,11 +124,11 @@ impl Network {
         self.routing.public_key_set().await.map_err(Error::Routing)
     }
 
-    pub async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
+    pub async fn get_section_pk_by_name(&self, name: &XorName) -> Result<bls::PublicKey> {
         let (pk, _elders) = self.routing.match_section(name).await;
 
-        if Some(pk) = pk {
-            return pk;
+        if let Some(pk) = pk {
+            return Ok(pk);
         } else {
             Err(Error::NoSectionPublicKeyKnown(name))
         }

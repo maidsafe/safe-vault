@@ -22,6 +22,9 @@ pub enum Error {
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
+    /// Target xorname could not be determined from DstLocation
+    #[error("No destination name found")]
+    NoDestinationName,
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing")]
     NoSectionPublicKey,
