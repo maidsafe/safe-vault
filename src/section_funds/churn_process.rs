@@ -48,16 +48,17 @@ pub enum Churn {
     /// Contains the new children EldersInfo/Wallets.
     Split {
         ///
-        our_elders: EldersInfo,
+        our_key: PublicKey,
         ///
-        sibling_elders: EldersInfo,
+        sibling_key: PublicKey,
     },
 }
 
 impl Churn {
     pub fn wallet_key(&self) -> PublicKey {
         match self {
-            Self::Regular(our_elders) | Self::Split { our_elders, .. } => our_elders.key(),
+            Self::Regular(our_elders) => our_elders.key(),
+            Self::Split { our_key, .. } => our_key,
         }
     }
 
@@ -67,7 +68,7 @@ impl Churn {
 
     pub fn our_elders(&self) -> &EldersInfo {
         match self {
-            Self::Regular(our_elders) | Self::Split { our_elders, .. } => our_elders,
+            Self::Regular(our_elders) | Self::Split { our_key: our_elders, .. } => our_elders,
         }
     }
 }
@@ -95,8 +96,8 @@ impl ChurnProcess {
         match self.churn.clone() {
             Churn::Regular(_next) => self.propose_wallet_creation(self.balance).await,
             Churn::Split {
-                our_elders,
-                sibling_elders,
+                our_key,
+                sibling_key,
             } => {
                 // Split the tokens of current actor.
                 let half_balance = self.balance.as_nano() / 2;
@@ -108,7 +109,7 @@ impl ChurnProcess {
 
                 // Determine which transfer is first
                 // (deterministic order is important for reaching consensus)
-                if our_elders.key() > sibling_elders.key() {
+                if our_key > sibling_key {
                     self.propose_wallet_creation(t1_amount).await
                 } else {
                     self.propose_wallet_creation(t2_amount).await

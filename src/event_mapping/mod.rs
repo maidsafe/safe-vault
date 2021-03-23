@@ -138,7 +138,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                         } else {
                             NodeDuty::ChurnMembers {
                                 elders,
-                                sibling_elders,
+                                sibling_key,
                                 newbie: false,
                             }
                         }

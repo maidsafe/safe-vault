@@ -46,7 +46,7 @@ impl Node {
     pub(crate) async fn begin_churn_as_newbie(
         &mut self,
         our_elders: EldersInfo,
-        sibling_elders: Option<EldersInfo>,
+        sibling_key: Option<PublicKey>,
     ) -> Result<NodeDuties> {
         debug!("begin_churn_as_newbie: Zero balance.");
 
@@ -58,16 +58,11 @@ impl Node {
             .get_section_pk_by_name(&our_elders_name)
             .await?;
 
-        let churn = if let Some(sibling_elders) = &sibling_elders {
-            let our_sibling_peers = sibling_elders.prefix.name();
-            let sibling_key = self
-                .network_api
-                .get_section_pk_by_name(&our_sibling_peers)
-                .await?;
+        let churn = if let Some(sibling_key) = &sibling_key {
 
             Churn::Split {
-                our_elders,
-                sibling_elders: sibling_elders.to_owned(),
+                our_key: our_elders,
+                sibling_key,
             }
         } else {
             Churn::Regular(our_elders)
@@ -111,8 +106,8 @@ impl Node {
     /// Called on ElderChanged event from routing layer.
     pub(crate) async fn begin_churn_as_oldie(
         &mut self,
-        our_elders: EldersInfo,
-        sibling_elders: Option<EldersInfo>,
+        our_key: PublicKey,
+        sibling_key: Option<PublicKey>,
     ) -> Result<NodeDuties> {
         let user_wallets = if let Some(transfers) = &mut self.transfers {
             update_transfers(self.node_info.path(), transfers, &self.network_api).await?;
@@ -129,28 +124,20 @@ impl Node {
         };
 
         // extract some info before moving our_elders..
-        let our_peers = our_elders.prefix.name();
-
         let section_key = self.network_api.get_section_pk_by_name(&our_peers).await?;
 
-        let churn = if let Some(sibling_elders) = &sibling_elders {
-            let our_sibling_peers = sibling_elders.prefix.name();
-            let sibling_key = self
-                .network_api
-                .get_section_pk_by_name(&our_sibling_peers)
-                .await?;
-
+        let churn = if let Some(sibling_key) = &sibling_key {
             debug!(
                 "@@@@@@ SPLIT: Our prefix: {:?}, neighbour: {:?}",
-                our_elders.prefix, sibling_elders.prefix
+                our_elders.prefix, sibling_key.prefix
             );
             debug!(
                 "@@@@@@ SPLIT: Our key: {:?}, neighbour: {:?}",
                 section_key, sibling_key
             );
             Churn::Split {
-                our_elders,
-                sibling_elders: sibling_elders.to_owned(),
+                our_key: our_elders,
+                sibling_key: sibling_elders.to_owned(),
             }
         } else {
             Churn::Regular(our_elders)

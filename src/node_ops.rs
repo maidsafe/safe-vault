@@ -188,9 +188,9 @@ pub enum NodeDuty {
     ChurnMembers {
         /// The Elders of our section.
         elders: Elders,
-        /// The Elders of the sibling section, if this event is fired during a split.
+        /// The PK of the sibling section, if this event is fired during a split.
         /// Otherwise `None`.
-        sibling_elders: Option<Elders>,
+        sibling_key: Option<PublicKey>,
         /// oldie or newbie?
         newbie: bool,
     },
