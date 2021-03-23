@@ -21,7 +21,7 @@ use sn_messaging::{
     client::{NodeCmd, NodeQuery, NodeSystemCmd, NodeSystemQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId,
 };
-use sn_routing::Elders;
+use sn_routing::EldersInfo;
 use xor_name::XorName;
 
 use super::{
@@ -43,14 +43,14 @@ pub struct ChurnProcess {
 #[derive(Clone, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum Churn {
-    /// Contains next section Elders/Wallet.
-    Regular(Elders),
-    /// Contains the new children Elders/Wallets.
+    /// Contains next section EldersInfo/Wallet.
+    Regular(EldersInfo),
+    /// Contains the new children EldersInfo/Wallets.
     Split {
         ///
-        our_elders: Elders,
+        our_elders: EldersInfo,
         ///
-        sibling_elders: Elders,
+        sibling_elders: EldersInfo,
     },
 }
 
@@ -65,7 +65,7 @@ impl Churn {
         self.wallet_key().into()
     }
 
-    pub fn our_elders(&self) -> &Elders {
+    pub fn our_elders(&self) -> &EldersInfo {
         match self {
             Self::Regular(our_elders) | Self::Split { our_elders, .. } => our_elders,
         }
@@ -82,7 +82,7 @@ impl ChurnProcess {
         }
     }
 
-    pub fn our_elders(&self) -> &Elders {
+    pub fn our_elders(&self) -> &EldersInfo {
         self.churn.our_elders()
     }
 
