@@ -32,12 +32,16 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
 
     let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
     let target_section_pk = match msg.dst {
-        DstLocation::EndUser(end_user) => Ok(end_user.id().bls().ok_or(Error::ProvidedPkIsNotBls)?),
+        DstLocation::EndUser(end_user) => Ok(*end_user.id()),
         DstLocation::Section(name) | DstLocation::Node(name) => {
             Ok(network.get_section_pk_by_name(&name).await?)
         }
         Direct => Err(Error::CannotDirectMessage),
     }?;
+
+    let target_section_pk = target_section_pk
+        .bls()
+        .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
     let message = Message::Process(msg.msg);
     let result = network
@@ -66,7 +70,9 @@ pub(crate) async fn send_to_nodes(
     for target in targets {
         let target_section_pk = network
             .get_section_pk_by_name(&target)
-            .await?;
+            .await?
+            .bls()
+            .ok_or(Error::NoSectionPublicKeyKnown(target))?;
         let bytes = &message.serialize(target, target_section_pk)?;
 
         network

@@ -2346,7 +2346,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "9.0.0"
-source = "git+https://github.com/joshuef/sn_messaging?branch=Lazy#3be3a44dd52b40756d8a83a6d46fa1381253e7bb"
+source = "git+https://github.com/joshuef/sn_messaging?branch=Lazy#53798774b0d66fd857e8de5c85935907cad0f2dc"
 dependencies = [
  "bincode",
  "bytes 1.0.1",

@@ -16,7 +16,7 @@ use crate::{
 use log::debug;
 use sn_messaging::{
     client::{
-        Cmd, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
+        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
         NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery,
         NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse,
         ProcessMsg, Query, TransferCmd, TransferQuery,
