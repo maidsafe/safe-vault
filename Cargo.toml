@@ -31,9 +31,9 @@ serde_json = "1.0.53"
 structopt = "~0.3.17"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0-pre.4"
-sn_transfers = { git = "https://github.com/joshuef/sn_transfers", branch = "Lazy" }
-sn_routing = { git = "https://github.com/joshuef/sn_routing", branch = "YogLz" }
-sn_messaging = { git = "https://github.com/joshuef/sn_messaging", branch = "Lazy" }
+sn_transfers = { git = "https://github.com/oetyng/sn_transfers", branch = "check-mem-cpu-issue" }
+sn_routing = { git = "https://github.com/oetyng/sn_routing", branch = "check-mem-cpu-issue" }
+sn_messaging = { git = "https://github.com/oetyng/sn_messaging", branch = "check-mem-cpu-issue" }
 sn_data_types = "~0.17.0"
 ed25519 = "1.0.1"
 signature = "1.1.10"

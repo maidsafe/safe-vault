@@ -111,6 +111,14 @@ impl ReplicaSigning for TestReplicaSigning {
             }),
         }
     }
+
+    async fn known_replicas(
+        &self,
+        _wallet_name: &sn_routing::XorName,
+        _section_key: bls::PublicKey,
+    ) -> bool {
+        true
+    }
 }
 
 /// Produces a genesis balance for a new network.

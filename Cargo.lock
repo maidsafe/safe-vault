@@ -2346,7 +2346,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "9.0.0"
-source = "git+https://github.com/joshuef/sn_messaging?branch=Lazy#fc7186020a074ece6e1cb9336bd92a9a10b04f4a"
+source = "git+https://github.com/oetyng/sn_messaging?branch=check-mem-cpu-issue#9bf0070a70226eadc62a1a88f8eaa2bf7986a574"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2413,8 +2413,8 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.49.1"
-source = "git+https://github.com/joshuef/sn_routing?branch=YogLz#b33a639d5d78568f0fcd09dcbdb0b032569a9734"
+version = "0.53.0"
+source = "git+https://github.com/oetyng/sn_routing?branch=check-mem-cpu-issue#4cbbdeec014f63d8aa0aaf089b8a16f71b38eaf3"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2443,7 +2443,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.6.0"
-source = "git+https://github.com/joshuef/sn_transfers?branch=Lazy#9cf4cac2b002d7caa36cdac4927700d663347e46"
+source = "git+https://github.com/oetyng/sn_transfers?branch=check-mem-cpu-issue#5751e2e7abf8e8d398ff87b93a952220ea17c6c7"
 dependencies = [
  "bincode",
  "crdts",

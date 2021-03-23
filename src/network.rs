@@ -19,8 +19,8 @@ use serde::Serialize;
 use sn_data_types::{Error as DtError, PublicKey, Result as DtResult, Signature, SignatureShare};
 use sn_messaging::{client::ProcessMsg, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::{
-    Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
-    SectionChain,
+    Config as RoutingConfig, EldersInfo, Error as RoutingError, EventStream,
+    Routing as RoutingNode, SectionChain,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -120,12 +120,19 @@ impl Network {
             .map(PublicKey::Bls)
     }
 
+    pub async fn matching_section(
+        &self,
+        name: &XorName,
+    ) -> (Option<bls::PublicKey>, Option<EldersInfo>) {
+        self.routing.matching_section(&name).await
+    }
+
     pub async fn our_public_key_set(&self) -> Result<PublicKeySet> {
         self.routing.public_key_set().await.map_err(Error::Routing)
     }
 
     pub async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
-        let (pk, elders) = self.routing.match_section(name).await;
+        let (pk, elders) = self.routing.matching_section(name).await;
         if let Some(pk) = pk {
             let pk = PublicKey::from(pk);
             Ok(pk)
