@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_data_types::{Error as DtError, PublicKey};
-use sn_messaging::{client::Error as ErrorMessage, MessageId};
+use sn_messaging::{
+    client::{Error as ErrorMessage, Message},
+    MessageId,
+};
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;
@@ -146,6 +149,9 @@ pub enum Error {
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
+    /// Unable to send message
+    #[error("Unable to send message: {0:?}")]
+    UnableToSend(Message),
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {

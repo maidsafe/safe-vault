@@ -13,7 +13,7 @@ use sn_data_types::{
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, Message, ProcessMsg},
+    client::{BlobRead, BlobWrite, ProcessMsg, ProcessingError},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::Prefix;
@@ -164,6 +164,9 @@ pub enum NodeDuty {
     SetNodeJoinsAllowed(bool),
     /// Send a message to the specified dst.
     Send(OutgoingMsg),
+    /// Send a lazy error as a result of a specfic message.
+    /// The aim here is for the sender to respond with any missing state
+    SendError(OutgoingLazyError),
     /// Send the same request to each individual node.
     SendToNodes {
         msg: ProcessMsg,
@@ -245,6 +248,7 @@ impl Debug for NodeDuty {
             Self::IncrementFullNodeCount { .. } => write!(f, "IncrementFullNodeCount"),
             Self::SetNodeJoinsAllowed(_) => write!(f, "SetNodeJoinsAllowed"),
             Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),
+            Self::SendError(msg) => write!(f, "SendError [ msg: {:?} ]", msg),
             Self::SendToNodes {
                 msg,
                 targets,
@@ -276,8 +280,20 @@ pub struct OutgoingMsg {
     pub aggregation: Aggregation,
 }
 
+#[derive(Debug, Clone)]
+pub struct OutgoingLazyError {
+    pub msg: ProcessingError,
+    pub dst: DstLocation,
+}
+
 impl OutgoingMsg {
     pub fn id(&self) -> MessageId {
         self.msg.id()
+    }
+}
+
+impl OutgoingLazyError {
+    pub fn id(&self) -> MessageId {
+        self.msg.id
     }
 }

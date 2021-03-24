@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::messaging::{send, send_to_nodes};
+use super::messaging::{send, send_error, send_to_nodes};
 use crate::{
     chunks::Chunks,
     node::{AdultRole, Role},
@@ -285,6 +285,10 @@ impl Node {
             }
             NodeDuty::Send(msg) => {
                 send(msg, &self.network_api).await?;
+                Ok(vec![])
+            }
+            NodeDuty::SendError(msg) => {
+                send_error(msg, &self.network_api).await?;
                 Ok(vec![])
             }
             NodeDuty::SendToNodes {

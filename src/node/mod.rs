@@ -18,7 +18,7 @@ use crate::{
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::Metadata,
     network::Network,
-    node_ops::NodeDuty,
+node_ops::{NodeDuty, OutgoingLazyError, OutgoingMsg},
     section_funds::SectionFunds,
     state_db::{get_reward_pk, store_new_reward_keypair},
     transfers::Transfers,
@@ -26,9 +26,9 @@ use crate::{
 };
 use bls::SecretKey;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
-use log::{error, info};
+use log::{error, info, warn};
 use sn_data_types::PublicKey;
-use sn_messaging::client::ProcessMsg;
+use sn_messaging::client::{ProcessMsg, ProcessingError, ProcessingErrorReason};
 use sn_routing::{EventStream, Prefix, XorName};
 use std::path::{Path, PathBuf};
 use std::{
@@ -211,11 +211,75 @@ impl Node {
             for duty in next_ops {
                 match self.handle(duty).await {
                     Ok(new_ops) => pending_node_ops.extend(new_ops),
-                    Err(e) => try_handle_error(e, ctx.clone()),
+                    Err(e) => {
+                        let new_op = try_handle_error(e, ctx.clone());
+                        pending_node_ops.push(new_op)
+                    }
                 };
             }
             next_ops = pending_node_ops;
         }
+    }
+}
+
+fn get_dst_from_src(src: SrcLocation) -> DstLocation {
+    match src {
+        SrcLocation::EndUser(user) => DstLocation::EndUser(user),
+        SrcLocation::Node(node) => DstLocation::Node(node),
+        SrcLocation::Section(section) => DstLocation::Section(section),
+    }
+}
+
+fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
+    use std::error::Error;
+    warn!("Error being handled by node: {:?}", err);
+    if let Some(source) = err.source() {
+        if let Some(_ctx) = ctx {
+            error!("Source of error: {:?}", source);
+            match ctx {
+                // The message that triggered this error
+                MsgContext::Msg { msg, src } => {
+                    error!("Error in response to a message: {:?}", msg);
+                    let dst = get_dst_from_src(src);
+
+                    // TODO: map node error to ProcessingError reasons...
+                    NodeDuty::SendError(OutgoingLazyError {
+                        msg: msg.create_processing_error(None),
+                        dst,
+                    })
+                }
+                // An error decoding a message
+                MsgContext::Bytes { msg, src } => {
+                    warn!("Error decoding msg bytes, sent from {:?}", src);
+                    let dst = get_dst_from_src(src);
+
+                    NodeDuty::SendError(OutgoingLazyError {
+                        msg: ProcessingError {
+                            reason: Some(ProcessingErrorReason::CouldNotDeserialize),
+                            source_message: None,
+                            id: MessageId::new(),
+                        },
+                        dst,
+                    })
+                }
+                // We received an error, and so need to handle that.
+                // Q: Should this be here? Probably should be handled at MsgContext::Error creation
+                // Not sure there's a need to bring it out here...
+                MsgContext::Error { msg, src } => {
+                    error!("%%%% A lazy error to be handled... {:?}", msg);
+                    NodeDuty::NoOp
+                }
+            }
+        } else {
+            error!(
+                "Erroring without a msg context. Source of error: {:?}",
+                source
+            );
+            NodeDuty::NoOp
+        }
+    } else {
+        info!("unimplemented: Handle errors. {:?}", err);
+        NodeDuty::NoOp
     }
 }
 
@@ -228,26 +292,6 @@ fn handle_error(err: LazyError) {
 
     if let Some(source) = err.error.source() {
         error!("Source of error: {:?}", source);
-    }
-}
-
-fn try_handle_error(err: Error, ctx: Option<MsgContext>) {
-    use std::error::Error;
-    if let Some(source) = err.source() {
-        if let Some(_ctx) = ctx {
-            info!(
-                "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
-                err
-            );
-            error!("Source of error: {:?}", source);
-        } else {
-            error!(
-                "Erroring without a msg context. Source of error: {:?}",
-                source
-            );
-        }
-    } else {
-        info!("unimplemented: Handle errors. {:?}", err);
     }
 }
 
