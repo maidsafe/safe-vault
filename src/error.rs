@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use log::debug;
 use sn_data_types::{Error as DtError, PublicKey};
 use sn_messaging::{
     client::{Error as ErrorMessage, Message},
@@ -29,12 +30,39 @@ pub enum Error {
     /// The key balance already exists when it was expected to be empty (during section genesis)
     #[error("Balance already exists.")]
     BalanceExists,
+    /// ActorHistory must contain only transfers of a single actor.
+    #[error("ActorHistory must contain only transfers of a single actor..")]
+    InvalidActorHistory,
+    /// Not enough space in `ChunkStore` to perform `put`.
+    #[error("Sync not valid for the current state of section funds")]
+    InvalidSectionFundsStage,
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
+    /// Node does not manage any section funds.
+    #[error("Node does not currently manage any section funds")]
+    NoSectionFunds,
+    /// Node does not manage any metadata, so is likely not a fully prepared elder yet.
+    #[error("Node does not currently manage any section metadata")]
+    NoSectionMetaData,
+    /// Node does not manage any immutable chunks.
+    #[error("Node does not currently manage any immutable chunks")]
+    NoImmutableChunks,
+    /// Node is currently churning so cannot perform the request.
+    #[error("Cannot complete request due to churning of funds")]
+    NodeChurningFunds,
+    /// Node is currently churning, but failed to sign a message.
+    #[error("Error signing message during churn")]
+    ChurnSignError,
+    /// The node is not in genesis stage.
+    #[error("Not in genesis stage")]
+    NotInGenesis,
     /// Target xorname could not be determined from DstLocation
     #[error("No destination name found")]
     NoDestinationName,
+    /// Failed to activate a node, due to it being active already
+    #[error("Cannot activate node: Node is already active")]
+    NodeAlreadyActive,
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing")]
     NoSectionPublicKey,
@@ -44,6 +72,9 @@ pub enum Error {
     /// Nodes cannot send direct messages
     #[error("Node cannot send direct messages. This functionality will be deprecated in routing.")]
     CannotDirectMessage,
+    /// Node cannot be updated, message cannot be resent
+    #[error("Process error could not be handled. We cannot update the problem node.")]
+    CannotUpdateProcessErrorNode,
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing for xorname {0}")]
     NoSectionPublicKeyKnown(XorName),
@@ -137,9 +168,6 @@ pub enum Error {
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwners(PublicKey),
-    /// Operation is invalid, eg signing validation
-    #[error("Invalid operation: {0}")]
-    InvalidOperation(String),
     /// No mapping to sn_messages::Error could be found. Either we need a new error there, or we need to handle or convert this error before sending it as a message
     #[error("No mapping to sn_messages error is set up for this NodeError {0}")]
     NoErrorMapping(String),
@@ -155,8 +183,12 @@ pub enum Error {
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {
+    // debug!("Attempting to map sn_node error to sn_messaging error");
     match error {
-        Error::InvalidOperation(_msg) => Ok(ErrorMessage::InvalidOperation),
+        Error::NoSectionMetaData => Ok(ErrorMessage::NoSectionMetaData),
+        Error::NoImmutableChunks => Ok(ErrorMessage::NoImmutableChunks),
+        Error::NodeChurningFunds => Ok(ErrorMessage::NodeChurningFunds),
+        Error::NoSectionFunds => Ok(ErrorMessage::NoSectionFunds),
         Error::InvalidOwners(key) => Ok(ErrorMessage::InvalidOwners(key)),
         Error::InvalidSignedTransfer(_) => Ok(ErrorMessage::InvalidSignature),
         Error::TransferAlreadyRegistered => Ok(ErrorMessage::TransactionIdExists),

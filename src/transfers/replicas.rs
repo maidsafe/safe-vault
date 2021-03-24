@@ -84,9 +84,7 @@ impl<T: ReplicaSigning> Replicas<T> {
             let valid_owners = wallet.credits.iter().all(|c| node == c.recipient())
                 && wallet.debits.iter().all(|d| node == d.sender());
             if !valid_owners {
-                return Err(Error::InvalidOperation(
-                    "ActorHistory must contain only transfers of a single actor.".to_string(),
-                ));
+                return Err(Error::InvalidActorHistory);
             }
             for credit_proof in wallet.credits {
                 let id = credit_proof.recipient();
