@@ -88,7 +88,10 @@ impl Node {
                                 credit_proof: credit_proof.clone(),
                                 replicas: replicas.clone(),
                             };
-                            return self.complete_wallet_churn(info).await;
+                            let mut ops = vec![];
+                            ops.push(Self::propagate_credit(credit_proof.clone())?);
+                            ops.extend(self.complete_wallet_churn(info).await?);
+                            return Ok(ops);
                         }
                         WalletStage::None => return Err(Error::InvalidGenesisStage),
                     }
@@ -118,7 +121,6 @@ impl Node {
                     );
 
                     if let WalletStage::Completed(credit_proof) = churn_process.stage().clone() {
-                        ops.push(Self::propagate_credit(credit_proof.clone())?);
                         if let Some(replicas) = replicas.clone() {
                             let recipient = credit_proof.recipient();
                             info!("Completing ({}): Replicas came before credit.", recipient);
@@ -128,6 +130,7 @@ impl Node {
                                 credit_proof: credit_proof.clone(),
                                 replicas: replicas.clone(),
                             };
+                            ops.push(Self::propagate_credit(credit_proof.clone())?);
                             ops.extend(self.complete_wallet_churn(info).await?);
                         }
                     }
