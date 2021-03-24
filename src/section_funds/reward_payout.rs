@@ -216,30 +216,22 @@ impl RewardPayout {
 
             /// send out the registration
             let msg_id = XorName::from_content(&[&bincode::serialize(&proof.credit_sig)?]);
-            let mut reward_ops: Vec<_> = self
-                .actor
-                .replicas()
-                .names
-                .into_iter()
-                .map(|elder| {
-                    // We ask of our Replicas to validate this transfer.
-                    Some(NodeDuty::Send(OutgoingMsg {
-                        msg: ProcessMsg::NodeCmd {
-                            cmd: Transfers(RegisterSectionPayout(proof.clone())),
-                            id: MessageId(msg_id),
-                        },
-                        section_source: false, // i.e. responses go to our section
-                        dst: DstLocation::Node(elder), // a remote section transfers module will handle this (i.e. our replicas)
-                        aggregation: Aggregation::AtDestination, // (not needed, but makes sn_node logs less chatty..)
-                    }))
-                })
-                .flatten()
-                .collect();
+
+            let mut ops = vec![];
+            ops.push(NodeDuty::Send(OutgoingMsg {
+                msg: ProcessMsg::NodeCmd {
+                    cmd: Transfers(RegisterSectionPayout(proof.clone())),
+                    id: MessageId(msg_id),
+                },
+                section_source: true, // i.e. responses go to our section
+                dst: DstLocation::Section(self.actor.id().into()), // a remote section transfers module will handle this (i.e. our replicas)
+                aggregation: Aggregation::AtDestination, // (not needed, but makes sn_node logs less chatty..)
+            }));
 
             // pop from queue if any
-            reward_ops.push(self.try_pop_queue().await?);
+            ops.push(self.try_pop_queue().await?);
 
-            Ok(reward_ops)
+            Ok(ops)
         } else {
             Ok(vec![])
         }
