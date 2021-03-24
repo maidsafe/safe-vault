@@ -19,7 +19,8 @@ use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     chunk_store::UsedSpace,
     chunks::Chunks,
-    event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
+    error::convert_to_error_message,
+    event_mapping::{map_routing_event, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty, OutgoingLazyError, OutgoingMsg},
     section_funds::SectionFunds,
@@ -35,7 +36,7 @@ use hex_fmt::HexFmt;
 use log::{debug, error, info, trace, warn};
 use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, TransferPropagated, WalletHistory};
 use sn_messaging::{
-    client::{ProcessMsg, ProcessingError, ProcessingErrorReason},
+    client::{Error as ErrorMessage, Message, ProcessMsg, ProcessingError},
     DstLocation, MessageId, SrcLocation,
 };
 use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
@@ -167,7 +168,10 @@ impl Node {
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
             match map_routing_event(event, &self.network_api).await {
                 Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,
-                Mapping::Error(error) => handle_error(error),
+                Mapping::Error { msg, error } => {
+                    let duty = try_handle_error(error, Some(msg));
+                    self.process_while_any(duty, None).await;
+                }
             }
         }
 
@@ -181,7 +185,7 @@ impl Node {
         while !next_ops.is_empty() {
             let mut pending_node_ops: Vec<NodeDuty> = vec![];
             for duty in next_ops {
-                match self.handle(duty).await {
+                match self.handle(duty, &ctx).await {
                     Ok(new_ops) => pending_node_ops.extend(new_ops),
                     Err(e) => {
                         let new_op = try_handle_error(e, ctx.clone());
@@ -206,64 +210,55 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
     use std::error::Error;
     warn!("Error being handled by node: {:?}", err);
     if let Some(source) = err.source() {
-        if let Some(ctx) = ctx {
-            error!("Source of error: {:?}", source);
-            match ctx {
-                // The message that triggered this error
-                MsgContext::Msg { msg, src } => {
-                    error!("Error in response to a message: {:?}", msg);
-                    let dst = get_dst_from_src(src);
+        warn!("Source: {:?}", source);
+    }
+    if let Some(ctx) = ctx {
+        match ctx {
+            // The message that triggered this error
+            MsgContext::Msg { msg, src } => {
+                warn!("Sending in response to a message: {:?}", msg);
+                let dst = get_dst_from_src(src);
 
-                    // TODO: map node error to ProcessingError reasons...
-                    NodeDuty::SendError(OutgoingLazyError {
-                        msg: msg.create_processing_error(None),
-                        dst,
-                    })
-                }
-                // An error decoding a message
-                MsgContext::Bytes { msg, src } => {
-                    warn!("Error decoding msg bytes, sent from {:?}", src);
-                    let dst = get_dst_from_src(src);
+                match msg {
+                    Message::Process(msg) => {
+                        let error_message: ErrorMessage = match convert_to_error_message(err) {
+                            Ok(err) => err,
+                            Err(error) => {
+                                error!("Problem handling error: {:?}", error);
+                                return NodeDuty::NoOp;
+                            }
+                        };
 
-                    NodeDuty::SendError(OutgoingLazyError {
-                        msg: ProcessingError {
-                            reason: Some(ProcessingErrorReason::CouldNotDeserialize),
-                            source_message: None,
-                            id: MessageId::new(),
-                        },
-                        dst,
-                    })
-                }
-                // We received an error, and so need to handle that.
-                // Q: Should this be here? Probably should be handled at MsgContext::Error creation
-                // Not sure there's a need to bring it out here...
-                MsgContext::Error { msg, src } => {
-                    error!("%%%% A lazy error to be handled... {:?}", msg);
-                    NodeDuty::NoOp
+                        NodeDuty::SendError(OutgoingLazyError {
+                            msg: msg.create_processing_error(Some(error_message)),
+                            dst,
+                        })
+                    }
+                    Message::ProcessingError(err) => {
+                        // TODO: handle error as a result of handling processing error...
+                        NodeDuty::NoOp
+                    }
                 }
             }
-        } else {
-            error!(
-                "Erroring without a msg context. Source of error: {:?}",
-                source
-            );
-            NodeDuty::NoOp
+            // An error decoding a message
+            MsgContext::Bytes { msg, src } => {
+                warn!("Error decoding msg bytes, sent from {:?}", src);
+                let dst = get_dst_from_src(src);
+
+                NodeDuty::SendError(OutgoingLazyError {
+                    msg: ProcessingError {
+                        reason: Some(ErrorMessage::Serialization(
+                            "Could not deserialize Message at node".to_string(),
+                        )),
+                        source_message: None,
+                        id: MessageId::new(),
+                    },
+                    dst,
+                })
+            }
         }
     } else {
-        info!("unimplemented: Handle errors. {:?}", err);
         NodeDuty::NoOp
-    }
-}
-
-fn handle_error(err: LazyError) {
-    use std::error::Error;
-    info!(
-        "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
-        err
-    );
-
-    if let Some(source) = err.error.source() {
-        error!("Source of error: {:?}", source);
     }
 }
 

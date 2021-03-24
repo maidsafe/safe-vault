@@ -151,7 +151,7 @@ impl ChurnProcess {
                 bootstrap.add(share.clone())?;
                 share
             }
-            _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
+            _ => return Err(Error::ChurnSignError),
         };
 
         self.stage = WalletStage::ProposingWallet(bootstrap);
@@ -191,7 +191,7 @@ impl ChurnProcess {
                         bootstrap.add(share.clone())?;
                         share
                     }
-                    _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
+                    _ => return Err(Error::ChurnSignError),
                 };
 
                 self.stage = WalletStage::ProposingWallet(bootstrap);
@@ -223,7 +223,7 @@ impl ChurnProcess {
                             bootstrap.add(share.clone())?;
                             share
                         }
-                        _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
+                        _ => return Err(Error::ChurnSignError),
                     };
 
                     self.stage = WalletStage::AccumulatingWallet(bootstrap);
@@ -273,7 +273,7 @@ impl ChurnProcess {
                         bootstrap.add(share.clone())?;
                         share
                     }
-                    _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
+                    _ => return Err(Error::ChurnSignError),
                 };
 
                 self.stage = WalletStage::AccumulatingWallet(bootstrap);
@@ -300,7 +300,7 @@ impl ChurnProcess {
                         bootstrap.add(share.clone())?;
                         share
                     }
-                    _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
+                    _ => return Err(Error::ChurnSignError),
                 };
 
                 self.stage = WalletStage::AccumulatingWallet(bootstrap);

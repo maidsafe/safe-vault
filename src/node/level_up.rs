@@ -9,7 +9,7 @@
 use super::genesis_stage::GenesisStage;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
-    event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
+    event_mapping::{map_routing_event, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
@@ -117,11 +117,7 @@ impl Node {
                 // TODO: more needed here
                 rewards.merge(node_rewards.clone());
             }
-            None => {
-                return Err(Error::InvalidOperation(
-                    "Invalid section funds stage".to_string(),
-                ))
-            }
+            None => return Err(Error::InvalidSectionFundsStage),
         }
 
         let node_id = self.network_api.our_name().await;

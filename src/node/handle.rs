@@ -18,6 +18,7 @@ use super::{
 };
 use crate::{
     chunks::Chunks,
+    event_mapping::{is_forming_genesis, MsgContext},
     metadata::Metadata,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
@@ -27,7 +28,7 @@ use crate::{
     transfers::Transfers,
     Error, Node, Result,
 };
-use log::{debug, info};
+use log::{debug, info, trace};
 use sn_data_types::{PublicKey, SectionElders, WalletHistory};
 use sn_messaging::{
     client::{NodeCmd, NodeQuery, ProcessMsg, Query},
@@ -37,7 +38,7 @@ use xor_name::XorName;
 
 impl Node {
     ///
-    pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
+    pub async fn handle(&mut self, duty: NodeDuty, ctx: &Option<MsgContext>) -> Result<NodeDuties> {
         match duty {
             NodeDuty::ChurnMembers {
                 our_key,
@@ -515,6 +516,22 @@ impl Node {
                     Ok(vec![])
                 }
             }
+            NodeDuty::UpdateErroringNodeSectionState => {
+                trace!("No funds section error being handled");
+
+                let is_forming_genesis = is_forming_genesis(&self.network_api).await;
+
+                if is_forming_genesis || !self.network_api.is_elder().await {
+                    trace!("Genesis not yet reached... so we ignore this");
+
+                    Ok(vec![])
+                } else {
+                    // TODO: 1) Send a message with the updated info
+                    // 2) Resend original message (which is ctx)
+                    debug!("TODO: Actually update + send message");
+                    Ok(vec![])
+                }
+            }
             NodeDuty::NoOp => Ok(vec![]),
         }
     }
@@ -523,9 +540,7 @@ impl Node {
         if let Some(chunks) = &mut self.chunks {
             Ok(chunks)
         } else {
-            Err(Error::InvalidOperation(
-                "No immutable chunks at this node".to_string(),
-            ))
+            Err(Error::NoImmutableChunks)
         }
     }
 
@@ -533,9 +548,7 @@ impl Node {
         if let Some(meta_data) = &mut self.meta_data {
             Ok(meta_data)
         } else {
-            Err(Error::InvalidOperation(
-                "No meta data at this node".to_string(),
-            ))
+            Err(Error::NoSectionMetaData)
         }
     }
 
@@ -543,9 +556,7 @@ impl Node {
         if let Some(transfers) = &mut self.transfers {
             Ok(transfers)
         } else {
-            Err(Error::InvalidOperation(
-                "No meta data at this node".to_string(),
-            ))
+            Err(Error::NoSectionMetaData)
         }
     }
 
@@ -555,9 +566,7 @@ impl Node {
         } else if let Some(SectionFunds::Rewarding(rewards)) = &mut self.section_funds {
             Ok(rewards)
         } else {
-            Err(Error::InvalidOperation(
-                "Section fund churn, cannot complete request.".to_string(),
-            ))
+            Err(Error::NodeChurningFunds)
         }
     }
 

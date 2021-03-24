@@ -170,10 +170,7 @@ impl RewardStages {
                     NodeRewardStage::AwaitingActivation(age) => age,
                     NodeRewardStage::Active { .. } => {
                         info!("Node already activated.");
-                        return Err(Error::InvalidOperation(format!(
-                            "Node already activated: {}",
-                            node_id
-                        )));
+                        return Err(Error::NodeAlreadyActive);
                     }
                     _ => {
                         warn!("Invalid operation: Node is not awaiting reward activation.");

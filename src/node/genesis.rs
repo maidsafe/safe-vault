@@ -96,9 +96,7 @@ pub async fn begin_forming_genesis_section(network_api: &Network) -> Result<Gene
         Ok(GenesisStage::AwaitingGenesisThreshold)
     } else {
         debug!("HITTING GENESIS ELSE FOR SOME REASON....");
-        Err(Error::InvalidOperation(
-            "Only for genesis formation".to_string(),
-        ))
+        Err(Error::NotInGenesis)
     }
 }
 

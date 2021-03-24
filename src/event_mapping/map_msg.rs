@@ -8,18 +8,18 @@
 
 use std::thread::current;
 
-use super::{LazyError, Mapping, MsgContext};
+use super::{Mapping, MsgContext};
 use crate::{
     node_ops::{NodeDuties, NodeDuty},
     Error, Result,
 };
-use log::debug;
+use log::{debug, warn};
 use sn_messaging::{
     client::{
-        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery,
-        NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse,
-        ProcessMsg, Query, TransferCmd, TransferQuery,
+        Cmd, Error as ErrorMessage, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery,
+        NodeQueryResponse, NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd,
+        NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery,
+        NodeTransferQueryResponse, ProcessMsg, ProcessingError, Query, TransferCmd, TransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
@@ -33,7 +33,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, dst: DstLocation, origin: EndUser) -
         } => Mapping::Ok {
             op: NodeDuty::ProcessRead { query, id, origin },
             ctx: Some(super::MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -47,7 +47,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, dst: DstLocation, origin: EndUser) -
                 origin,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -62,7 +62,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, dst: DstLocation, origin: EndUser) -
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -78,7 +78,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, dst: DstLocation, origin: EndUser) -
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -89,7 +89,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, dst: DstLocation, origin: EndUser) -
         } => Mapping::Ok {
             op: NodeDuty::RegisterTransfer { proof, msg_id: id },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -106,7 +106,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, dst: DstLocation, origin: EndUser) -
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -121,7 +121,7 @@ pub fn match_user_sent_msg(msg: ProcessMsg, dst: DstLocation, origin: EndUser) -
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
@@ -137,17 +137,17 @@ pub fn match_user_sent_msg(msg: ProcessMsg, dst: DstLocation, origin: EndUser) -
                 msg_id: id,
             },
             ctx: Some(MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             }),
         },
-        _ => Mapping::Error(LazyError {
+        _ => Mapping::Error {
             error: Error::InvalidMessage(msg.id(), format!("Unknown user msg: {:?}", msg)),
             msg: MsgContext::Msg {
-                msg,
+                msg: Message::Process(msg),
                 src: SrcLocation::EndUser(origin),
             },
-        }),
+        },
     }
 }
 
@@ -155,28 +155,96 @@ pub fn map_node_msg(msg: ProcessMsg, src: SrcLocation, dst: DstLocation) -> Mapp
     //debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
     match &dst {
         DstLocation::Section(_name) | DstLocation::Node(_name) => match_or_err(msg, src),
-        _ => Mapping::Error(LazyError {
+        _ => Mapping::Error {
             error: Error::InvalidMessage(msg.id(), format!("Invalid dst: {:?}", msg)),
-            msg: MsgContext::Msg { msg, src },
-        }),
+            msg: MsgContext::Msg {
+                msg: Message::Process(msg),
+                src,
+            },
+        },
+    }
+}
+
+/// Map a process error to relevant node duties
+pub fn map_node_process_err_msg(
+    msg: ProcessingError,
+    src: SrcLocation,
+    dst: DstLocation,
+) -> Mapping {
+    // debug!(" Handling received process err msg. {:?}.", msg);
+    match &dst {
+        DstLocation::Section(_name) | DstLocation::Node(_name) => match_process_err(msg, src),
+        _ => Mapping::Error {
+            error: Error::InvalidMessage(msg.id(), format!("Invalid dst: {:?}", msg)),
+            msg: MsgContext::Msg {
+                msg: Message::ProcessingError(msg),
+                src,
+            },
+        },
+    }
+}
+
+fn match_process_err(msg: ProcessingError, src: SrcLocation) -> Mapping {
+    if let Some(reason) = msg.clone().reason {
+        // debug!("ProcessingError with reason")
+        match reason {
+            ErrorMessage::NoSectionFunds => {
+                debug!("error NO FUNDS BEING HANDLED");
+                return Mapping::Ok {
+                    op: NodeDuty::UpdateErroringNodeSectionState,
+                    ctx: Some(MsgContext::Msg {
+                        msg: Message::ProcessingError(msg),
+                        src,
+                    }),
+                };
+            }
+            _ => {
+                warn!(
+                    "TODO: We do not handle this process error reason yet. {:?}",
+                    reason
+                );
+                // do nothing
+                return Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: None,
+                };
+            }
+        }
+    }
+
+    Mapping::Error {
+        error: Error::CannotUpdateProcessErrorNode,
+        msg: MsgContext::Msg {
+            msg: Message::ProcessingError(msg),
+            src,
+        },
     }
 }
 
 fn match_or_err(msg: ProcessMsg, src: SrcLocation) -> Mapping {
     match match_section_msg(msg.clone(), src) {
         NodeDuty::NoOp => match match_node_msg(msg.clone(), src) {
-            NodeDuty::NoOp => Mapping::Error(LazyError {
+            NodeDuty::NoOp => Mapping::Error {
                 error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
-                msg: MsgContext::Msg { msg, src },
-            }),
+                msg: MsgContext::Msg {
+                    msg: Message::Process(msg),
+                    src,
+                },
+            },
             op => Mapping::Ok {
                 op,
-                ctx: Some(MsgContext::Msg { msg, src }),
+                ctx: Some(MsgContext::Msg {
+                    msg: Message::Process(msg),
+                    src,
+                }),
             },
         },
         op => Mapping::Ok {
             op,
-            ctx: Some(MsgContext::Msg { msg, src }),
+            ctx: Some(MsgContext::Msg {
+                msg: Message::Process(msg),
+                src,
+            }),
         },
     }
 }

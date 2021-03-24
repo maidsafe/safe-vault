@@ -15,7 +15,7 @@ use sn_data_types::{
     Token, TransferAgreementProof, TransferValidated, WalletHistory,
 };
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, NodeSystemCmd, ProcessMsg, ProcessingError},
+    client::{BlobRead, BlobWrite, Message, NodeSystemCmd, ProcessMsg, ProcessingError},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::{NodeElderChange, Prefix};
@@ -278,6 +278,9 @@ pub enum NodeDuty {
         data: Blob,
         correlation_id: MessageId,
     },
+    /// Send section history to erroring node.
+    /// This should also trigger resending of the original message.
+    UpdateErroringNodeSectionState,
     NoOp,
 }
 
@@ -340,6 +343,9 @@ impl Debug for NodeDuty {
             Self::ReplicateChunk { .. } => write!(f, "ReplicateChunk"),
             Self::GetChunkForReplication { .. } => write!(f, "GetChunkForReplication"),
             Self::StoreChunkForReplication { .. } => write!(f, "StoreChunkForReplication"),
+            Self::UpdateErroringNodeSectionState { .. } => {
+                write!(f, "UpdateErroringNodeSectionState")
+            }
         }
     }
 }

@@ -13,7 +13,7 @@ use crate::{Error, Network, Result};
 use futures::future::Lazy;
 use hex_fmt::HexFmt;
 use log::{debug, info, trace, warn};
-use map_msg::{map_node_msg, match_user_sent_msg};
+use map_msg::{map_node_msg, map_node_process_err_msg, match_user_sent_msg};
 use sn_data_types::{Msg, PublicKey};
 use sn_messaging::{
     client::{Message, ProcessMsg, ProcessingError},
@@ -29,29 +29,16 @@ pub enum Mapping {
         op: NodeDuty,
         ctx: Option<MsgContext>,
     },
-    Error(LazyError),
+    Error {
+        msg: MsgContext,
+        error: Error,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub enum MsgContext {
-    Msg {
-        msg: ProcessMsg,
-        src: SrcLocation,
-    },
-    Error {
-        msg: ProcessingError,
-        src: SrcLocation,
-    },
-    Bytes {
-        msg: bytes::Bytes,
-        src: SrcLocation,
-    },
-}
-
-#[derive(Debug)]
-pub struct LazyError {
-    pub msg: MsgContext,
-    pub error: Error,
+    Msg { msg: Message, src: SrcLocation },
+    Bytes { msg: bytes::Bytes, src: SrcLocation },
 }
 
 /// Process any routing event
@@ -66,25 +53,16 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             let msg = match Message::from(content.clone()) {
                 Ok(msg) => msg,
                 Err(error) => {
-                    return Mapping::Error(LazyError {
+                    return Mapping::Error {
                         msg: MsgContext::Bytes { msg: content, src },
                         error: crate::Error::Message(error),
-                    })
+                    }
                 }
             };
 
             match msg {
                 Message::Process(process_msg) => map_node_msg(process_msg, src, dst),
-                Message::ProcessingError(error) => {
-                    warn!("Processing error received. {:?}", error);
-                    Mapping::Error(LazyError {
-                        msg: MsgContext::Error {
-                            msg: error.clone(),
-                            src,
-                        },
-                        error: Error::ProcessingError(error),
-                    })
-                }
+                Message::ProcessingError(error) => map_node_process_err_msg(error, src, dst),
             }
         }
         RoutingEvent::ClientMessageReceived { msg, user } => match *msg {
@@ -94,23 +72,28 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                 user,
             ),
             Message::ProcessingError(error) => {
-                warn!("Processing error received. {:?}", error);
-                Mapping::Error(LazyError {
-                    msg: MsgContext::Error {
-                        msg: error.clone(),
+                warn!(
+                    ">>>> Incoming client processing error received. This needs to be handled {:?}",
+                    error.reason
+                );
+                Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: Some(MsgContext::Msg {
+                        msg: Message::ProcessingError(error),
                         src: SrcLocation::EndUser(user),
-                    },
-                    error: Error::ProcessingError(error),
-                })
+                    }),
+                }
             }
         },
         RoutingEvent::EldersChanged {
-            prefix,
-            key,
-            sibling_key,
             elders,
             self_status_change,
+            sibling_elders,
         } => {
+            let prefix = elders.prefix;
+            let key = elders.key;
+            let sibling_key = sibling_elders.map(|elders| elders.key);
+
             match self_status_change {
                 NodeElderChange::None => {
                     // sync to others if we are elder
@@ -264,7 +247,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 }
 
 /// Are we forming the genesis?
-async fn is_forming_genesis(network_api: &Network) -> bool {
+pub async fn is_forming_genesis(network_api: &Network) -> bool {
     let is_genesis_section = network_api.our_prefix().await.is_empty();
     let elder_count = network_api.our_elder_names().await.len();
     let section_chain_len = network_api.section_chain().await.len();
