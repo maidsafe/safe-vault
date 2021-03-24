@@ -203,11 +203,6 @@ impl Network {
         self.routing.our_index().await.map_err(Error::Routing)
     }
 
-    // /// BLS key index in routing for key shares
-    // pub async fn get_section_elders(&self, name: &XorName) -> Result<usize> {
-    //     self.routing.get
-    // }
-
     pub async fn our_elder_names(&self) -> BTreeSet<XorName> {
         self.routing
             .our_elders()
