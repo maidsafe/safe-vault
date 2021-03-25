@@ -52,9 +52,9 @@ impl Node {
 
         self.level_up().await?;
 
-        let section_key = our_elders.key();
-        let our_elders_name = our_elders.name();
-        let churn = if let Some(sibling_elders) = &sibling_elders {
+        let our_elders_name = XorName::from(our_key);
+
+        let churn = if let Some(sibling_key) = &sibling_key {
             Churn::Split {
                 our_elders,
                 sibling_elders: sibling_elders.to_owned(),
