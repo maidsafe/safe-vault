@@ -2346,7 +2346,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "9.0.0"
-source = "git+https://github.com/oetyng/sn_messaging?branch=check-mem-cpu-issue#9bf0070a70226eadc62a1a88f8eaa2bf7986a574"
+source = "git+https://github.com/oetyng/sn_messaging?branch=reward-on-split#9bf0070a70226eadc62a1a88f8eaa2bf7986a574"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2413,8 +2413,8 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.53.0"
-source = "git+https://github.com/oetyng/sn_routing?branch=check-mem-cpu-issue#e8d49c0b410d817844913802f5bc68ded06487e2"
+version = "0.49.1"
+source = "git+https://github.com/oetyng/sn_routing?branch=reward-on-split#c3a040aca752b2fa736250bbf034b3cdab3ed5ab"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2443,7 +2443,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.6.0"
-source = "git+https://github.com/oetyng/sn_transfers?branch=check-mem-cpu-issue#5751e2e7abf8e8d398ff87b93a952220ea17c6c7"
+source = "git+https://github.com/oetyng/sn_transfers?branch=reward-on-split#5751e2e7abf8e8d398ff87b93a952220ea17c6c7"
 dependencies = [
  "bincode",
  "crdts",
