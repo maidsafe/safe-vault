@@ -169,6 +169,13 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     // -- ugly temporary until fixed in routing --
 
                     trace!("******Elders changed, we are promoted");
+                    let our_contact_info = network_api.our_connection_info().await;
+                    let _ = crate::config_handler::write_connection_info(our_contact_info)
+                        .unwrap_or_else(|err| {
+                            log::error!("Unable to write config to disk: {}", err);
+                            Default::default()
+                        });
+
                     if are_we_part_of_genesis(network_api).await {
                         Mapping::Ok {
                             op: NodeDuty::BeginFormingGenesisSection,

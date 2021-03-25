@@ -90,8 +90,20 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf, String> {
     }
 }
 
+fn clear_bootstrap() -> Result<(), String> {
+    let mut path = home_dir().ok_or_else(|| "Failed to obtain user's home path".to_string())?;
+    path.push(".safe");
+    path.push("node");
+    path.push("bootstrap");
+    if path.exists() {
+        remove_dir_all(&path).unwrap();
+    }
+    Ok(())
+}
+
 /// Uses SNLT to create a local network of nodes
 pub async fn run_network() -> Result<(), String> {
+    clear_bootstrap()?;
     info!("Starting local network");
     let verbosity = 4;
     let node_path = Some(PathBuf::from("./target/release"));

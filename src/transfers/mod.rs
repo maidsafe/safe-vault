@@ -573,13 +573,8 @@ impl Transfers {
                     correlation_id: msg_id,
                 }
             }
-            Err(Error::InvalidPropagatedTransfer(error)) => {
-                error!(
-                    ">> Error now being handled w/ fake Nosuchkeymsg at receive_propagated, {:?}",
-                    error
-                );
-
-                // Nonsense error just not to crash node for now. Should be converted properly to be handled at client.
+            Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted)) => {
+                error!(">> SectionKeyNeverExisted at receive_propagated");
                 ProcessMsg::NodeCmdError {
                     error: NodeCmdError::Transfers(TransferPropagation(ErrorMessage::NoSuchKey)),
                     id: MessageId::in_response_to(&msg_id),
