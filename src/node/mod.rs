@@ -200,14 +200,6 @@ impl Node {
     }
 }
 
-fn get_dst_from_src(src: SrcLocation) -> DstLocation {
-    match src {
-        SrcLocation::EndUser(user) => DstLocation::EndUser(user),
-        SrcLocation::Node(node) => DstLocation::Node(node),
-        SrcLocation::Section(section) => DstLocation::Section(section),
-    }
-}
-
 fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
     use std::error::Error;
     warn!("Error being handled by node: {:?}", err);
@@ -219,18 +211,16 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
             // The message that triggered this error
             MsgContext::Msg { msg, src } => {
                 error!("Error in response to a message: {:?}", msg);
-                let dst = get_dst_from_src(src);
 
                 // TODO: map node error to ProcessingError reasons...
                 NodeDuty::SendError(OutgoingLazyError {
                     msg: msg.create_processing_error(None),
-                    dst,
+                    dst: src.to_dst(),
                 })
             }
             // An error decoding a message
             MsgContext::Bytes { msg, src } => {
                 warn!("Error decoding msg bytes, sent from {:?}", src);
-                let dst = get_dst_from_src(src);
 
                 NodeDuty::SendError(OutgoingLazyError {
                     msg: ProcessingError {
@@ -238,7 +228,7 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
                         source_message: None,
                         id: MessageId::new(),
                     },
-                    dst,
+                    dst: src.to_dst(),
                 })
             }
             // We received an error, and so need to handle that.
@@ -253,18 +243,6 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
         NodeDuty::NoOp
     }
 }
-
-// fn handle_error(err: LazyError) {
-//     use std::error::Error;
-//     info!(
-//         "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
-//         err
-//     );
-
-//     if let Some(source) = err.error.source() {
-//         error!("Source of error: {:?}", source);
-//     }
-// }
 
 impl Display for Node {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {

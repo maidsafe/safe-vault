@@ -2414,7 +2414,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.53.0"
-source = "git+https://github.com/oetyng/sn_routing?branch=check-mem-cpu-issue#4cbbdeec014f63d8aa0aaf089b8a16f71b38eaf3"
+source = "git+https://github.com/oetyng/sn_routing?branch=check-mem-cpu-issue#e8d49c0b410d817844913802f5bc68ded06487e2"
 dependencies = [
  "bincode",
  "bls_dkg",

@@ -54,7 +54,7 @@ impl Node {
 
         self.level_up().await?;
 
-        let our_elders_name = our_prefix.name();
+        let our_elders_name = XorName::from(our_key);
 
         let churn = if let Some(sibling_key) = &sibling_key {
             Churn::Split {

@@ -60,7 +60,7 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
     let itinerary = Itinerary {
         src,
         dst: msg.dst,
-        aggregation: Aggregation::None,
+        aggregation: Aggregation::AtDestination, // the odd error is irrelevant, accumulated however means it is what happened.
     };
 
     let msg_id = msg.id();

@@ -184,11 +184,10 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     } else {
                         Mapping::Ok {
                             op: NodeDuty::ChurnMembers {
-                                // elders,
                                 our_prefix: prefix,
                                 our_key: PublicKey::from(key),
                                 sibling_key: sibling_key.map(PublicKey::from),
-                                newbie: false,
+                                newbie: true,
                             },
                             ctx: None,
                         }
