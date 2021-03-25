@@ -10,6 +10,7 @@
 
 use crate::{Error, Result};
 use log::{debug, Level};
+use rand::{Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use sn_routing::TransportConfig as NetworkConfig;
 use std::convert::Infallible;
@@ -346,9 +347,18 @@ impl Config {
 
 /// Writes connection info to file for use by clients.
 ///
-/// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub fn write_connection_info(contacts: &HashSet<SocketAddr>) -> Result<PathBuf> {
-    write_file(CONNECTION_INFO_FILE, contacts)
+/// The file is written to the `home_dir()` with the appropriate file name.
+pub fn write_connection_info(contact: SocketAddr) -> Result<PathBuf> {
+    let file_name = &contact.port().to_string();
+    let mut bootstrap_path = project_dirs()?;
+    bootstrap_path.push("bootstrap");
+    fs::create_dir_all(bootstrap_path.clone())?;
+    let path = bootstrap_path.join(file_name);
+    let mut file = File::create(&path)?;
+    let contact_info: HashSet<SocketAddr> = vec![contact].into_iter().collect();
+    serde_json::to_writer_pretty(&mut file, &contact_info)?;
+    file.sync_all()?;
+    Ok(path)
 }
 
 fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<PathBuf>

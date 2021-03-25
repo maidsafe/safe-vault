@@ -2333,12 +2333,12 @@ dependencies = [
 [[package]]
 name = "sn_launch_tool"
 version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c88cc07a0dcdfcdbe79437d8fec9669a79f901cc9b3a07fdd1f7ca5411c91244"
+source = "git+https://github.com/oetyng/sn_launch_tool.git?branch=temp-conn-info-changes#2fd3610230afae974abdff407c60bf0f764bc856"
 dependencies = [
  "directories",
  "env_logger 0.8.3",
  "log",
+ "rand 0.7.3",
  "serde_json",
  "structopt",
 ]

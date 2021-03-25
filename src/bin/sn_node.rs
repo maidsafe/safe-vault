@@ -30,7 +30,7 @@
 use log::{self, error, info};
 use self_update::{cargo_crate_version, Status};
 use sn_node::{self, utils, write_connection_info, Config, Node};
-use std::{collections::HashSet, io::Write, net::SocketAddr, process};
+use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 
 /// Runs a Safe Network node.
@@ -120,21 +120,21 @@ async fn run_node() {
         }
     };
 
-    let our_conn_info = node.our_connection_info().await;
+    let our_contact_info = node.our_connection_info().await;
     println!(
         "Node connection info:\n{}",
-        serde_json::to_string(&our_conn_info)
+        serde_json::to_string(&our_contact_info)
             .unwrap_or_else(|_| "Failed to serialize connection info".into())
     );
     info!(
         "Node connection info: {}",
-        serde_json::to_string(&our_conn_info)
+        serde_json::to_string(&our_contact_info)
             .unwrap_or_else(|_| "Failed to serialize connection info".into())
     );
 
     if config.is_first() {
-        let contact_info: HashSet<SocketAddr> = vec![our_conn_info].into_iter().collect();
-        let _ = write_connection_info(&contact_info).unwrap_or_else(|err| {
+        //let contact_info: HashSet<SocketAddr> = vec![our_conn_info].into_iter().collect();
+        let _ = write_connection_info(our_contact_info).unwrap_or_else(|err| {
             log::error!("Unable to write config to disk: {}", err);
             Default::default()
         });

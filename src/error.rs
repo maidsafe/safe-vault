@@ -38,7 +38,10 @@ pub enum Error {
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing for xorname {0}")]
     NoSectionPublicKeyKnown(XorName),
-    /// Unable to parse genesis proposal.
+    /// Not Section PublicKey.
+    #[error("PublicKey provided was not identified as a section {0}")]
+    UnknownSectionKey(PublicKey),
+    /// Not Section PublicKey.
     #[error("Cannot parse genesis proposal at this stage")]
     InvalidGenesisStage,
     /// Unable to parse non genesis proposal.
