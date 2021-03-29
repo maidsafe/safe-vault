@@ -21,7 +21,7 @@ use self::{
 };
 use super::node_ops::{NodeDuty, OutgoingMsg};
 use crate::Result;
-use sn_data_types::{NodeRewardStage, PublicKey, SectionElders, Token};
+use sn_data_types::{NodeRewardStage, PublicKey, SectionElders, Token, WalletHistory};
 use sn_messaging::{
     client::{NodeQuery, NodeSystemQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId, SrcLocation,
@@ -50,6 +50,27 @@ impl SectionFunds {
         match &self {
             //Self::TakingNodes(stages) => stages.node_rewards(),
             Self::Churning { rewards, .. } | Self::Rewarding(rewards) => rewards.node_rewards(),
+        }
+    }
+
+    /// Returns current section wallet history
+    pub fn section_wallet_history(&self) -> WalletHistory {
+        match &self {
+            Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
+                rewards.section_wallet_history()
+            }
+        }
+    }
+
+    /// Sync the section wallet with provided history
+    pub async fn sync_section_wallet_history(
+        &mut self,
+        history: WalletHistory,
+    ) -> Result<NodeDuty> {
+        match self {
+            Self::Churning { rewards, .. } | Self::Rewarding(rewards) => {
+                rewards.sync_section_wallet_history(history).await
+            }
         }
     }
 

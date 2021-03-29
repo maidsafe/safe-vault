@@ -19,6 +19,7 @@ use sn_messaging::{
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::{NodeElderChange, Prefix};
+use sn_transfers::WalletReplica;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Formatter},
@@ -74,6 +75,11 @@ pub enum NodeDuty {
     },
     ReceivePayoutValidation {
         validation: TransferValidated,
+        msg_id: MessageId,
+        origin: SrcLocation,
+    },
+    ReceiveSectionWalletHistory {
+        wallet_history: WalletHistory,
         msg_id: MessageId,
         origin: SrcLocation,
     },
@@ -303,6 +309,7 @@ impl Debug for NodeDuty {
             Self::RegisterSectionPayout { .. } => write!(f, "RegisterSectionPayout"),
             Self::SetNodeWallet { .. } => write!(f, "SetNodeWallet"),
             Self::ReceivePayoutValidation { .. } => write!(f, "ReceivePayoutValidation"),
+            Self::ReceiveSectionWalletHistory { .. } => write!(f, "ReceiveSectionWalletHistory"),
             Self::GetTransferReplicaEvents { .. } => write!(f, "GetTransferReplicaEvents"),
             Self::ValidateSectionPayout { .. } => write!(f, "ValidateSectionPayout"),
             Self::ValidateClientTransfer { .. } => write!(f, "ValidateClientTransfer"),

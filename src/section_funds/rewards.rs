@@ -100,6 +100,13 @@ impl Rewards {
         self.payout.section_wallet_history()
     }
 
+    pub async fn sync_section_wallet_history(
+        &mut self,
+        history: WalletHistory,
+    ) -> Result<NodeDuty> {
+        self.payout.synch(history).await
+    }
+
     /// Balance
     pub fn balance(&self) -> Token {
         self.payout.balance()
