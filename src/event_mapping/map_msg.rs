@@ -181,7 +181,6 @@ fn match_process_err(msg: ProcessingError, src: SrcLocation) -> Mapping {
         // debug!("ProcessingError with reason")
         match reason {
             ErrorMessage::NoSectionFunds => {
-                debug!("error NO FUNDS BEING HANDLED");
                 return Mapping::Ok {
                     op: NodeDuty::UpdateErroringNodeSectionState,
                     ctx: Some(MsgContext::Msg {
@@ -278,6 +277,15 @@ fn match_section_msg(msg: ProcessMsg, origin: SrcLocation) -> NodeDuty {
             ..
         } => NodeDuty::GetNodeWalletKey {
             node_name: *node_name,
+            msg_id: *id,
+            origin,
+        },
+        ProcessMsg::NodeEvent {
+            event: NodeEvent::SectionWalletCreated(wallet_history),
+            id,
+            ..
+        } => NodeDuty::ReceiveSectionWalletHistory {
+            wallet_history: wallet_history.clone(),
             msg_id: *id,
             origin,
         },
@@ -410,6 +418,9 @@ fn match_node_msg(msg: ProcessMsg, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin: *origin,
         },
-        _ => NodeDuty::NoOp,
+        _ => {
+            warn!("Node ProcessMsg from not handled: {:?}", msg);
+            NodeDuty::NoOp
+        }
     }
 }

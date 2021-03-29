@@ -39,6 +39,12 @@ pub enum Error {
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
+    /// No source message provided for ProcessingError
+    #[error("No source message for ProcessingError")]
+    NoSourceMessageForProcessingError,
+    /// No source message provided for ProcessingError
+    #[error("Unexpected Process msg. A ProcessingError was expected here...")]
+    UnexpectedProcessMsg,
     /// Node does not manage any section funds.
     #[error("Node does not currently manage any section funds")]
     NoSectionFunds,

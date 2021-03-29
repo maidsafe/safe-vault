@@ -18,7 +18,7 @@ use crate::{
 };
 use log::{debug, info, trace};
 use sn_messaging::{
-    client::{Message, NodeQuery, ProcessMsg},
+    client::{NodeCmd, NodeEvent, NodeQuery, ProcessMsg, Query},
     Aggregation, DstLocation, MessageId,
 };
 use xor_name::XorName;
@@ -367,20 +367,70 @@ impl Node {
                 let elder = self.role.as_elder_mut()?;
                 Ok(vec![elder.meta_data.finish_chunk_replication(data).await?])
             }
+            NodeDuty::ReceiveSectionWalletHistory {
+                wallet_history,
+                origin,
+                ..
+            } => {
+                trace!("Handling received section wallet history");
+                let mut section_funds = self.section_funds.as_mut().ok_or(Error::NoSectionFunds)?;
+                let duty = section_funds
+                    .sync_section_wallet_history(wallet_history)
+                    .await?;
+                Ok(vec![duty])
+            }
             NodeDuty::UpdateErroringNodeSectionState => {
                 trace!("No funds section error being handled");
 
+                let mut ops = vec![];
                 let is_forming_genesis = is_forming_genesis(&self.network_api).await;
 
                 if is_forming_genesis || !self.network_api.is_elder().await {
                     trace!("Genesis not yet reached... so we ignore this");
 
-                    Ok(vec![])
+                    Ok(ops)
                 } else {
-                    // TODO: 1) Send a message with the updated info
-                    // 2) Resend original message (which is ctx)
-                    debug!("TODO: Actually update + send message");
-                    Ok(vec![])
+                    if let Some(ctx) = ctx {
+                        debug!("ProcessingError context found, sending updates to failing node...");
+                        if let MsgContext::Msg { msg, src } = ctx {
+                            // This will map to the error that triggered this duty
+                            // and until we are updated, this will loop between these two nodes...
+                            let section_funds =
+                                self.section_funds.as_ref().ok_or(Error::NoSectionFunds)?;
+
+                            let wallet_history = section_funds.section_wallet_history();
+
+                            // 1) Send a message with the updated info
+                            ops.push(NodeDuty::Send(OutgoingMsg {
+                                msg: ProcessMsg::NodeEvent {
+                                    event: NodeEvent::SectionWalletCreated(wallet_history),
+                                    correlation_id: msg.id(),
+                                    id: MessageId::new(),
+                                },
+                                section_source: false,
+                                dst: DstLocation::Node(src.name()),
+                                aggregation: Aggregation::None, // AtDestination
+                            }));
+
+                            // 2) Resend original message (which is ctx)
+                            let originally_sent_msg = msg
+                                .get_processing_error()
+                                .ok_or(Error::UnexpectedProcessMsg)?
+                                .source_message
+                                .as_ref()
+                                .ok_or(Error::NoSourceMessageForProcessingError)?
+                                .clone();
+
+                            ops.push(NodeDuty::Send(OutgoingMsg {
+                                msg: originally_sent_msg,
+                                section_source: false,
+                                dst: DstLocation::Node(src.name()),
+                                aggregation: Aggregation::None,
+                            }));
+                        }
+                    }
+
+                    Ok(ops)
                 }
             }
             NodeDuty::NoOp => Ok(vec![]),
