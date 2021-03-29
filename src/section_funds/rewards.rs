@@ -72,7 +72,7 @@ impl Rewards {
                         .initiate_reward_payout(Payout {
                             to: wallet,
                             amount: Token::from_nano(
-                                self.reward_calc.reward(age).await.as_nano() / age as u64,
+                                self.reward_calc.reward(age).as_nano() / age as u64,
                             ),
                             node_id: *node_id,
                         })
@@ -190,7 +190,7 @@ impl Rewards {
         self.payout
             .initiate_reward_payout(Payout {
                 to: wallet,
-                amount: self.reward_calc.reward(age).await,
+                amount: self.reward_calc.reward(age),
                 node_id,
             })
             .await
