@@ -199,7 +199,7 @@ mod test {
     }
 
     #[test]
-    fn rate_limit_is_applied_up_to_3300_billion_nodes() {
+    fn rate_limit_is_applied_up_to_170_billion_nodes() {
         // setup
         // The size of the actual DataCmd
         // is used for storecost calc,
@@ -207,10 +207,10 @@ mod test {
         // In general, the size of a type is not stable across compilations,
         // but it is close enough for our purposes here.
         let minimum_storage_bytes = mem::size_of::<DataCmd>() as u64;
-        let half_full_nodes = 99;
-        let big_section_node_count = 199;
+        let half_full_nodes = 10;
+        let big_section_node_count = 20;
         let big_prefix_len = 33;
-        // storage rate limit is applied up to 3400 billion nodes
+        // storage rate limit is applied up to 170 billion nodes
         let endcost = RateLimit::rate_limit(
             minimum_storage_bytes,
             half_full_nodes,
@@ -220,7 +220,7 @@ mod test {
         .as_nano();
         assert!(
             endcost > 0,
-            "cost is not greater than zero up to 3400 billion nodes",
+            "cost is not greater than zero up to 170 billion nodes",
         );
     }
 
@@ -234,10 +234,10 @@ mod test {
         // In general, the size of a type is not stable across compilations,
         // but it is close enough for our purposes here.
         let minimum_storage_bytes = mem::size_of::<DataCmd>() as u64;
-        let half_full_nodes = 99;
-        let big_section_node_count = 199;
+        let half_full_nodes = 10;
+        let big_section_node_count = 20;
         let big_prefix_len = 256;
-        // storage rate limit is applied up to 2.3 * 10^79 nodes.
+        // storage rate limit is applied up to 2.3 * 10^78 nodes.
         let endcost = RateLimit::rate_limit(
             minimum_storage_bytes,
             half_full_nodes,
@@ -256,7 +256,7 @@ mod test {
     fn rate_limit_first_chunk_has_a_reasonable_cost() {
         // setup
         let one_mb_bytes = 1024 * 1024;
-        let max_initial_cost = 1_000 * 1_000_000_000; // 1000 tokens
+        let max_initial_cost = 1 * 1_000_000_000; // 1 token
         let zero_full_nodes = 0;
         let minimum_section_nodes = 5;
         let first_section_prefix = 0;
