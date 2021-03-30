@@ -45,7 +45,7 @@ pub type NodeDuties = Vec<NodeDuty>;
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
-    //
+    AddPayment(CreditAgreementProof),
     GetNodeWalletKey {
         node_name: XorName,
         msg_id: MessageId,
@@ -232,6 +232,7 @@ impl From<NodeDuty> for NodeDuties {
 impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::AddPayment { .. } => write!(f, "AddPayment"),
             Self::GetNodeWalletKey { .. } => write!(f, "GetNodeWalletKey"),
             Self::PropagateTransfer { .. } => write!(f, "PropagateTransfer"),
             Self::SetNodeWallet { .. } => write!(f, "SetNodeWallet"),
