@@ -228,9 +228,8 @@ impl<T: ReplicaSigning> Replicas<T> {
     pub async fn initiate(&self, events: &[ReplicaEvent]) -> Result<()> {
         use ReplicaEvent::*;
         if events.is_empty() {
-            info!("Events are empty. Initiating Genesis replica.");
-            let credit_proof = self.create_genesis().await?;
-            return self.store_genesis(&credit_proof).await;
+            info!("No events provided..");
+            return Ok(());
         }
         for e in events {
             let id = match e {
@@ -463,47 +462,6 @@ impl<T: ReplicaSigning> Replicas<T> {
         let _ = self_lock.overflowing_add(0); // resolve: is a usage at end of block necessary to actually engage the lock?
 
         Ok(key_lock)
-    }
-
-    // ------------------------------------------------------------------
-    //  ------------------------- Genesis ------------------------------
-    // ------------------------------------------------------------------
-
-    async fn create_genesis(&self) -> Result<CreditAgreementProof> {
-        // This means we are the first node in the network.
-        let balance = u32::MAX as u64 * 1_000_000_000;
-        let signed_credit = self.info.signing.try_genesis(balance).await?;
-        Ok(signed_credit)
-    }
-
-    /// This is the one and only infusion of tokens to the system. Ever.
-    /// It is carried out by the first node in the network.
-    async fn store_genesis(&self, credit_proof: &CreditAgreementProof) -> Result<()> {
-        let id = credit_proof.recipient();
-        // Acquire lock on self.
-        let self_lock = self.self_lock.lock().await;
-        // We expect nothing to exist before this transfer.
-        if self.load_key_lock(id).await.is_ok() {
-            return Err(Error::BalanceExists);
-        }
-        // No key lock (hence no store), so we create one
-        let store = TransferStore::new(id.into(), &self.root_dir)?;
-        let locked_store = Arc::new(Mutex::new(store));
-        let _ = self.locks.insert(id, locked_store.clone());
-        // Acquire lock of the wallet.
-        let mut store = locked_store.lock().await;
-        // last usage of self lock (we want to let go of the lock on self here)
-        let _ = self_lock.overflowing_add(0); // resolve: is a usage at end of block necessary to actually engage the lock?
-
-        // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
-        let _ = wallet.genesis(credit_proof)?;
-
-        // update state
-        // Q: are we locked on `info.signing` here? (we don't want to be)
-        store.try_insert(ReplicaEvent::TransferPropagated(TransferPropagated {
-            credit_proof: credit_proof.clone(),
-        }))
     }
 
     // ------------------------------------------------------------------
@@ -796,7 +754,7 @@ mod test {
         TempDir::new("test").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
     }
 
-    type Section = Vec<(Replicas<TestReplicaSigning>, Actor<Validator, Keypair>)>;
+    type Section = Vec<(Replicas<TestReplicaSigning>, Actor<Keypair>)>;
     fn get_section(count: u8) -> (Section, PublicKeySet) {
         let mut rng = rand::thread_rng();
         let threshold = count as usize - 1;
@@ -814,7 +772,7 @@ mod test {
     fn get_replica(
         key_index: usize,
         bls_secret_key: SecretKeySet,
-    ) -> Result<(Replicas<TestReplicaSigning>, Actor<Validator, Keypair>)> {
+    ) -> Result<(Replicas<TestReplicaSigning>, Actor<Keypair>)> {
         let peer_replicas = bls_secret_key.public_keys();
         let secret_key_share = bls_secret_key.secret_key_share(key_index);
         let id = secret_key_share.public_key_share();
@@ -846,7 +804,6 @@ mod test {
                 key_set: peer_replicas,
                 names: Default::default(),
             },
-            Validator {},
         );
 
         Ok((replicas, actor))

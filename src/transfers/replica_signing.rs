@@ -19,8 +19,6 @@ pub trait ReplicaSigning {
     /// Get the replica's PK set
     async fn replicas_pk_set(&self) -> Result<PublicKeySet>;
 
-    async fn try_genesis(&self, balance: u64) -> Result<CreditAgreementProof>;
-
     async fn sign_transfer(
         &self,
         signed_transfer: &SignedTransfer,
@@ -65,10 +63,6 @@ impl ReplicaSigning for ReplicaSigningImpl {
         Ok(self.network.our_public_key_set().await?)
     }
 
-    async fn try_genesis(&self, balance: u64) -> Result<CreditAgreementProof> {
-        get_genesis(balance, &self.network).await
-    }
-
     async fn sign_transfer(
         &self,
         signed_transfer: &SignedTransfer,
@@ -98,7 +92,7 @@ impl ReplicaSigning for ReplicaSigningImpl {
         wallet_name: &sn_routing::XorName,
         section_key: bls::PublicKey,
     ) -> bool {
-        if let (Some(key), _) = self.network.matching_section(wallet_name).await {
+        if let Some(key) = self.network.matching_section(wallet_name).await {
             key == section_key
         } else {
             false

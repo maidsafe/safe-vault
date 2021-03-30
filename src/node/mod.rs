@@ -33,7 +33,7 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use futures::lock::Mutex;
 use hex_fmt::HexFmt;
 use log::{debug, error, info, trace, warn};
-use sn_data_types::{ActorHistory, NodeRewardStage, PublicKey, TransferPropagated, WalletHistory};
+use sn_data_types::{ActorHistory, PublicKey, TransferPropagated, WalletHistory};
 use sn_messaging::{
     client::{ProcessMsg, ProcessingError, ProcessingErrorReason},
     DstLocation, MessageId, SrcLocation,

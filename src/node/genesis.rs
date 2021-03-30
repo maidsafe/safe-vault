@@ -22,8 +22,7 @@ use crate::{
 };
 use log::{debug, info, trace, warn};
 use sn_data_types::{
-    ActorHistory, Credit, NodeRewardStage, PublicKey, SignatureShare, SignedCredit, Token,
-    TransferPropagated,
+    ActorHistory, Credit, PublicKey, SignatureShare, SignedCredit, Token, TransferPropagated,
 };
 use sn_messaging::{
     client::{NodeCmd, NodeSystemCmd, ProcessMsg},

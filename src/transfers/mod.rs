@@ -395,70 +395,6 @@ impl Transfers {
         }
     }
 
-    /// This validation will render a signature over the
-    /// original request (ValidateTransfer), giving a partial
-    /// proof by this individual Elder, that the transfer is valid.
-    pub async fn validate_section_payout(
-        &self,
-        transfer: SignedTransferShare,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    ) -> Result<NodeDuty> {
-        debug!(">>>>> validating....");
-
-        if let Some(_id) = self
-            .recently_validated_transfers
-            .lock()
-            .await
-            .get(&transfer.id())
-        {
-            debug!(
-                ">>>>>>>>> seen this transfer as valid already {:?} ",
-                transfer.id()
-            );
-            // we've done this before so we can safely just return No op
-            return Ok(NodeDuty::NoOp);
-        }
-
-        match self.replicas.propose_validation(&transfer).await {
-            Ok(None) => return Ok(NodeDuty::NoOp),
-            Ok(Some(event)) => {
-                debug!(">>>>> reward payout validated!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                let _ = self
-                    .recently_validated_transfers
-                    .lock()
-                    .await
-                    .insert(transfer.id());
-                Ok(NodeDuty::Send(OutgoingMsg {
-                    msg: ProcessMsg::NodeEvent {
-                        event: NodeEvent::RewardPayoutValidated(event),
-                        id: MessageId::new(),
-                        correlation_id: msg_id,
-                    },
-                    section_source: false, // strictly this is not correct, but we don't expect responses to an event..
-                    dst: DstLocation::Section(origin.name()),
-                    aggregation: Aggregation::None, // outer msg cannot be aggregated due to containing sig share
-                }))
-            }
-            Err(e) => {
-                error!(">>>> transfer is not valid! {:?}", e);
-                let message_error = convert_to_error_message(e)?;
-                Ok(NodeDuty::Send(OutgoingMsg {
-                    msg: ProcessMsg::NodeCmdError {
-                        id: MessageId::in_response_to(&msg_id),
-                        error: NodeCmdError::Transfers(NodeTransferError::TransferPropagation(
-                            message_error,
-                        )), // TODO: SHOULD BE TRANSFERVALIDATION
-                        correlation_id: msg_id,
-                    },
-                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-                    dst: origin.to_dst(),
-                    aggregation: Aggregation::AtDestination,
-                }))
-            }
-        }
-    }
-
     /// Registration of a transfer is requested,
     /// with a proof of enough Elders having validated it.
     pub async fn register(
@@ -496,53 +432,6 @@ impl Transfers {
                     dst: DstLocation::EndUser(EndUser::AllClients(proof.sender())),
                     aggregation: Aggregation::AtDestination,
                 }))
-            }
-        }
-    }
-
-    /// Registration of a transfer is requested,
-    /// with a proof of enough Elders having validated it.
-    pub async fn register_reward_payout(
-        &self,
-        proof: &TransferAgreementProof,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    ) -> Result<NodeDuties> {
-        debug!(">>> registering section payout");
-        use NodeCmd::*;
-        use NodeTransferCmd::*;
-        match self.replicas.register(proof).await {
-            Ok(event) => {
-                debug!(">>> in match ok");
-                let mut ops: NodeDuties = vec![];
-                // notify receiving section
-                let location = event.transfer_proof.recipient().into();
-                ops.push(NodeDuty::Send(OutgoingMsg {
-                    msg: ProcessMsg::NodeCmd {
-                        cmd: Transfers(PropagateTransfer(event.transfer_proof.credit_proof())),
-                        id: MessageId::in_response_to(&msg_id),
-                    },
-                    section_source: true, // i.e. errors go to our section
-                    dst: DstLocation::Section(location),
-                    aggregation: Aggregation::AtDestination, // not necessary, but will be slimmer
-                }));
-                Ok(ops)
-            }
-            Err(e) => {
-                debug!(">>> Error in match payout, {:?}", e);
-                let message_error = convert_to_error_message(e)?;
-                Ok(NodeDuties::from(NodeDuty::Send(OutgoingMsg {
-                    msg: ProcessMsg::NodeCmdError {
-                        error: NodeCmdError::Transfers(
-                            NodeTransferError::SectionPayoutRegistration(message_error),
-                        ),
-                        id: MessageId::in_response_to(&msg_id),
-                        correlation_id: msg_id,
-                    },
-                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-                    dst: origin.to_dst(),
-                    aggregation: Aggregation::AtDestination,
-                })))
             }
         }
     }

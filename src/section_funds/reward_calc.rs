@@ -8,31 +8,33 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use log::debug;
 use sn_data_types::{PublicKey, Token};
-use sn_routing::Prefix;
+use sn_routing::{Prefix, XorName};
 
-const MIN_REWARD_AGE: u8 = 6;
+const MIN_REWARD_AGE: u8 = 5;
 
 /// Calculates reward for each public key
 /// proportional to the age of its node,
 /// out of the total payments received.
 pub fn distribute_rewards(
     payments: Token,
-    nodes: BTreeMap<PublicKey, Age>,
-) -> BTreeMap<PublicKey, Token> {
+    nodes: BTreeMap<XorName, (Age, PublicKey)>,
+) -> BTreeMap<XorName, (Age, PublicKey, Token)> {
     let reward_buckets = get_buckets(nodes);
-    let rewards = distribute(payments, reward_buckets);
-    rewards
+    distribute(payments, reward_buckets)
 }
 
-fn get_buckets(nodes: BTreeMap<PublicKey, Age>) -> BTreeMap<usize, BTreeSet<PublicKey>> {
+fn get_buckets(
+    nodes: BTreeMap<XorName, (Age, PublicKey)>,
+) -> BTreeMap<Age, BTreeMap<XorName, PublicKey>> {
     let mut reward_buckets = BTreeMap::new();
-    for (wallet, age) in nodes {
+    for (node_name, (age, wallet)) in nodes {
         if age >= MIN_REWARD_AGE {
             let _ = reward_buckets
-                .entry((age as usize))
-                .or_insert(BTreeSet::new())
-                .insert(wallet);
+                .entry(age)
+                .or_insert_with(BTreeMap::new)
+                .insert(node_name, wallet);
         }
     }
     println!("reward_buckets: {}", reward_buckets.len());
@@ -41,25 +43,31 @@ fn get_buckets(nodes: BTreeMap<PublicKey, Age>) -> BTreeMap<usize, BTreeSet<Publ
 
 fn distribute(
     payments: Token,
-    reward_buckets: BTreeMap<usize, BTreeSet<PublicKey>>,
-) -> BTreeMap<PublicKey, Token> {
+    reward_buckets: BTreeMap<Age, BTreeMap<XorName, PublicKey>>,
+) -> BTreeMap<XorName, (Age, PublicKey, Token)> {
+    if reward_buckets.is_empty() {
+        return Default::default();
+    }
     let mut counters = BTreeMap::new();
     let mut remaining_payments = payments.as_nano();
 
     // shorten iterations by
-    let apprx = remaining_payments / reward_buckets.len() as u64;
-    let ratio = reward_buckets.keys().max().unwrap();
-    let div = apprx / *ratio as u64 / 25;
+    let apprx = remaining_payments / u64::max(1, reward_buckets.len() as u64);
+    let ratio = reward_buckets.keys().max().unwrap_or(&1);
+    let div = u64::max(1, apprx / *ratio as u64 / 25);
 
     while remaining_payments > 0 {
         for (age, wallets) in &reward_buckets {
-            let reward = u64::min((*age * wallets.len()) as u64 * div, remaining_payments);
+            let reward = u64::min(
+                (*age as usize * wallets.len()) as u64 * div,
+                remaining_payments,
+            );
             let _ = counters
                 .entry(*age)
                 .and_modify(|existing| *existing += reward)
                 .or_insert(reward);
             remaining_payments -= reward;
-            if remaining_payments <= 0 {
+            if remaining_payments == 0 {
                 break;
             }
         }
@@ -73,12 +81,22 @@ fn distribute(
         let remainder = reward % wallet_count;
 
         let mut first_added: bool = false;
-        for wallet in wallets {
+        for (node_name, wallet) in wallets {
             if !first_added {
-                let _ = to_return.insert(*wallet, Token::from_nano(reward_per_wallet + remainder));
+                let _ = to_return.insert(
+                    *node_name,
+                    (
+                        age,
+                        *wallet,
+                        Token::from_nano(reward_per_wallet + remainder),
+                    ),
+                );
                 first_added = true;
             } else {
-                let _ = to_return.insert(*wallet, Token::from_nano(reward_per_wallet));
+                let _ = to_return.insert(
+                    *node_name,
+                    (age, *wallet, Token::from_nano(reward_per_wallet)),
+                );
             }
         }
     }
@@ -126,7 +144,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn distr() {
+    fn calculates_reward_distribution() {
         // setup
         let full_amount = Token::from_nano(u32::MAX as u64 * 1_000_000_000);
         println!("Initial amount: {:?}", full_amount.as_nano());
@@ -134,11 +152,11 @@ mod test {
 
         let iters = 7;
         //let new_section_size = 21;
-        let mut nodes = BTreeMap::<PublicKey, Age>::new();
+        let mut nodes = BTreeMap::<XorName, (Age, PublicKey)>::new();
         for i in 0..iters {
-            let _ = nodes.insert(get_random_pk(), i + MIN_REWARD_AGE - 1);
-            let _ = nodes.insert(get_random_pk(), i + MIN_REWARD_AGE);
-            let _ = nodes.insert(get_random_pk(), i + MIN_REWARD_AGE);
+            let _ = nodes.insert(XorName::random(), (i + MIN_REWARD_AGE - 1, get_random_pk()));
+            let _ = nodes.insert(XorName::random(), (i + MIN_REWARD_AGE, get_random_pk()));
+            let _ = nodes.insert(XorName::random(), (i + MIN_REWARD_AGE, get_random_pk()));
         }
 
         println!("Added {} nodes", nodes.len());
@@ -158,7 +176,7 @@ mod test {
 
         let mut total = 0;
         let rewards = rewards.values().sorted();
-        for amount in rewards {
+        for (_, _, amount) in rewards {
             println!("{:?}", amount.as_nano());
             total += amount.as_nano();
         }

@@ -19,11 +19,11 @@ use serde::Serialize;
 use sn_data_types::{Error as DtError, PublicKey, Result as DtResult, Signature, SignatureShare};
 use sn_messaging::{client::ProcessMsg, Aggregation, DstLocation, Itinerary, SrcLocation};
 use sn_routing::{
-    Config as RoutingConfig, EldersInfo, Error as RoutingError, EventStream,
-    Routing as RoutingNode, SectionChain,
+    Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
+    SectionChain,
 };
-use std::net::SocketAddr;
 use std::sync::Arc;
+use std::{collections::BTreeMap, net::SocketAddr};
 use std::{collections::BTreeSet, path::PathBuf};
 use xor_name::{Prefix, XorName};
 
@@ -120,11 +120,9 @@ impl Network {
             .map(PublicKey::Bls)
     }
 
-    pub async fn matching_section(
-        &self,
-        name: &XorName,
-    ) -> (Option<bls::PublicKey>, Option<EldersInfo>) {
-        self.routing.match_section(&name).await
+    pub async fn matching_section(&self, name: &XorName) -> Option<bls::PublicKey> {
+        let (key, _) = self.routing.match_section(&name).await;
+        key
     }
 
     pub async fn our_public_key_set(&self) -> Result<PublicKeySet> {
@@ -238,12 +236,43 @@ impl Network {
             .collect::<Vec<_>>()
     }
 
-    pub async fn our_adults(&self) -> Vec<XorName> {
+    pub async fn age_of_node(&self, node: XorName) -> Vec<XorName> {
         self.routing
             .our_adults_sorted_by_distance_to(&XorName::default())
             .await
             .into_iter()
             .take(u8::MAX as usize)
+            .map(|p2p_node| XorName(p2p_node.name().0))
+            .collect::<Vec<_>>()
+    }
+
+    pub async fn our_members(&self) -> BTreeMap<XorName, u8> {
+        let elders: Vec<_> = self
+            .routing
+            .our_elders()
+            .await
+            .into_iter()
+            .map(|peer| (*peer.name(), peer.age()))
+            .collect();
+        let adults: Vec<_> = self
+            .routing
+            .our_adults()
+            .await
+            .into_iter()
+            .map(|peer| (*peer.name(), peer.age()))
+            .collect();
+
+        vec![elders, adults]
+            .into_iter()
+            .flatten()
+            .collect::<BTreeMap<XorName, u8>>()
+    }
+
+    pub async fn our_adults(&self) -> Vec<XorName> {
+        self.routing
+            .our_adults()
+            .await
+            .into_iter()
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>()
     }
