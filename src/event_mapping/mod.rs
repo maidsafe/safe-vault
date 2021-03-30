@@ -59,6 +59,17 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             match msg {
                 Message::Process(process_msg) => map_node_msg(process_msg, src, dst),
                 Message::ProcessingError(error) => map_node_process_err_msg(error, src, dst),
+                Message::SupportingInfo(msg) => {
+                    debug!(">>>>> Supporting info received");
+
+                    Mapping::Ok {
+                        op: NodeDuty::NoOp,
+                        ctx: Some(MsgContext::Msg {
+                            msg: Message::SupportingInfo(msg),
+                            src,
+                        }),
+                    }
+                }
             }
         }
         RoutingEvent::ClientMessageReceived { msg, user } => match *msg {
@@ -66,12 +77,23 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             Message::ProcessingError(error) => {
                 warn!(
                     ">>>> Incoming client processing error received. This needs to be handled {:?}",
-                    error.reason
+                    error.reason()
                 );
                 Mapping::Ok {
                     op: NodeDuty::NoOp,
                     ctx: Some(MsgContext::Msg {
                         msg: Message::ProcessingError(error),
+                        src: SrcLocation::EndUser(user),
+                    }),
+                }
+            }
+            Message::SupportingInfo(msg) => {
+                debug!(">>>>> Supporting info received");
+
+                Mapping::Ok {
+                    op: NodeDuty::NoOp,
+                    ctx: Some(MsgContext::Msg {
+                        msg: Message::SupportingInfo(msg),
                         src: SrcLocation::EndUser(user),
                     }),
                 }
