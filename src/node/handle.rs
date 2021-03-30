@@ -14,8 +14,8 @@ use crate::{
     metadata::Metadata,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
-        churn_process::PayoutProcess,
-        payout_stage::{CreditAccumulation, PayoutStage},
+        reward_process::RewardProcess,
+        reward_stage::{CreditAccumulation, RewardStage},
         reward_wallets::RewardWallets,
         section_wallet::SectionWallet,
         SectionFunds,
@@ -82,7 +82,7 @@ impl Node {
                             .await?,
                     );
 
-                    if let PayoutStage::Completed(credit_proofs) = churn_process.stage().clone() {
+                    if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
                         ops.extend(Self::propagate_credits(credit_proofs)?);
                         // update state
                         self.section_funds = Some(SectionFunds::KeepingNodeWallets {
@@ -410,7 +410,7 @@ impl Node {
     fn get_churning_funds(
         &mut self,
     ) -> Result<(
-        &mut PayoutProcess,
+        &mut RewardProcess,
         &mut RewardWallets,
         &mut DashMap<CreditId, CreditAgreementProof>,
     )> {

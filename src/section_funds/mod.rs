@@ -6,20 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod churn_process;
 pub mod elder_signing;
-pub mod payout_stage;
 mod reward_calc;
+pub mod reward_process;
+pub mod reward_stage;
 pub mod reward_wallets;
 pub mod section_wallet;
 
 use self::{
-    churn_process::PayoutProcess, reward_wallets::RewardWallets, section_wallet::SectionWallet,
+    reward_process::RewardProcess, reward_wallets::RewardWallets, section_wallet::SectionWallet,
 };
 use super::node_ops::{NodeDuty, OutgoingMsg};
 use crate::Result;
 use dashmap::DashMap;
-use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders, Token};
+use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, SectionElders, Token};
 use sn_messaging::{
     client::{NodeQuery, NodeSystemQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId, SrcLocation,
@@ -36,7 +36,7 @@ pub enum SectionFunds {
         payments: DashMap<CreditId, CreditAgreementProof>,
     },
     Churning {
-        process: PayoutProcess,
+        process: RewardProcess,
         wallets: RewardWallets,
         payments: DashMap<CreditId, CreditAgreementProof>,
     },
@@ -64,7 +64,7 @@ impl SectionFunds {
     }
 
     /// Returns node wallet keys of registered nodes.
-    pub fn node_wallets(&self) -> BTreeMap<XorName, (u8, PublicKey)> {
+    pub fn node_wallets(&self) -> BTreeMap<XorName, (NodeAge, PublicKey)> {
         match &self {
             Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
                 wallets.node_wallets()
