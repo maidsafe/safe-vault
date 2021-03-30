@@ -328,16 +328,6 @@ fn match_section_msg(msg: ProcessMsg, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin,
         },
-        // tricky to accumulate, since it has a vec of events.. but we try anyway for now..
-        ProcessMsg::NodeQueryResponse {
-            response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(replicas)),
-            id,
-            ..
-        } => NodeDuty::ContinueWalletChurn {
-            replicas: replicas.to_owned(),
-            msg_id: *id,
-            origin,
-        },
         _ => NodeDuty::NoOp,
     }
 }

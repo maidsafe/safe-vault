@@ -9,25 +9,24 @@
 use crate::{Error, Result};
 use log::{debug, info, warn};
 use sn_data_types::{
-    Credit, CreditAgreementProof, CreditId, ReplicaPublicKeySet, SignatureShare, SignedCredit,
-    SignedCreditShare, Token, TransferPropagated,
+    Credit, CreditAgreementProof, CreditId, PublicKey, ReplicaPublicKeySet, SignatureShare,
+    SignedCredit, SignedCreditShare, Token, TransferPropagated,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum ChurnPayoutStage {
+pub enum PayoutStage {
     None,
     AwaitingThreshold,
     ProposingCredits(ChurnProposalDetails),
     AccumulatingCredits(ChurnAccumulationDetails),
-    Completed(AccumulatedAgreements),
+    Completed(BTreeMap<CreditId, CreditAgreementProof>),
 }
 
 #[derive(Clone, Debug)]
 pub struct ChurnProposalDetails {
     pub pk_set: ReplicaPublicKeySet,
-    pub section_wallet: CreditProposal,
     pub rewards: BTreeMap<CreditId, CreditProposal>,
 }
 
@@ -51,7 +50,6 @@ impl CreditProposal {
 #[derive(Clone)]
 pub struct ChurnAccumulationDetails {
     pub pk_set: ReplicaPublicKeySet,
-    pub section_wallet: CreditAccumulation,
     pub rewards: BTreeMap<CreditId, CreditAccumulation>,
 }
 
@@ -66,25 +64,10 @@ impl CreditAccumulation {
     pub fn id(&self) -> &CreditId {
         self.agreed_proposal.id()
     }
-
-    // pub fn amount(&self) -> Token {
-    //     self.agreed_proposal.amount
-    // }
-}
-
-pub struct PendingAgreements {
-    pub section_wallet: SignedCredit,
-    pub rewards: BTreeMap<CreditId, SignedCredit>,
 }
 
 impl ChurnProposalDetails {
-    pub(crate) fn pending_agreements(&self) -> Option<PendingAgreements> {
-        let section_wallet = if let Some(wallet) = self.section_wallet.pending_agreement.clone() {
-            wallet
-        } else {
-            debug!("No section wallet yet");
-            return None;
-        };
+    pub(crate) fn pending_agreements(&self) -> Option<BTreeMap<CreditId, SignedCredit>> {
         let rewards: BTreeMap<CreditId, SignedCredit> = self
             .rewards
             .values()
@@ -93,10 +76,7 @@ impl ChurnProposalDetails {
             .map(|credit| (*credit.id(), credit))
             .collect();
         if rewards.len() == self.rewards.len() {
-            Some(PendingAgreements {
-                rewards,
-                section_wallet,
-            })
+            Some(rewards)
         } else {
             debug!(
                 "Rewards len {}, self.rewards len {}",
@@ -107,16 +87,13 @@ impl ChurnProposalDetails {
         }
     }
 
-    pub(crate) fn get_proposal(&self, index: usize) -> Option<sn_data_types::ChurnPayoutProposal> {
-        let share = self.section_wallet.signatures.get(&index)?;
-        Some(sn_data_types::ChurnPayoutProposal {
-            section_wallet: SignedCreditShare {
-                credit: self.section_wallet.proposal.clone(),
-                actor_signature: SignatureShare {
-                    share: share.clone(),
-                    index,
-                },
-            },
+    pub(crate) fn get_proposal(
+        &self,
+        section_key: PublicKey,
+        index: usize,
+    ) -> sn_data_types::ChurnPayoutProposal {
+        sn_data_types::ChurnPayoutProposal {
+            section_key,
             rewards: self
                 .rewards
                 .iter()
@@ -132,25 +109,20 @@ impl ChurnProposalDetails {
                 })
                 .flatten()
                 .collect(),
-        })
+        }
     }
 
-    pub(crate) fn add(&mut self, id: &CreditId, sig: &SignatureShare) -> Result<()> {
-        let credit = if self.section_wallet.proposal.id() == id {
-            &mut self.section_wallet
-        } else {
-            self.rewards
-                .get_mut(id)
-                .ok_or_else(|| Error::Logic("logic error..".to_string()))?
-        };
+    pub(crate) fn add_sig(&mut self, id: &CreditId, sig: &SignatureShare) -> Result<()> {
+        let credit = self
+            .rewards
+            .get_mut(id)
+            .ok_or_else(|| Error::Logic("logic error..".to_string()))?;
         if let Some(true) = check(&sig, &credit.signatures) {
             return Ok(());
         }
         let _ = credit.signatures.insert(sig.index, sig.share.clone());
         let min_count = 1 + self.pk_set.threshold();
         if credit.signatures.len() >= min_count {
-            info!("Aggregating actor signature..");
-
             // Combine shares to produce the main signature.
             let actor_signature = sn_data_types::Signature::Bls(
                 self.pk_set
@@ -186,15 +158,8 @@ fn check(sig: &SignatureShare, signatures: &BTreeMap<usize, bls::SignatureShare>
     }
 }
 
-#[derive(Clone)]
-pub struct AccumulatedAgreements {
-    pub section_wallet: CreditAgreementProof,
-    pub rewards: BTreeMap<CreditId, CreditAgreementProof>,
-}
-
 impl ChurnAccumulationDetails {
-    pub(crate) fn pending_agreements(&self) -> Option<AccumulatedAgreements> {
-        let section_wallet = self.section_wallet.pending_agreement.clone()?;
+    pub(crate) fn pending_agreements(&self) -> Option<BTreeMap<CreditId, CreditAgreementProof>> {
         let rewards: BTreeMap<CreditId, CreditAgreementProof> = self
             .rewards
             .values()
@@ -203,10 +168,7 @@ impl ChurnAccumulationDetails {
             .map(|credit| (*credit.id(), credit))
             .collect();
         if rewards.len() == self.rewards.len() {
-            Some(AccumulatedAgreements {
-                rewards,
-                section_wallet,
-            })
+            Some(rewards)
         } else {
             None
         }
@@ -214,17 +176,11 @@ impl ChurnAccumulationDetails {
 
     pub(crate) fn get_accumulation(
         &self,
+        section_key: PublicKey,
         index: usize,
-    ) -> Option<sn_data_types::ChurnPayoutAccumulation> {
-        let share = self.section_wallet.signatures.get(&index)?;
-        Some(sn_data_types::ChurnPayoutAccumulation {
-            section_wallet: sn_data_types::AccumulatingProof {
-                signed_credit: self.section_wallet.agreed_proposal.clone(),
-                sig: SignatureShare {
-                    share: share.clone(),
-                    index,
-                },
-            },
+    ) -> sn_data_types::ChurnPayoutAccumulation {
+        sn_data_types::ChurnPayoutAccumulation {
+            section_key,
             rewards: self
                 .rewards
                 .iter()
@@ -240,24 +196,20 @@ impl ChurnAccumulationDetails {
                 })
                 .flatten()
                 .collect(),
-        })
+        }
     }
 
-    pub(crate) fn add(&mut self, id: CreditId, sig: SignatureShare) -> Result<()> {
-        let credit = if self.section_wallet.agreed_proposal.id() == &id {
-            &mut self.section_wallet
-        } else {
-            self.rewards
-                .get_mut(&id)
-                .ok_or_else(|| Error::Logic("".to_string()))?
-        };
-        if let Some(true) = check(&sig, &credit.signatures) {
+    pub(crate) fn add_sig(&mut self, id: &CreditId, sig: &SignatureShare) -> Result<()> {
+        let credit = self
+            .rewards
+            .get_mut(id)
+            .ok_or_else(|| Error::Logic("".to_string()))?;
+        if let Some(true) = check(sig, &credit.signatures) {
             return Ok(());
         }
-        let _ = credit.signatures.insert(sig.index, sig.share);
+        let _ = credit.signatures.insert(sig.index, sig.share.clone());
         let min_count = 1 + self.pk_set.threshold();
         if credit.signatures.len() >= min_count {
-            info!("Aggregating replica signature..");
             // Combine shares to produce the main signature.
             let debiting_replicas_sig = sn_data_types::Signature::Bls(
                 self.pk_set

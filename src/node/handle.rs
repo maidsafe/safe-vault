@@ -13,7 +13,6 @@ use super::{
     genesis::receive_genesis_accumulation,
     genesis::receive_genesis_proposal,
     genesis_stage::GenesisStage,
-    interaction::CompletedWalletChurn,
     messaging::{send, send_error, send_to_nodes},
 };
 use crate::{
@@ -21,14 +20,18 @@ use crate::{
     metadata::Metadata,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
-        churn_payout_stage::ChurnPayoutStage, churn_process::ChurnProcess,
-        reward_wallets::RewardWallets, section_wallet::SectionWallet, SectionFunds,
+        churn_process::PayoutProcess,
+        payout_stage::{CreditAccumulation, PayoutStage},
+        reward_wallets::RewardWallets,
+        section_wallet::SectionWallet,
+        SectionFunds,
     },
     transfers::Transfers,
     Error, Node, Result,
 };
+use dashmap::DashMap;
 use log::{debug, info};
-use sn_data_types::{PublicKey, SectionElders, WalletHistory};
+use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders, WalletHistory};
 use sn_messaging::{
     client::{NodeCmd, NodeQuery, ProcessMsg, Query},
     Aggregation, DstLocation, MessageId,
@@ -42,14 +45,24 @@ impl Node {
             NodeDuty::ChurnMembers {
                 our_key,
                 our_prefix,
+                newbie,
+            } => {
+                if newbie {
+                    self.level_up().await?;
+                }
+                Ok(vec![])
+            }
+            NodeDuty::SplitSection {
+                our_key,
+                our_prefix,
                 sibling_key,
                 newbie,
             } => {
                 if newbie {
-                    self.begin_churn_as_newbie(our_key, our_prefix, sibling_key)
-                        .await
+                    self.begin_split_as_newbie(our_key, our_prefix).await?;
+                    Ok(vec![])
                 } else {
-                    self.begin_churn_as_oldie(our_prefix, our_key, sibling_key)
+                    self.begin_split_as_oldie(our_prefix, our_key, sibling_key)
                         .await
                 }
             }
@@ -57,47 +70,8 @@ impl Node {
             NodeDuty::GetSectionElders { msg_id, origin } => {
                 Ok(vec![self.get_section_elders(msg_id, origin).await?])
             }
-            // we get to know who our new wallet replicas are, thus continue the churn
-            NodeDuty::ContinueWalletChurn {
-                replicas,
-                msg_id,
-                origin,
-            } => {
-                let members = super::level_up::section_elders(&self.network_api).await?;
-                let (reward_wallets, churn_process, existing_replicas) =
-                    self.get_churning_funds()?;
-
-                if existing_replicas.is_none() {
-                    match churn_process.stage().clone() {
-                        ChurnPayoutStage::AwaitingThreshold
-                        | ChurnPayoutStage::ProposingCredits(_)
-                        | ChurnPayoutStage::AccumulatingCredits(_) => {
-                            debug!("handling ContinueWalletChurn: Setting SectionFunds::Churning");
-                            self.section_funds = Some(SectionFunds::Churning {
-                                process: churn_process.clone(),
-                                wallets: reward_wallets.clone(),
-                                replicas: Some(replicas),
-                            });
-                        }
-                        ChurnPayoutStage::Completed(credit_proofs) => {
-                            let recipient = credit_proofs.section_wallet.recipient();
-                            let ops = Self::propagate_credits(credit_proofs)?;
-                            // update state
-                            self.section_funds = Some(SectionFunds::KeepingNodeWallets {
-                                section_wallet: SectionWallet::new(members, replicas),
-                                wallets: reward_wallets.clone(),
-                            });
-                            info!("COMPLETED({}): We have our new section wallet! (Credit came before replicas.)", recipient);
-                            return Ok(ops);
-                        }
-                        ChurnPayoutStage::None => return Err(Error::InvalidGenesisStage),
-                    }
-                }
-                Ok(vec![])
-            }
             NodeDuty::ReceiveChurnProposal(proposal) => {
-                debug!("handle: ReceiveChurnProposal");
-                if let Ok((_, churn_process, _)) = self.get_churning_funds() {
+                if let Ok((churn_process, _, _)) = self.get_churning_funds() {
                     Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
                 } else {
                     // we are an adult, so ignore this msg
@@ -105,8 +79,7 @@ impl Node {
                 }
             }
             NodeDuty::ReceiveChurnAccumulation(accumulation) => {
-                let members = super::level_up::section_elders(&self.network_api).await?;
-                if let Ok((reward_wallets, churn_process, replicas)) = self.get_churning_funds() {
+                if let Ok((churn_process, reward_wallets, payments)) = self.get_churning_funds() {
                     let mut ops = vec![];
 
                     ops.push(
@@ -115,19 +88,15 @@ impl Node {
                             .await?,
                     );
 
-                    if let ChurnPayoutStage::Completed(credit_proofs) =
-                        churn_process.stage().clone()
-                    {
-                        if let Some(replicas) = replicas.clone() {
-                            let recipient = credit_proofs.section_wallet.recipient();
-                            ops.extend(Self::propagate_credits(credit_proofs)?);
-                            // update state
-                            self.section_funds = Some(SectionFunds::KeepingNodeWallets {
-                                section_wallet: SectionWallet::new(members, replicas),
-                                wallets: reward_wallets.clone(),
-                            });
-                            info!("COMPLETED({}): We have our new section wallet! (Replicas came before credit.)", recipient);
-                        }
+                    if let PayoutStage::Completed(credit_proofs) = churn_process.stage().clone() {
+                        ops.extend(Self::propagate_credits(credit_proofs)?);
+                        // update state
+                        self.section_funds = Some(SectionFunds::KeepingNodeWallets {
+                            wallets: reward_wallets.clone(),
+                            payments: payments.clone(),
+                        });
+                        let section_key = &self.network_api.section_public_key().await?;
+                        info!("COMPLETED({}): Rewards have been paid out.", section_key);
                     }
 
                     Ok(ops)
@@ -158,14 +127,7 @@ impl Node {
                 node_name,
                 msg_id,
                 origin,
-            } => {
-                //let rewards = self.get_section_funds()?;
-                Ok(vec![
-                    // rewards
-                    //     .get_node_wallet(node_name, msg_id, origin)
-                    //     .await?,
-                ])
-            }
+            } => Ok(vec![]),
             NodeDuty::ProcessLostMember { name, age } => {
                 let rewards = self.get_section_funds()?;
                 rewards.remove_node_wallet(name)?;
@@ -291,6 +253,8 @@ impl Node {
                 msg_id,
                 origin,
             } => {
+                // TODO: remove this conditional branching
+                // routing should take care of this
                 let data_section_addr = read.dst_address();
                 if self
                     .network_api
@@ -321,27 +285,8 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let data_section_addr = write.dst_address();
-                if self
-                    .network_api
-                    .our_prefix()
-                    .await
-                    .matches(&&data_section_addr)
-                {
-                    let chunks = self.get_chunks()?;
-                    Ok(vec![chunks.write(&write, msg_id, origin).await?])
-                } else {
-                    Ok(vec![NodeDuty::Send(OutgoingMsg {
-                        msg: ProcessMsg::NodeCmd {
-                            cmd: NodeCmd::Chunks { cmd: write, origin },
-                            id: msg_id,
-                        },
-                        dst: DstLocation::Section(data_section_addr),
-                        // TBD
-                        section_source: false,
-                        aggregation: Aggregation::None,
-                    })])
-                }
+                let chunks = self.get_chunks()?;
+                Ok(vec![chunks.write(&write, msg_id, origin).await?])
             }
             NodeDuty::ReachingMaxCapacity => Ok(vec![self.notify_section_of_our_storage().await?]),
             //
@@ -367,6 +312,8 @@ impl Node {
             //
             // ------- Data ------------
             NodeDuty::ProcessRead { query, id, origin } => {
+                // TODO: remove this conditional branching
+                // routing should take care of this
                 let data_section_addr = query.dst_address();
                 if self
                     .network_api
@@ -390,27 +337,8 @@ impl Node {
                 }
             }
             NodeDuty::ProcessWrite { cmd, id, origin } => {
-                let data_section_addr = cmd.dst_address();
-                if self
-                    .network_api
-                    .our_prefix()
-                    .await
-                    .matches(&data_section_addr)
-                {
-                    let meta_data = self.get_metadata()?;
-                    Ok(vec![meta_data.write(cmd, id, origin).await?])
-                } else {
-                    Ok(vec![NodeDuty::Send(OutgoingMsg {
-                        msg: ProcessMsg::NodeCmd {
-                            cmd: NodeCmd::Metadata { cmd, origin },
-                            id,
-                        },
-                        dst: DstLocation::Section(data_section_addr),
-                        // TBD
-                        section_source: false,
-                        aggregation: Aggregation::None,
-                    })])
-                }
+                let meta_data = self.get_metadata()?;
+                Ok(vec![meta_data.write(cmd, id, origin).await?])
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
                 let transfers = self.get_transfers()?;
@@ -492,10 +420,8 @@ impl Node {
     fn get_reward_wallets(&mut self) -> Result<&mut RewardWallets> {
         if self.section_funds.is_none() {
             Err(Error::NoSectionFunds)
-        } else if let Some(SectionFunds::KeepingNodeWallets {
-            section_wallet,
-            wallets,
-        }) = &mut self.section_funds
+        } else if let Some(SectionFunds::KeepingNodeWallets { wallets, payments }) =
+            &mut self.section_funds
         {
             Ok(wallets)
         } else {
@@ -516,17 +442,17 @@ impl Node {
     fn get_churning_funds(
         &mut self,
     ) -> Result<(
+        &mut PayoutProcess,
         &mut RewardWallets,
-        &mut ChurnProcess,
-        &mut Option<SectionElders>,
+        &mut DashMap<CreditId, CreditAgreementProof>,
     )> {
         if let Some(SectionFunds::Churning {
-            wallets,
             process,
-            replicas,
+            wallets,
+            payments,
         }) = &mut self.section_funds
         {
-            Ok((wallets, process, replicas))
+            Ok((process, wallets, payments))
         } else {
             debug!("get_churning_funds: whaaat? NoSectionFunds");
             Err(Error::NoSectionFunds)

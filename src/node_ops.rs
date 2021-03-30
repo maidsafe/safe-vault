@@ -66,27 +66,23 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
-
     /// Validate a transfer from a client
     ValidateClientTransfer {
         signed_transfer: SignedTransfer,
         msg_id: MessageId,
         origin: SrcLocation,
     },
-
     /// Register a transfer from a client
     RegisterTransfer {
         proof: TransferAgreementProof,
         msg_id: MessageId,
     },
-
     /// TEMP: Simulate a transfer from a client
     SimulatePayout {
         transfer: Transfer,
         msg_id: MessageId,
         origin: SrcLocation,
     },
-
     ReadChunk {
         read: BlobRead,
         msg_id: MessageId,
@@ -97,18 +93,11 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: EndUser,
     },
-    ContinueWalletChurn {
-        replicas: SectionElders,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    },
-
     /// Get section elders.
     GetSectionElders {
         msg_id: MessageId,
         origin: SrcLocation,
     },
-
     /// Get key transfers since specified version.
     GetTransfersHistory {
         /// The wallet key.
@@ -118,14 +107,12 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
-
     /// Get Balance at a specific key
     GetBalance {
         at: PublicKey,
         msg_id: MessageId,
         origin: SrcLocation,
     },
-
     GetStoreCost {
         /// The requester's key.
         requester: PublicKey,
@@ -134,7 +121,6 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
-
     /// On being promoted, an Adult node becomes an Elder.
     BeginFormingGenesisSection,
     /// Bootstrap of genesis section actor.
@@ -160,9 +146,16 @@ pub enum NodeDuty {
         our_prefix: Prefix,
         /// our section public key
         our_key: PublicKey,
-        /// The PK of the sibling section, if this event is fired during a split.
-        /// Otherwise `None`.
-        sibling_key: Option<PublicKey>,
+        /// oldie or newbie?
+        newbie: bool,
+    },
+    SplitSection {
+        /// Our section prefix.
+        our_prefix: Prefix,
+        /// our section public key
+        our_key: PublicKey,
+        /// The PK of the sibling section, as this event is fired during a split.
+        sibling_key: PublicKey,
         /// oldie or newbie?
         newbie: bool,
     },
@@ -267,13 +260,13 @@ impl Debug for NodeDuty {
             Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
-            Self::ContinueWalletChurn { .. } => write!(f, "ContinueWalletChurn"),
             Self::ReceiveChurnProposal { .. } => write!(f, "ReceiveChurnProposal"),
             Self::ReceiveChurnAccumulation { .. } => write!(f, "ReceiveChurnAccumulation"),
             // ------
             Self::LevelDown => write!(f, "LevelDown"),
             Self::SynchState { .. } => write!(f, "SynchState"),
             Self::ChurnMembers { .. } => write!(f, "ChurnMembers"),
+            Self::SplitSection { .. } => write!(f, "SplitSection"),
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
             Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
             Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),

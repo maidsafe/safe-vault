@@ -6,19 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod churn_payout_stage;
 pub mod churn_process;
 pub mod elder_signing;
+pub mod payout_stage;
 mod reward_calc;
 pub mod reward_wallets;
 pub mod section_wallet;
 
 use self::{
-    churn_process::ChurnProcess, reward_wallets::RewardWallets, section_wallet::SectionWallet,
+    churn_process::PayoutProcess, reward_wallets::RewardWallets, section_wallet::SectionWallet,
 };
 use super::node_ops::{NodeDuty, OutgoingMsg};
 use crate::Result;
-use sn_data_types::{PublicKey, SectionElders, Token};
+use dashmap::DashMap;
+use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders, Token};
 use sn_messaging::{
     client::{NodeQuery, NodeSystemQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId, SrcLocation,
@@ -31,18 +32,27 @@ use std::collections::BTreeMap;
 #[allow(clippy::large_enum_variant)]
 pub enum SectionFunds {
     KeepingNodeWallets {
-        section_wallet: SectionWallet,
         wallets: RewardWallets,
+        payments: DashMap<CreditId, CreditAgreementProof>,
     },
-    // in transition
     Churning {
-        process: ChurnProcess,
+        process: PayoutProcess,
         wallets: RewardWallets,
-        replicas: Option<SectionElders>,
+        payments: DashMap<CreditId, CreditAgreementProof>,
     },
 }
 
 impl SectionFunds {
+    /// Adds payment
+    pub fn add_payment(&self, credit: CreditAgreementProof) {
+        // todo: validate
+        match &self {
+            Self::Churning { payments, .. } | Self::KeepingNodeWallets { payments, .. } => {
+                let _ = payments.insert(*credit.id(), credit);
+            }
+        }
+    }
+
     /// Returns registered wallet key of a node.
     pub fn get_node_wallet(&self, node_name: &XorName) -> Option<PublicKey> {
         match &self {

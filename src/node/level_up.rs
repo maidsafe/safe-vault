@@ -57,17 +57,12 @@ impl Node {
 
         //
         // start handling node rewards
-        let members = section_elders(&self.network_api).await?;
-        let replicas = members.clone();
-        let section_wallet = SectionWallet::new(members, replicas);
-
-        section_wallet.add_payment(genesis_tx);
-
-        let wallets = RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new());
-        self.section_funds = Some(SectionFunds::KeepingNodeWallets {
-            section_wallet,
-            wallets,
-        });
+        let section_funds = SectionFunds::KeepingNodeWallets {
+            wallets: RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new()),
+            payments: Default::default(),
+        };
+        section_funds.add_payment(genesis_tx);
+        self.section_funds = Some(section_funds);
 
         Ok(NodeDuty::Send(self.register_wallet().await))
     }
@@ -94,6 +89,14 @@ impl Node {
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
         let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
         self.transfers = Some(Transfers::new(replicas, rate_limit));
+
+        // //
+        // // start handling node rewards
+        // self.section_funds = Some(SectionFunds::KeepingNodeWallets {
+        //     wallets: RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new()),
+        //     payments: Default::default(),
+        // });
+
         Ok(())
     }
 
@@ -135,14 +138,4 @@ impl Node {
             Ok(NodeDuty::NoOp)
         }
     }
-}
-
-pub async fn section_elders(network_api: &crate::Network) -> Result<SectionElders> {
-    /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
-    #[allow(clippy::eval_order_dependence)]
-    Ok(SectionElders {
-        prefix: network_api.our_prefix().await,
-        names: network_api.our_elder_names().await,
-        key_set: network_api.our_public_key_set().await?,
-    })
 }

@@ -39,7 +39,7 @@ pub async fn begin_forming_genesis_section(network_api: &Network) -> Result<Gene
     let our_pk_set = network_api.our_public_key_set().await?;
 
     debug!(
-        "begin_transition_to_elder. is_genesis_section: {}, elder_count: {}, section_chain_len: {}",
+        "begin_forming_genesis_section. is_genesis_section: {}, elder_count: {}, section_chain_len: {}",
         is_genesis_section, elder_count, section_chain_len
     );
     if is_genesis_section
@@ -49,15 +49,12 @@ pub async fn begin_forming_genesis_section(network_api: &Network) -> Result<Gene
         // this is the case when we are the GENESIS_ELDER_COUNT-th Elder!
         debug!("**********threshold reached; proposing genesis!");
 
-        // let rewards_and_wallets = RewardsAndWallets::new(network_api.clone()).await?;
-        let genesis_balance = u32::MAX as u64 * 1_000_000_000;
+        // init an arbitrary balance for first reward payout
+        let genesis_balance = 1234 * 1_000_000_000;
         let credit = Credit {
             id: Default::default(),
             amount: Token::from_nano(genesis_balance),
-            recipient: network_api
-                .section_public_key()
-                .await
-                .ok_or(Error::NoSectionPublicKey)?,
+            recipient: network_api.section_public_key().await?,
             msg: "genesis".to_string(),
         };
 

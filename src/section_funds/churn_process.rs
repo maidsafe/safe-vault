@@ -25,77 +25,56 @@ use sn_messaging::{
 use xor_name::{Prefix, XorName};
 
 use super::{
-    churn_payout_stage::{
-        ChurnAccumulationDetails, ChurnPayoutStage, ChurnProposalDetails, CreditAccumulation,
-        CreditProposal, PendingAgreements,
-    },
     elder_signing::ElderSigning,
+    payout_stage::{
+        ChurnAccumulationDetails, ChurnProposalDetails, CreditAccumulation, CreditProposal,
+        PayoutStage,
+    },
     reward_calc::distribute_rewards,
     section_wallet::SectionWallet,
 };
 
 ///
 #[derive(Clone)]
-pub struct ChurnProcess {
+pub struct PayoutProcess {
     balance: Token,
-    churn: Churn,
-    stage: ChurnPayoutStage,
+    section: OurSection,
+    stage: PayoutStage,
     signing: ElderSigning,
 }
 
 ///
 #[derive(Clone, Debug)]
-#[allow(clippy::large_enum_variant)]
-pub enum Churn {
-    /// Contains next section prefix + wallets.
-    Regular {
-        our_prefix: Prefix,
-
-        our_key: PublicKey,
-    },
-    /// Contains the new children prefix + wallets.
-    Split {
-        our_prefix: Prefix,
-        ///
-        our_key: PublicKey,
-        /// Neighbouring section Pk
-        sibling_key: PublicKey,
-    },
+pub struct OurSection {
+    ///
+    pub our_prefix: Prefix,
+    ///
+    pub our_key: PublicKey,
 }
 
-impl Churn {
+impl OurSection {
+    // Our section wallet key
     pub fn wallet_key(&self) -> PublicKey {
-        match self {
-            Self::Regular { our_key, .. } => *our_key,
-            Self::Split { our_key, .. } => *our_key,
-        }
+        self.our_key
     }
 
-    /// Our elder's prefix name
-    pub fn our_elders_address(&self) -> XorName {
-        match self {
-            Self::Regular { our_prefix, .. } => our_prefix.name(),
-            Self::Split { our_prefix, .. } => our_prefix.name(),
-        }
-    }
-
-    /// Our elders wallet key name. (XorName derived from PK)
-    pub fn our_elders_name(&self) -> XorName {
-        XorName::from(self.wallet_key())
+    /// Our section's prefix name
+    pub fn address(&self) -> XorName {
+        self.our_prefix.name()
     }
 }
 
-impl ChurnProcess {
-    pub fn new(balance: Token, churn: Churn, signing: ElderSigning) -> Self {
+impl PayoutProcess {
+    pub fn new(balance: Token, section: OurSection, signing: ElderSigning) -> Self {
         Self {
             balance,
-            churn,
+            section,
             signing,
-            stage: ChurnPayoutStage::AwaitingThreshold,
+            stage: PayoutStage::AwaitingThreshold,
         }
     }
 
-    pub fn stage(&self) -> &ChurnPayoutStage {
+    pub fn stage(&self) -> &PayoutStage {
         &self.stage
     }
 
@@ -103,54 +82,33 @@ impl ChurnProcess {
         &mut self,
         our_nodes: BTreeMap<XorName, (NodeAge, PublicKey)>,
     ) -> Result<NodeDuty> {
-        let proposal = match self.churn.clone() {
-            Churn::Regular { .. } => self.add_wallet_proposal(self.balance).await?,
-            Churn::Split {
-                our_prefix,
-                our_key,
-                sibling_key,
-            } => {
-                // Calculate our nodes' rewards;
-                // the size being the sum of payments to parent section.
-                let reward_credits = self.get_reward_proposals(our_prefix, our_key, our_nodes);
-                let reward_sum: u64 = reward_credits.iter().map(|c| c.amount().as_nano()).sum();
+        //  -----  MINTING  -----
+        // This is the minting of new coins happening;
+        // the size being the sum of payments to parent section.
+        let minting = 2; // double the amount paid into section
 
-                //  -----  MINTING  -----
-                // This is the minting of new coins happening;
-                // the size being the sum of payments to parent section.
-                let half_balance = self.balance.as_nano() / 2;
-                let remainder = self.balance.as_nano() % 2;
+        // Calculate our nodes' rewards;
+        // the size being the sum of payments to parent section.
+        let reward_credits = self.get_reward_proposals(minting, self.section.our_key, our_nodes);
+        let reward_sum: u64 = reward_credits.iter().map(|c| c.amount().as_nano()).sum();
 
-                // Setup two transfer amounts; one to each sibling wallet
-                let t1_amount = Token::from_nano(half_balance + remainder);
-                let t2_amount = Token::from_nano(half_balance);
+        let proposal = self.sign_proposed_rewards(reward_credits).await?;
 
-                // Determine which transfer is first
-                // (deterministic order is important for reaching consensus)
-                let mut proposal = if our_key > sibling_key {
-                    self.add_wallet_proposal(t1_amount).await?
-                } else {
-                    self.add_wallet_proposal(t2_amount).await?
-                };
+        let to_send =
+            proposal.get_proposal(self.section.wallet_key(), self.signing.our_index().await?);
 
-                self.sign_proposed_rewards(proposal, reward_credits)?
-            }
-        };
-
-        let our_index = self.signing.our_index().await?;
-        let to_send = proposal
-            .get_proposal(our_index)
-            .ok_or_else(|| Error::Logic("Could not get proposal".to_string()))?;
-
-        self.stage = ChurnPayoutStage::ProposingCredits(proposal.clone());
-        Ok(send_prop_msg(to_send, self.churn.our_elders_address()))
+        self.stage = PayoutStage::ProposingCredits(proposal.clone());
+        Ok(send_prop_msg(to_send, self.section.address()))
     }
 
-    fn sign_proposed_rewards(
+    async fn sign_proposed_rewards(
         &self,
-        mut proposal: ChurnProposalDetails,
         rewards: Vec<CreditProposal>,
     ) -> Result<ChurnProposalDetails> {
+        let mut proposal = ChurnProposalDetails {
+            rewards: BTreeMap::new(),
+            pk_set: self.signing.public_key_set().await?,
+        };
         for credit in rewards {
             let _ = proposal.rewards.insert(*credit.id(), credit);
         }
@@ -159,16 +117,19 @@ impl ChurnProcess {
                 Signature::BlsShare(share) => share,
                 _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
             };
-            proposal.add(credit.id(), &share)?;
+            proposal.add_sig(credit.id(), &share)?;
         }
         Ok(proposal)
     }
 
-    fn sign_accumulating_rewards(
+    async fn sign_accumulating_rewards(
         &self,
-        mut accumulation: ChurnAccumulationDetails,
         rewards: Vec<CreditAccumulation>,
     ) -> Result<ChurnAccumulationDetails> {
+        let mut accumulation = ChurnAccumulationDetails {
+            pk_set: self.signing.public_key_set().await?,
+            rewards: Default::default(),
+        };
         for acc in rewards {
             let _ = accumulation.rewards.insert(*acc.id(), acc);
         }
@@ -177,14 +138,14 @@ impl ChurnProcess {
                 Signature::BlsShare(share) => share,
                 _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
             };
-            accumulation.add(*credit.id(), share)?;
+            accumulation.add_sig(credit.id(), &share)?;
         }
         Ok(accumulation)
     }
 
     fn get_reward_proposals(
         &self,
-        section_prefix: Prefix,
+        minting: u8,
         section_key: PublicKey,
         nodes: BTreeMap<XorName, (NodeAge, PublicKey)>,
     ) -> Vec<CreditProposal> {
@@ -210,104 +171,52 @@ impl ChurnProcess {
             .collect()
     }
 
-    /// Generates msgs for creation of new section wallet.
-    async fn add_wallet_proposal(&mut self, amount: Token) -> Result<ChurnProposalDetails> {
-        let id = MessageId::combine(vec![
-            self.churn.our_elders_address(),
-            self.churn.our_elders_name(),
-        ])
-        .0
-         .0;
-
-        let credit = Credit {
-            id,
-            amount,
-            recipient: self.churn.wallet_key(),
-            msg: "New section wallet".to_string(),
-        };
-
-        let mut churn_proposal = ChurnProposalDetails {
-            section_wallet: CreditProposal {
-                proposal: credit.clone(),
-                signatures: Default::default(),
-                pending_agreement: None,
-            },
-            rewards: BTreeMap::new(),
-            pk_set: self.signing.public_key_set().await?,
-        };
-
-        match self.signing.sign(&credit)? {
-            Signature::BlsShare(share) => {
-                churn_proposal.add(&id, &share)?;
-            }
-            _ => return Err(Error::InvalidOperation("aarrgh".to_string())),
-        };
-
-        Ok(churn_proposal)
-    }
-
     // TODO: validate the credit...
     pub async fn receive_churn_proposal(
         &mut self,
         proposal: ChurnPayoutProposal,
     ) -> Result<NodeDuty> {
-        if proposal.section_wallet.recipient() != self.churn.wallet_key() {
-            return Err(Error::Transfer(sn_transfers::Error::CreditDoesNotBelong(
-                self.churn.wallet_key(),
-                proposal.section_wallet.credit,
-            )));
+        if proposal.section_key != self.section.wallet_key() {
+            return Err(Error::Transfer(sn_transfers::Error::InvalidOwner));
         }
         match self.stage.clone() {
-            ChurnPayoutStage::None | ChurnPayoutStage::AwaitingThreshold => {
-                debug!("@ receive_churn_proposal when ChurnPayoutStage::None | ChurnPayoutStage::AwaitingThreshold");
-                let amount = proposal.section_wallet.amount();
-                let mut our_proposal = self.add_wallet_proposal(amount).await?;
-                let our_proposal = self.sign_proposed_rewards(
-                    our_proposal,
-                    proposal
-                        .rewards
-                        .into_iter()
-                        .map(|share| CreditProposal {
-                            proposal: share.credit,
-                            signatures: Default::default(),
-                            pending_agreement: None,
-                        })
-                        .collect(),
-                )?;
+            PayoutStage::None | PayoutStage::AwaitingThreshold => {
+                debug!("@ receive_churn_proposal when PayoutStage::None | PayoutStage::AwaitingThreshold");
+                let rewards = proposal
+                    .rewards
+                    .iter()
+                    .map(|share| CreditProposal {
+                        proposal: share.credit.clone(),
+                        signatures: Default::default(),
+                        pending_agreement: None,
+                    })
+                    .collect();
 
-                let our_index = self.signing.our_index().await?;
+                let mut our_proposal = self.sign_proposed_rewards(rewards).await?;
+
+                // Add sigs of incoming proposal
+                for p in proposal.rewards {
+                    our_proposal.add_sig(p.id(), &p.actor_signature)?
+                }
+
                 let to_send = our_proposal
-                    .get_proposal(our_index)
-                    .ok_or_else(|| Error::Logic("Could not get proposal".to_string()))?;
+                    .get_proposal(self.section.wallet_key(), self.signing.our_index().await?);
 
-                self.stage = ChurnPayoutStage::ProposingCredits(our_proposal);
+                self.stage = PayoutStage::ProposingCredits(our_proposal);
 
-                Ok(send_prop_msg(to_send, self.churn.our_elders_address()))
+                Ok(send_prop_msg(to_send, self.section.address()))
             }
-            ChurnPayoutStage::ProposingCredits(mut proposal_details) => {
-                // Add section wallet proposal
-                proposal_details.add(
-                    proposal.section_wallet.id(),
-                    &proposal.section_wallet.actor_signature,
-                )?;
+            PayoutStage::ProposingCredits(mut proposal_details) => {
+                // Add proposals
+                for p in proposal.rewards {
+                    proposal_details.add_sig(p.id(), &p.actor_signature)?
+                }
 
-                if let Some(PendingAgreements {
-                    section_wallet,
-                    rewards,
-                }) = proposal_details.pending_agreements()
-                {
-                    info!(
-                        "******* there is an agreement for churn proposal (newbie?: {}).",
-                        self.balance == Token::zero()
-                    );
+                if let Some(rewards) = proposal_details.pending_agreements() {
+                    info!("******* there is an agreement for reward proposal.");
                     // replicas signatures over > signed_credit <
                     let mut our_acc = ChurnAccumulationDetails {
                         pk_set: proposal_details.pk_set,
-                        section_wallet: CreditAccumulation {
-                            agreed_proposal: section_wallet,
-                            signatures: Default::default(),
-                            pending_agreement: None,
-                        },
                         rewards: Default::default(),
                     };
 
@@ -320,23 +229,23 @@ impl ChurnProcess {
                         })
                         .collect();
 
-                    let our_acc = self.sign_accumulating_rewards(our_acc, rewards)?;
-                    let our_index = self.signing.our_index().await?;
-                    let to_send = our_acc
-                        .get_accumulation(our_index)
-                        .ok_or_else(|| Error::Logic("Could not get proposal".to_string()))?;
+                    let our_acc = self.sign_accumulating_rewards(rewards).await?;
+                    let to_send = our_acc.get_accumulation(
+                        self.section.wallet_key(),
+                        self.signing.our_index().await?,
+                    );
 
-                    self.stage = ChurnPayoutStage::AccumulatingCredits(our_acc);
+                    self.stage = PayoutStage::AccumulatingCredits(our_acc);
 
-                    Ok(send_acc_msg(to_send, self.churn.our_elders_address()))
+                    Ok(send_acc_msg(to_send, self.section.address()))
                 } else {
-                    self.stage = ChurnPayoutStage::ProposingCredits(proposal_details);
+                    self.stage = PayoutStage::ProposingCredits(proposal_details);
                     Ok(NodeDuty::NoOp)
                 }
             }
-            ChurnPayoutStage::AccumulatingCredits(_) => Ok(NodeDuty::NoOp),
-            ChurnPayoutStage::Completed(_) => Ok(NodeDuty::NoOp),
-            ChurnPayoutStage::None => Err(Error::InvalidGenesisStage),
+            PayoutStage::AccumulatingCredits(_) => Ok(NodeDuty::NoOp),
+            PayoutStage::Completed(_) => Ok(NodeDuty::NoOp),
+            PayoutStage::None => Err(Error::InvalidGenesisStage),
         }
     }
 
@@ -345,100 +254,83 @@ impl ChurnProcess {
         &mut self,
         new_acc: ChurnPayoutAccumulation,
     ) -> Result<NodeDuty> {
-        if new_acc.section_wallet.signed_credit.recipient() != self.churn.wallet_key() {
-            return Err(Error::Transfer(sn_transfers::Error::CreditDoesNotBelong(
-                self.churn.wallet_key(),
-                new_acc.section_wallet.signed_credit.credit,
-            )));
+        if new_acc.section_key != self.section.wallet_key() {
+            return Err(Error::Transfer(sn_transfers::Error::InvalidOwner));
         }
         match self.stage.clone() {
-            ChurnPayoutStage::AwaitingThreshold => {
-                // replicas signatures over > signed_credit <
-                let mut our_acc = ChurnAccumulationDetails {
-                    pk_set: self.signing.public_key_set().await?,
-                    section_wallet: CreditAccumulation {
-                        agreed_proposal: new_acc.section_wallet.signed_credit.clone(),
-                        signatures: Default::default(),
-                        pending_agreement: None,
-                    },
-                    rewards: Default::default(),
-                };
-
-                // add the incoming sig
-                our_acc.add(*new_acc.section_wallet.id(), new_acc.section_wallet.sig);
-
+            PayoutStage::AwaitingThreshold => {
                 let rewards = new_acc
                     .rewards
-                    .into_iter()
+                    .iter()
                     .map(|reward| CreditAccumulation {
-                        agreed_proposal: reward.signed_credit,
+                        agreed_proposal: reward.signed_credit.clone(),
                         signatures: Default::default(),
                         pending_agreement: None,
                     })
                     .collect();
 
-                let our_acc = self.sign_accumulating_rewards(our_acc, rewards)?;
-                let our_index = self.signing.our_index().await?;
+                let mut our_acc = self.sign_accumulating_rewards(rewards).await?;
+
+                // Add sigs of incoming proposal
+                for p in new_acc.rewards {
+                    our_acc.add_sig(p.id(), &p.sig)?
+                }
+
                 let to_send = our_acc
-                    .get_accumulation(our_index)
-                    .ok_or_else(|| Error::Logic("Could not get proposal".to_string()))?;
+                    .get_accumulation(self.section.wallet_key(), self.signing.our_index().await?);
 
-                self.stage = ChurnPayoutStage::AccumulatingCredits(our_acc);
+                self.stage = PayoutStage::AccumulatingCredits(our_acc);
 
-                Ok(send_acc_msg(to_send, self.churn.our_elders_address()))
+                Ok(send_acc_msg(to_send, self.section.address()))
             }
-            ChurnPayoutStage::ProposingCredits(proposal_details) => {
+            PayoutStage::ProposingCredits(proposal_details) => {
                 // create our acc details
                 let mut our_acc = ChurnAccumulationDetails {
                     pk_set: proposal_details.pk_set,
-                    section_wallet: CreditAccumulation {
-                        agreed_proposal: new_acc.section_wallet.signed_credit.clone(),
-                        signatures: Default::default(),
-                        pending_agreement: None,
-                    },
                     rewards: Default::default(),
                 };
 
-                // add the incoming sig
-                our_acc.add(*new_acc.section_wallet.id(), new_acc.section_wallet.sig);
-
                 let rewards = new_acc
                     .rewards
-                    .into_iter()
+                    .iter()
                     .map(|reward| CreditAccumulation {
-                        agreed_proposal: reward.signed_credit,
+                        agreed_proposal: reward.signed_credit.clone(),
                         signatures: Default::default(),
                         pending_agreement: None,
                     })
                     .collect();
 
                 // sign all the rewards
-                let our_acc = self.sign_accumulating_rewards(our_acc, rewards)?;
-                let our_index = self.signing.our_index().await?;
+                let mut our_acc = self.sign_accumulating_rewards(rewards).await?;
+
+                // Add sigs of incoming proposal
+                for p in new_acc.rewards {
+                    our_acc.add_sig(p.id(), &p.sig)?
+                }
+
                 let to_send = our_acc
-                    .get_accumulation(our_index)
-                    .ok_or_else(|| Error::Logic("Could not get proposal".to_string()))?;
+                    .get_accumulation(self.section.wallet_key(), self.signing.our_index().await?);
 
-                self.stage = ChurnPayoutStage::AccumulatingCredits(our_acc);
+                self.stage = PayoutStage::AccumulatingCredits(our_acc);
 
-                Ok(send_acc_msg(to_send, self.churn.our_elders_address()))
+                Ok(send_acc_msg(to_send, self.section.address()))
             }
-            ChurnPayoutStage::AccumulatingCredits(mut our_acc) => {
-                // add the incoming sig
-                our_acc.add(*new_acc.section_wallet.id(), new_acc.section_wallet.sig);
+            PayoutStage::AccumulatingCredits(mut our_acc) => {
+                // Add sigs of incoming proposal
+                for p in new_acc.rewards {
+                    our_acc.add_sig(p.id(), &p.sig)?
+                }
+
                 if let Some(credit_proofs) = our_acc.pending_agreements() {
-                    info!(
-                        "******* there is an agreement for wallet accumulation (newbie?: {}).",
-                        self.balance == Token::zero()
-                    );
-                    self.stage = ChurnPayoutStage::Completed(credit_proofs);
+                    info!("******* there is an agreement for reward accumulation.");
+                    self.stage = PayoutStage::Completed(credit_proofs);
                 } else {
-                    self.stage = ChurnPayoutStage::AccumulatingCredits(our_acc);
+                    self.stage = PayoutStage::AccumulatingCredits(our_acc);
                 }
                 Ok(NodeDuty::NoOp)
             }
-            ChurnPayoutStage::Completed(_) => Ok(NodeDuty::NoOp),
-            ChurnPayoutStage::None => Err(Error::InvalidGenesisStage),
+            PayoutStage::Completed(_) => Ok(NodeDuty::NoOp),
+            PayoutStage::None => Err(Error::InvalidGenesisStage),
         }
     }
 }
