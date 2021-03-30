@@ -32,10 +32,11 @@ structopt = "~0.3.17"
 crdts = "4.3.0"
 ed25519-dalek = "1.0.0-pre.4"
 sn_transfers = "~0.6.0"
-sn_routing = { git = "https://github.com/joshuef/sn_routing", branch = "Lazy" }
-# sn_routing = { path="../sn_routing" }
-# sn_messaging = { path="../sn_messaging" }
-sn_messaging = "^10.0.0"
+# sn_routing = { git = "https://github.com/Yoga07/sn_routing", branch = "Lazy" }
+# sn_messaging = "^10.0.0"
+sn_routing = { path="../sn_routing" }
+sn_messaging = { path="../sn_messaging" }
+
 sn_data_types = "~0.17.0"
 ed25519 = "1.0.1"
 signature = "1.1.10"

@@ -185,12 +185,12 @@ pub fn map_node_process_err_msg(
 }
 
 fn match_process_err(msg: ProcessingError, src: SrcLocation) -> Mapping {
-    if let Some(reason) = msg.clone().reason {
+    if let Some(reason) = msg.clone().reason() {
         // debug!("ProcessingError with reason")
         match reason {
             ErrorMessage::NoSectionFunds => {
                 return Mapping::Ok {
-                    op: NodeDuty::UpdateErroringNodeSectionState,
+                    op: NodeDuty::ProvideSectionWalletSupportingInfo,
                     ctx: Some(MsgContext::Msg {
                         msg: Message::ProcessingError(msg),
                         src,

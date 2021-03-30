@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node_ops::{OutgoingLazyError, OutgoingMsg},
+    node_ops::{OutgoingLazyError, OutgoingMsg, OutgoingSupportingInfo},
     Error,
 };
 use crate::{Network, Result};
@@ -55,7 +55,7 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
 }
 
 pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Result<()> {
-    trace!("Sending msg: {:?}", msg);
+    trace!("Sending error msg: {:?}", msg);
     let src = SrcLocation::Node(network.our_name().await);
     let itinerary = Itinerary {
         src,
@@ -73,6 +73,39 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
     let message = Message::ProcessingError(msg.msg);
+    let result = network
+        .send_message(itinerary, message.serialize(dst_name, target_section_pk)?)
+        .await;
+
+    result.map_or_else(
+        |err| {
+            error!("Unable to send msg: {:?}", err);
+            Err(Error::UnableToSend(message))
+        },
+        |()| Ok(()),
+    )
+}
+
+// TODO: Refactor over support/error
+pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network) -> Result<()> {
+    trace!("Sending support msg: {:?}", msg);
+    let src = SrcLocation::Node(network.our_name().await);
+    let itinerary = Itinerary {
+        src,
+        dst: msg.dst,
+        aggregation: Aggregation::None,
+    };
+
+    let msg_id = msg.id();
+
+    let dst_name = msg.dst.name().ok_or(Error::NoDestinationName)?;
+    let target_section_pk = network.get_section_pk_by_name(&dst_name).await?;
+
+    let target_section_pk = target_section_pk
+        .bls()
+        .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
+
+    let message = Message::SupportingInfo(msg.msg);
     let result = network
         .send_message(itinerary, message.serialize(dst_name, target_section_pk)?)
         .await;

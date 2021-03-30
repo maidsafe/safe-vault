@@ -238,6 +238,10 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
                         // TODO: handle error as a result of handling processing error...
                         NodeDuty::NoOp
                     }
+                    Message::SupportingInfo(msg) => {
+                        // TODO: handle error as a result of supporting info msg
+                        NodeDuty::NoOp
+                    }
                 }
             }
             // An error decoding a message
@@ -246,13 +250,13 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
                 let dst = get_dst_from_src(src);
 
                 NodeDuty::SendError(OutgoingLazyError {
-                    msg: ProcessingError {
-                        reason: Some(ErrorMessage::Serialization(
+                    msg: ProcessingError::new(
+                        Some(ErrorMessage::Serialization(
                             "Could not deserialize Message at node".to_string(),
                         )),
-                        source_message: None,
-                        id: MessageId::new(),
-                    },
+                        None,
+                        MessageId::new(),
+                    ),
                     dst,
                 })
             }
