@@ -8,13 +8,7 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
-use super::{
-    genesis::begin_forming_genesis_section,
-    genesis::receive_genesis_accumulation,
-    genesis::receive_genesis_proposal,
-    genesis_stage::GenesisStage,
-    messaging::{send, send_error, send_to_nodes},
-};
+use super::messaging::{send, send_error, send_to_nodes};
 use crate::{
     chunks::Chunks,
     metadata::Metadata,
@@ -134,36 +128,6 @@ impl Node {
 
                 let metadata = self.get_metadata()?;
                 Ok(metadata.trigger_chunk_replication(name).await?)
-            }
-            //
-            // ----- Genesis ----------
-            NodeDuty::BeginFormingGenesisSection => {
-                self.genesis_stage = begin_forming_genesis_section(&self.network_api).await?;
-                Ok(vec![])
-            }
-            NodeDuty::ReceiveGenesisProposal { credit, sig } => {
-                self.genesis_stage = receive_genesis_proposal(
-                    credit,
-                    sig,
-                    self.genesis_stage.clone(),
-                    &self.network_api,
-                )
-                .await?;
-                Ok(vec![])
-            }
-            NodeDuty::ReceiveGenesisAccumulation { signed_credit, sig } => {
-                self.genesis_stage = receive_genesis_accumulation(
-                    signed_credit,
-                    sig,
-                    self.genesis_stage.clone(),
-                    &self.network_api,
-                )
-                .await?;
-                let genesis_tx = match &self.genesis_stage {
-                    GenesisStage::Completed(genesis_tx) => genesis_tx.clone(),
-                    _ => return Ok(vec![]),
-                };
-                Ok(vec![self.genesis(genesis_tx).await?])
             }
             //
             // ---------- Levelling --------------
@@ -454,7 +418,6 @@ impl Node {
         {
             Ok((process, wallets, payments))
         } else {
-            debug!("get_churning_funds: whaaat? NoSectionFunds");
             Err(Error::NoSectionFunds)
         }
     }

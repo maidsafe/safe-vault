@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::genesis_stage::GenesisStage;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
@@ -90,12 +89,12 @@ impl Node {
         let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
         self.transfers = Some(Transfers::new(replicas, rate_limit));
 
-        // //
-        // // start handling node rewards
-        // self.section_funds = Some(SectionFunds::KeepingNodeWallets {
-        //     wallets: RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new()),
-        //     payments: Default::default(),
-        // });
+        //
+        // start handling node rewards
+        self.section_funds = Some(SectionFunds::KeepingNodeWallets {
+            wallets: RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new()),
+            payments: Default::default(),
+        });
 
         Ok(())
     }

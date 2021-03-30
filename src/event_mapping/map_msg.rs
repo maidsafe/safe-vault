@@ -183,20 +183,6 @@ fn match_or_err(msg: ProcessMsg, src: SrcLocation) -> Mapping {
 
 fn match_section_msg(msg: ProcessMsg, origin: SrcLocation) -> NodeDuty {
     match &msg {
-        ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ProposeGenesis { credit, sig }),
-            ..
-        } => NodeDuty::ReceiveGenesisProposal {
-            credit: credit.clone(),
-            sig: sig.clone(),
-        },
-        ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::AccumulateGenesis { signed_credit, sig }),
-            ..
-        } => NodeDuty::ReceiveGenesisAccumulation {
-            signed_credit: signed_credit.clone(),
-            sig: sig.clone(),
-        },
         // ------ wallet register ------
         ProcessMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet)),

@@ -121,22 +121,6 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
-    /// On being promoted, an Adult node becomes an Elder.
-    BeginFormingGenesisSection,
-    /// Bootstrap of genesis section actor.
-    ReceiveGenesisProposal {
-        /// The genesis credit.
-        credit: Credit,
-        /// An individual elder's sig over the credit.
-        sig: SignatureShare,
-    },
-    /// Bootstrap of genesis section actor.
-    ReceiveGenesisAccumulation {
-        /// The genesis credit.
-        signed_credit: SignedCredit,
-        /// An individual elder's sig over the credit.
-        sig: SignatureShare,
-    },
     /// Proposal of payout of rewards.
     ReceiveChurnProposal(ChurnPayoutProposal),
     /// Accumulation of payout of rewards.
@@ -268,9 +252,6 @@ impl Debug for NodeDuty {
             Self::ChurnMembers { .. } => write!(f, "ChurnMembers"),
             Self::SplitSection { .. } => write!(f, "SplitSection"),
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
-            Self::ReceiveGenesisProposal { .. } => write!(f, "ReceiveGenesisProposal"),
-            Self::ReceiveGenesisAccumulation { .. } => write!(f, "ReceiveGenesisAccumulation"),
-            Self::BeginFormingGenesisSection => write!(f, "BeginFormingGenesisSection"),
 
             Self::NoOp => write!(f, "No op."),
             Self::ReachingMaxCapacity => write!(f, "ReachingMaxCapacity"),
