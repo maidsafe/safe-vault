@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum PayoutStage {
+pub enum RewardStage {
     None,
     AwaitingThreshold,
     ProposingCredits(ChurnProposalDetails),
@@ -91,8 +91,8 @@ impl ChurnProposalDetails {
         &self,
         section_key: PublicKey,
         index: usize,
-    ) -> sn_data_types::ChurnPayoutProposal {
-        sn_data_types::ChurnPayoutProposal {
+    ) -> sn_data_types::RewardProposal {
+        sn_data_types::RewardProposal {
             section_key,
             rewards: self
                 .rewards
@@ -178,15 +178,15 @@ impl ChurnAccumulationDetails {
         &self,
         section_key: PublicKey,
         index: usize,
-    ) -> sn_data_types::ChurnPayoutAccumulation {
-        sn_data_types::ChurnPayoutAccumulation {
+    ) -> sn_data_types::RewardAccumulation {
+        sn_data_types::RewardAccumulation {
             section_key,
             rewards: self
                 .rewards
                 .iter()
                 .map(|(id, credit)| {
                     let share = credit.signatures.get(&index)?;
-                    Some(sn_data_types::AccumulatingProof {
+                    Some(sn_data_types::AccumulatingReward {
                         signed_credit: credit.agreed_proposal.clone(),
                         sig: SignatureShare {
                             share: share.clone(),

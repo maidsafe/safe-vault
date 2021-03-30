@@ -10,8 +10,8 @@ use bls::PublicKeySet;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
-    ActorHistory, Blob, BlobAddress, ChurnPayoutAccumulation, ChurnPayoutProposal, Credit,
-    CreditAgreementProof, PublicKey, ReplicaEvent, SectionElders, SignatureShare, SignedCredit,
+    ActorHistory, Blob, BlobAddress, Credit, CreditAgreementProof, NodeAge, PublicKey,
+    ReplicaEvent, RewardAccumulation, RewardProposal, SectionElders, SignatureShare, SignedCredit,
     SignedTransfer, SignedTransferShare, Token, TransferAgreementProof, TransferValidated,
     WalletHistory,
 };
@@ -122,9 +122,9 @@ pub enum NodeDuty {
         origin: SrcLocation,
     },
     /// Proposal of payout of rewards.
-    ReceiveChurnProposal(ChurnPayoutProposal),
+    ReceiveChurnProposal(RewardProposal),
     /// Accumulation of payout of rewards.
-    ReceiveChurnAccumulation(ChurnPayoutAccumulation),
+    ReceiveChurnAccumulation(RewardAccumulation),
     ChurnMembers {
         /// Our section prefix.
         our_prefix: Prefix,
@@ -148,7 +148,7 @@ pub enum NodeDuty {
     /// Initiates the node with state from peers.
     SynchState {
         /// The registered wallet keys for nodes earning rewards
-        node_rewards: BTreeMap<XorName, (u8, PublicKey)>,
+        node_rewards: BTreeMap<XorName, (NodeAge, PublicKey)>,
         /// The wallets of users on the network.
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },

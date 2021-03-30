@@ -24,7 +24,8 @@ use crdts::Actor;
 use itertools::Itertools;
 use log::{debug, info};
 use sn_data_types::{
-    ActorHistory, CreditAgreementProof, PublicKey, SectionElders, TransferPropagated, WalletHistory,
+    ActorHistory, CreditAgreementProof, NodeAge, PublicKey, SectionElders, TransferPropagated,
+    WalletHistory,
 };
 use sn_messaging::{
     client::{Message, NodeCmd, NodeSystemCmd},
@@ -57,7 +58,7 @@ impl Node {
         //
         // start handling node rewards
         let section_funds = SectionFunds::KeepingNodeWallets {
-            wallets: RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new()),
+            wallets: RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new()),
             payments: Default::default(),
         };
         section_funds.add_payment(genesis_tx);
@@ -92,7 +93,7 @@ impl Node {
         //
         // start handling node rewards
         self.section_funds = Some(SectionFunds::KeepingNodeWallets {
-            wallets: RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new()),
+            wallets: RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new()),
             payments: Default::default(),
         });
 
@@ -102,7 +103,7 @@ impl Node {
     /// Continue the level up and handle more responsibilities.
     pub async fn synch_state(
         &mut self,
-        node_wallets: BTreeMap<XorName, (u8, PublicKey)>,
+        node_wallets: BTreeMap<XorName, (NodeAge, PublicKey)>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     ) -> Result<NodeDuty> {
         // merge in provided user wallets

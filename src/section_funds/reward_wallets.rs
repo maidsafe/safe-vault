@@ -6,12 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use super::reward_calc::RewardCalc;
 use crate::node_ops::{NodeDuties, NodeDuty, OutgoingMsg};
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::{debug, error, info, warn};
-use sn_data_types::{Error as DtError, PublicKey, Token, TransferValidated, WalletHistory};
+use sn_data_types::{
+    Error as DtError, NodeAge, PublicKey, Token, TransferValidated, WalletHistory,
+};
 use sn_messaging::{
     client::{Error as ErrorMessage, NodeQuery, NodeQueryResponse, NodeRewardQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId, SrcLocation,
@@ -25,26 +26,21 @@ use xor_name::XorName;
 /// their work in the network.
 #[derive(Clone)]
 pub struct RewardWallets {
-    node_rewards: DashMap<XorName, (Age, PublicKey)>,
+    node_rewards: DashMap<XorName, (NodeAge, PublicKey)>,
 }
-
-// /// The wallet of the node operator.
-// wallet: PublicKey,
-// /// The node age.
-// age: NodeAge,
 
 // Node age
 type Age = u8;
 
 impl RewardWallets {
-    pub fn new(node_rewards: BTreeMap<XorName, (Age, PublicKey)>) -> Self {
+    pub fn new(node_rewards: BTreeMap<XorName, (NodeAge, PublicKey)>) -> Self {
         Self {
             node_rewards: node_rewards.into_iter().collect(),
         }
     }
 
     /// Returns the stage of a specific node.
-    pub fn get(&self, node_name: &XorName) -> Option<(Age, PublicKey)> {
+    pub fn get(&self, node_name: &XorName) -> Option<(NodeAge, PublicKey)> {
         Some(*self.node_rewards.get(node_name)?)
     }
 
@@ -54,7 +50,7 @@ impl RewardWallets {
     }
 
     ///
-    pub fn node_wallets(&self) -> BTreeMap<XorName, (Age, PublicKey)> {
+    pub fn node_wallets(&self) -> BTreeMap<XorName, (NodeAge, PublicKey)> {
         self.node_rewards
             .clone()
             .into_read_only()

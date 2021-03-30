@@ -6,11 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use log::debug;
-use sn_data_types::{PublicKey, Token};
+use sn_data_types::{NodeAge, PublicKey, Token};
 use sn_routing::{Prefix, XorName};
+use std::collections::{BTreeMap, BTreeSet};
 
 const MIN_REWARD_AGE: u8 = 5;
 
@@ -19,15 +18,15 @@ const MIN_REWARD_AGE: u8 = 5;
 /// out of the total payments received.
 pub fn distribute_rewards(
     payments: Token,
-    nodes: BTreeMap<XorName, (Age, PublicKey)>,
-) -> BTreeMap<XorName, (Age, PublicKey, Token)> {
+    nodes: BTreeMap<XorName, (NodeAge, PublicKey)>,
+) -> BTreeMap<XorName, (NodeAge, PublicKey, Token)> {
     let reward_buckets = get_buckets(nodes);
     distribute(payments, reward_buckets)
 }
 
 fn get_buckets(
-    nodes: BTreeMap<XorName, (Age, PublicKey)>,
-) -> BTreeMap<Age, BTreeMap<XorName, PublicKey>> {
+    nodes: BTreeMap<XorName, (NodeAge, PublicKey)>,
+) -> BTreeMap<NodeAge, BTreeMap<XorName, PublicKey>> {
     let mut reward_buckets = BTreeMap::new();
     for (node_name, (age, wallet)) in nodes {
         if age >= MIN_REWARD_AGE {
@@ -43,8 +42,8 @@ fn get_buckets(
 
 fn distribute(
     payments: Token,
-    reward_buckets: BTreeMap<Age, BTreeMap<XorName, PublicKey>>,
-) -> BTreeMap<XorName, (Age, PublicKey, Token)> {
+    reward_buckets: BTreeMap<NodeAge, BTreeMap<XorName, PublicKey>>,
+) -> BTreeMap<XorName, (NodeAge, PublicKey, Token)> {
     if reward_buckets.is_empty() {
         return Default::default();
     }
@@ -106,40 +105,10 @@ fn distribute(
     to_return
 }
 
-/// Calculation of reward for nodes.
-#[derive(Clone)]
-pub struct RewardCalc {
-    prefix: Prefix,
-}
-
-// Node age
-type Age = u8;
-
-impl RewardCalc {
-    /// Ctor
-    pub fn new(prefix: Prefix) -> RewardCalc {
-        Self { prefix }
-    }
-
-    /// Calculates the reward for a node
-    /// when it has reached a certain age.
-    pub fn reward(&self, age: Age) -> Token {
-        let prefix_len = self.prefix.bit_count();
-        RewardCalc::reward_from(age, prefix_len)
-    }
-
-    fn reward_from(age: Age, prefix_len: usize) -> Token {
-        let time = 2_u64.pow(age as u32);
-        let nanos = 1_000_000_000;
-        let network_size = 2_u64.pow(prefix_len as u32);
-        let steepness_reductor = prefix_len as u64 + 1;
-        Token::from_nano(time * nanos / network_size * steepness_reductor)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
+    use sn_data_types::NodeAge;
 
     use super::*;
 
@@ -152,7 +121,7 @@ mod test {
 
         let iters = 7;
         //let new_section_size = 21;
-        let mut nodes = BTreeMap::<XorName, (Age, PublicKey)>::new();
+        let mut nodes = BTreeMap::<XorName, (NodeAge, PublicKey)>::new();
         for i in 0..iters {
             let _ = nodes.insert(XorName::random(), (i + MIN_REWARD_AGE - 1, get_random_pk()));
             let _ = nodes.insert(XorName::random(), (i + MIN_REWARD_AGE, get_random_pk()));
@@ -188,21 +157,5 @@ mod test {
 
     fn get_random_pk() -> PublicKey {
         PublicKey::from(bls::SecretKey::random().public_key())
-    }
-
-    #[test]
-    fn first_reward_is_32bn_nanos() {
-        let age = 5;
-        let prefix_len = 1;
-        let reward = RewardCalc::reward_from(age, prefix_len);
-        assert!(reward == Token::from_nano(32_000_000_000));
-    }
-
-    #[test]
-    fn min_reward_payable_up_to_at_least_2000bn_nodes() {
-        let age = 5;
-        let prefix_len = 34;
-        let reward = RewardCalc::reward_from(age, prefix_len);
-        assert!(reward >= Token::from_nano(1));
     }
 }

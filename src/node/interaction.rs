@@ -21,13 +21,14 @@ use crate::{
 use dashmap::DashMap;
 use log::{debug, info};
 use section_funds::{
-    churn_process::{OurSection, PayoutProcess},
     elder_signing::ElderSigning,
-    payout_stage::PayoutStage,
+    reward_process::{OurSection, RewardProcess},
+    reward_stage::RewardStage,
     reward_wallets::RewardWallets,
 };
 use sn_data_types::{
-    ActorHistory, CreditAgreementProof, CreditId, PublicKey, SectionElders, Token, WalletHistory,
+    ActorHistory, CreditAgreementProof, CreditId, NodeAge, PublicKey, SectionElders, Token,
+    WalletHistory,
 };
 use sn_messaging::{
     client::{
@@ -63,13 +64,13 @@ impl Node {
             our_key,
         };
 
-        let mut process = PayoutProcess::new(
+        let mut process = RewardProcess::new(
             Token::zero(),
             section,
             ElderSigning::new(self.network_api.clone()).await?,
         );
 
-        let wallets = RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new());
+        let wallets = RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new());
 
         self.section_funds = Some(SectionFunds::Churning {
             process,
@@ -123,7 +124,7 @@ impl Node {
         debug!("Section balance: {}", section_balance);
 
         // generate reward and minting proposal
-        let mut process = PayoutProcess::new(
+        let mut process = RewardProcess::new(
             section_balance,
             OurSection {
                 our_prefix,
