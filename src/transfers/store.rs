@@ -74,7 +74,6 @@ where
 
     ///
     pub fn try_insert(&mut self, event: TEvent) -> Result<()> {
-        debug!("Inserting replica event: {:?}", event);
         let key = &self.db.total_keys().to_string();
         if self.db.exists(key) {
             return Err(Error::Logic(format!(

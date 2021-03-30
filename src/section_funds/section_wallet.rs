@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::collections::BTreeMap;
+
 use dashmap::DashMap;
 use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders, Token};
 use sn_routing::XorName;
@@ -22,11 +24,15 @@ pub struct SectionWallet {
 }
 
 impl SectionWallet {
-    pub fn new(members: SectionElders, replicas: SectionElders) -> Self {
+    pub fn new(
+        members: SectionElders,
+        replicas: SectionElders,
+        payments: BTreeMap<CreditId, CreditAgreementProof>,
+    ) -> Self {
         Self {
             members,
             replicas,
-            payments: Default::default(),
+            payments: payments.into_iter().collect(),
         }
     }
 

@@ -106,9 +106,13 @@ impl Network {
         self.routing.public_key().await
     }
 
-    pub async fn section_public_key(&self) -> Option<PublicKey> {
-        Some(PublicKey::Bls(
-            self.routing.public_key_set().await.ok()?.public_key(),
+    pub async fn section_public_key(&self) -> Result<PublicKey> {
+        Ok(PublicKey::Bls(
+            self.routing
+                .public_key_set()
+                .await
+                .map_err(|_| Error::NoSectionPublicKey)?
+                .public_key(),
         ))
     }
 

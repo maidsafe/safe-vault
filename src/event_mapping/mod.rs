@@ -78,40 +78,49 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
         } => {
             match self_status_change {
                 NodeElderChange::None => {
+                    if !network_api.is_elder().await {
+                        return Mapping::Ok {
+                            op: NodeDuty::NoOp,
+                            ctx: None,
+                        };
+                    }
                     // sync to others if we are elder
-                    let op = if network_api.is_elder().await {
-                        // -- ugly temporary until fixed in routing --
-                        let mut sanity_counter = 0_i32;
-                        while sanity_counter < 240 {
-                            match network_api.our_public_key_set().await {
-                                Ok(pk_set) => {
-                                    if elders.key == pk_set.public_key() {
-                                        break;
-                                    } else {
-                                        trace!("******Elders changed, we are still Elder but we seem to be lagging the DKG...");
-                                    }
-                                }
-                                Err(e) => {
-                                    trace!("******Elders changed, should NOT be an error here...!");
-                                    sanity_counter += 1;
+                    // -- ugly temporary until fixed in routing --
+                    let mut sanity_counter = 0_i32;
+                    while sanity_counter < 240 {
+                        match network_api.our_public_key_set().await {
+                            Ok(pk_set) => {
+                                if key == pk_set.public_key() {
+                                    break;
+                                } else {
+                                    trace!("******Elders changed, we are still Elder but we seem to be lagging the DKG...");
                                 }
                             }
-                            sleep(Duration::from_millis(500))
+                            Err(e) => {
+                                trace!("******Elders changed, should NOT be an error here...!");
+                                sanity_counter += 1;
+                            }
                         }
-                        // -- ugly temporary until fixed in routing --
+                        sleep(Duration::from_millis(500))
+                    }
+                    // -- ugly temporary until fixed in routing --
 
-                        trace!("******Elders changed, we are still Elder");
-                        if are_we_part_of_genesis(network_api).await {
-                            NodeDuty::BeginFormingGenesisSection
-                        } else {
-                            NodeDuty::ChurnMembers {
-                                elders,
-                                sibling_elders,
-                                newbie: false,
-                            }
+                    trace!("******Elders changed, we are still Elder");
+                    let op = if are_we_part_of_genesis(network_api).await {
+                        NodeDuty::BeginFormingGenesisSection
+                    } else if let Some(sibling_key) = sibling_key {
+                        NodeDuty::SplitSection {
+                            our_prefix: prefix,
+                            our_key: PublicKey::from(key),
+                            sibling_key: PublicKey::from(sibling_key),
+                            newbie: false,
                         }
                     } else {
-                        NodeDuty::NoOp
+                        NodeDuty::ChurnMembers {
+                            our_prefix: prefix,
+                            our_key: PublicKey::from(key),
+                            newbie: false,
+                        }
                     };
                     Mapping::Ok { op, ctx: None }
                 }
@@ -140,22 +149,23 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                             Default::default()
                         });
 
-                    if are_we_part_of_genesis(network_api).await {
-                        Mapping::Ok {
-                            op: NodeDuty::BeginFormingGenesisSection,
-                            ctx: None,
+                    let op = if are_we_part_of_genesis(network_api).await {
+                        NodeDuty::BeginFormingGenesisSection
+                    } else if let Some(sibling_key) = sibling_key {
+                        NodeDuty::SplitSection {
+                            our_prefix: prefix,
+                            our_key: PublicKey::from(key),
+                            sibling_key: PublicKey::from(sibling_key),
+                            newbie: true,
                         }
                     } else {
-                        Mapping::Ok {
-                            op: NodeDuty::ChurnMembers {
-                                our_prefix: prefix,
-                                our_key: PublicKey::from(key),
-                                sibling_key: sibling_key.map(PublicKey::from),
-                                newbie: true,
-                            },
-                            ctx: None,
+                        NodeDuty::ChurnMembers {
+                            our_prefix: prefix,
+                            our_key: PublicKey::from(key),
+                            newbie: true,
                         }
-                    }
+                    };
+                    Mapping::Ok { op, ctx: None }
                 }
                 NodeElderChange::Demoted => Mapping::Ok {
                     op: NodeDuty::LevelDown,
