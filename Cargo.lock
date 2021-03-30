@@ -2371,7 +2371,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.31.0"
+version = "0.31.1"
 dependencies = [
  "async-log",
  "async-trait",

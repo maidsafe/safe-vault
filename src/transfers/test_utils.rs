@@ -14,21 +14,7 @@ use sn_data_types::{
     Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, SignedDebit,
     SignedTransfer, Token,
 };
-use sn_transfers::ReplicaValidator;
 use std::collections::BTreeMap;
-
-/// Should be validating
-/// other replica groups, i.e.
-/// make sure they are run at Elders
-/// of sections we know of.
-/// TBD.
-pub struct Validator {}
-
-impl ReplicaValidator for Validator {
-    fn is_valid(&self, _replica_group: PublicKey) -> bool {
-        true
-    }
-}
 
 /// An impl of ReplicaSigningTrait.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,15 +48,6 @@ impl ReplicaSigning for TestReplicaSigning {
     /// Get the replica's PK set
     async fn replicas_pk_set(&self) -> Result<PublicKeySet> {
         Ok(self.peer_replicas.clone())
-    }
-
-    async fn try_genesis(&self, balance: u64) -> Result<CreditAgreementProof> {
-        get_genesis(
-            balance,
-            PublicKey::Bls(self.peer_replicas.public_key()),
-            self.peer_replicas.clone(),
-            self.secret_key.clone(),
-        )
     }
 
     async fn sign_transfer(

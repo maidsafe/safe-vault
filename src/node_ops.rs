@@ -10,9 +10,10 @@ use bls::PublicKeySet;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
-    ActorHistory, Blob, BlobAddress, Credit, CreditAgreementProof, NodeRewardStage, PublicKey,
-    ReplicaEvent, SectionElders, SignatureShare, SignedCredit, SignedTransfer, SignedTransferShare,
-    Token, TransferAgreementProof, TransferValidated, WalletHistory,
+    ActorHistory, Blob, BlobAddress, ChurnPayoutAccumulation, ChurnPayoutProposal, Credit,
+    CreditAgreementProof, PublicKey, ReplicaEvent, SectionElders, SignatureShare, SignedCredit,
+    SignedTransfer, SignedTransferShare, Token, TransferAgreementProof, TransferValidated,
+    WalletHistory,
 };
 use sn_messaging::{
     client::{BlobRead, BlobWrite, Message, NodeSystemCmd},
@@ -44,15 +45,9 @@ pub type NodeDuties = Vec<NodeDuty>;
 /// Common duties run by all nodes.
 #[allow(clippy::large_enum_variant)]
 pub enum NodeDuty {
+    //
     GetNodeWalletKey {
-        old_node_id: XorName,
-        new_node_id: XorName,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    },
-    PayoutNodeReward {
-        wallet: PublicKey,
-        node_id: XorName,
+        node_name: XorName,
         msg_id: MessageId,
         origin: SrcLocation,
     },
@@ -61,19 +56,9 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: SrcLocation,
     },
-    RegisterSectionPayout {
-        debit_agreement: TransferAgreementProof,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    },
     SetNodeWallet {
         wallet_id: PublicKey,
         node_id: XorName,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    },
-    ReceivePayoutValidation {
-        validation: TransferValidated,
         msg_id: MessageId,
         origin: SrcLocation,
     },
@@ -102,11 +87,6 @@ pub enum NodeDuty {
         origin: SrcLocation,
     },
 
-    ValidateSectionPayout {
-        signed_transfer: SignedTransferShare,
-        msg_id: MessageId,
-        origin: SrcLocation,
-    },
     ReadChunk {
         read: BlobRead,
         msg_id: MessageId,
@@ -171,20 +151,10 @@ pub enum NodeDuty {
         /// An individual elder's sig over the credit.
         sig: SignatureShare,
     },
-    /// Transition of section actor.
-    ReceiveWalletProposal {
-        /// The genesis credit.
-        credit: Credit,
-        /// An individual elder's sig over the credit.
-        sig: SignatureShare,
-    },
-    /// Bootstrap of genesis section actor.
-    ReceiveWalletAccumulation {
-        /// The genesis credit.
-        signed_credit: SignedCredit,
-        /// An individual elder's sig over the credit.
-        sig: SignatureShare,
-    },
+    /// Proposal of payout of rewards.
+    ReceiveChurnProposal(ChurnPayoutProposal),
+    /// Accumulation of payout of rewards.
+    ReceiveChurnAccumulation(ChurnPayoutAccumulation),
     ChurnMembers {
         /// The Elders of our section.
         elders: Elders,
@@ -199,24 +169,15 @@ pub enum NodeDuty {
     /// Initiates the node with state from peers.
     SynchState {
         /// The registered wallet keys for nodes earning rewards
-        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+        node_rewards: BTreeMap<XorName, (u8, PublicKey)>,
         /// The wallets of users on the network.
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     },
-    ProcessNewMember(XorName),
     /// As members are lost for various reasons
     /// there are certain things nodes need
     /// to do, to update for that.
     ProcessLostMember {
         name: XorName,
-        age: u8,
-    },
-    ProcessRelocatedMember {
-        /// The id of the node at the previous section.
-        old_node_id: XorName,
-        /// The id of the node at its new section (i.e. this one).
-        new_node_id: XorName,
-        // The age of the node (among things determines if it is eligible for rewards yet).
         age: u8,
     },
     /// Storage reaching max capacity.
@@ -290,13 +251,9 @@ impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GetNodeWalletKey { .. } => write!(f, "GetNodeWalletKey"),
-            Self::PayoutNodeReward { .. } => write!(f, "PayoutNodeReward"),
             Self::PropagateTransfer { .. } => write!(f, "PropagateTransfer"),
-            Self::RegisterSectionPayout { .. } => write!(f, "RegisterSectionPayout"),
             Self::SetNodeWallet { .. } => write!(f, "SetNodeWallet"),
-            Self::ReceivePayoutValidation { .. } => write!(f, "ReceivePayoutValidation"),
             Self::GetTransferReplicaEvents { .. } => write!(f, "GetTransferReplicaEvents"),
-            Self::ValidateSectionPayout { .. } => write!(f, "ValidateSectionPayout"),
             Self::ValidateClientTransfer { .. } => write!(f, "ValidateClientTransfer"),
             Self::RegisterTransfer { .. } => write!(f, "RegisterTransfer"),
             Self::GetBalance { .. } => write!(f, "GetBalance"),
@@ -306,8 +263,8 @@ impl Debug for NodeDuty {
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
             Self::ContinueWalletChurn { .. } => write!(f, "ContinueWalletChurn"),
-            Self::ReceiveWalletProposal { .. } => write!(f, "ReceiveWalletProposal"),
-            Self::ReceiveWalletAccumulation { .. } => write!(f, "ReceiveWalletAccumulation"),
+            Self::ReceiveChurnProposal { .. } => write!(f, "ReceiveChurnProposal"),
+            Self::ReceiveChurnAccumulation { .. } => write!(f, "ReceiveChurnAccumulation"),
             // ------
             Self::LevelDown => write!(f, "LevelDown"),
             Self::SynchState { .. } => write!(f, "SynchState"),
@@ -319,9 +276,8 @@ impl Debug for NodeDuty {
 
             Self::NoOp => write!(f, "No op."),
             Self::ReachingMaxCapacity => write!(f, "ReachingMaxCapacity"),
-            Self::ProcessNewMember(_) => write!(f, "ProcessNewMember"),
             Self::ProcessLostMember { .. } => write!(f, "ProcessLostMember"),
-            Self::ProcessRelocatedMember { .. } => write!(f, "ProcessRelocatedMember"),
+            //Self::ProcessRelocatedMember { .. } => write!(f, "ProcessRelocatedMember"),
             Self::IncrementFullNodeCount { .. } => write!(f, "IncrementFullNodeCount"),
             Self::SwitchNodeJoin(_) => write!(f, "SwitchNodeJoin"),
             Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),

@@ -11,7 +11,10 @@ use std::collections::BTreeMap;
 use crate::{
     node::{level_up::section_elders, update_transfers::update_transfers},
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    section_funds::{self, reward_payout::Validator, rewards::Rewards, SectionFunds},
+    section_funds::{
+        self, churn_payout_stage::AccumulatedAgreements, section_wallet::SectionWallet,
+        SectionFunds,
+    },
     transfers::{
         replica_signing::ReplicaSigningImpl,
         replicas::{ReplicaInfo, Replicas},
@@ -20,16 +23,13 @@ use crate::{
 };
 use log::{debug, info};
 use section_funds::{
+    churn_payout_stage::ChurnPayoutStage,
     churn_process::{Churn, ChurnProcess},
     elder_signing::ElderSigning,
-    reward_payout::RewardPayout,
-    reward_stages::RewardStages,
-    rewards::RewardCalc,
-    wallet_stage::WalletStage,
+    reward_wallets::RewardWallets,
 };
 use sn_data_types::{
-    ActorHistory, CreditAgreementProof, NodeRewardStage, PublicKey, SectionElders, Token,
-    WalletHistory,
+    ActorHistory, CreditAgreementProof, PublicKey, SectionElders, Token, WalletHistory,
 };
 use sn_messaging::{
     client::{
@@ -77,22 +77,12 @@ impl Node {
                 members.name()
             )));
         }
-        let temp_section_wallet = WalletHistory {
-            replicas: members.clone(),
-            history: ActorHistory::empty(),
-        };
-        let signing = ElderSigning::new(self.network_api.clone()).await?;
-        let actor = TransferActor::from_info(signing, temp_section_wallet, Validator {})?;
-        let payout = RewardPayout::new(actor, members);
-        let stages = RewardStages::new(BTreeMap::<XorName, NodeRewardStage>::new());
-        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
-        let rewards = Rewards::new(payout, stages, reward_calc);
+        let wallets = RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new());
 
         self.section_funds = Some(SectionFunds::Churning {
             process,
-            rewards,
+            wallets,
             replicas: None,
-            reward_queue: BTreeMap::new(),
         });
 
         Ok(vec![get_wallet_replica_elders(section_key)])
@@ -111,9 +101,13 @@ impl Node {
             return Err(Error::Logic("No transfers on this node".to_string()));
         };
 
-        let rewards = if let Some(SectionFunds::Rewarding(rewards)) = &mut self.section_funds {
-            rewards.stash_payout_in_flight(); // is picked up again after churn
-            rewards.clone()
+        let (section_wallet, wallets) = if let Some(SectionFunds::KeepingNodeWallets {
+            section_wallet,
+            wallets,
+        }) = &mut self.section_funds
+        {
+            debug!("Node wallets: {:?}", wallets.node_wallets());
+            (section_wallet.clone(), wallets.clone())
         } else {
             return Err(Error::Logic("No section funds on this node".to_string()));
         };
@@ -142,19 +136,20 @@ impl Node {
 
         let mut ops = vec![];
 
-        // generate new wallet proposal
+        debug!("Section balance: {}", section_wallet.balance());
+
+        // generate reward and minting proposal
         let mut process = ChurnProcess::new(
-            rewards.balance(),
+            section_wallet.balance(),
             churn,
             ElderSigning::new(self.network_api.clone()).await?,
         );
-        ops.push(process.move_wallet().await?);
+        ops.push(process.reward_and_mint(wallets.node_wallets()).await?);
 
         self.section_funds = Some(SectionFunds::Churning {
             process,
-            rewards: rewards.clone(),
+            wallets: wallets.clone(),
             replicas: None,
-            reward_queue: BTreeMap::new(),
         });
 
         // query the network for the section elders of the new wallet
@@ -166,7 +161,7 @@ impl Node {
         ops.push(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
-                    node_rewards: rewards.node_rewards(),
+                    node_rewards: wallets.node_wallets(),
                     user_wallets: user_wallets.clone(),
                 }),
                 id: MessageId::new(), //MessageId::in_response_to(&msg_id), //
@@ -184,7 +179,7 @@ impl Node {
             ops.push(NodeDuty::Send(OutgoingMsg {
                 msg: Message::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
-                        node_rewards: rewards.node_rewards(),
+                        node_rewards: wallets.node_wallets(),
                         user_wallets: user_wallets.clone(),
                     }),
                     id: MessageId::new(), //MessageId::in_response_to(&msg_id), //
@@ -199,78 +194,37 @@ impl Node {
         Ok(ops)
     }
 
-    pub(crate) fn propagate_credit(credit_proof: CreditAgreementProof) -> Result<NodeDuty> {
+    pub(crate) fn propagate_credits(credit_proofs: AccumulatedAgreements) -> Result<NodeDuties> {
         use NodeCmd::*;
         use NodeTransferCmd::*;
-        let location = credit_proof.recipient().into();
-        let msg_id = MessageId::from_content(&credit_proof.debiting_replicas_sig)?;
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
-                cmd: Transfers(PropagateTransfer(credit_proof)),
+        let mut ops = vec![];
+        let location = XorName::from(credit_proofs.section_wallet.recipient());
+        let msg_id = MessageId::from_content(&credit_proofs.section_wallet.debiting_replicas_sig)?;
+        ops.push(NodeDuty::Send(OutgoingMsg {
+            msg: ProcessMsg::NodeCmd {
+                cmd: Transfers(PropagateTransfer(credit_proofs.section_wallet)),
                 id: msg_id,
                 target_section_pk: None,
             },
             section_source: true, // i.e. errors go to our section
             dst: DstLocation::Section(location),
             aggregation: Aggregation::AtDestination, // not necessary, but will be slimmer
-        }))
-    }
+        }));
 
-    /// Completes the section wallet churn.
-    pub(crate) async fn complete_wallet_churn(
-        &mut self,
-        info: CompletedWalletChurn,
-    ) -> Result<NodeDuties> {
-        let recipient = info.credit_proof.recipient();
-        let mut rewards = self
-            .setup_section_wallet(
-                info.rewards.clone(),
-                info.replicas.clone(),
-                info.credit_proof.clone(),
-            )
-            .await?;
-        info!("COMPLETED({}): We have our new section wallet!", recipient);
-        // get ops from enqueued rewards
-        let reward_ops = rewards.payout_node_rewards(info.reward_queue.clone()).await;
-        // insert our rewards instance to state
-        self.section_funds = Some(SectionFunds::Rewarding(rewards));
-        // return ops
-        reward_ops
-    }
-
-    /// set funds to Rewarding stage
-    async fn setup_section_wallet(
-        &self,
-        rewards: Rewards,
-        replicas: SectionElders,
-        credit_proof: CreditAgreementProof,
-    ) -> Result<Rewards> {
-        let section_wallet = WalletHistory {
-            replicas,
-            history: ActorHistory {
-                credits: vec![credit_proof.clone()],
-                debits: vec![],
-            },
-        };
-
-        /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
-        #[allow(clippy::eval_order_dependence)]
-        let members = SectionElders {
-            prefix: self.network_api.our_prefix().await,
-            names: self.network_api.our_elder_names().await,
-            key_set: self.network_api.our_public_key_set().await?,
-        };
-
-        let our_section_address = members.address();
-        let correlation_id = MessageId::combine(vec![members.name(), our_section_address]);
-
-        let reward_calc = RewardCalc::new(members.prefix);
-        let signing = ElderSigning::new(self.network_api.clone()).await?;
-        let actor = TransferActor::from_info(signing, section_wallet.clone(), Validator {})?;
-        let mut rewards = rewards;
-        rewards.set(actor, members, reward_calc);
-
-        Ok(rewards)
+        for (_, credit_proof) in credit_proofs.rewards {
+            let location = XorName::from(credit_proof.recipient());
+            let msg_id = MessageId::from_content(&credit_proof.debiting_replicas_sig)?;
+            ops.push(NodeDuty::Send(OutgoingMsg {
+                msg: ProcessMsg::NodeCmd {
+                    cmd: Transfers(PropagateTransfer(credit_proof)),
+                    id: msg_id,
+                },
+                section_source: true, // i.e. errors go to our section
+                dst: DstLocation::Section(location),
+                aggregation: Aggregation::AtDestination, // not necessary, but will be slimmer
+            }))
+        }
+        Ok(ops)
     }
 
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
@@ -351,8 +305,7 @@ pub(crate) fn get_wallet_replica_elders(wallet: PublicKey) -> NodeDuty {
 }
 
 pub(crate) struct CompletedWalletChurn {
-    pub rewards: Rewards,
-    pub reward_queue: BTreeMap<XorName, PublicKey>,
-    pub credit_proof: CreditAgreementProof,
+    pub wallets: RewardWallets,
+    pub credit_proofs: AccumulatedAgreements,
     pub replicas: SectionElders,
 }

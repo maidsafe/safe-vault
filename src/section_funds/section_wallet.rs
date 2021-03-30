@@ -6,32 +6,52 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_data_types::{PublicKey, SectionElders};
+use dashmap::DashMap;
+use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders, Token};
 use sn_routing::XorName;
 
 ///
 #[derive(Clone, Debug)]
 pub struct SectionWallet {
     ///
-    pub members: SectionElders,
+    members: SectionElders,
     ///
-    pub replicas: SectionElders,
+    replicas: SectionElders,
+    ///
+    payments: DashMap<CreditId, CreditAgreementProof>,
 }
 
 impl SectionWallet {
-    fn key(&self) -> bls::PublicKey {
+    pub fn new(members: SectionElders, replicas: SectionElders) -> Self {
+        Self {
+            members,
+            replicas,
+            payments: Default::default(),
+        }
+    }
+
+    pub fn add_payment(&self, credit: CreditAgreementProof) {
+        // todo: validate
+        let _ = self.payments.insert(*credit.id(), credit);
+    }
+
+    pub fn balance(&self) -> Token {
+        Token::from_nano(self.payments.iter().map(|c| (*c).amount().as_nano()).sum())
+    }
+
+    pub fn key(&self) -> bls::PublicKey {
         self.members.key_set.public_key()
     }
 
-    fn name(&self) -> XorName {
+    pub fn name(&self) -> XorName {
         PublicKey::Bls(self.key()).into()
     }
 
-    fn owner_address(&self) -> XorName {
+    pub fn owner_address(&self) -> XorName {
         self.members.prefix.name()
     }
 
-    fn replicas_address(&self) -> XorName {
+    pub fn replicas_address(&self) -> XorName {
         self.replicas.prefix.name()
     }
 }

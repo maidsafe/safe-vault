@@ -53,6 +53,9 @@ pub enum Error {
     /// Key, Value pair not found in `ChunkStore`.
     #[error("No such chunk")]
     NoSuchChunk,
+    /// This node does not know or manage any section funds
+    #[error("No section funds")]
+    NoSectionFunds,
     /// Creating temp directory failed.
     #[error("Could not create temp store: {0}")]
     TempDirCreationFailed(String),

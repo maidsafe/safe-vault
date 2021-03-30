@@ -13,10 +13,7 @@ use crate::{
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
-        elder_signing::ElderSigning,
-        reward_payout::{RewardPayout, Validator},
-        reward_stages::RewardStages,
-        rewards::{RewardCalc, Rewards},
+        elder_signing::ElderSigning, reward_wallets::RewardWallets, section_wallet::SectionWallet,
         SectionFunds,
     },
     state_db::store_new_reward_keypair,
@@ -28,8 +25,7 @@ use crdts::Actor;
 use itertools::Itertools;
 use log::{debug, info};
 use sn_data_types::{
-    ActorHistory, CreditAgreementProof, NodeRewardStage, PublicKey, SectionElders,
-    TransferPropagated, WalletHistory,
+    ActorHistory, CreditAgreementProof, PublicKey, SectionElders, TransferPropagated, WalletHistory,
 };
 use sn_messaging::{
     client::{Message, NodeCmd, NodeSystemCmd},
@@ -42,7 +38,7 @@ use std::collections::BTreeMap;
 impl Node {
     /// Level up and handle more responsibilities.
     pub async fn genesis(&mut self, genesis_tx: CreditAgreementProof) -> Result<NodeDuty> {
-        if let Some(SectionFunds::Rewarding(_)) = &self.section_funds {
+        if let Some(SectionFunds::KeepingNodeWallets { .. }) = &self.section_funds {
             // already had genesis..
             return Ok(NodeDuty::NoOp);
         }
@@ -60,16 +56,18 @@ impl Node {
         }
 
         //
-        // start handling node reward
-        let section_wallet = WalletHistory {
-            replicas: section_elders(&self.network_api).await?,
-            history: ActorHistory {
-                credits: vec![genesis_tx],
-                debits: vec![],
-            },
-        };
-        let node_rewards = BTreeMap::<XorName, NodeRewardStage>::new();
-        self.set_as_rewarding(section_wallet, node_rewards).await?;
+        // start handling node rewards
+        let members = section_elders(&self.network_api).await?;
+        let replicas = members.clone();
+        let section_wallet = SectionWallet::new(members, replicas);
+
+        section_wallet.add_payment(genesis_tx);
+
+        let wallets = RewardWallets::new(BTreeMap::<XorName, (u8, PublicKey)>::new());
+        self.section_funds = Some(SectionFunds::KeepingNodeWallets {
+            section_wallet,
+            wallets,
+        });
 
         Ok(NodeDuty::Send(self.register_wallet().await))
     }
@@ -102,7 +100,7 @@ impl Node {
     /// Continue the level up and handle more responsibilities.
     pub async fn synch_state(
         &mut self,
-        node_rewards: BTreeMap<XorName, NodeRewardStage>,
+        node_wallets: BTreeMap<XorName, (u8, PublicKey)>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     ) -> Result<NodeDuty> {
         // merge in provided user wallets
@@ -112,10 +110,11 @@ impl Node {
 
         //  merge in provided node reward stages
         match &mut self.section_funds {
-            Some(SectionFunds::Rewarding(rewards))
-            | Some(SectionFunds::Churning { rewards, .. }) => {
-                // TODO: more needed here
-                rewards.merge(node_rewards.clone());
+            Some(SectionFunds::KeepingNodeWallets { wallets, .. })
+            | Some(SectionFunds::Churning { wallets, .. }) => {
+                for (key, (age, wallet)) in &node_wallets {
+                    wallets.set_node_wallet(*key, *age, *wallet);
+                }
             }
             None => {
                 return Err(Error::InvalidOperation(
@@ -125,42 +124,16 @@ impl Node {
         }
 
         let node_id = self.network_api.our_name().await;
-        let no_wallet_found = match node_rewards.get(&node_id) {
-            None => true,
-            Some(stage) => match stage {
-                NodeRewardStage::NewNode | NodeRewardStage::AwaitingActivation(_) => true,
-                NodeRewardStage::Active { .. } | NodeRewardStage::AwaitingRelocation(_) => false,
-            },
-        };
+        let no_wallet_found = node_wallets.get(&node_id).is_none();
         if no_wallet_found {
             info!(
                 "Registering wallet of node: {} (since not found in {:?})",
-                node_id, node_rewards
+                node_id, node_wallets
             );
             Ok(NodeDuty::Send(self.register_wallet().await))
         } else {
             Ok(NodeDuty::NoOp)
         }
-    }
-
-    async fn set_as_rewarding(
-        &mut self,
-        section_wallet: WalletHistory,
-        node_rewards: BTreeMap<XorName, NodeRewardStage>,
-    ) -> Result<()> {
-        let members = section_elders(&self.network_api).await?;
-        let signing = ElderSigning::new(self.network_api.clone()).await?;
-        let actor = TransferActor::from_info(signing, section_wallet, Validator {})?;
-        info!(
-            "COMPLETED({}): We got our new section wallet synched to us!",
-            PublicKey::Bls(members.key())
-        );
-        let payout = RewardPayout::new(actor, members);
-        let reward_calc = RewardCalc::new(self.network_api.our_prefix().await);
-        let stages = RewardStages::new(node_rewards);
-        let rewards = Rewards::new(payout, stages, reward_calc);
-        self.section_funds = Some(SectionFunds::Rewarding(rewards));
-        Ok(())
     }
 }
 

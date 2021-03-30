@@ -17,9 +17,9 @@ use log::debug;
 use sn_messaging::{
     client::{
         Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeRewardQueryResponse, NodeSystemCmd, NodeSystemQuery,
-        NodeSystemQueryResponse, NodeTransferCmd, NodeTransferQuery, NodeTransferQueryResponse,
-        Query, TransferCmd, TransferQuery,
+        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
+        NodeTransferQuery, NodeTransferQueryResponse, ProcessMsg, Query, TransferCmd,
+        TransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
@@ -220,68 +220,21 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             node_rewards: node_rewards.to_owned(),
             user_wallets: user_wallets.to_owned(),
         },
-        Message::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ProposeNewWallet { credit, sig }),
+        ProcessMsg::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::ProposeChurnPayout(proposal)),
             ..
-        } => NodeDuty::ReceiveWalletProposal {
-            credit: credit.clone(),
-            sig: sig.clone(),
-        },
-        Message::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::AccumulateNewWallet { signed_credit, sig }),
+        } => NodeDuty::ReceiveChurnProposal(proposal.clone()),
+        ProcessMsg::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::AccumulateChurnPayout(accumulation)),
             ..
-        } => NodeDuty::ReceiveWalletAccumulation {
-            signed_credit: signed_credit.clone(),
-            sig: sig.clone(),
-        },
+        } => NodeDuty::ReceiveChurnAccumulation(accumulation.clone()),
         // ------ section funds -----
-        Message::NodeCmd {
-            cmd: NodeCmd::Transfers(NodeTransferCmd::ValidateSectionPayout(signed_transfer)),
-            id,
-            ..
-        } => {
-            debug!(">>>> validating section payout to {:?}", signed_transfer);
-            NodeDuty::ValidateSectionPayout {
-                signed_transfer: signed_transfer.clone(),
-                msg_id: *id,
-                origin,
-            }
-        }
-        Message::NodeQuery {
-            query:
-                NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletId {
-                    old_node_id,
-                    new_node_id,
-                }),
+        ProcessMsg::NodeQuery {
+            query: NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletKey(node_name)),
             id,
             ..
         } => NodeDuty::GetNodeWalletKey {
-            old_node_id: *old_node_id,
-            new_node_id: *new_node_id,
-            msg_id: *id,
-            origin,
-        },
-        // trivial to accumulate
-        Message::NodeQueryResponse {
-            response:
-                NodeQueryResponse::Rewards(NodeRewardQueryResponse::GetNodeWalletId(Ok((
-                    wallet_id,
-                    new_node_id,
-                )))),
-            id,
-            ..
-        } => NodeDuty::PayoutNodeReward {
-            wallet: *wallet_id,
-            node_id: *new_node_id,
-            msg_id: *id,
-            origin,
-        },
-        Message::NodeEvent {
-            event: NodeEvent::RewardPayoutValidated(validation),
-            id,
-            ..
-        } => NodeDuty::ReceivePayoutValidation {
-            validation: validation.clone(),
+            node_name: *node_name,
             msg_id: *id,
             origin,
         },
@@ -415,17 +368,6 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
                 NodeDuty::NoOp
             }
         }
-        //
-        // ------ rewards ------
-        Message::NodeCmd {
-            cmd: NodeCmd::Transfers(NodeTransferCmd::RegisterSectionPayout(debit_agreement)),
-            id,
-            ..
-        } => NodeDuty::RegisterSectionPayout {
-            debit_agreement: debit_agreement.clone(),
-            msg_id: *id,
-            origin,
-        },
         //
         // ------ transfers ------
         Message::NodeQuery {

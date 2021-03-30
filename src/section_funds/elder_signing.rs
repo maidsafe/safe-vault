@@ -25,6 +25,13 @@ impl ElderSigning {
         })
     }
 
+    pub async fn our_index(&self) -> Result<usize> {
+        self.network
+            .our_index()
+            .await
+            .map_err(|_| Error::NoSectionPublicKeySet)
+    }
+
     pub async fn public_key_set(&self) -> Result<PublicKeySet> {
         self.network
             .our_public_key_set()

@@ -256,7 +256,7 @@ mod test {
     fn rate_limit_first_chunk_has_a_reasonable_cost() {
         // setup
         let one_mb_bytes = 1024 * 1024;
-        let max_initial_cost = 1 * 1_000_000_000; // 1 token
+        let max_initial_cost = 1_000_000_000; // 1 token
         let zero_full_nodes = 0;
         let minimum_section_nodes = 5;
         let first_section_prefix = 0;
