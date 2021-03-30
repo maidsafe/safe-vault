@@ -207,11 +207,11 @@ fn match_section_msg(msg: ProcessMsg, origin: SrcLocation) -> NodeDuty {
             user_wallets: user_wallets.to_owned(),
         },
         ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ProposeChurnPayout(proposal)),
+            cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             ..
         } => NodeDuty::ReceiveChurnProposal(proposal.clone()),
         ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::AccumulateChurnPayout(accumulation)),
+            cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             ..
         } => NodeDuty::ReceiveChurnAccumulation(accumulation.clone()),
         // ------ section funds -----

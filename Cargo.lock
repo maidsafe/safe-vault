@@ -2312,6 +2312,7 @@ checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 [[package]]
 name = "sn_data_types"
 version = "0.16.0"
+source = "git+https://github.com/oetyng/sn_data_types?branch=reward-on-split#697dd667ede734926f2e8aa5693950922ca73316"
 dependencies = [
  "bincode",
  "crdts",
@@ -2344,6 +2345,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "9.0.0"
+source = "git+https://github.com/oetyng/sn_messaging?branch=reward-on-split#b6f4dc07b1806e0128ca5ded096952b58db3b8b8"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2411,6 +2413,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.49.1"
+source = "git+https://github.com/oetyng/sn_routing?branch=reward-on-split#943bff2bfdba84688d77f49a5d46e996311be0c6"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2439,6 +2442,7 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.6.0"
+source = "git+https://github.com/oetyng/sn_transfers?branch=reward-on-split#336da75f9ef1aa4a5125ce1278b612ff14fb97c1"
 dependencies = [
  "bincode",
  "crdts",

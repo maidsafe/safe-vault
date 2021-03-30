@@ -333,7 +333,7 @@ impl RewardProcess {
 fn send_prop_msg(proposal: RewardProposal, our_elders: XorName) -> NodeDuty {
     NodeDuty::Send(OutgoingMsg {
         msg: ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ProposeChurnPayout(proposal)),
+            cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             id: MessageId::new(),
         },
         section_source: false,                 // sent as single node
@@ -345,7 +345,7 @@ fn send_prop_msg(proposal: RewardProposal, our_elders: XorName) -> NodeDuty {
 fn send_acc_msg(accumulation: RewardAccumulation, our_elders: XorName) -> NodeDuty {
     NodeDuty::Send(OutgoingMsg {
         msg: ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::AccumulateChurnPayout(accumulation)),
+            cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             id: MessageId::new(),
         },
         section_source: false,                 // sent as single node
