@@ -164,7 +164,7 @@ impl Transfers {
     /// Makes sure the payment contained
     /// within a data write, is credited
     /// to the section funds.
-    pub async fn process_payment(&self, msg: &Message, origin: EndUser) -> Result<NodeDuty> {
+    pub async fn process_payment(&self, msg: &Message, origin: EndUser) -> Result<NodeDuties> {
         debug!(">>>> processing payment");
         let (payment, data_cmd, num_bytes, dst_address) = match &msg {
             Message::Cmd {
@@ -176,7 +176,7 @@ impl Transfers {
                 utils::serialise(cmd)?.len() as u64,
                 cmd.dst_address(),
             ),
-            _ => return Ok(NodeDuty::NoOp),
+            _ => return Ok(vec![]),
         };
 
         // Make sure we are actually at the correct replicas,
@@ -189,7 +189,7 @@ impl Transfers {
         if recipient_is_not_section {
             warn!("Payment: recipient is not section");
             let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
-            return Ok(NodeDuty::Send(OutgoingMsg {
+            return Ok(vec![NodeDuty::Send(OutgoingMsg {
                 msg: Message::CmdError {
                     error: CmdError::Transfer(TransferRegistration(ErrorMessage::NoSuchRecipient)),
                     id: MessageId::in_response_to(&msg.id()),
@@ -199,7 +199,7 @@ impl Transfers {
                 section_source: false, // strictly this is not correct, but we don't expect responses to a response..
                 dst: origin.to_dst(),
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            }));
+            })]);
         }
         let registration = self.replicas.register(&payment).await;
         let result = match registration {
@@ -208,19 +208,20 @@ impl Transfers {
                 .receive_propagated(payment.sender().into(), &payment.credit_proof())
                 .await
             {
-                Ok(_) => Ok(()),
+                Ok(e) => Ok(e),
                 Err(error) => Err(error),
             },
             Err(error) => Err(error), // not using TransferPropagation error, since that is for NodeCmds, so wouldn't be returned to client.
         };
         match result {
-            Ok(_) => {
+            Ok(e) => {
                 let total_cost = self.rate_limit.from(num_bytes).await;
                 info!("Payment: registration and propagation succeeded. (Store cost: {}, paid amount: {}.)", total_cost, payment.amount());
                 info!(
                     "Section balance: {}",
                     self.replicas.balance(payment.recipient()).await?
                 );
+                let mut ops = vec![NodeDuty::AddPayment(e.credit_proof)];
                 if total_cost > payment.amount() {
                     // Paying too little will see the amount be forfeited.
                     // This prevents spam of the network.
@@ -231,7 +232,7 @@ impl Transfers {
                     );
                     // todo, better error, like `TooLowPayment`
                     let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
-                    return Ok(NodeDuty::Send(OutgoingMsg {
+                    ops.push(NodeDuty::Send(OutgoingMsg {
                         msg: Message::CmdError {
                             error: CmdError::Transfer(TransferRegistration(
                                 ErrorMessage::InsufficientBalance,
@@ -244,11 +245,12 @@ impl Transfers {
                         dst: origin.to_dst(),
                         aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
                     }));
+                    return Ok(ops);
                 }
                 info!("Payment: forwarding data..");
                 // consider having the section actor be
                 // informed of this transfer as well..
-                Ok(NodeDuty::Send(OutgoingMsg {
+                ops.push(NodeDuty::Send(OutgoingMsg {
                     msg: Message::NodeCmd {
                         cmd: NodeCmd::Metadata {
                             cmd: data_cmd.clone(),
@@ -260,12 +262,13 @@ impl Transfers {
                     section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Section(dst_address),
                     aggregation: Aggregation::AtDestination,
-                }))
+                }));
+                Ok(ops)
             }
             Err(e) => {
                 warn!("Payment: registration or propagation failed: {}", e);
                 let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
-                Ok(NodeDuty::Send(OutgoingMsg {
+                Ok(vec![NodeDuty::Send(OutgoingMsg {
                     msg: Message::CmdError {
                         error: CmdError::Transfer(TransferRegistration(
                             ErrorMessage::PaymentFailed,
@@ -277,7 +280,7 @@ impl Transfers {
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: origin.to_dst(),
                     aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                }))
+                })])
             }
         }
     }

@@ -301,7 +301,11 @@ impl Node {
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
                 let transfers = self.get_transfers()?;
-                Ok(vec![transfers.process_payment(&msg, origin).await?])
+                transfers.process_payment(&msg, origin).await
+            }
+            NodeDuty::AddPayment(credit) => {
+                self.get_section_funds()?.add_payment(credit);
+                Ok(vec![])
             }
             NodeDuty::ReplicateChunk {
                 current_holders,
