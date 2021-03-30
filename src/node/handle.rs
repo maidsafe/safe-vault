@@ -17,7 +17,6 @@ use crate::{
         reward_process::RewardProcess,
         reward_stage::{CreditAccumulation, RewardStage},
         reward_wallets::RewardWallets,
-        section_wallet::SectionWallet,
         SectionFunds,
     },
     transfers::Transfers,

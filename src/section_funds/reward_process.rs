@@ -13,7 +13,6 @@ use super::{
         ChurnAccumulationDetails, ChurnProposalDetails, CreditAccumulation, CreditProposal,
         RewardStage,
     },
-    section_wallet::SectionWallet,
 };
 use crate::{
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},

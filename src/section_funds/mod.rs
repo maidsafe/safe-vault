@@ -11,11 +11,8 @@ mod reward_calc;
 pub mod reward_process;
 pub mod reward_stage;
 pub mod reward_wallets;
-pub mod section_wallet;
 
-use self::{
-    reward_process::RewardProcess, reward_wallets::RewardWallets, section_wallet::SectionWallet,
-};
+use self::{reward_process::RewardProcess, reward_wallets::RewardWallets};
 use super::node_ops::{NodeDuty, OutgoingMsg};
 use crate::Result;
 use dashmap::DashMap;

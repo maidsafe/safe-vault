@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use crate::{
     node::update_transfers::update_transfers,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    section_funds::{self, section_wallet::SectionWallet, SectionFunds},
+    section_funds::{self, SectionFunds},
     transfers::{
         replica_signing::ReplicaSigningImpl,
         replicas::{ReplicaInfo, Replicas},

@@ -92,13 +92,6 @@ impl Transfers {
     }
 
     ///
-    pub async fn genesis(&self, genesis: TransferPropagated) -> Result<()> {
-        self.replicas
-            .initiate(&[ReplicaEvent::TransferPropagated(genesis)])
-            .await
-    }
-
-    ///
     pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
         self.replicas.user_wallets()
     }

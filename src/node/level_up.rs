@@ -11,10 +11,7 @@ use crate::{
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    section_funds::{
-        elder_signing::ElderSigning, reward_wallets::RewardWallets, section_wallet::SectionWallet,
-        SectionFunds,
-    },
+    section_funds::{elder_signing::ElderSigning, reward_wallets::RewardWallets, SectionFunds},
     state_db::store_new_reward_keypair,
     transfers::get_replicas::transfer_replicas,
     transfers::Transfers,
@@ -36,37 +33,6 @@ use sn_transfers::TransferActor;
 use std::collections::BTreeMap;
 
 impl Node {
-    /// Level up and handle more responsibilities.
-    pub async fn genesis(&mut self, genesis_tx: CreditAgreementProof) -> Result<NodeDuty> {
-        if let Some(SectionFunds::KeepingNodeWallets { .. }) = &self.section_funds {
-            // already had genesis..
-            return Ok(NodeDuty::NoOp);
-        }
-
-        //
-        self.level_up().await?;
-
-        // does local init, with no roundrip via network messaging
-        if let Some(transfers) = &mut self.transfers {
-            transfers
-                .genesis(TransferPropagated {
-                    credit_proof: genesis_tx.clone(),
-                })
-                .await?;
-        }
-
-        //
-        // start handling node rewards
-        let section_funds = SectionFunds::KeepingNodeWallets {
-            wallets: RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new()),
-            payments: Default::default(),
-        };
-        section_funds.add_payment(genesis_tx);
-        self.section_funds = Some(section_funds);
-
-        Ok(NodeDuty::Send(self.register_wallet().await))
-    }
-
     /// Level up on promotion
     pub async fn level_up(&mut self) -> Result<()> {
         //
