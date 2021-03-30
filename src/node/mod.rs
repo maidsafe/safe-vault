@@ -6,15 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub mod genesis;
-pub mod genesis_stage;
 mod handle;
 mod interaction;
 mod level_up;
 mod messaging;
 mod update_transfers;
 
-use self::genesis_stage::GenesisStage;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     chunk_store::UsedSpace,
@@ -75,7 +72,6 @@ pub struct Node {
     node_info: NodeInfo,
     used_space: UsedSpace,
     prefix: Prefix,
-    genesis_stage: GenesisStage,
     // immutable chunks
     chunks: Option<Chunks>,
     // data operations
@@ -140,7 +136,6 @@ impl Node {
             used_space,
             network_api,
             network_events,
-            genesis_stage: GenesisStage::None,
             meta_data: None,
             transfers: None,
             section_funds: None,

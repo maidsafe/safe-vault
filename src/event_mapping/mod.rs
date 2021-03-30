@@ -44,15 +44,8 @@ pub struct LazyError {
 pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
     //trace!("Processing Routing Event: {:?}", event);
     match event {
-        RoutingEvent::Genesis => Mapping::Ok {
-            op: NodeDuty::BeginFormingGenesisSection,
-            ctx: None,
-        },
         RoutingEvent::MessageReceived {
-            content,
-            src,
-            dst,
-            proof_chain,
+            content, src, dst, ..
         } => {
             let msg = match Message::from(content.clone()) {
                 Ok(msg) => msg,
@@ -106,9 +99,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     // -- ugly temporary until fixed in routing --
 
                     trace!("******Elders changed, we are still Elder");
-                    let op = if are_we_part_of_genesis(network_api).await {
-                        NodeDuty::BeginFormingGenesisSection
-                    } else if let Some(sibling_key) = sibling_key {
+                    let op = if let Some(sibling_key) = sibling_key {
                         NodeDuty::SplitSection {
                             our_prefix: prefix,
                             our_key: PublicKey::from(key),
@@ -149,9 +140,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                             Default::default()
                         });
 
-                    let op = if are_we_part_of_genesis(network_api).await {
-                        NodeDuty::BeginFormingGenesisSection
-                    } else if let Some(sibling_key) = sibling_key {
+                    let op = if let Some(sibling_key) = sibling_key {
                         NodeDuty::SplitSection {
                             our_prefix: prefix,
                             our_key: PublicKey::from(key),
@@ -243,23 +232,23 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
     }
 }
 
-/// Are we forming the genesis?
-async fn is_forming_genesis(network_api: &Network) -> bool {
-    let is_genesis_section = network_api.our_prefix().await.is_empty();
-    let elder_count = network_api.our_elder_names().await.len();
-    let section_chain_len = network_api.section_chain().await.len();
-    is_genesis_section
-        && elder_count < GENESIS_ELDER_COUNT
-        && section_chain_len <= GENESIS_ELDER_COUNT
-}
+// /// Are we forming the genesis?
+// async fn is_forming_genesis(network_api: &Network) -> bool {
+//     let is_genesis_section = network_api.our_prefix().await.is_empty();
+//     let elder_count = network_api.our_elder_names().await.len();
+//     let section_chain_len = network_api.section_chain().await.len();
+//     is_genesis_section
+//         && elder_count < GENESIS_ELDER_COUNT
+//         && section_chain_len <= GENESIS_ELDER_COUNT
+// }
 
-/// Are we the conclusion of genesis?
-async fn are_we_part_of_genesis(network_api: &Network) -> bool {
-    let is_genesis_section = network_api.our_prefix().await.is_empty();
-    let elder_count = network_api.our_elder_names().await.len();
-    let section_chain_len = network_api.section_chain().await.len();
-    is_forming_genesis(network_api).await
-        || (is_genesis_section
-            && elder_count == GENESIS_ELDER_COUNT
-            && section_chain_len <= GENESIS_ELDER_COUNT)
-}
+// /// Are we the conclusion of genesis?
+// async fn are_we_part_of_genesis(network_api: &Network) -> bool {
+//     let is_genesis_section = network_api.our_prefix().await.is_empty();
+//     let elder_count = network_api.our_elder_names().await.len();
+//     let section_chain_len = network_api.section_chain().await.len();
+//     is_forming_genesis(network_api).await
+//         || (is_genesis_section
+//             && elder_count == GENESIS_ELDER_COUNT
+//             && section_chain_len <= GENESIS_ELDER_COUNT)
+// }
