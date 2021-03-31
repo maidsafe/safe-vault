@@ -14,7 +14,7 @@ use sn_data_types::{
     Error as DtError, NodeAge, PublicKey, Token, TransferValidated, WalletHistory,
 };
 use sn_messaging::{
-    client::{Error as ErrorMessage, NodeQuery, NodeQueryResponse, NodeRewardQuery, ProcessMsg},
+    client::{Error as ErrorMessage, NodeQuery, NodeQueryResponse, NodeRewardQuery},
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use sn_transfers::TransferActor;

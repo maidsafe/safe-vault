@@ -13,7 +13,6 @@ use super::{
         ChurnAccumulationDetails, ChurnProposalDetails, CreditAccumulation, CreditProposal,
         RewardStage,
     },
-    section_wallet::SectionWallet,
 };
 use crate::{
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
@@ -331,8 +330,8 @@ impl RewardProcess {
 
 fn send_prop_msg(proposal: RewardProposal, our_elders: XorName) -> NodeDuty {
     NodeDuty::Send(OutgoingMsg {
-        msg: ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ProposeChurnPayout(proposal)),
+        msg: Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             id: MessageId::new(),
             target_section_pk: None,
         },
@@ -344,8 +343,8 @@ fn send_prop_msg(proposal: RewardProposal, our_elders: XorName) -> NodeDuty {
 
 fn send_acc_msg(accumulation: RewardAccumulation, our_elders: XorName) -> NodeDuty {
     NodeDuty::Send(OutgoingMsg {
-        msg: ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::AccumulateChurnPayout(accumulation)),
+        msg: Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             id: MessageId::new(),
             target_section_pk: None,
         },

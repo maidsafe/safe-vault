@@ -92,13 +92,6 @@ impl Transfers {
     }
 
     ///
-    pub async fn genesis(&self, genesis: TransferPropagated) -> Result<()> {
-        self.replicas
-            .initiate(&[ReplicaEvent::TransferPropagated(genesis)])
-            .await
-    }
-
-    ///
     pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
         self.replicas.user_wallets()
     }
@@ -477,9 +470,9 @@ impl Transfers {
                     target_section_pk: None,
                 }
             }
-            Err(Error::UnknownSectionKey) => {
+            Err(Error::UnknownSectionKey(_)) => {
                 error!(">> UnknownSectionKey at receive_propagated");
-                ProcessMsg::NodeCmdError {
+                Message::NodeCmdError {
                     error: NodeCmdError::Transfers(TransferPropagation(ErrorMessage::NoSuchKey)),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,

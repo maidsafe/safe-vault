@@ -115,12 +115,11 @@ mod test {
     #[test]
     fn calculates_reward_distribution() {
         // setup
-        let full_amount = Token::from_nano(u32::MAX as u64 * 1_000_000_000);
-        println!("Initial amount: {:?}", full_amount.as_nano());
+        let amount = Token::from_nano(1_000_000_000);
+        println!("Paid to section: {:?}", amount.as_nano());
         println!();
 
         let iters = 7;
-        //let new_section_size = 21;
         let mut nodes = BTreeMap::<XorName, (NodeAge, PublicKey)>::new();
         for i in 0..iters {
             let _ = nodes.insert(XorName::random(), (i + MIN_REWARD_AGE - 1, get_random_pk()));
@@ -134,7 +133,7 @@ mod test {
         let now = std::time::Instant::now();
 
         // calc
-        let rewards = distribute_rewards(full_amount, nodes);
+        let rewards = distribute_rewards(amount, nodes);
 
         // stop timer
         let duration = now.elapsed();

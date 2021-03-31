@@ -18,8 +18,7 @@ use sn_messaging::{
     client::{
         Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
         NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
-        NodeTransferQuery, NodeTransferQueryResponse, ProcessMsg, Query, TransferCmd,
-        TransferQuery,
+        NodeTransferQuery, NodeTransferQueryResponse, Query, TransferCmd, TransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
@@ -206,16 +205,16 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             node_rewards: node_rewards.to_owned(),
             user_wallets: user_wallets.to_owned(),
         },
-        ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ProposeChurnPayout(proposal)),
+        Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             ..
         } => NodeDuty::ReceiveChurnProposal(proposal.clone()),
-        ProcessMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::AccumulateChurnPayout(accumulation)),
+        Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             ..
         } => NodeDuty::ReceiveChurnAccumulation(accumulation.clone()),
         // ------ section funds -----
-        ProcessMsg::NodeQuery {
+        Message::NodeQuery {
             query: NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletKey(node_name)),
             id,
             ..

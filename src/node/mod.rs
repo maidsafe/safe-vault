@@ -122,7 +122,7 @@ impl Node {
 
         let used_space = UsedSpace::new(config.max_capacity());
 
-        let node = Self {
+        let mut node = Self {
             prefix: network_api.our_prefix().await,
             chunks: Some(
                 Chunks::new(
@@ -140,6 +140,11 @@ impl Node {
             transfers: None,
             section_funds: None,
         };
+
+        // was not necessary when AE changes were in
+        if config.is_first() {
+            node.level_up().await?;
+        }
 
         messaging::send(node.register_wallet().await, &node.network_api).await;
 

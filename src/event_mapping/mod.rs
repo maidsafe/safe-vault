@@ -65,8 +65,10 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             user,
         ),
         RoutingEvent::EldersChanged {
+            prefix,
+            key,
+            sibling_key,
             elders,
-            sibling_elders,
             self_status_change,
         } => {
             match self_status_change {

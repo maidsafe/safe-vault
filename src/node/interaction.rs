@@ -6,12 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::collections::BTreeMap;
-
 use crate::{
     node::update_transfers::update_transfers,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    section_funds::{self, section_wallet::SectionWallet, SectionFunds},
+    section_funds::{self, SectionFunds},
     transfers::{
         replica_signing::ReplicaSigningImpl,
         replicas::{ReplicaInfo, Replicas},
@@ -37,8 +35,9 @@ use sn_messaging::{
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
-use sn_routing::{Elders, XorName};
+use sn_routing::{Prefix, XorName};
 use sn_transfers::TransferActor;
+use std::collections::BTreeMap;
 
 impl Node {
     /// Called on split reported from routing layer.
@@ -105,9 +104,7 @@ impl Node {
                 return Err(Error::NoSectionFunds);
             };
 
-        // extract some info before moving our_elders..
-        let our_peers = our_elders.prefix.name();
-        let section_key = our_elders.key();
+        let our_peers = our_prefix.name();
 
         debug!(
             "@@@@@@ SPLIT: Our prefix: {:?}, neighbour: {:?}",
@@ -162,12 +159,13 @@ impl Node {
 
         let msg_id = MessageId::combine(vec![our_sibling_peers, XorName::from(sibling_key)]);
         ops.push(NodeDuty::Send(OutgoingMsg {
-            msg: ProcessMsg::NodeCmd {
+            msg: Message::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                     node_rewards: wallets.node_wallets(),
                     user_wallets: user_wallets.clone(),
                 }),
                 id: MessageId::new(), //MessageId::in_response_to(&msg_id), //
+                target_section_pk: None,
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to an event..
             dst: DstLocation::Section(our_sibling_peers), // swarming to our peers, if splitting many will be needing this, otherwise only one..
@@ -188,9 +186,10 @@ impl Node {
             let location = XorName::from(credit_proof.recipient());
             let msg_id = MessageId::from_content(&credit_proof.debiting_replicas_sig)?;
             ops.push(NodeDuty::Send(OutgoingMsg {
-                msg: ProcessMsg::NodeCmd {
+                msg: Message::NodeCmd {
                     cmd: Transfers(PropagateTransfer(credit_proof)),
                     id: msg_id,
+                    target_section_pk: None,
                 },
                 section_source: true, // i.e. errors go to our section
                 dst: DstLocation::Section(location),

@@ -125,7 +125,7 @@ impl Network {
     }
 
     pub async fn matching_section(&self, name: &XorName) -> Option<bls::PublicKey> {
-        let (key, _) = self.routing.match_section(&name).await;
+        let (key, _) = self.routing.matching_section(&name).await;
         key
     }
 

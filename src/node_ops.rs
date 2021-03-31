@@ -19,7 +19,7 @@ use sn_messaging::{
     client::{BlobRead, BlobWrite, Message, NodeSystemCmd},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
-use sn_routing::{Elders, NodeElderChange, Prefix};
+use sn_routing::{NodeElderChange, Prefix};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Formatter},
