@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.32.0](https://github.com/maidsafe/sn_node/compare/v0.31.1...v0.32.0) (2021-03-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** Reward flow overhaul
+
+### Features
+
+* **payment:** add payment to section funds ([3383e2d](https://github.com/maidsafe/sn_node/commit/3383e2d5d216ad124dde9b7dad768298f0e286f2))
+* **rewards:** distribute to many based on age ([230ec03](https://github.com/maidsafe/sn_node/commit/230ec03ca9af7ad3e0b8ef71cb700fe8e080a964))
+* **rewards:** mint and reward at churn ([4ff05c4](https://github.com/maidsafe/sn_node/commit/4ff05c47bd3fa53f43dd28696f13c218c3f7f509))
+* **section_funds:** remove section wallet ([2d48ce2](https://github.com/maidsafe/sn_node/commit/2d48ce2775b3b5364e01bd44c722ea3f0e79f233))
+* **tokens:** add the actual minting of new tokens ([d885117](https://github.com/maidsafe/sn_node/commit/d885117b6ce1d4cd074a77d92da27be181312595))
+
+
+### Bug Fixes
+
+* post-rebase issues ([1350573](https://github.com/maidsafe/sn_node/commit/13505732ab1911a53ec08f48a88c1447e66f2b67))
+* propagate only once per wallet churn ([f072e89](https://github.com/maidsafe/sn_node/commit/f072e891e71a3374db84be6556edebcd54c2850e))
+* send register payout to section instead of nodes ([fc6ed33](https://github.com/maidsafe/sn_node/commit/fc6ed33cb67cf007fba31f2f028274132d2ea87a))
+
+
+* **deps:** update sn_routing ([ddaa1ce](https://github.com/maidsafe/sn_node/commit/ddaa1ce618ad2fd8f7ce76a49d01196011f4aa23))
+
 ### [0.31.1](https://github.com/maidsafe/sn_node/compare/v0.31.0...v0.31.1) (2021-03-31)
 
 ## [0.31.0](https://github.com/maidsafe/sn_node/compare/v0.30.0...v0.31.0) (2021-03-23)
