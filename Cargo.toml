@@ -76,9 +76,9 @@ async-trait = "0.1.42"
   features = [ "macros", "fs", "sync", "io-util" ]
 
 [dev_dependencies]
-maplit = "1.0.1"
 tempdir = "~0.3.7"
 futures = "~0.3.8"
+anyhow = "1.0.40"
 
   [dev_dependencies.tokio]
   version = "1.3.0"

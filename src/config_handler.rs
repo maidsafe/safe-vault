@@ -16,7 +16,7 @@ use std::convert::Infallible;
 use std::net::AddrParseError;
 use std::num::ParseIntError;
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs::{self, File},
     io::{self, BufReader},
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -28,26 +28,6 @@ const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
-const ARGS: [&str; 18] = [
-    "wallet-id",
-    "max-capacity",
-    "root-dir",
-    "verbose",
-    "hard-coded-contacts",
-    "local-port",
-    "local-ip",
-    "max-msg-size-allowed",
-    "idle-timeout-msec",
-    "keep-alive-interval-msec",
-    "first",
-    "completions",
-    "log-dir",
-    "update",
-    "update-only",
-    "upnp-lease-duration",
-    "local",
-    "clear-data",
-];
 
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, StructOpt)]
@@ -106,24 +86,92 @@ impl Config {
             Ok(Some(config)) => config,
             Ok(None) | Err(_) => Default::default(),
         };
-        let command_line_args = Config::clap().get_matches();
 
-        for arg in &ARGS {
-            let occurrences = command_line_args.occurrences_of(arg);
-            if occurrences != 0 {
-                if let Some(cla) = command_line_args.value_of(arg) {
-                    config.set_value(arg, cla)?;
-                } else {
-                    config.set_flag(arg, occurrences);
-                }
-            }
-        }
+        let command_line_args = Config::from_args();
+        config.merge(command_line_args);
 
         config.clear_data_from_disk().unwrap_or_else(|_| {
             log::error!("Error deleting data file from disk");
         });
 
         Ok(config)
+    }
+
+    /// Overwrites the current config with the provided values from another config
+    fn merge(&mut self, config: Config) {
+        if let Some(wallet_id) = config.wallet_id() {
+            self.wallet_id = Some(wallet_id.clone());
+        }
+
+        if let Some(max_capacity) = &config.max_capacity {
+            self.max_capacity = Some(*max_capacity);
+        }
+
+        if let Some(root_dir) = &config.root_dir {
+            self.root_dir = Some(root_dir.clone());
+        }
+
+        if config.verbose > 0 {
+            self.verbose = config.verbose;
+        }
+
+        self.local = config.local || self.local;
+        self.first = config.first || self.first;
+
+        if let Some(completions) = &config.completions {
+            self.completions = Some(completions.clone());
+        }
+
+        if let Some(log_dir) = &config.log_dir {
+            self.log_dir = Some(log_dir.clone());
+        }
+
+        self.update = config.update || self.update;
+        self.update_only = config.update_only || self.update_only;
+        self.clear_data = config.clear_data || self.clear_data;
+
+        if !config.network_config.hard_coded_contacts.is_empty() {
+            self.network_config.hard_coded_contacts = config.network_config.hard_coded_contacts;
+        }
+
+        if let Some(port) = config.network_config.local_port {
+            self.network_config.local_port = Some(port);
+        }
+
+        if let Some(ip) = config.network_config.local_ip {
+            self.network_config.local_ip = Some(ip);
+        }
+
+        self.network_config.forward_port =
+            config.network_config.forward_port || self.network_config.forward_port;
+
+        if let Some(port) = config.network_config.external_port {
+            self.network_config.external_port = Some(port);
+        }
+
+        if let Some(ip) = config.network_config.external_ip {
+            self.network_config.external_ip = Some(ip);
+        }
+
+        if let Some(max_msg_size) = config.network_config.max_msg_size_allowed {
+            self.network_config.max_msg_size_allowed = Some(max_msg_size);
+        }
+
+        if let Some(idle_timeout) = config.network_config.idle_timeout_msec {
+            self.network_config.idle_timeout_msec = Some(idle_timeout);
+        }
+
+        if let Some(keep_alive) = config.network_config.keep_alive_interval_msec {
+            self.network_config.keep_alive_interval_msec = Some(keep_alive);
+        }
+
+        if let Some(bootstrap_cache_dir) = config.network_config.bootstrap_cache_dir {
+            self.network_config.bootstrap_cache_dir = Some(bootstrap_cache_dir);
+        }
+
+        if let Some(upnp_lease_duration) = config.network_config.upnp_lease_duration {
+            self.network_config.upnp_lease_duration = Some(upnp_lease_duration);
+        }
     }
 
     /// The address to be credited when this node farms SafeCoin.
@@ -212,92 +260,6 @@ impl Config {
         self.network_config.local_ip = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
-    pub(crate) fn set_value(&mut self, arg: &str, value: &str) -> Result<(), Error> {
-        if arg == "wallet-id" {
-            self.wallet_id =
-                Some(value.parse().map_err(|e: Infallible| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else if arg == "max-capacity" {
-            self.max_capacity =
-                Some(value.parse().map_err(|e: ParseIntError| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else if arg == "root-dir" {
-            self.root_dir =
-                Some(value.parse().map_err(|e: Infallible| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else if arg == "verbose" {
-            self.verbose = value
-                .parse()
-                .map_err(|e: ParseIntError| Error::Logic(format!("Config file error: {:?}", e)))?;
-        } else if arg == "hard-coded-contacts" {
-            self.network_config.hard_coded_contacts = serde_json::from_str(value)
-                .map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
-        } else if arg == "local-port" {
-            self.network_config.local_port =
-                Some(value.parse().map_err(|e: ParseIntError| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else if arg == "local-ip" {
-            self.network_config.local_ip = Some(value.parse().map_err(|e: AddrParseError| {
-                Error::Logic(format!("Config file error: {:?}", e))
-            })?);
-        } else if arg == "completions" {
-            self.completions =
-                Some(value.parse().map_err(|e: Infallible| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else if arg == "log-dir" {
-            self.log_dir =
-                Some(value.parse().map_err(|e: Infallible| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else if arg == "max-msg-size-allowed" {
-            self.network_config.max_msg_size_allowed =
-                Some(value.parse().map_err(|e: ParseIntError| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else if arg == "idle-timeout-msec" {
-            self.network_config.idle_timeout_msec =
-                Some(value.parse().map_err(|e: ParseIntError| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else if arg == "keep-alive-interval-msec" {
-            self.network_config.keep_alive_interval_msec =
-                Some(value.parse().map_err(|e: ParseIntError| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else if arg == "upnp-lease-duration" {
-            self.network_config.upnp_lease_duration =
-                Some(value.parse().map_err(|e: ParseIntError| {
-                    Error::Logic(format!("Config file error: {:?}", e))
-                })?);
-        } else {
-            println!("ERROR");
-        }
-        Ok(())
-    }
-
-    pub(crate) fn set_flag(&mut self, arg: &str, occurrences: u64) {
-        if arg == "verbose" {
-            self.verbose = occurrences;
-        } else if arg == "first" {
-            self.first = occurrences >= 1;
-        } else if arg == "update" {
-            self.update = occurrences >= 1;
-        } else if arg == "update-only" {
-            self.update_only = occurrences >= 1;
-        } else if arg == "local" {
-            self.local = occurrences >= 1;
-        } else if arg == "clear-data" {
-            self.clear_data = occurrences >= 1;
-        } else {
-            println!("ERROR");
-        }
-    }
-
     // Clear data from of a previous node running on the same PC
     fn clear_data_from_disk(&self) -> Result<()> {
         if self.clear_data {
@@ -331,15 +293,8 @@ impl Config {
         }
     }
 
-    /// Writes a Node config file **for use by tests and examples**.
-    ///
-    /// The file is written to the `current_bin_dir()` with the appropriate file name.
-    ///
-    /// N.B. This method should only be used as a utility for test and examples.  In normal use cases,
-    /// the config file should be created by the Node's installer.
-    #[cfg(test)]
-    #[allow(dead_code)]
-    pub fn write_config_file(&self) -> Result<PathBuf> {
+    /// Writes the config file to disk
+    pub fn write_to_disk(&self) -> Result<PathBuf> {
         write_file(CONFIG_FILE, self)
     }
 }
@@ -374,106 +329,4 @@ fn project_dirs() -> Result<PathBuf> {
     home_dir.push("node");
 
     Ok(home_dir)
-}
-
-#[cfg(test)]
-mod test {
-    //use super::ARGS;
-    use super::{Config, Error, Result};
-    use std::{fs::File, io::Read, path::Path};
-    //use structopt::StructOpt;
-
-    // #[test]
-    // fn smoke() -> Result<()> {
-    //     let app_name = Config::clap().get_name().to_string();
-    //     let test_values = [
-    //         ["wallet-id", "86a23e052dd07f3043f5b98e3add38764d7384f105a25eddbce62f3e02ac13467ff4565ff31bd3f1801d86e2ef79c103"],
-    //         ["max-capacity", "1"],
-    //         ["root-dir", "dir"],
-    //         ["verbose", "None"],
-    //         ["hard-coded-contacts", "[\"127.0.0.1:33292\"]"],
-    //         ["local-port", "1"],
-    //         ["local-ip", "127.0.0.1"],
-    //         ["max-msg-size-allowed", "1"],
-    //         ["idle-timeout-msec", "1"],
-    //         ["keep-alive-interval-msec", "1"],
-    //         ["first", "None"],
-    //         ["completions", "bash"],
-    //         ["log-dir", "log-dir-path"],
-    //         ["update", "None"],
-    //         ["update-only", "None"],
-    //         ["local", "None"],
-    //         ["upnp-lease-duration", "180"],
-    //         ["clear-data", "None"],
-    //     ];
-
-    //     for arg in &ARGS {
-    //         let user_arg = format!("--{}", arg);
-    //         let value = test_values
-    //             .iter()
-    //             .find(|elt| &elt[0] == arg)
-    //             .ok_or_else(|| Error::Logic(format!("Missing arg: {:?}", &arg)))?[1];
-    //         let matches = if value == "None" {
-    //             Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str()])
-    //         } else {
-    //             Config::clap().get_matches_from(&[app_name.as_str(), user_arg.as_str(), value])
-    //         };
-    //         let occurrences = matches.occurrences_of(arg);
-    //         assert_eq!(1, occurrences);
-
-    //         let mut config = Config {
-    //             local: false,
-    //             wallet_id: None,
-    //             max_capacity: None,
-    //             root_dir: None,
-    //             verbose: 0,
-    //             network_config: Default::default(),
-    //             first: false,
-    //             completions: None,
-    //             log_dir: None,
-    //             update: false,
-    //             update_only: false,
-    //             clear_data: false,
-    //         };
-    //         let empty_config = config.clone();
-    //         if let Some(val) = matches.value_of(arg) {
-    //             config.set_value(arg, val)?;
-    //         } else {
-    //             config.set_flag(arg, occurrences);
-    //         }
-    //         assert_ne!(empty_config, config, "Failed to set_value() for {}", arg);
-    //     }
-    //     Ok(())
-    // }
-
-    #[ignore]
-    #[test]
-    fn parse_sample_config_file() -> Result<(), Error> {
-        let path = Path::new("installer/common/sample.node.config").to_path_buf();
-        let mut file =
-            File::open(&path).map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
-        let mut encoded_contents = String::new();
-        let _ = file
-            .read_to_string(&mut encoded_contents)
-            .map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
-        let config: Config = serde_json::from_str(&encoded_contents)
-            .map_err(|e| Error::Logic(format!("Config file error: {:?}", e)))?;
-
-        assert!(
-            config.wallet_id.is_some(),
-            "{} is missing `wallet_id` field.",
-            path.display()
-        );
-        assert!(
-            config.max_capacity.is_some(),
-            "{} is missing `max_capacity` field.",
-            path.display()
-        );
-        assert!(
-            config.root_dir.is_some(),
-            "{} is missing `root_dir` field.",
-            path.display()
-        );
-        Ok(())
-    }
 }

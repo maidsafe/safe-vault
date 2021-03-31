@@ -82,9 +82,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.38"
+version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afddf7f520a80dbf76e6f50a35bca42a2331ef227a28b3b6dc5c2e2338d114b1"
+checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
 
 [[package]]
 name = "arrayref"
@@ -1347,12 +1347,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "991058cf0e7f161b37a4a610ddbada9d2f051d0db76369b973de9f3466f1cba3"
 
 [[package]]
-name = "maplit"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
-
-[[package]]
 name = "matches"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2373,6 +2367,7 @@ dependencies = [
 name = "sn_node"
 version = "0.31.1"
 dependencies = [
+ "anyhow",
  "async-log",
  "async-trait",
  "base64 0.10.1",
@@ -2391,7 +2386,6 @@ dependencies = [
  "itertools 0.10.0",
  "lazy_static",
  "log",
- "maplit",
  "pickledb",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
