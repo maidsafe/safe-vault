@@ -111,7 +111,6 @@ impl Node {
                 let rewards = self.get_section_funds()?;
                 if let Some(age) = members.get(&node_id) {
                     rewards.set_node_wallet(node_id, wallet_id, *age);
-                    debug!("Node wallet set. (wallets: {:?})", rewards.node_wallets());
                     Ok(vec![])
                 } else {
                     debug!("Couldn't find node id!");
