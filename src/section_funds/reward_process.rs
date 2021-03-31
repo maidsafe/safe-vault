@@ -145,8 +145,10 @@ impl RewardProcess {
         section_key: PublicKey,
         nodes: BTreeMap<XorName, (NodeAge, PublicKey)>,
     ) -> Vec<CreditProposal> {
+        // multiply by minting rate as to add the tokens to be minted
+        let rewards = Token::from_nano(minting as u64 * self.balance.as_nano());
         // create reward distribution
-        distribute_rewards(self.balance, nodes)
+        distribute_rewards(rewards, nodes)
             .into_iter()
             .map(|(node, (age, wallet, amount))| {
                 let id = MessageId::combine(vec![node, XorName::from(section_key)])
