@@ -74,6 +74,10 @@ impl RewardProcess {
         &self.stage
     }
 
+    /// Calculates reward for each node
+    /// proportional to the age of it,
+    /// out of the total payments received.
+    /// Additionally adds minted tokens.
     pub async fn reward_and_mint(
         &mut self,
         our_nodes: BTreeMap<XorName, (NodeAge, PublicKey)>,

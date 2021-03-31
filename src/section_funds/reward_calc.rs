@@ -15,13 +15,13 @@ const MIN_REWARD_AGE: u8 = 5;
 
 /// Calculates reward for each public key
 /// proportional to the age of its node,
-/// out of the total payments received.
+/// out of the total amount supplied.
 pub fn distribute_rewards(
-    payments: Token,
+    amount: Token,
     nodes: BTreeMap<XorName, (NodeAge, PublicKey)>,
 ) -> BTreeMap<XorName, (NodeAge, PublicKey, Token)> {
     let reward_buckets = get_buckets(nodes);
-    distribute(payments, reward_buckets)
+    distribute(amount, reward_buckets)
 }
 
 fn get_buckets(
@@ -41,32 +41,32 @@ fn get_buckets(
 }
 
 fn distribute(
-    payments: Token,
+    amount: Token,
     reward_buckets: BTreeMap<NodeAge, BTreeMap<XorName, PublicKey>>,
 ) -> BTreeMap<XorName, (NodeAge, PublicKey, Token)> {
     if reward_buckets.is_empty() {
         return Default::default();
     }
     let mut counters = BTreeMap::new();
-    let mut remaining_payments = payments.as_nano();
+    let mut remaining_amount = amount.as_nano();
 
     // shorten iterations by
-    let apprx = remaining_payments / u64::max(1, reward_buckets.len() as u64);
+    let apprx = remaining_amount / u64::max(1, reward_buckets.len() as u64);
     let ratio = reward_buckets.keys().max().unwrap_or(&1);
     let div = u64::max(1, apprx / *ratio as u64 / 25);
 
-    while remaining_payments > 0 {
+    while remaining_amount > 0 {
         for (age, wallets) in &reward_buckets {
             let reward = u64::min(
                 (*age as usize * wallets.len()) as u64 * div,
-                remaining_payments,
+                remaining_amount,
             );
             let _ = counters
                 .entry(*age)
                 .and_modify(|existing| *existing += reward)
                 .or_insert(reward);
-            remaining_payments -= reward;
-            if remaining_payments == 0 {
+            remaining_amount -= reward;
+            if remaining_amount == 0 {
                 break;
             }
         }
@@ -100,7 +100,7 @@ fn distribute(
         }
     }
 
-    println!("remaining_payments: {}", remaining_payments);
+    println!("remaining_amount: {}", remaining_amount);
 
     to_return
 }
