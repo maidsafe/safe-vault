@@ -12,8 +12,11 @@ use structopt::StructOpt;
 
 fn main() -> Result<()> {
     // Create some config and write it to disk
-    let mut file_config = Config::default();
-    file_config.first = true;
+    let mut file_config = Config {
+        first: true,
+        ..Default::default()
+    };
+
     file_config.network_config.local_ip = Some(
         "192.168.0.1"
             .parse()
