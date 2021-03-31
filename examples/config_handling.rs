@@ -54,7 +54,11 @@ fn main() -> Result<()> {
         assert_eq!(file_config.verbose, config.verbose)
     }
 
-    assert_eq!(config.local, file_config.local || command_line_args.local);
+    assert_eq!(
+        config.loopback,
+        file_config.loopback || command_line_args.loopback
+    );
+    assert_eq!(config.lan, file_config.lan || command_line_args.lan);
     assert_eq!(config.first, file_config.first || command_line_args.first);
 
     if command_line_args.completions.is_some() {

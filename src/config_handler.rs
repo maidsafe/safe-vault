@@ -52,10 +52,13 @@ pub struct Config {
     /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
     #[structopt(short, long, parse(from_occurrences))]
     pub verbose: u64,
-    /// Is the node running for a local section?
+    /// Is the node running for a network on localhost ?
     #[structopt(short, long)]
-    pub local: bool,
-    /// Is this the first node in a section?
+    pub loopback: bool,
+    /// Is the node meant for a network running withing a LAN ?
+    #[structopt(short, long)]
+    pub lan: bool,
+    /// Is this the first node in the network ?
     #[structopt(short, long)]
     pub first: bool,
     #[structopt(flatten)]
@@ -115,7 +118,8 @@ impl Config {
             self.verbose = config.verbose;
         }
 
-        self.local = config.local || self.local;
+        self.loopback = config.loopback || self.loopback;
+        self.lan = config.lan || self.lan;
         self.first = config.first || self.first;
 
         if let Some(completions) = &config.completions {
@@ -184,9 +188,9 @@ impl Config {
         self.first
     }
 
-    /// Is the node running for a local section?
-    pub fn is_local(&self) -> bool {
-        self.local
+    /// Is the node running on localhost ?
+    pub fn is_localhost(&self) -> bool {
+        self.loopback
     }
 
     /// Upper limit in bytes for allowed network storage on this node.
@@ -329,4 +333,14 @@ fn project_dirs() -> Result<PathBuf> {
     home_dir.push("node");
 
     Ok(home_dir)
+}
+
+#[test]
+fn smoke() {
+    // NOTE: IF this value is being changed due to a change in the config,
+    // the change in config also be handled in Config::merge()
+    // and in examples/config_handling.rs
+    let expected_size = 296;
+
+    assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }
