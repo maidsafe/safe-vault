@@ -64,11 +64,8 @@ impl Node {
             our_key,
         };
 
-        let mut process = RewardProcess::new(
-            Token::zero(),
-            section,
-            ElderSigning::new(self.network_api.clone()).await?,
-        );
+        let mut process =
+            RewardProcess::new(section, ElderSigning::new(self.network_api.clone()).await?);
 
         let wallets = RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new());
 
@@ -95,7 +92,7 @@ impl Node {
             return Err(Error::Logic("No transfers on this node".to_string()));
         };
 
-        let (wallets, section_balance) =
+        let (wallets, total_payments) =
             if let Some(SectionFunds::KeepingNodeWallets { wallets, payments }) =
                 &mut self.section_funds
             {
@@ -117,20 +114,27 @@ impl Node {
             our_key, sibling_key
         );
 
-        let mut ops = vec![];
+        let section_managed = self.get_transfers()?.managed_amount();
 
-        debug!("Section balance: {}", section_balance);
+        // payments made since last churn
+        debug!("Total payments: {}", total_payments);
+        // total amount in wallets
+        debug!("Managed amount: {}", section_managed);
 
         // generate reward and minting proposal
         let mut process = RewardProcess::new(
-            section_balance,
             OurSection {
                 our_prefix,
                 our_key,
             },
             ElderSigning::new(self.network_api.clone()).await?,
         );
-        ops.push(process.reward_and_mint(wallets.node_wallets()).await?);
+
+        let mut ops = vec![
+            process
+                .reward_and_mint(total_payments, section_managed, wallets.node_wallets())
+                .await?,
+        ];
 
         self.section_funds = Some(SectionFunds::Churning {
             process,

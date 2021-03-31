@@ -10,6 +10,7 @@ use super::{replica_signing::ReplicaSigning, store::TransferStore};
 use crate::{Error, Result};
 use bls::PublicKeySet;
 use dashmap::DashMap;
+use futures::executor::block_on as block;
 use futures::lock::Mutex;
 use log::info;
 use sn_data_types::{
@@ -115,6 +116,22 @@ impl<T: ReplicaSigning> Replicas<T> {
     /// -----------------------------------------------------------------
     /// ---------------------- Queries ----------------------------------
     /// -----------------------------------------------------------------
+
+    /// The total amount in wallets managed
+    /// by the replicas in this section.
+    pub fn managed_amount(&self) -> Token {
+        let amount = self
+            .locks
+            .iter()
+            .map(|r| *r.key())
+            .filter_map(|id| {
+                block(self.balance(id))
+                    .ok()
+                    .map(|balance| balance.as_nano())
+            })
+            .sum();
+        Token::from_nano(amount)
+    }
 
     ///
     pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {

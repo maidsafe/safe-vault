@@ -357,9 +357,7 @@ impl Node {
         if let Some(chunks) = &mut self.chunks {
             Ok(chunks)
         } else {
-            Err(Error::InvalidOperation(
-                "No immutable chunks at this node".to_string(),
-            ))
+            Err(Error::NoChunks)
         }
     }
 
@@ -367,33 +365,15 @@ impl Node {
         if let Some(meta_data) = &mut self.meta_data {
             Ok(meta_data)
         } else {
-            Err(Error::InvalidOperation(
-                "No meta data at this node".to_string(),
-            ))
+            Err(Error::NoMetadata)
         }
     }
 
-    fn get_transfers(&mut self) -> Result<&mut Transfers> {
+    pub(crate) fn get_transfers(&mut self) -> Result<&mut Transfers> {
         if let Some(transfers) = &mut self.transfers {
             Ok(transfers)
         } else {
-            Err(Error::InvalidOperation(
-                "No meta data at this node".to_string(),
-            ))
-        }
-    }
-
-    fn get_reward_wallets(&mut self) -> Result<&mut RewardWallets> {
-        if self.section_funds.is_none() {
-            Err(Error::NoSectionFunds)
-        } else if let Some(SectionFunds::KeepingNodeWallets { wallets, payments }) =
-            &mut self.section_funds
-        {
-            Ok(wallets)
-        } else {
-            Err(Error::InvalidOperation(
-                "Section fund churn, cannot complete request.".to_string(),
-            ))
+            Err(Error::NoTransfers)
         }
     }
 
@@ -401,9 +381,7 @@ impl Node {
         if let Some(section_funds) = &mut self.section_funds {
             Ok(section_funds)
         } else {
-            Err(Error::InvalidOperation(
-                "No section funds at this node".to_string(),
-            ))
+            Err(Error::NoSectionFunds)
         }
     }
 
@@ -422,7 +400,7 @@ impl Node {
         {
             Ok((process, wallets, payments))
         } else {
-            Err(Error::NoSectionFunds)
+            Err(Error::NotChurningFunds)
         }
     }
 }
