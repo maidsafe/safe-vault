@@ -26,6 +26,9 @@ pub enum Error {
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing")]
     NoSectionPublicKey,
+    /// Unknown as a Section PublicKey.
+    #[error("PublicKey provided was not identified as a section {0}")]
+    UnknownSectionKey(PublicKey),
     /// Not a Section PublicKeyShare.
     #[error("PublicKey provided for signing as elder is not a BLS PublicKeyShare")]
     ProvidedPkIsNotBlsShare,
@@ -38,10 +41,7 @@ pub enum Error {
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing for xorname {0}")]
     NoSectionPublicKeyKnown(XorName),
-    /// Not Section PublicKey.
-    #[error("PublicKey provided was not identified as a section {0}")]
-    UnknownSectionKey(PublicKey),
-    /// Not Section PublicKey.
+    /// Unable to parse genesis proposal.
     #[error("Cannot parse genesis proposal at this stage")]
     InvalidGenesisStage,
     /// Unable to parse non genesis proposal.

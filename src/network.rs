@@ -147,7 +147,7 @@ impl Network {
         self.routing.name().await
     }
 
-    pub async fn our_connection_info(&self) -> SocketAddr {
+    pub async fn our_connection_info(&mut self) -> SocketAddr {
         self.routing.our_connection_info()
     }
 
