@@ -208,11 +208,11 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             ..
-        } => NodeDuty::ReceiveChurnProposal(proposal.clone()),
+        } => NodeDuty::ReceiveRewardProposal(proposal.clone()),
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             ..
-        } => NodeDuty::ReceiveChurnAccumulation(accumulation.clone()),
+        } => NodeDuty::ReceiveRewardAccumulation(accumulation.clone()),
         // ------ section funds -----
         Message::NodeQuery {
             query: NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletKey(node_name)),

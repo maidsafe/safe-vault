@@ -122,9 +122,9 @@ pub enum NodeDuty {
         origin: SrcLocation,
     },
     /// Proposal of payout of rewards.
-    ReceiveChurnProposal(RewardProposal),
+    ReceiveRewardProposal(RewardProposal),
     /// Accumulation of payout of rewards.
-    ReceiveChurnAccumulation(RewardAccumulation),
+    ReceiveRewardAccumulation(RewardAccumulation),
     ChurnMembers {
         /// Our section prefix.
         our_prefix: Prefix,
@@ -242,8 +242,8 @@ impl Debug for NodeDuty {
             Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
-            Self::ReceiveChurnProposal { .. } => write!(f, "ReceiveChurnProposal"),
-            Self::ReceiveChurnAccumulation { .. } => write!(f, "ReceiveChurnAccumulation"),
+            Self::ReceiveRewardProposal { .. } => write!(f, "ReceiveRewardProposal"),
+            Self::ReceiveRewardAccumulation { .. } => write!(f, "ReceiveRewardAccumulation"),
             // ------
             Self::LevelDown => write!(f, "LevelDown"),
             Self::SynchState { .. } => write!(f, "SynchState"),

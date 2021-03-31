@@ -10,7 +10,7 @@ use super::{
     elder_signing::ElderSigning,
     reward_calc::distribute_rewards,
     reward_stage::{
-        ChurnAccumulationDetails, ChurnProposalDetails, CreditAccumulation, CreditProposal,
+        CreditAccumulation, CreditProposal, RewardAccumulationDetails, RewardProposalDetails,
         RewardStage,
     },
 };
@@ -100,8 +100,8 @@ impl RewardProcess {
     async fn sign_proposed_rewards(
         &self,
         rewards: Vec<CreditProposal>,
-    ) -> Result<ChurnProposalDetails> {
-        let mut proposal = ChurnProposalDetails {
+    ) -> Result<RewardProposalDetails> {
+        let mut proposal = RewardProposalDetails {
             rewards: BTreeMap::new(),
             pk_set: self.signing.public_key_set().await?,
         };
@@ -121,8 +121,8 @@ impl RewardProcess {
     async fn sign_accumulating_rewards(
         &self,
         rewards: Vec<CreditAccumulation>,
-    ) -> Result<ChurnAccumulationDetails> {
-        let mut accumulation = ChurnAccumulationDetails {
+    ) -> Result<RewardAccumulationDetails> {
+        let mut accumulation = RewardAccumulationDetails {
             pk_set: self.signing.public_key_set().await?,
             rewards: Default::default(),
         };
@@ -208,7 +208,7 @@ impl RewardProcess {
                 if let Some(rewards) = proposal_details.pending_agreements() {
                     info!("******* there is an agreement for reward proposal.");
                     // replicas signatures over > signed_credit <
-                    let mut our_acc = ChurnAccumulationDetails {
+                    let mut our_acc = RewardAccumulationDetails {
                         pk_set: proposal_details.pk_set,
                         rewards: Default::default(),
                     };
@@ -278,7 +278,7 @@ impl RewardProcess {
             }
             RewardStage::ProposingCredits(proposal_details) => {
                 // create our acc details
-                let mut our_acc = ChurnAccumulationDetails {
+                let mut our_acc = RewardAccumulationDetails {
                     pk_set: proposal_details.pk_set,
                     rewards: Default::default(),
                 };

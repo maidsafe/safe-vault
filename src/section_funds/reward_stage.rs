@@ -19,13 +19,13 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum RewardStage {
     None,
     AwaitingThreshold,
-    ProposingCredits(ChurnProposalDetails),
-    AccumulatingCredits(ChurnAccumulationDetails),
+    ProposingCredits(RewardProposalDetails),
+    AccumulatingCredits(RewardAccumulationDetails),
     Completed(BTreeMap<CreditId, CreditAgreementProof>),
 }
 
 #[derive(Clone, Debug)]
-pub struct ChurnProposalDetails {
+pub struct RewardProposalDetails {
     pub pk_set: ReplicaPublicKeySet,
     pub rewards: BTreeMap<CreditId, CreditProposal>,
 }
@@ -48,7 +48,7 @@ impl CreditProposal {
 }
 
 #[derive(Clone)]
-pub struct ChurnAccumulationDetails {
+pub struct RewardAccumulationDetails {
     pub pk_set: ReplicaPublicKeySet,
     pub rewards: BTreeMap<CreditId, CreditAccumulation>,
 }
@@ -66,7 +66,7 @@ impl CreditAccumulation {
     }
 }
 
-impl ChurnProposalDetails {
+impl RewardProposalDetails {
     pub(crate) fn pending_agreements(&self) -> Option<BTreeMap<CreditId, SignedCredit>> {
         let rewards: BTreeMap<CreditId, SignedCredit> = self
             .rewards
@@ -158,7 +158,7 @@ fn check(sig: &SignatureShare, signatures: &BTreeMap<usize, bls::SignatureShare>
     }
 }
 
-impl ChurnAccumulationDetails {
+impl RewardAccumulationDetails {
     pub(crate) fn pending_agreements(&self) -> Option<BTreeMap<CreditId, CreditAgreementProof>> {
         let rewards: BTreeMap<CreditId, CreditAgreementProof> = self
             .rewards

@@ -62,7 +62,7 @@ impl Node {
             NodeDuty::GetSectionElders { msg_id, origin } => {
                 Ok(vec![self.get_section_elders(msg_id, origin).await?])
             }
-            NodeDuty::ReceiveChurnProposal(proposal) => {
+            NodeDuty::ReceiveRewardProposal(proposal) => {
                 if let Ok((churn_process, _, _)) = self.get_churning_funds() {
                     Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
                 } else {
@@ -70,7 +70,7 @@ impl Node {
                     Ok(vec![])
                 }
             }
-            NodeDuty::ReceiveChurnAccumulation(accumulation) => {
+            NodeDuty::ReceiveRewardAccumulation(accumulation) => {
                 if let Ok((churn_process, reward_wallets, payments)) = self.get_churning_funds() {
                     let mut ops = vec![
                         churn_process
