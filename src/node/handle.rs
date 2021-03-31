@@ -15,7 +15,7 @@ use crate::{
         reward_process::RewardProcess,
         reward_stage::{CreditAccumulation, RewardStage},
         reward_wallets::RewardWallets,
-        SectionFunds,
+        Credits, SectionFunds,
     },
     transfers::Transfers,
     Error, Node, Result,
@@ -79,6 +79,7 @@ impl Node {
                     ];
 
                     if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
+                        let reward_sum = credit_proofs.sum();
                         ops.extend(Self::propagate_credits(credit_proofs)?);
                         // update state
                         self.section_funds = Some(SectionFunds::KeepingNodeWallets {
@@ -86,7 +87,10 @@ impl Node {
                             payments: payments.clone(),
                         });
                         let section_key = &self.network_api.section_public_key().await?;
-                        info!("COMPLETED({}): Rewards have been paid out.", section_key);
+                        info!(
+                            "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
+                            section_key, reward_sum
+                        );
                     }
 
                     Ok(ops)
@@ -107,6 +111,7 @@ impl Node {
                 let rewards = self.get_section_funds()?;
                 if let Some(age) = members.get(&node_id) {
                     rewards.set_node_wallet(node_id, wallet_id, *age);
+                    debug!("Node wallet set. (wallets: {:?})", rewards.node_wallets());
                     Ok(vec![])
                 } else {
                     debug!("Couldn't find node id!");

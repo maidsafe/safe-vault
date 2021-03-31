@@ -23,6 +23,7 @@ use section_funds::{
     reward_process::{OurSection, RewardProcess},
     reward_stage::RewardStage,
     reward_wallets::RewardWallets,
+    Credits,
 };
 use sn_data_types::{
     ActorHistory, CreditAgreementProof, CreditId, NodeAge, PublicKey, SectionElders, Token,
@@ -99,7 +100,7 @@ impl Node {
                 &mut self.section_funds
             {
                 debug!("Node wallets: {:?}", wallets.node_wallets());
-                (wallets.clone(), sum(payments))
+                (wallets.clone(), payments.sum())
             } else {
                 return Err(Error::NoSectionFunds);
             };
@@ -258,8 +259,4 @@ impl Node {
             aggregation: Aggregation::None,
         }
     }
-}
-
-fn sum(payments: &DashMap<CreditId, CreditAgreementProof>) -> Token {
-    Token::from_nano(payments.iter().map(|c| (*c).amount().as_nano()).sum())
 }

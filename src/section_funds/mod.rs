@@ -30,12 +30,12 @@ use std::collections::BTreeMap;
 pub enum SectionFunds {
     KeepingNodeWallets {
         wallets: RewardWallets,
-        payments: DashMap<CreditId, CreditAgreementProof>,
+        payments: Payments,
     },
     Churning {
         process: RewardProcess,
         wallets: RewardWallets,
-        payments: DashMap<CreditId, CreditAgreementProof>,
+        payments: Payments,
     },
 }
 
@@ -86,6 +86,25 @@ impl SectionFunds {
                 wallets.remove_wallet(node_name)
             }
         }
+    }
+}
+
+type Payments = DashMap<CreditId, CreditAgreementProof>;
+type Rewards = BTreeMap<CreditId, CreditAgreementProof>;
+
+pub trait Credits {
+    fn sum(&self) -> Token;
+}
+
+impl Credits for Payments {
+    fn sum(&self) -> Token {
+        Token::from_nano(self.iter().map(|c| (*c).amount().as_nano()).sum())
+    }
+}
+
+impl Credits for Rewards {
+    fn sum(&self) -> Token {
+        Token::from_nano(self.iter().map(|(_, c)| c.amount().as_nano()).sum())
     }
 }
 

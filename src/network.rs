@@ -163,46 +163,6 @@ impl Network {
         self.routing.matches_our_prefix(&XorName(name.0)).await
     }
 
-    pub async fn send_to_nodes(&self, targets: BTreeSet<XorName>, msg: &Message) -> Result<()> {
-        let name = self.our_name().await;
-        let bytes = &msg.serialize()?;
-        for target in targets {
-            self.send_message(
-                Itinerary {
-                    src: SrcLocation::Node(name),
-                    dst: DstLocation::Node(XorName(target.0)),
-                    aggregation: Aggregation::AtDestination,
-                },
-                bytes.clone(),
-            )
-            .await
-            .map_or_else(
-                |err| {
-                    error!("Unable to send Message to Peer: {:?}", err);
-                },
-                |()| {},
-            );
-        }
-        Ok(())
-    }
-
-    pub async fn send(&self, msg: OutgoingMsg) -> Result<()> {
-        let itry = Itinerary {
-            src: SrcLocation::Node(self.our_name().await),
-            dst: msg.dst,
-            aggregation: msg.aggregation,
-        };
-        let result = self.send_message(itry, msg.msg.serialize()?).await;
-
-        result.map_or_else(
-            |err| {
-                error!("Unable to send msg: {:?}", err);
-                Err(Error::Logic(format!("Unable to send msg: {:?}", msg.id())))
-            },
-            |()| Ok(()),
-        )
-    }
-
     pub async fn send_message(
         &self,
         itinerary: Itinerary,
