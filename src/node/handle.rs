@@ -106,13 +106,11 @@ impl Node {
                 if let Ok((rewards, churn_process, replicas, reward_queue)) =
                     self.get_churning_funds()
                 {
-                    let mut ops = vec![];
-
-                    ops.push(
+                    let mut ops = vec![
                         churn_process
                             .receive_wallet_accumulation(signed_credit, sig)
                             .await?,
-                    );
+                    ];
 
                     if let WalletStage::Completed(credit_proof) = churn_process.stage().clone() {
                         ops.push(Self::propagate_credit(credit_proof.clone())?);

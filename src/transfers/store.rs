@@ -31,7 +31,7 @@ impl<'a, TEvent: Debug + Serialize + DeserializeOwned> TransferStore<TEvent>
 where
     TEvent: 'a,
 {
-    pub fn new(id: XorName, root_dir: &PathBuf) -> Result<Self> {
+    pub fn new(id: XorName, root_dir: &Path) -> Result<Self> {
         let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME));
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         Ok(Self {
