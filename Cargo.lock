@@ -2371,7 +2371,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "async-log",
  "async-trait",
@@ -2414,9 +2414,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.52.0"
+version = "0.54.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de61e931371f8a549a003d265878a18b36a608b7524ef25c86ddec2590d8356a"
+checksum = "25dfe5ff5f699888ed3cf9edc9eca58b263d9385b1b1eb88d1b79bbf6915780e"
 dependencies = [
  "bincode",
  "bls_dkg",

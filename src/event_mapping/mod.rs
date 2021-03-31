@@ -48,7 +48,12 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             op: NodeDuty::BeginFormingGenesisSection,
             ctx: None,
         },
-        RoutingEvent::MessageReceived { content, src, dst } => {
+        RoutingEvent::MessageReceived {
+            content,
+            src,
+            dst,
+            proof_chain,
+        } => {
             let msg = match Message::from(content.clone()) {
                 Ok(msg) => msg,
                 Err(error) => {
