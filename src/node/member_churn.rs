@@ -8,12 +8,10 @@
 
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
-    event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    section_funds::{elder_signing::ElderSigning, reward_wallets::RewardWallets, SectionFunds},
-    state_db::store_new_reward_keypair,
-    transfers::get_replicas::transfer_replicas,
+    node_ops::NodeDuty,
+    section_funds::{reward_wallets::RewardWallets, SectionFunds},
+    transfers::get_replicas::{replica_info, transfer_replicas},
     transfers::Transfers,
     Error, Node, Result,
 };
@@ -29,11 +27,20 @@ use sn_messaging::{
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::XorName;
-use sn_transfers::TransferActor;
 use std::collections::BTreeMap;
 
 impl Node {
-    /// Level up on promotion
+    /// If we are an oldie we'll have a transfer instance,
+    /// This updates the replica info on it.
+    pub async fn update_replicas(&mut self) -> Result<()> {
+        if let Some(ref mut transfers) = self.transfers {
+            let info = replica_info(&self.node_info, &self.network_api).await?;
+            transfers.update_replica_info(info);
+        }
+        Ok(())
+    }
+
+    /// Level up a newbie to an oldie on promotion
     pub async fn level_up(&mut self) -> Result<()> {
         //
         // do not hande immutable chunks anymore

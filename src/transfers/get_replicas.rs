@@ -17,6 +17,14 @@ pub async fn transfer_replicas(
     user_wallets: BTreeMap<PublicKey, ActorHistory>,
 ) -> Result<Replicas<ReplicaSigningImpl>> {
     let root_dir = node_info.root_dir.clone();
+    let info = replica_info(node_info, network).await?;
+    Replicas::new(root_dir, info, user_wallets).await
+}
+
+pub async fn replica_info(
+    node_info: &NodeInfo,
+    network: &Network,
+) -> Result<ReplicaInfo<ReplicaSigningImpl>> {
     let id = network
         .our_public_key_share()
         .await?
@@ -25,13 +33,12 @@ pub async fn transfer_replicas(
     let key_index = network.our_index().await?;
     let peer_replicas = network.our_public_key_set().await?;
     let signing = ReplicaSigningImpl::new(network.clone());
-    let info = ReplicaInfo {
+    Ok(ReplicaInfo {
         id,
         key_index,
         peer_replicas,
         section_chain: network.section_chain().await,
         signing,
         initiating: true,
-    };
-    Replicas::new(root_dir, info, user_wallets).await
+    })
 }

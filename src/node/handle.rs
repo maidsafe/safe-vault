@@ -41,6 +41,8 @@ impl Node {
             } => {
                 if newbie {
                     self.level_up().await?;
+                } else {
+                    self.update_replicas().await?;
                 }
                 Ok(vec![])
             }
