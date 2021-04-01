@@ -7,6 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::messaging::{send, send_to_nodes};
+use crate::transfers::replica_signing::ReplicaSigningImpl;
+use crate::transfers::replicas::ReplicaInfo;
 use crate::{
     chunks::Chunks,
     metadata::Metadata,
@@ -41,6 +43,25 @@ impl Node {
             } => {
                 if newbie {
                     self.level_up().await?;
+                } else if let Some(transfers) = &mut self.transfers {
+                    let signing = ReplicaSigningImpl::new(self.network_api.clone());
+                    transfers.update_replica_info(ReplicaInfo {
+                        id: self
+                            .network_api
+                            .our_public_key_share()
+                            .await?
+                            .bls_share()
+                            .ok_or_else(|| {
+                                Error::Logic("We do not have a PublicKeyShare yet".to_string())
+                            })?,
+                        key_index: self.network_api.our_index().await?,
+                        peer_replicas: self.network_api.our_public_key_set().await?,
+                        section_chain: self.network_api.section_chain().await,
+                        signing,
+                        initiating: false,
+                    });
+                } else {
+                    return Err(Error::Logic("No transfers on this node".to_string()));
                 }
                 Ok(vec![])
             }

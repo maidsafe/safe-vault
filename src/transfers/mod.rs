@@ -259,7 +259,7 @@ impl Transfers {
                 Ok(ops)
             }
             Err(e) => {
-                warn!("Payment: registration or propagation failed: {}", e);
+                warn!("Payment: registration or propagation failed: {:?}", e);
                 let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
                 Ok(vec![NodeDuty::Send(OutgoingMsg {
                     msg: Message::CmdError {
