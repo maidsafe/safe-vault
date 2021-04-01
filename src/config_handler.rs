@@ -146,8 +146,7 @@ impl Config {
             self.network_config.local_ip = Some(ip);
         }
 
-        self.network_config.forward_port =
-            config.network_config.forward_port || self.network_config.forward_port;
+        self.network_config.use_igd = config.network_config.use_igd || self.network_config.use_igd;
 
         if let Some(port) = config.network_config.external_port {
             self.network_config.external_port = Some(port);

@@ -81,7 +81,7 @@ async fn run_node() {
     if config.is_localhost() {
         config.listen_on_loopback();
     } else {
-        config.network_config.forward_port = !config.lan;
+        config.network_config.use_igd = !config.lan;
     }
 
     utils::init_logging(&config);

@@ -130,8 +130,8 @@ fn main() -> Result<()> {
     }
 
     assert_eq!(
-        config.network_config.forward_port,
-        file_config.network_config.forward_port || command_line_args.network_config.forward_port
+        config.network_config.use_igd,
+        file_config.network_config.use_igd || command_line_args.network_config.use_igd
     );
 
     if command_line_args.network_config.external_port.is_some() {
