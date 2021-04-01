@@ -122,7 +122,7 @@ impl Node {
 
         let used_space = UsedSpace::new(config.max_capacity());
 
-        let mut node = Self {
+        let node = Self {
             prefix: network_api.our_prefix().await,
             chunks: Some(
                 Chunks::new(
@@ -141,11 +141,6 @@ impl Node {
             section_funds: None,
         };
 
-        // was not necessary when AE changes were in
-        if config.is_first() {
-            node.level_up().await?;
-        }
-
         messaging::send(node.register_wallet().await, &node.network_api).await;
 
         Ok(node)
@@ -154,6 +149,11 @@ impl Node {
     /// Returns our connection info.
     pub async fn our_connection_info(&mut self) -> SocketAddr {
         self.network_api.our_connection_info().await
+    }
+
+    /// Returns our name.
+    pub async fn our_name(&mut self) -> XorName {
+        self.network_api.our_name().await
     }
 
     /// Starts the node, and runs the main event loop.

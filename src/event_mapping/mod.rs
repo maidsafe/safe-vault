@@ -70,6 +70,14 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             elders,
             self_status_change,
         } => {
+            let first_section = network_api.our_prefix().await.is_empty();
+            let first_elder = network_api.our_elder_names().await.len() == 1;
+            if first_section && first_elder {
+                return Mapping::Ok {
+                    op: NodeDuty::Genesis,
+                    ctx: None,
+                };
+            }
             match self_status_change {
                 NodeElderChange::None => {
                     if !network_api.is_elder().await {
@@ -101,14 +109,14 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 
                     trace!("******Elders changed, we are still Elder");
                     let op = if let Some(sibling_key) = sibling_key {
-                        NodeDuty::SplitSection {
+                        NodeDuty::SectionSplit {
                             our_prefix: prefix,
                             our_key: PublicKey::from(key),
                             sibling_key: PublicKey::from(sibling_key),
                             newbie: false,
                         }
                     } else {
-                        NodeDuty::ChurnMembers {
+                        NodeDuty::EldersChanged {
                             our_prefix: prefix,
                             our_key: PublicKey::from(key),
                             newbie: false,
@@ -135,14 +143,14 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 
                     trace!("******Elders changed, we are promoted");
                     let op = if let Some(sibling_key) = sibling_key {
-                        NodeDuty::SplitSection {
+                        NodeDuty::SectionSplit {
                             our_prefix: prefix,
                             our_key: PublicKey::from(key),
                             sibling_key: PublicKey::from(sibling_key),
                             newbie: true,
                         }
                     } else {
-                        NodeDuty::ChurnMembers {
+                        NodeDuty::EldersChanged {
                             our_prefix: prefix,
                             our_key: PublicKey::from(key),
                             newbie: true,
@@ -156,16 +164,13 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                 },
             }
         }
-        RoutingEvent::MemberLeft { name, age } => {
-            debug!("A node has left the section. Node: {:?}", name);
-            Mapping::Ok {
-                op: NodeDuty::ProcessLostMember {
-                    name: XorName(name.0),
-                    age,
-                },
-                ctx: None,
-            }
-        }
+        RoutingEvent::MemberLeft { name, age } => Mapping::Ok {
+            op: NodeDuty::ProcessLostMember {
+                name: XorName(name.0),
+                age,
+            },
+            ctx: None,
+        },
         // RoutingEvent::MemberJoined {
         //     name,
         //     previous_name,
@@ -208,10 +213,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             // Check our current status
             let age = network_api.age().await;
             if age > MIN_AGE {
-                info!("Node promoted to Adult");
-                info!("Our Age: {:?}", age);
-                // return Ok(())
-                // Ok(NetworkDuties::from(NodeDuty::AssumeAdultDuties))
+                info!("Relocated, our Age: {:?}", age);
             }
             Mapping::Ok {
                 op: NodeDuty::NoOp,

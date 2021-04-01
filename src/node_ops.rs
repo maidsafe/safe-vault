@@ -125,7 +125,8 @@ pub enum NodeDuty {
     ReceiveRewardProposal(RewardProposal),
     /// Accumulation of payout of rewards.
     ReceiveRewardAccumulation(RewardAccumulation),
-    ChurnMembers {
+    Genesis,
+    EldersChanged {
         /// Our section prefix.
         our_prefix: Prefix,
         /// our section public key
@@ -133,7 +134,7 @@ pub enum NodeDuty {
         /// oldie or newbie?
         newbie: bool,
     },
-    SplitSection {
+    SectionSplit {
         /// Our section prefix.
         our_prefix: Prefix,
         /// our section public key
@@ -229,6 +230,7 @@ impl From<NodeDuty> for NodeDuties {
 impl Debug for NodeDuty {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Genesis { .. } => write!(f, "Genesis"),
             Self::AddPayment { .. } => write!(f, "AddPayment"),
             Self::GetNodeWalletKey { .. } => write!(f, "GetNodeWalletKey"),
             Self::PropagateTransfer { .. } => write!(f, "PropagateTransfer"),
@@ -247,8 +249,8 @@ impl Debug for NodeDuty {
             // ------
             Self::LevelDown => write!(f, "LevelDown"),
             Self::SynchState { .. } => write!(f, "SynchState"),
-            Self::ChurnMembers { .. } => write!(f, "ChurnMembers"),
-            Self::SplitSection { .. } => write!(f, "SplitSection"),
+            Self::EldersChanged { .. } => write!(f, "EldersChanged"),
+            Self::SectionSplit { .. } => write!(f, "SectionSplit"),
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
 
             Self::NoOp => write!(f, "No op."),

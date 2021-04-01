@@ -123,4 +123,45 @@ impl Node {
             aggregation: Aggregation::None,
         }
     }
+
+    /// Push our state to the given dst
+    pub fn push_state(&self, prefix: Prefix, msg_id: MessageId) -> NodeDuty {
+        let dst = DstLocation::Section(prefix.name());
+
+        let user_wallets = if let Some(transfers) = &self.transfers {
+            transfers.user_wallets()
+        } else {
+            Default::default()
+        };
+
+        let node_rewards = match &self.section_funds {
+            Some(SectionFunds::KeepingNodeWallets { wallets, .. })
+            | Some(SectionFunds::Churning { wallets, .. }) => wallets.node_wallets(),
+            None => Default::default(),
+        };
+
+        // only push that what should be in dst
+        let user_wallets = user_wallets
+            .into_iter()
+            .filter(|(key, _)| dst.contains(&XorName::from(*key), &prefix))
+            .collect();
+        let node_rewards = node_rewards
+            .into_iter()
+            .filter(|(name, _)| dst.contains(name, &prefix))
+            .collect();
+
+        NodeDuty::Send(OutgoingMsg {
+            msg: Message::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
+                    node_rewards,
+                    user_wallets,
+                }),
+                id: msg_id,
+                target_section_pk: None,
+            },
+            section_source: false, // strictly this is not correct, but we don't expect responses to an event..
+            dst,
+            aggregation: Aggregation::None,
+        })
+    }
 }

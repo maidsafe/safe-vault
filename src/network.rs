@@ -147,6 +147,10 @@ impl Network {
         self.routing.name().await
     }
 
+    pub async fn our_age(&self) -> u8 {
+        self.routing.age().await
+    }
+
     pub async fn our_connection_info(&mut self) -> SocketAddr {
         self.routing.our_connection_info()
     }

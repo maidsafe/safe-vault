@@ -86,8 +86,6 @@ async fn run_node() {
 
     utils::init_logging(&config);
 
-    info!("Node PID is: {:?}", std::process::id());
-
     if config.update() || config.update_only() {
         match update() {
             Ok(status) => {
@@ -119,17 +117,18 @@ async fn run_node() {
             process::exit(1);
         }
     };
-
+    let node_name = node.our_name().await;
     let our_conn_info = node.our_connection_info().await;
+    let our_pid = std::process::id();
+    let our_conn_info_json = serde_json::to_string(&our_conn_info)
+        .unwrap_or_else(|_| "Failed to serialize connection info".into());
     println!(
-        "Node connection info:\n{}",
-        serde_json::to_string(&our_conn_info)
-            .unwrap_or_else(|_| "Failed to serialize connection info".into())
+        "Node PID: {:?}, name: {}, connection info:\n{}",
+        our_pid, node_name, our_conn_info_json,
     );
     info!(
-        "Node connection info: {}",
-        serde_json::to_string(&our_conn_info)
-            .unwrap_or_else(|_| "Failed to serialize connection info".into())
+        "Node PID: {:?}, name: {}, connection info: {}",
+        our_pid, node_name, our_conn_info_json,
     );
 
     if config.is_first() {

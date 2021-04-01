@@ -14,9 +14,10 @@ use sn_routing::XorName;
 use std::collections::BTreeSet;
 
 pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
-    trace!("Sending msg: {:?}", msg);
+    let our_prefix = network.our_prefix().await;
+    trace!("{:?}, Sending msg: {:?}", our_prefix, msg);
     let src = if msg.section_source {
-        SrcLocation::Section(network.our_prefix().await.name())
+        SrcLocation::Section(our_prefix.name())
     } else {
         SrcLocation::Node(network.our_name().await)
     };
@@ -41,7 +42,13 @@ pub(crate) async fn send_to_nodes(
     msg: &Message,
     network: &Network,
 ) -> Result<()> {
-    trace!("Sending msg to nodes: {:?}: {:?}", targets, msg);
+    let our_prefix = network.our_prefix().await;
+    trace!(
+        "{:?}, Sending msg to nodes: {:?}: {:?}",
+        our_prefix,
+        targets,
+        msg
+    );
 
     let name = network.our_name().await;
     let bytes = &msg.serialize()?;
