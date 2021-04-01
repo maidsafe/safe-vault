@@ -32,7 +32,7 @@ use std::collections::{BTreeMap, HashSet};
 use futures::lock::Mutex;
 use sn_data_types::{
     ActorHistory, CreditAgreementProof, DebitId, PublicKey, ReplicaEvent, SignedTransfer,
-    SignedTransferShare, TransferAgreementProof, TransferPropagated,
+    SignedTransferShare, Token, TransferAgreementProof, TransferPropagated,
 };
 use sn_messaging::{
     client::{
@@ -89,6 +89,12 @@ impl Transfers {
             rate_limit,
             recently_validated_transfers: Default::default(),
         }
+    }
+
+    /// The total amount in wallets managed
+    /// by the replicas in this section.
+    pub async fn managed_amount(&self) -> Result<Token> {
+        self.replicas.managed_amount().await
     }
 
     ///

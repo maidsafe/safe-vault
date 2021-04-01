@@ -371,7 +371,7 @@ impl Node {
         }
     }
 
-    fn get_transfers(&mut self) -> Result<&mut Transfers> {
+    pub(crate) fn get_transfers(&mut self) -> Result<&mut Transfers> {
         if let Some(transfers) = &mut self.transfers {
             Ok(transfers)
         } else {

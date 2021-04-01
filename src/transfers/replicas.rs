@@ -115,6 +115,17 @@ impl<T: ReplicaSigning> Replicas<T> {
     /// ---------------------- Queries ----------------------------------
     /// -----------------------------------------------------------------
 
+    /// The total amount in wallets managed
+    /// by the replicas in this section.
+    pub async fn managed_amount(&self) -> Result<Token> {
+        let mut amount = 0;
+        for entry in &self.locks {
+            let key = *entry.key();
+            amount += self.balance(key).await?.as_nano();
+        }
+        Ok(Token::from_nano(amount))
+    }
+
     ///
     pub fn user_wallets(&self) -> BTreeMap<PublicKey, ActorHistory> {
         let wallets = self

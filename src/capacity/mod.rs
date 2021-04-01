@@ -15,6 +15,10 @@ use log::info;
 pub use rate_limit::RateLimit;
 use sn_data_types::PublicKey;
 
+pub const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
+const MAX_CHUNK_SIZE: u64 = 1_000_000;
+const MAX_NETWORK_STORAGE_RATIO: f64 = 0.5;
+
 /// A util for sharing the
 /// info on data capacity among the
 /// chunk storing nodes in the section.

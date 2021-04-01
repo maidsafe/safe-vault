@@ -6,13 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{Capacity, MAX_CHUNK_SIZE, MAX_NETWORK_STORAGE_RATIO, MAX_SUPPLY};
 use crate::Network;
-use crate::{capacity::Capacity, Result};
+use crate::Result;
 use log::info;
 use sn_data_types::{PublicKey, Token};
-const MAX_CHUNK_SIZE: u64 = 1_000_000;
-const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
-const MAX_NETWORK_STORAGE_RATIO: f64 = 0.5;
 
 /// Calculation of rate limit for writes.
 #[derive(Clone)]
