@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.3](https://github.com/maidsafe/sn_node/compare/v0.33.2...v0.33.3) (2021-04-01)
+
+
+### Features
+
+* **rewards:** limit supply ([1dae6c2](https://github.com/maidsafe/sn_node/commit/1dae6c24edeedce94703a715a3f6aa97304e3eb1))
+
 ### [0.33.2](https://github.com/maidsafe/sn_node/compare/v0.33.1...v0.33.2) (2021-04-01)
 
 
