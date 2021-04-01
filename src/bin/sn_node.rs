@@ -78,10 +78,10 @@ async fn run_node() {
         return;
     }
 
-    if config.is_localhost() {
+    if config.is_local() {
         config.listen_on_loopback();
     } else {
-        config.network_config.forward_port = !config.lan;
+        config.network_config.forward_port = true;
     }
 
     utils::init_logging(&config);

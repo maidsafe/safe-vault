@@ -137,12 +137,6 @@ jobs:
           command: test
           args: --release  --features=simulated-payouts
 
-      - name: Configuration test
-        uses: actions-rs/cargo@v1
-        with:
-          command: run
-          args: --release --example config_handling -- --first --loopback --local-port 0 --external-port 12345 -h ${{ '["127.0.0.1:1234"]' }}
-
       - name: Upload node data on fail
         if: ${{ failure() }}
         uses: actions/upload-artifact@master
