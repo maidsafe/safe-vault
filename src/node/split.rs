@@ -31,8 +31,8 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{
-        Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeSystemCmd, NodeSystemQuery,
-        NodeSystemQueryResponse, NodeTransferCmd,
+        Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeSystemCmd,
+        NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -93,90 +93,64 @@ impl Node {
             return Err(Error::Logic("No transfers on this node".to_string()));
         };
 
-        let (wallets, payments) =
-            if let Some(SectionFunds::KeepingNodeWallets { wallets, payments }) =
-                &mut self.section_funds
-            {
-                debug!("Node wallets: {:?}", wallets.node_wallets());
-                (wallets.clone(), payments.sum())
-            } else {
-                return Err(Error::NoSectionFunds);
-            };
+        let (wallets, payments) = match &mut self.section_funds {
+            Some(SectionFunds::KeepingNodeWallets { wallets, payments })
+            | Some(SectionFunds::Churning {
+                wallets, payments, ..
+            }) => (wallets.clone(), payments.sum()),
+            None => return Err(Error::NoSectionFunds),
+        };
 
-        let our_peers = our_prefix.name();
+        let sibling_prefix = our_prefix.sibling();
 
         debug!(
             "@@@@@@ SPLIT: Our prefix: {:?}, neighbour: {:?}",
-            our_prefix,
-            our_prefix.sibling()
+            our_prefix, sibling_prefix,
         );
         debug!(
             "@@@@@@ SPLIT: Our key: {:?}, neighbour: {:?}",
             our_key, sibling_key
         );
 
-        let section_managed = self.get_transfers()?.managed_amount().await?;
+        let mut ops = vec![];
 
-        // payments made since last churn
-        debug!("Payments: {}", payments);
-        // total amount in wallets
-        debug!("Managed amount: {}", section_managed);
+        if payments > Token::zero() {
+            let section_managed = self.get_transfers()?.managed_amount().await?;
 
-        // generate reward and minting proposal
-        let mut process = RewardProcess::new(
-            OurSection {
-                our_prefix,
-                our_key,
-            },
-            ElderSigning::new(self.network_api.clone()).await?,
-        );
+            // payments made since last churn
+            debug!("Payments: {}", payments);
+            // total amount in wallets
+            debug!("Managed amount: {}", section_managed);
 
-        let mut ops = vec![
-            process
-                .reward_and_mint(payments, section_managed, wallets.node_wallets())
-                .await?,
-        ];
+            // generate reward and minting proposal
+            let mut process = RewardProcess::new(
+                OurSection {
+                    our_prefix,
+                    our_key,
+                },
+                ElderSigning::new(self.network_api.clone()).await?,
+            );
 
-        self.section_funds = Some(SectionFunds::Churning {
-            process,
-            wallets: wallets.clone(),
-            payments: Default::default(), // clear old payments
-        });
+            ops.push(
+                process
+                    .reward_and_mint(payments, section_managed, wallets.node_wallets())
+                    .await?,
+            );
 
-        let msg_id = MessageId::combine(vec![our_peers, XorName::from(our_key)]);
+            self.section_funds = Some(SectionFunds::Churning {
+                process,
+                wallets: wallets.clone(),
+                payments: Default::default(), // clear old payments
+            });
+        } else {
+            debug!("Not paying out rewards, as no payments have been received since last split.");
+        }
 
-        // push out data to our new (and old..) peers
-        ops.push(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
-                    node_rewards: wallets.node_wallets(),
-                    user_wallets: user_wallets.clone(),
-                }),
-                id: MessageId::new(), //MessageId::in_response_to(&msg_id), //
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to an event..
-            dst: DstLocation::Section(our_peers), // swarming to our peers, if splitting many will be needing this, otherwise only one..
-            aggregation: Aggregation::None,       // AtDestination
-        }));
+        let msg_id = MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
+        ops.push(self.push_state(our_prefix, msg_id));
 
-        // push out data to our sibling peers (i.e. our old peers, and new ones that were promoted)
-        let our_sibling_peers = our_prefix.sibling().name();
-
-        let msg_id = MessageId::combine(vec![our_sibling_peers, XorName::from(sibling_key)]);
-        ops.push(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
-                    node_rewards: wallets.node_wallets(),
-                    user_wallets: user_wallets.clone(),
-                }),
-                id: MessageId::new(), //MessageId::in_response_to(&msg_id), //
-                target_section_pk: None,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to an event..
-            dst: DstLocation::Section(our_sibling_peers), // swarming to our peers, if splitting many will be needing this, otherwise only one..
-            aggregation: Aggregation::None,               // AtDestination
-        }));
+        let msg_id = MessageId::combine(vec![sibling_prefix.name(), XorName::from(sibling_key)]);
+        ops.push(self.push_state(sibling_prefix, msg_id));
 
         Ok(ops)
     }

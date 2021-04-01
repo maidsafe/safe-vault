@@ -34,19 +34,26 @@ impl Node {
     ///
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         match duty {
-            NodeDuty::ChurnMembers {
+            NodeDuty::Genesis => {
+                self.level_up().await?;
+                Ok(vec![])
+            }
+            NodeDuty::EldersChanged {
                 our_key,
                 our_prefix,
                 newbie,
             } => {
                 if newbie {
                     self.level_up().await?;
+                    Ok(vec![])
                 } else {
                     self.update_replicas().await?;
+                    let msg_id =
+                        MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
+                    Ok(vec![self.push_state(our_prefix, msg_id)])
                 }
-                Ok(vec![])
             }
-            NodeDuty::SplitSection {
+            NodeDuty::SectionSplit {
                 our_key,
                 our_prefix,
                 sibling_key,
@@ -115,7 +122,12 @@ impl Node {
                     rewards.set_node_wallet(node_id, wallet_id, *age);
                     Ok(vec![])
                 } else {
-                    debug!("Couldn't find node id!");
+                    debug!(
+                        "{:?}: Couldn't find node id {} when adding wallet {}",
+                        self.network_api.our_prefix().await,
+                        node_id,
+                        wallet_id
+                    );
                     Err(Error::NodeNotFoundForReward)
                 }
             }
@@ -126,7 +138,7 @@ impl Node {
             } => Ok(vec![]),
             NodeDuty::ProcessLostMember { name, age } => {
                 let rewards = self.get_section_funds()?;
-                rewards.remove_node_wallet(name)?;
+                rewards.remove_node_wallet(name);
 
                 let metadata = self.get_metadata()?;
                 Ok(metadata.trigger_chunk_replication(name).await?)

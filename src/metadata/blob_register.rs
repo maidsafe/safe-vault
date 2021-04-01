@@ -310,8 +310,6 @@ impl BlobRegister {
     }
 
     pub(super) async fn replicate_chunks(&mut self, holder: XorName) -> Result<NodeDuties> {
-        trace!("Replicating chunks of holder {:?}", holder);
-
         let chunks_stored = match self.remove_holder(holder).await {
             Ok(chunks) => chunks,
             _ => return Ok(vec![]),

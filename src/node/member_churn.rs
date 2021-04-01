@@ -103,8 +103,8 @@ impl Node {
         let no_wallet_found = node_wallets.get(&node_id).is_none();
         if no_wallet_found {
             info!(
-                "Registering wallet of node: {} (since not found in {:?})",
-                node_id, node_wallets
+                "Registering wallet of node: {} (since not found in received state)",
+                node_id,
             );
             Ok(NodeDuty::Send(self.register_wallet().await))
         } else {

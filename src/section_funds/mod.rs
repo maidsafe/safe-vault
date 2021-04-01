@@ -80,7 +80,7 @@ impl SectionFunds {
 
     /// When the section becomes aware that a node has left,
     /// its reward key is removed.
-    pub fn remove_node_wallet(&self, node_name: XorName) -> Result<()> {
+    pub fn remove_node_wallet(&self, node_name: XorName) {
         match &self {
             Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
                 wallets.remove_wallet(node_name)

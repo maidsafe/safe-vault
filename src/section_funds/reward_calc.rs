@@ -16,7 +16,7 @@ const MIN_REWARD_AGE: u8 = 5;
 ///  -----  MINTING  -----
 /// This is the minting of new coins happening;
 /// the size being the sum of payments to parent section,
-/// i.e. it at least doubles the amount paid into section,
+/// i.e. it at most doubles the amount paid into section,
 /// or else what's left until we've reached max supply.
 /// Max supply is the proportional supply for a section in
 /// a network of a certain size, i.e. max _total_ supply (2^32) divided by number of sections.
@@ -41,7 +41,7 @@ pub fn get_reward_and_mint_amount(
         if payments > excess_supply {
             payments - excess_supply
         } else {
-            0 // can't go minus rewards, but whatever was paid has been burned completely
+            0 // can't go minus rewards, but whatever was paid is now burned completely
         }
     };
 

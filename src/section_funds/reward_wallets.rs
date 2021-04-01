@@ -76,9 +76,7 @@ impl RewardWallets {
 
     /// When the section becomes aware that a node has left,
     /// its reward key is removed.
-    pub fn remove_wallet(&self, node_name: XorName) -> Result<()> {
-        debug!("Rewards: removing {}", node_name);
+    pub fn remove_wallet(&self, node_name: XorName) {
         let _ = self.node_rewards.remove(&node_name);
-        Ok(())
     }
 }
