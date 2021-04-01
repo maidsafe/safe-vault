@@ -244,7 +244,7 @@ impl RewardProcess {
             }
             RewardStage::AccumulatingCredits(_) => Ok(NodeDuty::NoOp),
             RewardStage::Completed(_) => Ok(NodeDuty::NoOp),
-            RewardStage::None => Err(Error::InvalidGenesisStage),
+            RewardStage::None => Err(Error::InvalidRewardStage),
         }
     }
 
@@ -329,7 +329,7 @@ impl RewardProcess {
                 Ok(NodeDuty::NoOp)
             }
             RewardStage::Completed(_) => Ok(NodeDuty::NoOp),
-            RewardStage::None => Err(Error::InvalidGenesisStage),
+            RewardStage::None => Err(Error::InvalidRewardStage),
         }
     }
 }

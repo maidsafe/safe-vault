@@ -41,21 +41,30 @@ pub enum Error {
     /// Not Section PublicKey.
     #[error("Not section public key returned from routing for xorname {0}")]
     NoSectionPublicKeyKnown(XorName),
-    /// Unable to parse genesis proposal.
-    #[error("Cannot parse genesis proposal at this stage")]
-    InvalidGenesisStage,
-    /// Unable to parse non genesis proposal.
-    #[error("Cannot parse anything but genesis proposal at this stage")]
-    InvalidGenesisStageForProposal,
+    /// Unable to parse reward proposal.
+    #[error("Cannot parse reward proposal at this stage")]
+    InvalidRewardStage,
     /// Node not found for rewarding
     #[error("Node not found for rewards")]
     NodeNotFoundForReward,
     /// Key, Value pair not found in `ChunkStore`.
     #[error("No such chunk")]
     NoSuchChunk,
+    /// This node does not know or manage any chunks
+    #[error("No chunks")]
+    NoChunks,
+    /// This node does not know or manage any metadata
+    #[error("No metadata")]
+    NoMetadata,
+    /// This node does not know or manage any transfers
+    #[error("No transfers")]
+    NoTransfers,
     /// This node does not know or manage any section funds
     #[error("No section funds")]
     NoSectionFunds,
+    /// Unable to process fund churn message.
+    #[error("Cannot process fund churn message")]
+    NotChurningFunds,
     /// Creating temp directory failed.
     #[error("Could not create temp store: {0}")]
     TempDirCreationFailed(String),
