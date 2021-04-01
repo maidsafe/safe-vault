@@ -8,7 +8,7 @@
 
 use super::{
     elder_signing::ElderSigning,
-    reward_calc::distribute_rewards,
+    reward_calc::{distribute_rewards, get_reward_and_mint_amount},
     reward_stage::{
         CreditAccumulation, CreditProposal, RewardAccumulationDetails, RewardProposalDetails,
         RewardStage,
@@ -76,50 +76,27 @@ impl RewardProcess {
     /// Calculates reward for each node
     /// proportional to the age of it,
     /// out of the total payments received.
-    /// Additionally adds minted tokens.
+    /// Additionally adds newly minted tokens, unless max supply has been reached.
     pub async fn reward_and_mint(
         &mut self,
         payments: Token,
         section_managed: Token,
         our_nodes: BTreeMap<XorName, (NodeAge, PublicKey)>,
     ) -> Result<NodeDuty> {
-        // derive an amount to pay out in rewards, including payments
-        let rewards = self.get_reward_amount(payments, section_managed);
+        /// Max supply is the proportional supply for a section in a network of a certain size.
+        /// The network size is derived from the prefix len.
+        let max_supply =
+            Token::from_nano(MAX_SUPPLY / 2_u64.pow(self.section.our_prefix.bit_count() as u32));
+        // derive an amount to pay out in rewards, i.e. payments + newly minted tokens
+        let rewards = get_reward_and_mint_amount(payments, section_managed, max_supply);
         // generate proposal
-        let reward_credits = self.get_reward_proposals(rewards, self.section.our_key, our_nodes);
-        let proposal = self.sign_proposed_rewards(reward_credits).await?;
-        let to_send =
-            proposal.get_proposal(self.section.wallet_key(), self.signing.our_index().await?);
+        let reward_credits = self.get_reward_credits(rewards, self.section.our_key, our_nodes);
+        let proposal_details = self.sign_proposed_rewards(reward_credits).await?;
+        let proposal = proposal_details
+            .get_proposal(self.section.wallet_key(), self.signing.our_index().await?);
 
-        self.stage = RewardStage::ProposingCredits(proposal.clone());
-        Ok(send_prop_msg(to_send, self.section.address()))
-    }
-
-    /// This is the minting of new coins happening;
-    /// the size being the sum of payments to parent section.
-    /// Currently it doubles the amount paid into section.
-    fn get_reward_amount(&self, payments: Token, section_managed: Token) -> Token {
-        //  -----  MINTING  -----
-        let payments = payments.as_nano();
-        let section_managed = section_managed.as_nano();
-        let theoretical_max = MAX_SUPPLY / 2_u64.pow(self.section.our_prefix.bit_count() as u32);
-        let reward_nanos = if theoretical_max > section_managed {
-            // an amount at most equal to `payments` will be minted
-            let to_be_minted = u64::min(payments, theoretical_max - section_managed);
-            payments + to_be_minted
-        } else {
-            // the section has exceeded its proportional supply in the network
-            let excess_supply = section_managed - theoretical_max;
-            if payments > excess_supply {
-                // paid tokens are burned
-                payments - excess_supply
-            } else {
-                // no rewards can be paid
-                0
-            }
-        };
-
-        Token::from_nano(reward_nanos)
+        self.stage = RewardStage::ProposingCredits(proposal_details.clone());
+        Ok(send_prop_msg(proposal, self.section.address()))
     }
 
     async fn sign_proposed_rewards(
@@ -164,7 +141,7 @@ impl RewardProcess {
         Ok(accumulation)
     }
 
-    fn get_reward_proposals(
+    fn get_reward_credits(
         &self,
         rewards: Token,
         section_key: PublicKey,
