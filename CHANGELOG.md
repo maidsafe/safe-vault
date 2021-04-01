@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.2](https://github.com/maidsafe/sn_node/compare/v0.33.1...v0.33.2) (2021-04-01)
+
+
+### Bug Fixes
+
+* **transfers:** update replica info on churn ([a052cd6](https://github.com/maidsafe/sn_node/commit/a052cd6f53e3a5ccff66cfdd146cf4032d211da4))
+
 ### [0.33.1](https://github.com/maidsafe/sn_node/compare/v0.33.0...v0.33.1) (2021-04-01)
 
 
