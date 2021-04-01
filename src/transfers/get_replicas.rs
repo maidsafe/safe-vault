@@ -39,6 +39,5 @@ pub async fn replica_info(
         peer_replicas,
         section_chain: network.section_chain().await,
         signing,
-        initiating: true,
     })
 }

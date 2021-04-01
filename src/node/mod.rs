@@ -11,7 +11,6 @@ mod interaction;
 mod member_churn;
 mod messaging;
 mod split;
-mod update_transfers;
 
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},

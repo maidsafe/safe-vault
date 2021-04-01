@@ -42,7 +42,6 @@ where
     pub peer_replicas: PublicKeySet,
     pub section_chain: sn_routing::SectionChain,
     pub signing: T,
-    pub initiating: bool,
 }
 
 #[derive(Clone)]

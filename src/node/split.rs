@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::update_transfers::update_transfers,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{self, SectionFunds},
     transfers::{
+        get_replicas::replica_info,
         replica_signing::ReplicaSigningImpl,
         replicas::{ReplicaInfo, Replicas},
     },
@@ -89,7 +89,8 @@ impl Node {
         sibling_key: PublicKey,
     ) -> Result<NodeDuties> {
         let user_wallets = if let Some(transfers) = &mut self.transfers {
-            update_transfers(self.node_info.path(), transfers, &self.network_api).await?;
+            let info = replica_info(&self.node_info, &self.network_api).await?;
+            transfers.update_replica_info(info);
             transfers.user_wallets()
         } else {
             return Err(Error::Logic("No transfers on this node".to_string()));

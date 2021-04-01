@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node::update_transfers::update_transfers,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{self, SectionFunds},
     transfers::{
