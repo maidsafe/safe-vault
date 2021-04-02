@@ -476,7 +476,8 @@ impl Transfers {
                     target_section_pk: None,
                 }
             }
-            Err(Error::UnknownSectionKey(_)) | Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted)) => {
+            Err(Error::UnknownSectionKey(_))
+            | Err(Error::Transfer(sn_transfers::Error::SectionKeyNeverExisted)) => {
                 error!(">> UnknownSectionKey at receive_propagated");
                 Message::NodeCmdError {
                     error: NodeCmdError::Transfers(TransferPropagation(ErrorMessage::NoSuchKey)),
@@ -488,8 +489,8 @@ impl Transfers {
             Err(e) => {
                 error!("Error receiving propogated: {}", e);
 
-                return Err(e)
-            },
+                return Err(e);
+            }
         };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg,
