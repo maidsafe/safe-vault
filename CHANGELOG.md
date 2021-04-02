@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.4](https://github.com/maidsafe/sn_node/compare/v0.33.3...v0.33.4) (2021-04-02)
+
+
+### Bug Fixes
+
+* use routing 0.57 for qp2p wan fixes ([e08dde7](https://github.com/maidsafe/sn_node/commit/e08dde78e5b727e0c9a7162b64f2021e6983457c))
+
 ### [0.33.3](https://github.com/maidsafe/sn_node/compare/v0.33.2...v0.33.3) (2021-04-01)
 
 
