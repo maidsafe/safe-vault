@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.33.5](https://github.com/maidsafe/sn_node/compare/v0.33.4...v0.33.5) (2021-04-02)
+
+
+### Bug Fixes
+
+* unimplemented error handling of transfer error ([e21aa51](https://github.com/maidsafe/sn_node/commit/e21aa51f4aea36c3a5afcb276c4a373b8a032a85))
+* **rewards:** sync wallets in a better way ([090344f](https://github.com/maidsafe/sn_node/commit/090344fe089248c508587773e1d41ab2a5cc4607))
+
 ### [0.33.4](https://github.com/maidsafe/sn_node/compare/v0.33.3...v0.33.4) (2021-04-02)
 
 
