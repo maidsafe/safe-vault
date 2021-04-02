@@ -1642,9 +1642,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.10.1"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caea181b4ebb5fe0c0b6f258567c7ea2214e2a1ae311069cc744e1db47cea207"
+checksum = "4eb97035e9ea6f12976bec67741509285d5f2193238526f50d865dc11a789964"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2276,7 +2276,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.33.2"
+version = "0.33.3"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2319,9 +2319,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.56.0"
+version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "353a18d93c48145f1eb3458567b0a286980a9b2552ac734999ba051258e5a7e4"
+checksum = "f73e8edddd8afbd4d3f1193d30f86928500f4551502869c88c9ed25e33a29505"
 dependencies = [
  "bincode",
  "bls_dkg",
