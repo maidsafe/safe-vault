@@ -42,6 +42,7 @@ pub struct LazyError {
 
 /// Process any routing event
 pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Mapping {
+    info!("Handling RoutingEvent: {:?}", event);
     match event {
         RoutingEvent::MessageReceived {
             content, src, dst, ..

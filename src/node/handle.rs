@@ -33,6 +33,7 @@ use xor_name::XorName;
 impl Node {
     ///
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
+        info!("Handling NodeDuty: {:?}", duty);
         match duty {
             NodeDuty::Genesis => {
                 self.level_up().await?;
@@ -44,9 +45,11 @@ impl Node {
                 newbie,
             } => {
                 if newbie {
+                    info!("Promoted to Elder on Churn");
                     self.level_up().await?;
                     Ok(vec![])
                 } else {
+                    info!("Updating our replicas on Churn");
                     self.update_replicas().await?;
                     let msg_id =
                         MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
@@ -60,9 +63,11 @@ impl Node {
                 newbie,
             } => {
                 if newbie {
+                    info!("Beginning split as Newbie");
                     self.begin_split_as_newbie(our_key, our_prefix).await?;
                     Ok(vec![])
                 } else {
+                    info!("Beginning split as Oldie");
                     self.begin_split_as_oldie(our_prefix, our_key, sibling_key)
                         .await
                 }
@@ -73,6 +78,7 @@ impl Node {
             }
             NodeDuty::ReceiveRewardProposal(proposal) => {
                 if let Ok((churn_process, _, _)) = self.get_churning_funds() {
+                    info!("Handling Churn proposal as an Elder");
                     Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
                 } else {
                     // we are an adult, so ignore this msg
@@ -137,6 +143,7 @@ impl Node {
                 origin,
             } => Ok(vec![]),
             NodeDuty::ProcessLostMember { name, age } => {
+                info!("Member Lost: {:?}", name);
                 let rewards = self.get_section_funds()?;
                 rewards.remove_node_wallet(name);
 
@@ -150,6 +157,7 @@ impl Node {
                 user_wallets,
             } => Ok(vec![self.synch_state(node_rewards, user_wallets).await?]),
             NodeDuty::LevelDown => {
+                info!("Getting Demoted");
                 self.meta_data = None;
                 self.transfers = None;
                 self.section_funds = None;
