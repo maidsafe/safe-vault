@@ -188,20 +188,23 @@ impl Config {
             self.log_dir = Some(log_dir.clone());
         }
 
-        if let Some(socket_addr) = config.first {
-            self.first = Some(socket_addr);
-        }
-
         self.update = config.update || self.update;
         self.update_only = config.update_only || self.update_only;
         self.clear_data = config.clear_data || self.clear_data;
 
+        if let Some(socket_addr) = config.first {
+            self.first = Some(socket_addr);
+            self.local_addr = Some(socket_addr);
+        }
+
         if let Some(local_addr) = config.local_addr {
+            self.local_addr = config.local_addr;
             self.network_config.local_port = Some(local_addr.port());
             self.network_config.local_ip = Some(local_addr.ip());
         }
 
         if let Some(public_addr) = config.public_addr {
+            self.public_addr = config.public_addr;
             self.network_config.external_port = Some(public_addr.port());
             self.network_config.external_ip = Some(public_addr.ip());
         }
@@ -390,7 +393,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 296;
+    let expected_size = 504;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }
