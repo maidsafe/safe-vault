@@ -131,6 +131,9 @@ pub enum Error {
     /// Logic error.
     #[error("Logic error: {0}")]
     Logic(String),
+    /// Configuration error.
+    #[error("Configuration error: {0}")]
+    Configuration(String),
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {

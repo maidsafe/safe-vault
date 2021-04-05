@@ -2237,9 +2237,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db61a824675e16b0b1e65365b0304f0792044d2814b49cb2649f41cc0c84eec4"
+checksum = "9f9a8df9d31ec249e47efd5de62770dbd08bedbc368fc497eaa0eb01be34b9e0"
 dependencies = [
  "dirs-next 1.0.2",
  "env_logger 0.8.3",

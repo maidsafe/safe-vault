@@ -54,7 +54,7 @@ fn main() {
 }
 
 async fn run_node() {
-    let mut config = match Config::new() {
+    let config = match Config::new() {
         Ok(cfg) => cfg,
         Err(e) => {
             println!("Failed to create Config: {:?}", e);
@@ -76,12 +76,6 @@ async fn run_node() {
         }
         // we exit program on both success and error.
         return;
-    }
-
-    if config.is_localhost() {
-        config.listen_on_loopback();
-    } else {
-        config.network_config.forward_port = !config.lan;
     }
 
     utils::init_logging(&config);
