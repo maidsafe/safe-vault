@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.34.1](https://github.com/maidsafe/sn_node/compare/v0.34.0...v0.34.1) (2021-04-06)
+
+
+### Features
+
+* **local_network:** connect to random elder ([21cd191](https://github.com/maidsafe/sn_node/commit/21cd1917c7facab19c80eac6daa679fea1d5830c))
+
 ## [0.34.0](https://github.com/maidsafe/sn_node/compare/v0.33.5...v0.34.0) (2021-04-06)
 
 
