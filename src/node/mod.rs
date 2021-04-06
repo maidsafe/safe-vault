@@ -147,13 +147,18 @@ impl Node {
     }
 
     /// Returns our connection info.
-    pub async fn our_connection_info(&mut self) -> SocketAddr {
-        self.network_api.our_connection_info().await
+    pub fn our_connection_info(&mut self) -> SocketAddr {
+        self.network_api.our_connection_info()
     }
 
     /// Returns our name.
     pub async fn our_name(&mut self) -> XorName {
         self.network_api.our_name().await
+    }
+
+    /// Returns our prefix.
+    pub async fn our_prefix(&mut self) -> Prefix {
+        self.network_api.our_prefix().await
     }
 
     /// Starts the node, and runs the main event loop.

@@ -151,7 +151,7 @@ impl Network {
         self.routing.age().await
     }
 
-    pub async fn our_connection_info(&mut self) -> SocketAddr {
+    pub fn our_connection_info(&self) -> SocketAddr {
         self.routing.our_connection_info()
     }
 

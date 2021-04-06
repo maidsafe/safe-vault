@@ -17,6 +17,7 @@ use sn_data_types::PublicKey;
 use sn_messaging::{client::Message, DstLocation, SrcLocation};
 use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
 use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
+use std::collections::HashSet;
 use std::{thread::sleep, time::Duration};
 
 #[derive(Debug)]
@@ -142,6 +143,11 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     }
                     // -- ugly temporary until fixed in routing --
 
+                    // used by local networks only, if err not much to do
+                    let _ = crate::config_handler::add_connection_info(
+                        network_api.our_connection_info(),
+                    );
+
                     trace!("******Elders changed, we are promoted");
                     let op = if let Some(sibling_key) = sibling_key {
                         NodeDuty::SectionSplit {
@@ -159,10 +165,16 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     };
                     Mapping::Ok { op, ctx: None }
                 }
-                NodeElderChange::Demoted => Mapping::Ok {
-                    op: NodeDuty::LevelDown,
-                    ctx: None,
-                },
+                NodeElderChange::Demoted => {
+                    // used by local networks only, if err not much to do
+                    let _ = crate::config_handler::remove_connection_info(
+                        network_api.our_connection_info(),
+                    );
+                    Mapping::Ok {
+                        op: NodeDuty::LevelDown,
+                        ctx: None,
+                    }
+                }
             }
         }
         RoutingEvent::MemberLeft { name, age } => Mapping::Ok {

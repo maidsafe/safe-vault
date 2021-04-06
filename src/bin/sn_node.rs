@@ -29,8 +29,8 @@
 
 use log::{self, error, info};
 use self_update::{cargo_crate_version, Status};
-use sn_node::{self, utils, write_connection_info, Config, Node};
-use std::{collections::HashSet, io::Write, net::SocketAddr, process};
+use sn_node::{self, add_connection_info, utils, Config, Node};
+use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 
 /// Runs a Safe Network node.
@@ -111,23 +111,23 @@ async fn run_node() {
             process::exit(1);
         }
     };
+    let node_prefix = node.our_prefix().await;
     let node_name = node.our_name().await;
-    let our_conn_info = node.our_connection_info().await;
+    let our_conn_info = node.our_connection_info();
     let our_pid = std::process::id();
     let our_conn_info_json = serde_json::to_string(&our_conn_info)
         .unwrap_or_else(|_| "Failed to serialize connection info".into());
     println!(
-        "Node PID: {:?}, name: {}, connection info:\n{}",
-        our_pid, node_name, our_conn_info_json,
+        "Node PID: {:?}, prefix: {:?}, name: {}, connection info:\n{}",
+        our_pid, node_prefix, node_name, our_conn_info_json,
     );
     info!(
-        "Node PID: {:?}, name: {}, connection info: {}",
-        our_pid, node_name, our_conn_info_json,
+        "Node PID: {:?}, prefix: {:?}, name: {}, connection info: {}",
+        our_pid, node_prefix, node_name, our_conn_info_json,
     );
 
     if config.is_first() {
-        let contact_info: HashSet<SocketAddr> = vec![our_conn_info].into_iter().collect();
-        let _ = write_connection_info(&contact_info).unwrap_or_else(|err| {
+        let _ = add_connection_info(our_conn_info).unwrap_or_else(|err| {
             log::error!("Unable to write config to disk: {}", err);
             Default::default()
         });
