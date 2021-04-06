@@ -92,8 +92,10 @@ fn distribute(
 
     while remaining_amount > 0 {
         for (age, wallets) in &reward_buckets {
+            // every tick up in age indicates about double amount of work performed
+            let proportional_work = 2_u64.pow(*age as u32);
             let reward = u64::min(
-                (*age as usize * wallets.len()) as u64 * div,
+                (proportional_work * wallets.len() as u64) * div,
                 remaining_amount,
             );
             let _ = counters
