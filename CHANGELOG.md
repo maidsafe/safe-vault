@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.34.0](https://github.com/maidsafe/sn_node/compare/v0.33.5...v0.34.0) (2021-04-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **config:** this changes the fields of the node configuration
+
+* **config:** refactor command line arguments to improve user ([11850c8](https://github.com/maidsafe/sn_node/commit/11850c8b4a9607ed8d9b07b6758aa84cb4678966))
+
 ### [0.33.5](https://github.com/maidsafe/sn_node/compare/v0.33.4...v0.33.5) (2021-04-02)
 
 
