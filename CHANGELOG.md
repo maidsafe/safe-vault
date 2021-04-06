@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.34.2](https://github.com/maidsafe/sn_node/compare/v0.34.1...v0.34.2) (2021-04-06)
+
+
+### Bug Fixes
+
+* **propagation:** rely on routing aggregation ([f9840a3](https://github.com/maidsafe/sn_node/commit/f9840a324d3714035afa2159303d1dfb0480160a))
+
 ### [0.34.1](https://github.com/maidsafe/sn_node/compare/v0.34.0...v0.34.1) (2021-04-06)
 
 
