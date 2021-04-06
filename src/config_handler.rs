@@ -209,7 +209,7 @@ impl Config {
             self.network_config.external_ip = Some(public_addr.ip());
         }
 
-        self.network_config.forward_port = !config.skip_igd && self.network_config.forward_port;
+        self.network_config.forward_port = !config.skip_igd;
 
         if !config.hard_coded_contacts.is_empty() {
             self.network_config.hard_coded_contacts = config.hard_coded_contacts;
