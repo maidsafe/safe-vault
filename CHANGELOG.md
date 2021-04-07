@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.34.7](https://github.com/maidsafe/sn_node/compare/v0.34.6...v0.34.7) (2021-04-07)
+
+
+### Features
+
+* **joining:** open for new joins when nodes leave ([b307730](https://github.com/maidsafe/sn_node/commit/b307730a8cc4e50a906c6148f48166480c282b5f))
+
 ### [0.34.6](https://github.com/maidsafe/sn_node/compare/v0.34.5...v0.34.6) (2021-04-07)
 
 
