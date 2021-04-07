@@ -356,6 +356,13 @@ impl Config {
     }
 }
 
+/// Overwrites connection info at file.
+///
+/// The file is written to the `current_bin_dir()` with the appropriate file name.
+pub fn set_connection_info(contact: SocketAddr) -> Result<PathBuf> {
+    write_file(CONNECTION_INFO_FILE, &vec![contact])
+}
+
 /// Writes connection info to file for use by clients (and joining nodes when local network).
 ///
 /// The file is written to the `current_bin_dir()` with the appropriate file name.

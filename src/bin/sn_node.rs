@@ -29,7 +29,7 @@
 
 use log::{self, error, info};
 use self_update::{cargo_crate_version, Status};
-use sn_node::{self, add_connection_info, utils, Config, Node};
+use sn_node::{self, set_connection_info, utils, Config, Node};
 use std::{io::Write, process};
 use structopt::{clap, StructOpt};
 
@@ -127,8 +127,8 @@ async fn run_node() {
     );
 
     if config.is_first() {
-        let _ = add_connection_info(our_conn_info).unwrap_or_else(|err| {
-            log::error!("Unable to write config to disk: {}", err);
+        let _ = set_connection_info(our_conn_info).unwrap_or_else(|err| {
+            log::error!("Unable to write connection info to disk: {}", err);
             Default::default()
         });
     }

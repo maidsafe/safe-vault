@@ -53,7 +53,7 @@ pub mod utils;
 pub(crate) use to_db_key::ToDbKey;
 
 pub use crate::{
-    config_handler::{add_connection_info, Config},
+    config_handler::{add_connection_info, set_connection_info, Config},
     error::{Error, Result},
     network::Network,
     node::Node,
