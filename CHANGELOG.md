@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.34.6](https://github.com/maidsafe/sn_node/compare/v0.34.5...v0.34.6) (2021-04-07)
+
+
+### Features
+
+* **joins:** enable limiting joins again ([328b8d4](https://github.com/maidsafe/sn_node/commit/328b8d45b9ae9002017d9dff4e562934953946f7))
+
 ### [0.34.5](https://github.com/maidsafe/sn_node/compare/v0.34.4...v0.34.5) (2021-04-07)
 
 
