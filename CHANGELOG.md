@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.34.5](https://github.com/maidsafe/sn_node/compare/v0.34.4...v0.34.5) (2021-04-07)
+
+
+### Bug Fixes
+
+* **config:** set connection info when genesis ([9857435](https://github.com/maidsafe/sn_node/commit/9857435f96e9fae834d96cd0be717efdb3b5210b))
+
 ### [0.34.4](https://github.com/maidsafe/sn_node/compare/v0.34.3...v0.34.4) (2021-04-07)
 
 
