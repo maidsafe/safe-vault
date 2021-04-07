@@ -46,6 +46,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "2";
 const RUST_LOG: &str = "RUST_LOG";
+const NODE_COUNT: &str = "60";
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -114,6 +115,8 @@ pub async fn run_network() -> Result<(), String> {
     let arg_node_log_dir = node_log_dir.display().to_string();
     info!("Storing nodes' generated data at {}", arg_node_log_dir);
 
+    let node_count = std::env::var("NODE_COUNT").unwrap_or_else(|_| NODE_COUNT.to_string());
+
     // Let's create an args array to pass to the network launcher tool
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool",
@@ -126,7 +129,7 @@ pub async fn run_network() -> Result<(), String> {
         &INTERVAL,
         "--local",
         "--num-nodes",
-        "60",
+        &node_count,
     ];
 
     // If RUST_LOG was set we pass it down to the launch tool
