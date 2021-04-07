@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.34.4](https://github.com/maidsafe/sn_node/compare/v0.34.3...v0.34.4) (2021-04-07)
+
+
+### Features
+
+* **launch_network:** use NODE_COUNT env variable to set number of nodes ([aff6d4e](https://github.com/maidsafe/sn_node/commit/aff6d4eb19cc1be99a18ef1f2d90071a8efce8ff))
+
 ### [0.34.3](https://github.com/maidsafe/sn_node/compare/v0.34.2...v0.34.3) (2021-04-06)
 
 
