@@ -6,12 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::capacity::MAX_SUPPLY;
 use log::debug;
 use sn_data_types::{NodeAge, PublicKey, Token};
 use sn_routing::{Prefix, XorName};
 use std::collections::{BTreeMap, BTreeSet};
 
-const MIN_REWARD_AGE: u8 = 5;
+const MIN_REWARD_AGE: u8 = 6;
 
 ///  -----  MINTING  -----
 /// This is the minting of new coins happening;
@@ -85,17 +86,19 @@ fn distribute(
     let mut counters = BTreeMap::new();
     let mut remaining_amount = amount.as_nano();
 
-    // shorten iterations by
-    let apprx = remaining_amount / u64::max(1, reward_buckets.len() as u64);
-    let ratio = reward_buckets.keys().max().unwrap_or(&1);
-    let div = u64::max(1, apprx / *ratio as u64 / 25);
+    // shorten iterations
+    let max_age = (*reward_buckets.keys().max().unwrap_or(&1) as u64);
+    let node_count = reward_buckets.values().map(|b| b.len() as u64).sum::<u64>();
+    let share = remaining_amount / (max_age * node_count);
+    let divisor = max_age * remaining_amount.to_string().len() as u64;
+    let bucket_multiplier = u64::max(1, share / divisor);
 
     while remaining_amount > 0 {
         for (age, wallets) in &reward_buckets {
             // every tick up in age indicates about double amount of work performed
             let proportional_work = 2_u64.pow(*age as u32);
             let reward = u64::min(
-                (proportional_work * wallets.len() as u64) * div,
+                (proportional_work * wallets.len() as u64) * bucket_multiplier,
                 remaining_amount,
             );
             let _ = counters
@@ -152,11 +155,11 @@ mod test {
     #[test]
     fn calculates_reward_distribution() {
         // setup
-        let amount = Token::from_nano(1_000_000_000);
+        let amount = Token::from_nano(u32::MAX as u64 * 1_000_000_000);
         println!("Paid to section: {:?}", amount.as_nano());
         println!();
 
-        let iters = 7;
+        let iters = 10;
         let mut nodes = BTreeMap::<XorName, (NodeAge, PublicKey)>::new();
         for i in 0..iters {
             let _ = nodes.insert(XorName::random(), (i + MIN_REWARD_AGE - 1, get_random_pk()));
