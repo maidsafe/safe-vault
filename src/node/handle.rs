@@ -249,7 +249,10 @@ impl Node {
                     .matches(&&data_section_addr)
                 {
                     let chunks = self.get_chunks()?;
-                    Ok(vec![chunks.read(&read, msg_id, origin).await?])
+                    let read = chunks.read(&read, msg_id, origin).await?;
+                    let mut ops = chunks.check_storage().await?;
+                    ops.insert(0, read);
+                    Ok(ops)
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
                         msg: Message::NodeQuery {
