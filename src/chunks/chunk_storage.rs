@@ -245,3 +245,74 @@ impl Display for ChunkStorage {
         write!(formatter, "ChunkStorage")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::chunk_store::UsedSpace;
+    use crate::error::Error::InvalidOwners;
+    use crate::error::Result;
+    use bls::SecretKey;
+    use sn_data_types::{PrivateBlob, PublicBlob, PublicKey};
+    use sn_messaging::MessageId;
+    use std::path::PathBuf;
+    use tempdir::TempDir;
+    use xor_name::XorName;
+
+    fn temp_dir() -> Result<TempDir> {
+        TempDir::new("test").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
+    }
+
+    fn get_random_pk() -> PublicKey {
+        PublicKey::from(SecretKey::random().public_key())
+    }
+
+    #[tokio::test]
+    pub async fn try_store_stores_public_blob() -> Result<()> {
+        let xor_name = XorName::random();
+        let path = PathBuf::from(temp_dir()?.path());
+        let mut storage = ChunkStorage::new(xor_name, &path, UsedSpace::new(u64::MAX)).await?;
+        let value = "immutable data value".to_owned().into_bytes();
+        let blob = Blob::Public(PublicBlob::new(value));
+        assert!(storage
+            .try_store(&blob, EndUser::AllClients(get_random_pk()))
+            .await
+            .is_ok());
+        assert!(storage.chunks.has(blob.address()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn try_store_stores_private_blob() -> Result<()> {
+        let xor_name = XorName::random();
+        let path = PathBuf::from(temp_dir()?.path());
+        let mut storage = ChunkStorage::new(xor_name, &path, UsedSpace::new(u64::MAX)).await?;
+        let value = "immutable data value".to_owned().into_bytes();
+        let key = get_random_pk();
+        let blob = Blob::Private(PrivateBlob::new(value, key));
+        assert!(storage
+            .try_store(&blob, EndUser::AllClients(key))
+            .await
+            .is_ok());
+        assert!(storage.chunks.has(blob.address()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn try_store_errors_if_end_user_doesnt_own_data() -> Result<()> {
+        let xor_name = XorName::random();
+        let path = PathBuf::from(temp_dir()?.path());
+        let mut storage = ChunkStorage::new(xor_name, &path, UsedSpace::new(u64::MAX)).await?;
+        let value = "immutable data value".to_owned().into_bytes();
+        let data_owner = get_random_pk();
+        let end_user = get_random_pk();
+        let blob = Blob::Private(PrivateBlob::new(value, data_owner));
+        let result = storage
+            .try_store(&blob, EndUser::AllClients(end_user))
+            .await;
+        assert!(matches!(result, Err(InvalidOwners(end_user))));
+        Ok(())
+    }
+}
