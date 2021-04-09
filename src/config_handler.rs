@@ -156,8 +156,13 @@ impl Config {
         }
 
         if self.public_addr.is_none() && self.local_addr.is_some() {
-            println!("Warning: Local Address provided is skipped since external address is not provided.");
-            self.local_addr = None;
+            if self.skip_igd {
+                // local_addr duplicated to public_addr so that the specified port is used (and not a random one)
+                self.public_addr = self.local_addr;
+            } else {
+                println!("Warning: Local Address provided is skipped since external address is not provided.");
+                self.local_addr = None;
+            }
         }
         Ok(())
     }
