@@ -189,6 +189,12 @@ dependencies = [
 
 [[package]]
 name = "base64"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
+
+[[package]]
+name = "base64"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
@@ -637,6 +643,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "err-derive"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22deed3a8124cff5fa835713fa105621e43bbdc46690c3a6b68328a012d350d4"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2 1.0.24",
+ "quote 1.0.9",
+ "rustversion",
+ "syn 1.0.63",
+ "synstructure",
+]
+
+[[package]]
 name = "failure"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1000,6 +1020,12 @@ name = "hex"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
+
+[[package]]
+name = "hex"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
 
 [[package]]
 name = "hex_fmt"
@@ -1508,6 +1534,18 @@ dependencies = [
 
 [[package]]
 name = "pem"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39eb474073dfddbf7156515344266245d91ce698ddbf15e0498cef22b836f45a"
+dependencies = [
+ "base64 0.10.1",
+ "failure",
+ "lazy_static",
+ "regex",
+]
+
+[[package]]
+name = "pem"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd56cbd21fea48d0c440b41cd69c589faacade08c992d9a54e471b79d0fd13eb"
@@ -1641,6 +1679,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "qjsonrpc"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cf68de614d2ce0598837c46f4940f5c01ed017aabff0dfd7fdbb522eb416efd"
+dependencies = [
+ "futures",
+ "log",
+ "quinn 0.6.2",
+ "rand 0.7.3",
+ "rcgen 0.7.0",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
 name = "qp2p"
 version = "0.11.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1653,8 +1707,8 @@ dependencies = [
  "futures",
  "igd",
  "log",
- "quinn",
- "rcgen",
+ "quinn 0.7.0",
+ "rcgen 0.8.9",
  "rustls 0.19.0",
  "serde",
  "serde_json",
@@ -1687,6 +1741,25 @@ dependencies = [
 
 [[package]]
 name = "quinn"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a626bb32aee973667aff87a9f5187bd076a78a09f79c262f78ab260b9ba0077"
+dependencies = [
+ "bytes 0.5.6",
+ "err-derive",
+ "futures",
+ "libc",
+ "mio 0.6.23",
+ "quinn-proto 0.6.1",
+ "rustls 0.17.0",
+ "socket2",
+ "tokio 0.2.25",
+ "tracing",
+ "webpki",
+]
+
+[[package]]
+name = "quinn"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624cfcfa9fcfc826945183ecd4a613480f67a1cf6b55d9d8df0d43bf3c12e951"
@@ -1696,11 +1769,27 @@ dependencies = [
  "lazy_static",
  "libc",
  "mio 0.7.10",
- "quinn-proto",
+ "quinn-proto 0.7.0",
  "rustls 0.19.0",
  "socket2",
  "thiserror",
  "tokio 1.3.0",
+ "tracing",
+ "webpki",
+]
+
+[[package]]
+name = "quinn-proto"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0ea0a358c179c6b7af34805c675d1664a9c6a234a7acd7efdbb32d2f39d3d2a"
+dependencies = [
+ "bytes 0.5.6",
+ "err-derive",
+ "rand 0.7.3",
+ "ring",
+ "rustls 0.17.0",
+ "slab",
  "tracing",
  "webpki",
 ]
@@ -1866,12 +1955,24 @@ dependencies = [
 
 [[package]]
 name = "rcgen"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6d6cbbf5f43710b9242a4897f4671a469198e2d826d9df043fc16e046f45d8a"
+dependencies = [
+ "chrono",
+ "pem 0.6.1",
+ "ring",
+ "yasna",
+]
+
+[[package]]
+name = "rcgen"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cb7a2dc0e5307189b6933a61290ff06b65b35bdcaae2b2c50a0c3e355cb118e"
 dependencies = [
  "chrono",
- "pem",
+ "pem 0.8.3",
  "ring",
  "yasna",
 ]
@@ -2033,6 +2134,19 @@ checksum = "6e3bad0ee36814ca07d7968269dd4b7ec89ec2da10c4bb613928d3077083c232"
 
 [[package]]
 name = "rustls"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0d4a31f5d68413404705d6982529b0e11a9aacd4839d1d6222ee3b8cb4015e1"
+dependencies = [
+ "base64 0.11.0",
+ "log",
+ "ring",
+ "sct",
+ "webpki",
+]
+
+[[package]]
+name = "rustls"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d1126dcf58e93cee7d098dbda643b5f92ed724f1f6a63007c1116eed6700c81"
@@ -2056,6 +2170,12 @@ dependencies = [
  "sct",
  "webpki",
 ]
+
+[[package]]
+name = "rustversion"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb5d2a036dc6d2d8fd16fde3498b04306e29bd193bf306a57427019b823d5acd"
 
 [[package]]
 name = "ryu"
@@ -2178,6 +2298,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_with"
+version = "1.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b44be9227e214a0420707c9ca74c2d4991d9955bae9415a8f93f05cebf561be5"
+dependencies = [
+ "hex 0.4.2",
+ "serde",
+]
+
+[[package]]
 name = "serde_yaml"
 version = "0.8.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2223,7 +2353,7 @@ dependencies = [
  "bincode",
  "crdts",
  "ed25519-dalek",
- "hex",
+ "hex 0.3.2",
  "multibase",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -2276,7 +2406,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.35.0"
+version = "0.35.2"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2292,12 +2422,13 @@ dependencies = [
  "flexi_logger",
  "futures",
  "fxhash",
- "hex",
+ "hex 0.3.2",
  "hex_fmt",
  "itertools 0.10.0",
  "lazy_static",
  "log",
  "pickledb",
+ "qjsonrpc",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
  "self_update",
@@ -2307,6 +2438,7 @@ dependencies = [
  "sn_data_types",
  "sn_launch_tool",
  "sn_messaging",
+ "sn_node_rpc_data_types",
  "sn_routing",
  "sn_transfers",
  "structopt",
@@ -2315,6 +2447,16 @@ dependencies = [
  "threshold_crypto",
  "tokio 1.3.0",
  "xor_name",
+]
+
+[[package]]
+name = "sn_node_rpc_data_types"
+version = "0.0.1"
+source = "git+https://github.com/Scorch-Dev/sn_node_rpc_data_types?branch=master#7a896150f379af97df14cab272275a8bd1cc8d2f"
+dependencies = [
+ "serde",
+ "serde_with",
+ "sn_data_types",
 ]
 
 [[package]]

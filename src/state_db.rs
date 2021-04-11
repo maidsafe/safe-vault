@@ -67,11 +67,13 @@ fn sk_to_hex(secret: &SecretKey) -> String {
     vec_to_hex(sk_serialised)
 }
 
-fn vec_to_hex(hash: Vec<u8>) -> String {
+///
+pub fn vec_to_hex(hash: Vec<u8>) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-fn parse_hex(hex_str: &str) -> Vec<u8> {
+///
+pub fn parse_hex(hex_str: &str) -> Vec<u8> {
     let mut hex_bytes = hex_str
         .as_bytes()
         .iter()

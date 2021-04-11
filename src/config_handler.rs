@@ -121,6 +121,9 @@ pub struct Config {
     #[structopt(skip)]
     #[allow(missing_docs)]
     pub network_config: NetworkConfig,
+    /// Port to use for rpc interface
+    #[structopt(long)]
+    pub rpc_port: Option<u16>,
 }
 
 impl Config {
@@ -315,6 +318,11 @@ impl Config {
     /// Attempt to self-update without starting the node process
     pub fn update_only(&self) -> bool {
         self.update_only
+    }
+
+    /// Get the rpc port number or None (for disabled rpc interface)
+    pub fn rpc_port(&self) -> Option<u16> {
+        self.rpc_port
     }
 
     /// Set the Quic-P2P `ip` configuration to 127.0.0.1.

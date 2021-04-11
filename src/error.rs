@@ -125,6 +125,9 @@ pub enum Error {
     /// Operation is invalid, eg signing validation
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
+    /// qjsonrpc error
+    #[error("JSON RPC over Quic rror: {0:?}")]
+    QJsonRpc(qjsonrpc::Error),
     /// No mapping to sn_messages::Error could be found. Either we need a new error there, or we need to handle or convert this error before sending it as a message
     #[error("No mapping to sn_messages error is set up for this NodeError {0}")]
     NoErrorMapping(String),
@@ -134,6 +137,12 @@ pub enum Error {
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
+}
+
+impl From<qjsonrpc::Error> for Error {
+    fn from(err: qjsonrpc::Error) -> Self {
+        Self::QJsonRpc(err)
+    }
 }
 
 pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {

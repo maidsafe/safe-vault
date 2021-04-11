@@ -43,6 +43,8 @@ dashmap = "3.11.10"
 thiserror = "1.0.23"
 itertools = "0.10.0"
 async-trait = "0.1.42"
+qjsonrpc = "~0.1.1"
+sn_node_rpc_data_types = { git = "https://github.com/Scorch-Dev/sn_node_rpc_data_types", branch = "master" }
 
   [dependencies.bytes]
   version = "1.0.1"

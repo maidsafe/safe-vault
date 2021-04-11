@@ -8,7 +8,10 @@
 
 use crate::{Error, Result};
 use log::warn;
-use std::{path::Path, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tokio::{io::AsyncSeekExt, sync::Mutex};
 
 const USED_SPACE_FILENAME: &str = "used_space";
@@ -65,6 +68,18 @@ impl UsedSpace {
         inner::UsedSpace::local(self.inner.clone(), id).await
     }
 
+    /// Returns the root dir of a store with the given store id,
+    /// or None if no such store exists
+    pub async fn local_root_dir(&self, id: StoreId) -> Option<PathBuf> {
+        inner::UsedSpace::local_root_dir(self.inner.clone(), id).await
+    }
+
+    /// Returns an object used_space::Iter which can be used to
+    /// iterate local stores to fetch info about them via Iter::get_next()
+    pub async fn iter_local_stores(&self) -> Iter {
+        inner::UsedSpace::iter_local_stores(self.inner.clone()).await
+    }
+
     /// Add an object and file store to track used space of a single
     /// `ChunkStore`
     pub async fn add_local_store<T: AsRef<Path>>(&self, dir: T) -> Result<StoreId> {
@@ -79,6 +94,52 @@ impl UsedSpace {
     /// Decrease the used amount of a single chunk store and the global used value
     pub async fn decrease(&self, id: StoreId, released: u64) -> Result<()> {
         inner::UsedSpace::decrease(self.inner.clone(), id, released).await
+    }
+}
+
+/// Iterator for local used space objects
+pub struct Iter {
+    /// A reference to the underlying used space object
+    used_space: UsedSpace,
+    /// the next store id used to get the next entry
+    current_store_id: StoreId,
+    /// the maximum number of stores to iterate over
+    max_store_id: StoreId,
+}
+
+impl Iter {
+    /// ctor
+    fn new(used_space: UsedSpace, max_store_id: StoreId) -> Self {
+        Self {
+            used_space,
+            current_store_id: 0,
+            max_store_id,
+        }
+    }
+
+    /// get the next tuple of (local_root_dir, local_value) for
+    /// each store (including those with local value = 0)
+    pub async fn get_next(&mut self) -> Option<(PathBuf, u64)> {
+        if self.current_store_id < self.max_store_id {
+            // note loccal_root_dir fetches static data, but if we ever
+            // allow moving the local root, we'd need to introduce
+            // another call to do these two operations atomically
+            let maybe_path = self.used_space.local_root_dir(self.current_store_id).await;
+            if maybe_path.is_none() {
+                warn!(
+                    "Local store with StoreId {} does not exist (but it should). Was the implementation changed? Was it deleted?",
+                    self.current_store_id
+                );
+            }
+            let res = (
+                maybe_path.unwrap_or_default(),
+                self.used_space.local(self.current_store_id).await,
+            );
+            self.current_store_id += 1;
+            Some(res)
+        } else {
+            None
+        }
     }
 }
 
@@ -108,6 +169,8 @@ mod inner {
     /// An entry used to track the used space of a single `ChunkStore`
     #[derive(Debug)]
     struct LocalUsedSpace {
+        // Root directory on the fs for this local store
+        pub root_dir: PathBuf,
         // Space consumed by this one `ChunkStore`.
         pub local_value: u64,
         // File used to maintain on-disk record of `local_value`.
@@ -171,6 +234,30 @@ mod inner {
                 .map_or(0, |res| res.local_value)
         }
 
+        /// Returns the root dir of a store with the given store id,
+        /// or None if no such store exists
+        /// We return an owned copy to avoid returning a reference from another thread
+        pub async fn local_root_dir(
+            used_space: Arc<Mutex<UsedSpace>>,
+            id: StoreId,
+        ) -> Option<PathBuf> {
+            let used_space_lock = used_space.lock().await;
+            used_space_lock
+                .local_stores
+                .get(&id)
+                .map(|local| local.root_dir.clone())
+        }
+
+        /// Returns an object used_space::Iter which can be used to
+        /// iterate local stores to fetch info about them via Iter::get_next()
+        pub async fn iter_local_stores(used_space: Arc<Mutex<UsedSpace>>) -> Iter {
+            let wrapped_used_space = super::UsedSpace {
+                inner: used_space.clone(),
+            };
+            let used_space_lock = used_space.lock().await;
+            Iter::new(wrapped_used_space, used_space_lock.next_id)
+        }
+
         /// Adds a new record for tracking the actions
         /// of a local chunk store as part of the global
         /// used amount tracking
@@ -178,11 +265,12 @@ mod inner {
             used_space: Arc<Mutex<UsedSpace>>,
             dir: T,
         ) -> Result<StoreId> {
+            let root_dir = dir.as_ref().to_owned();
             let mut local_record = OpenOptions::new()
                 .read(true)
                 .write(true)
                 .create(true)
-                .open(dir.as_ref().join(USED_SPACE_FILENAME))
+                .open(root_dir.join(USED_SPACE_FILENAME))
                 .await?;
 
             // try read
@@ -200,6 +288,7 @@ mod inner {
             };
 
             let local_store = LocalUsedSpace {
+                root_dir,
                 local_value,
                 local_record,
             };
@@ -303,6 +392,7 @@ mod inner {
 #[cfg(test)]
 mod tests {
     use super::{Error, Result, UsedSpace};
+    use rand::prelude::*;
     use tempdir::TempDir;
 
     const TEST_STORE_MAX_SIZE: u64 = u64::MAX;
@@ -331,15 +421,10 @@ mod tests {
         let used_space = UsedSpace::new(TEST_STORE_MAX_SIZE);
         let id = used_space.add_local_store(&store_dir).await?;
         // get a random vec of u64 by adding u32 (avoid overflow)
-        let mut rng = rand::thread_rng();
-        let bytes = crate::utils::random_vec(&mut rng, std::mem::size_of::<u32>() * NUMS_TO_ADD);
+        let mut rng = thread_rng();
         let mut nums = Vec::new();
-        for chunk in bytes.as_slice().chunks_exact(std::mem::size_of::<u32>()) {
-            let mut num = 0u32;
-            for (i, component) in chunk.iter().enumerate() {
-                num |= (*component as u32) << (i * 8);
-            }
-            nums.push(num as u64);
+        for _ in 0..NUMS_TO_ADD {
+            nums.push(rng.gen::<u32>() as u64);
         }
         let total: u64 = nums.iter().sum();
 
