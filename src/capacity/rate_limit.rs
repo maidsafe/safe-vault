@@ -6,11 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Capacity, MAX_CHUNK_SIZE, MAX_NETWORK_STORAGE_RATIO, MAX_SUPPLY};
+use super::{Capacity, MAX_CHUNK_SIZE, MAX_SUPPLY};
 use crate::Network;
 use crate::Result;
 use log::info;
 use sn_data_types::{PublicKey, Token};
+use xor_name::XorName;
 
 /// Calculation of rate limit for writes.
 #[derive(Clone)]
@@ -42,16 +43,11 @@ impl RateLimit {
         self.capacity.increase_full_node_count(node_id).await
     }
 
-    /// Returns `true` if more storage capacity is required, otherwise `false`.
-    pub async fn more_nodes_required(&mut self) -> bool {
-        info!("Checking if more nodes are required");
-        let all_nodes = self.network.our_adults().await.len() as f64;
-        let full_nodes = self.capacity.full_nodes().await as f64;
-        let usage_ratio = full_nodes / all_nodes;
-        info!("Total number of adult nodes: {:?}", all_nodes);
-        info!("Number of full adult nodes: {:?}", full_nodes);
-        info!("Section storage usage ratio: {:?}", usage_ratio);
-        usage_ratio > MAX_NETWORK_STORAGE_RATIO
+    /// Adds this node to the list of full nodes.
+    pub async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
+        self.capacity
+            .decrease_full_node_count_if_present(node_name)
+            .await
     }
 
     fn rate_limit(bytes: u64, full_nodes: u8, all_nodes: u8, prefix_len: usize) -> Token {

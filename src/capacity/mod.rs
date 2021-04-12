@@ -9,15 +9,15 @@
 mod chunk_dbs;
 mod rate_limit;
 
-use crate::Result;
+use crate::{Error, Result};
 pub use chunk_dbs::ChunkHolderDbs;
-use log::info;
+use log::{error, info};
 pub use rate_limit::RateLimit;
 use sn_data_types::PublicKey;
+use xor_name::XorName;
 
 pub const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
 const MAX_CHUNK_SIZE: u64 = 1_000_000;
-const MAX_NETWORK_STORAGE_RATIO: f64 = 0.5;
 
 /// A util for sharing the
 /// info on data capacity among the
@@ -40,14 +40,39 @@ impl Capacity {
 
     ///
     pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
-        info!("Increasing full node count");
+        info!("Increasing full_node count");
         let _ = self
             .dbs
             .full_adults
             .lock()
             .await
-            .lcreate(&node_id.to_string())?
+            .lcreate(&XorName::from(node_id).to_string())?
             .ladd(&"Node Full");
         Ok(())
+    }
+
+    ///
+    pub async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
+        info!("Checking to decrease full_node count for: {:?}", node_name);
+        match self
+            .dbs
+            .full_adults
+            .lock()
+            .await
+            .rem(&node_name.to_string())
+        {
+            Ok(true) => {
+                info!("Node present in DB, remove successful");
+                Ok(())
+            }
+            Ok(false) => {
+                info!("Node not found on full_nodes db");
+                Ok(())
+            }
+            Err(e) => {
+                error!("Error removing from full_nodes db");
+                Err(Error::PickleDb(e))
+            }
+        }
     }
 }

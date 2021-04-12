@@ -120,6 +120,13 @@ impl Transfers {
         self.rate_limit.increase_full_node_count(node_id).await
     }
 
+    ///
+    pub async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
+        self.rate_limit
+            .decrease_full_node_count_if_present(node_name)
+            .await
+    }
+
     /// Get latest StoreCost for the given number of bytes.
     /// Also check for Section storage capacity and report accordingly.
     pub async fn get_store_cost(
@@ -128,7 +135,6 @@ impl Transfers {
         msg_id: MessageId,
         origin: SrcLocation,
     ) -> NodeDuties {
-        let mut ops = vec![];
         let result = self.rate_limit.from(bytes).await;
         info!("StoreCost for {:?} bytes: {}", bytes, result);
         let response = NodeDuty::Send(OutgoingMsg {
@@ -142,13 +148,7 @@ impl Transfers {
             dst: origin.to_dst(),
             aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
         });
-
-        ops.push(response);
-        ops.push(NodeDuty::SetNodeJoinsAllowed(
-            self.rate_limit.more_nodes_required().await,
-        ));
-
-        ops
+        vec![response]
     }
 
     ///
@@ -269,7 +269,7 @@ impl Transfers {
                 Ok(ops)
             }
             Err(e) => {
-                warn!("Payment: registration or propagation failed: {}", e);
+                warn!("Payment: registration or propagation failed: {:?}", e);
                 let origin = SrcLocation::EndUser(EndUser::AllClients(payment.sender()));
                 Ok(vec![NodeDuty::Send(OutgoingMsg {
                     msg: Message::CmdError {
@@ -491,7 +491,7 @@ impl Transfers {
                 }
             }
             Err(e) => {
-                error!("Error receiving propogated: {}", e);
+                error!("Error receiving propogated: {:?}", e);
 
                 return Err(e);
             }

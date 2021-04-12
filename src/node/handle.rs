@@ -142,10 +142,18 @@ impl Node {
                 msg_id,
                 origin,
             } => Ok(vec![]),
-            NodeDuty::ProcessLostMember { name, age } => {
+            NodeDuty::ProcessLostMember { name, .. } => {
                 info!("Member Lost: {:?}", name);
+                let mut ops = vec![];
+
+                info!("Setting JoinsAllowed to `True` for replacing the member left");
+                ops.push(NodeDuty::SetNodeJoinsAllowed(true));
+
                 let rewards = self.get_section_funds()?;
                 rewards.remove_node_wallet(name);
+
+                let transfers = self.get_transfers()?;
+                let _ = transfers.decrease_full_node_count_if_present(name).await;
 
                 let metadata = self.get_metadata()?;
                 Ok(metadata.trigger_chunk_replication(name).await?)
@@ -284,7 +292,8 @@ impl Node {
             NodeDuty::IncrementFullNodeCount { node_id } => {
                 let transfers = self.get_transfers()?;
                 transfers.increase_full_node_count(node_id).await?;
-                Ok(vec![])
+                // Accept a new node in place for the full node.
+                Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
             }
             NodeDuty::Send(msg) => {
                 send(msg, &self.network_api).await?;

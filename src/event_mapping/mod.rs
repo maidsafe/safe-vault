@@ -201,10 +201,6 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                 ctx: None,
             }
         }
-        RoutingEvent::MemberLeft { name, age, .. } => Mapping::Ok {
-            op: NodeDuty::SetNodeJoinsAllowed(true),
-            ctx: None,
-        },
         // Ignore all other events
         _ => Mapping::Ok {
             op: NodeDuty::NoOp,
