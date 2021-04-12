@@ -73,40 +73,23 @@ impl BlobRegister {
         // If the data already exist, check the existing no of copies.
         // If no of copies are less then required, then continue with the put request.
         let target_holders = if let Ok(metadata) = self.get_metadata_for(*data.address()).await {
-            if metadata.holders.len() == CHUNK_COPY_COUNT {
-                if data.is_public() {
-                    trace!("{}: All good, {:?}, chunk already exists.", self, data);
-                    return Ok(NodeDuty::NoOp);
-                } else {
-                    return Ok(NodeDuty::Send(OutgoingMsg {
-                        msg: Message::CmdError {
-                            error: CmdError::Data(ErrorMessage::DataExists),
-                            id: MessageId::in_response_to(&msg_id),
-                            correlation_id: msg_id,
-                            target_section_pk: None,
-                        },
-                        section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-                        dst: DstLocation::EndUser(origin),
-                        aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-                    }));
-                }
+            if metadata.holders.len() < CHUNK_COPY_COUNT {
+                self.get_new_holders_for_chunk(data.address()).await
+            } else if data.is_public() {
+                trace!("{}: All good, {:?}, chunk already exists.", self, data);
+                return Ok(NodeDuty::NoOp);
             } else {
-                let mut existing_holders = metadata.holders;
-                let closest_holders = self
-                    .get_holders_for_chunk(data.name())
-                    .await
-                    .iter()
-                    .cloned()
-                    .collect::<BTreeSet<_>>();
-
-                for holder_xorname in closest_holders {
-                    if !existing_holders.contains(&holder_xorname)
-                        && existing_holders.len() < CHUNK_COPY_COUNT
-                    {
-                        let _ = existing_holders.insert(holder_xorname);
-                    }
-                }
-                existing_holders
+                return Ok(NodeDuty::Send(OutgoingMsg {
+                    msg: Message::CmdError {
+                        error: CmdError::Data(ErrorMessage::DataExists),
+                        id: MessageId::in_response_to(&msg_id),
+                        correlation_id: msg_id,
+                        target_section_pk: None,
+                    },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                    dst: DstLocation::EndUser(origin),
+                    aggregation: Aggregation::AtDestination,
+                }));
             }
         } else {
             self.get_holders_for_chunk(data.name())
@@ -118,30 +101,32 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
 
-        let mut results = vec![];
         for holder in &target_holders {
-            results.push(
-                self.set_chunk_holder(*data.address(), *holder, origin)
-                    .await,
-            )
+            // TODO: This error needs to be handled in some way.
+            if let Err(e) = self
+                .set_chunk_holder(*data.address(), *holder, origin)
+                .await
+            {
+                warn!(
+                    "Error ({:?}) setting chunk holder ({:?}) of {:?}, sent by origin: {:?}",
+                    e,
+                    *holder,
+                    *data.address(),
+                    origin
+                )
+            }
         }
 
-        let results: Vec<_> = results.iter().filter(|res| res.is_err()).collect();
-
-        if !results.is_empty() {
-            info!("Results is not empty!");
-        }
-        let msg = Message::NodeCmd {
-            cmd: NodeCmd::Chunks {
-                cmd: BlobWrite::New(data),
-                origin,
-            },
-            id: msg_id,
-            target_section_pk: None,
-        };
         Ok(NodeDuty::SendToNodes {
             targets: target_holders,
-            msg,
+            msg: Message::NodeCmd {
+                cmd: NodeCmd::Chunks {
+                    cmd: BlobWrite::New(data),
+                    origin,
+                },
+                id: msg_id,
+                target_section_pk: None,
+            },
         })
     }
 
@@ -161,7 +146,7 @@ impl BlobRegister {
             },
             section_source: false, // strictly this is not correct, but we don't expect responses to an error..
             dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            aggregation: Aggregation::AtDestination,
         }))
     }
 
@@ -317,24 +302,25 @@ impl BlobRegister {
         };
         let mut cmds = Vec::new();
         for (address, holders) in chunks_stored {
-            cmds.extend(self.get_replication_msgs(address, holders).await);
+            cmds.extend(self.get_replication_msgs(address, holders).await?);
         }
         Ok(cmds)
     }
 
     async fn get_replication_msgs(
-        &self,
+        &mut self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
-    ) -> NodeDuties {
+    ) -> Result<NodeDuties> {
         use NodeCmd::*;
         let mut node_ops = Vec::new();
-        let messages = self
-            .get_new_holders_for_chunk(&address)
-            .await
+        let new_holders = self.get_new_holders_for_chunk(&address).await;
+        for holder in &new_holders {
+            self.update_holders(address, *holder).await?;
+        }
+        let messages = new_holders
             .into_iter()
             .map(|new_holder| {
-                let message_id = MessageId::combine(vec![*address.name(), new_holder]);
                 info!("Sending replicate-chunk cmd to NewHolder {:?}", new_holder);
                 (
                     Message::NodeCmd {
@@ -343,7 +329,7 @@ impl BlobRegister {
                             address,
                             current_holders: current_holders.clone(),
                         }),
-                        id: message_id,
+                        id: MessageId::combine(vec![*address.name(), new_holder]),
                         target_section_pk: None,
                     },
                     new_holder,
@@ -355,10 +341,10 @@ impl BlobRegister {
                 msg,
                 section_source: true, // i.e. errors go to our section
                 dst: DstLocation::Node(dst),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                aggregation: Aggregation::AtDestination,
             }));
         }
-        node_ops
+        Ok(node_ops)
     }
 
     pub(super) async fn read(
@@ -391,7 +377,7 @@ impl BlobRegister {
                 msg: err_msg,
                 section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                 dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                aggregation: Aggregation::AtDestination,
             }))
         };
 
@@ -419,14 +405,7 @@ impl BlobRegister {
         })
     }
 
-    #[allow(unused)]
-    pub(super) async fn update_holders(
-        &mut self,
-        address: BlobAddress,
-        holder: XorName,
-        result: NdResult<()>,
-        message_id: MessageId,
-    ) -> Result<NodeDuty> {
+    async fn update_holders(&mut self, address: BlobAddress, holder: XorName) -> Result<()> {
         let mut chunk_metadata = self.get_metadata_for(address).await.unwrap_or_default();
         let _ = chunk_metadata.holders.insert(holder);
         if let Err(error) = self
@@ -452,8 +431,11 @@ impl BlobRegister {
                 self, error
             );
         }
-        info!("Replication process completed for: {:?}", message_id);
-        Ok(NodeDuty::NoOp)
+        info!(
+            "Requested replication of chunk {:?} to new holder {:?}",
+            address, holder
+        );
+        Ok(())
     }
 
     // Updates the metadata of the chunks help by a node that left.
@@ -508,15 +490,15 @@ impl BlobRegister {
         {
             Some(metadata) => {
                 if metadata.chunks.is_empty() {
-                    //warn!("{}: is not responsible for any chunk", holder);
-                    Err(Error::NoSuchChunk)
+                    warn!("{}: is not responsible for any chunk", holder);
+                    Err(Error::NodeDoesNotHoldChunks)
                 } else {
                     Ok(metadata)
                 }
             }
             None => {
-                //info!("{}: is not responsible for any chunk", holder);
-                Err(Error::NoSuchChunk)
+                warn!("{}: is not responsible for any chunk", holder);
+                Err(Error::NodeDoesNotHoldChunks)
             }
         }
     }
@@ -532,13 +514,16 @@ impl BlobRegister {
             Some(metadata) => {
                 if metadata.holders.is_empty() {
                     warn!("{}: Metadata holders is empty for: {:?}", self, address);
-                    Err(Error::NoSuchChunk)
+                    Err(Error::NoHoldersOfChunk)
                 } else {
                     Ok(metadata)
                 }
             }
             None => {
-                warn!("{}: Failed to get metadata from DB: {:?}", self, address);
+                warn!(
+                    "{}: Did not find metadata in DB for chunk: {:?}",
+                    self, address
+                );
                 Err(Error::NoSuchChunk)
             }
         }
