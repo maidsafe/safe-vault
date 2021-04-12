@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.5](https://github.com/maidsafe/sn_node/compare/v0.35.4...v0.35.5) (2021-04-12)
+
+
+### Features
+
+* **chunks:** report full when at 50% ([23e1fdb](https://github.com/maidsafe/sn_node/commit/23e1fdb56baa5b2ba703b1f88ac6c22787d37308))
+
 ### [0.35.4](https://github.com/maidsafe/sn_node/compare/v0.35.3...v0.35.4) (2021-04-12)
 
 
