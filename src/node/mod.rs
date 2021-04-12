@@ -9,7 +9,7 @@
 mod handle;
 mod interaction;
 mod member_churn;
-mod messaging;
+mod routing;
 mod split;
 
 use crate::{
@@ -167,7 +167,7 @@ impl Node {
             network_events,
         };
 
-        messaging::send(node.register_wallet().await, &node.network_api).await?;
+        routing::send(node.register_wallet().await, &node.network_api).await?;
 
         Ok(node)
     }

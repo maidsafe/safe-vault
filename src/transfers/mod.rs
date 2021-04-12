@@ -19,14 +19,11 @@ use crate::{
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     utils, Error, Result,
 };
+use futures::lock::Mutex;
 use log::{debug, error, info, trace, warn};
 use replica_signing::ReplicaSigningImpl;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
-use sn_routing::XorName;
-use std::collections::{BTreeMap, HashSet};
-
-use futures::lock::Mutex;
 use sn_data_types::{
     ActorHistory, CreditAgreementProof, DebitId, PublicKey, SignedTransfer, Token,
     TransferAgreementProof,
@@ -35,10 +32,12 @@ use sn_messaging::{
     client::{
         Cmd, CmdError, Error as ErrorMessage, Event, Message, NodeCmd, NodeCmdError,
         NodeQueryResponse, NodeTransferCmd, NodeTransferError, NodeTransferQueryResponse,
-        QueryResponse, TransferError,
+        QueryResponse, TransferError, TransferEvent,
     },
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
+use sn_routing::XorName;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
 use xor_name::Prefix;
@@ -374,7 +373,7 @@ impl Transfers {
         match self.replicas.validate(transfer).await {
             Ok(event) => Ok(NodeDuty::Send(OutgoingMsg {
                 msg: Message::Event {
-                    event: Event::TransferValidated { event },
+                    event: Event::Transfers(TransferEvent::TransferValidated { event }),
                     id: MessageId::new(),
                     correlation_id: msg_id,
                     target_section_pk: None,

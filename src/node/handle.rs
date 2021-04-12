@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::messaging::{send, send_to_nodes};
+use super::routing::{send, send_to_nodes};
 use crate::{
     chunks::Chunks,
     node::{AdultRole, Role},
