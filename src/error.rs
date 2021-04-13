@@ -62,21 +62,6 @@ pub enum Error {
     /// Key, Value pair not found in `ChunkStore`.
     #[error("No such chunk")]
     NoSuchChunk,
-    /// This node does not know or manage any chunks
-    #[error("No chunks")]
-    NoChunks,
-    /// This node does not know or manage any metadata
-    #[error("No metadata")]
-    NoMetadata,
-    /// This node does not know or manage any transfers
-    #[error("No transfers")]
-    NoTransfers,
-    /// This node does not know or manage any section funds
-    #[error("No section funds")]
-    NoSectionFunds,
-    /// Unable to process fund churn message.
-    #[error("Cannot process fund churn message")]
-    NotChurningFunds,
     /// Creating temp directory failed.
     #[error("Could not create temp store: {0}")]
     TempDirCreationFailed(String),
