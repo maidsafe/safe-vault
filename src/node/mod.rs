@@ -65,6 +65,20 @@ impl NodeInfo {
     }
 }
 
+struct AdultNode {
+    // immutable chunks
+    chunks: Chunks,
+}
+
+struct ElderNode {
+    // data operations
+    meta_data: Metadata,
+    // transfers
+    transfers: Transfers,
+    // reward payouts
+    section_funds: SectionFunds,
+}
+
 /// Main node struct.
 pub struct Node {
     network_api: Network,
@@ -72,14 +86,8 @@ pub struct Node {
     node_info: NodeInfo,
     used_space: UsedSpace,
     prefix: Prefix,
-    // immutable chunks
-    chunks: Option<Chunks>,
-    // data operations
-    meta_data: Option<Metadata>,
-    // transfers
-    transfers: Option<Transfers>,
-    // reward payouts
-    section_funds: Option<SectionFunds>,
+    adult_state: Option<AdultNode>,
+    elder_state: Option<ElderNode>,
 }
 
 impl Node {
@@ -124,21 +132,19 @@ impl Node {
 
         let node = Self {
             prefix: network_api.our_prefix().await,
-            chunks: Some(
-                Chunks::new(
+            adult_state: Some(AdultNode {
+                chunks: Chunks::new(
                     node_info.node_name,
                     node_info.root_dir.as_path(),
                     used_space.clone(),
                 )
                 .await?,
-            ),
+            }),
             node_info,
             used_space,
             network_api,
             network_events,
-            meta_data: None,
-            transfers: None,
-            section_funds: None,
+            elder_state: None,
         };
 
         messaging::send(node.register_wallet().await, &node.network_api).await;

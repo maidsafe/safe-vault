@@ -10,6 +10,7 @@ use super::messaging::{send, send_to_nodes};
 use crate::{
     chunks::Chunks,
     metadata::Metadata,
+    node::AdultNode,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
         reward_process::RewardProcess,
@@ -77,30 +78,45 @@ impl Node {
                 Ok(vec![self.get_section_elders(msg_id, origin).await?])
             }
             NodeDuty::ReceiveRewardProposal(proposal) => {
-                if let Ok((churn_process, _, _)) = self.get_churning_funds() {
+                let elder_state = if let Some(elder_state) = &mut self.elder_state {
+                    elder_state
+                } else {
+                    // else we are an adult, so ignore this msg
+                    return Ok(vec![]);
+                };
+
+                if let SectionFunds::Churning { process, .. } = &mut elder_state.section_funds {
                     info!("Handling Churn proposal as an Elder");
-                    Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
+                    Ok(vec![process.receive_churn_proposal(proposal).await?])
                 } else {
                     // we are an adult, so ignore this msg
                     Ok(vec![])
                 }
             }
             NodeDuty::ReceiveRewardAccumulation(accumulation) => {
-                if let Ok((churn_process, reward_wallets, payments)) = self.get_churning_funds() {
-                    let mut ops = vec![
-                        churn_process
-                            .receive_wallet_accumulation(accumulation)
-                            .await?,
-                    ];
+                let elder_state = if let Some(elder_state) = &mut self.elder_state {
+                    elder_state
+                } else {
+                    // else we are an adult, so ignore this msg
+                    return Ok(vec![]);
+                };
 
-                    if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
+                if let SectionFunds::Churning {
+                    process,
+                    wallets,
+                    payments,
+                } = &mut elder_state.section_funds
+                {
+                    let mut ops = vec![process.receive_wallet_accumulation(accumulation).await?];
+
+                    if let RewardStage::Completed(credit_proofs) = process.stage().clone() {
                         let reward_sum = credit_proofs.sum();
                         ops.extend(Self::propagate_credits(credit_proofs)?);
                         // update state
-                        self.section_funds = Some(SectionFunds::KeepingNodeWallets {
-                            wallets: reward_wallets.clone(),
+                        elder_state.section_funds = SectionFunds::KeepingNodeWallets {
+                            wallets: wallets.clone(),
                             payments: payments.clone(),
-                        });
+                        };
                         let section_key = &self.network_api.section_public_key().await?;
                         info!(
                             "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
@@ -110,7 +126,7 @@ impl Node {
 
                     Ok(ops)
                 } else {
-                    // else we are an adult, so ignore this msg
+                    // else we are not churning so ignore this message
                     Ok(vec![])
                 }
             }
@@ -166,17 +182,15 @@ impl Node {
             } => Ok(vec![self.synch_state(node_rewards, user_wallets).await?]),
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
-                self.meta_data = None;
-                self.transfers = None;
-                self.section_funds = None;
-                self.chunks = Some(
-                    Chunks::new(
+                self.elder_state = None;
+                self.adult_state = Some(AdultNode {
+                    chunks: Chunks::new(
                         self.node_info.node_name,
                         self.node_info.root_dir.as_path(),
                         self.used_space.clone(),
                     )
                     .await?,
-                );
+                });
                 Ok(vec![])
             }
             //
@@ -390,54 +404,39 @@ impl Node {
         }
     }
 
+    // TODO(drusu): inline this code
     fn get_chunks(&mut self) -> Result<&mut Chunks> {
-        if let Some(chunks) = &mut self.chunks {
-            Ok(chunks)
+        if let Some(adult_state) = &mut self.adult_state {
+            Ok(&mut adult_state.chunks)
         } else {
             Err(Error::NoChunks)
         }
     }
 
+    // TODO(drusu): inline this code
     fn get_metadata(&mut self) -> Result<&mut Metadata> {
-        if let Some(meta_data) = &mut self.meta_data {
-            Ok(meta_data)
+        if let Some(elder_state) = &mut self.elder_state {
+            Ok(&mut elder_state.meta_data)
         } else {
             Err(Error::NoMetadata)
         }
     }
 
+    // TODO(drusu): inline this code
     pub(crate) fn get_transfers(&mut self) -> Result<&mut Transfers> {
-        if let Some(transfers) = &mut self.transfers {
-            Ok(transfers)
+        if let Some(elder_state) = &mut self.elder_state {
+            Ok(&mut elder_state.transfers)
         } else {
             Err(Error::NoTransfers)
         }
     }
 
+    // TODO(drusu): inline this
     fn get_section_funds(&mut self) -> Result<&mut SectionFunds> {
-        if let Some(section_funds) = &mut self.section_funds {
-            Ok(section_funds)
+        if let Some(elder_state) = &mut self.elder_state {
+            Ok(&mut elder_state.section_funds)
         } else {
             Err(Error::NoSectionFunds)
-        }
-    }
-
-    fn get_churning_funds(
-        &mut self,
-    ) -> Result<(
-        &mut RewardProcess,
-        &mut RewardWallets,
-        &mut DashMap<CreditId, CreditAgreementProof>,
-    )> {
-        if let Some(SectionFunds::Churning {
-            process,
-            wallets,
-            payments,
-        }) = &mut self.section_funds
-        {
-            Ok((process, wallets, payments))
-        } else {
-            Err(Error::NotChurningFunds)
         }
     }
 }
