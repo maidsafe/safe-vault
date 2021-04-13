@@ -135,10 +135,7 @@ impl Node {
         };
 
         let node_rewards = if let Ok(elder) = &self.role.as_elder() {
-            match &elder.section_funds {
-                SectionFunds::KeepingNodeWallets { wallets, .. }
-                | SectionFunds::Churning { wallets, .. } => wallets.node_wallets(),
-            }
+            elder.section_funds.node_wallets()
         } else {
             BTreeMap::new()
         };

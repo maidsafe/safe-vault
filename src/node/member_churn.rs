@@ -89,13 +89,8 @@ impl Node {
         elder.transfers.merge(user_wallets);
 
         //  merge in provided node reward stages
-        match &mut elder.section_funds {
-            SectionFunds::KeepingNodeWallets { wallets, .. }
-            | SectionFunds::Churning { wallets, .. } => {
-                for (key, (age, wallet)) in &node_wallets {
-                    wallets.set_node_wallet(*key, *age, *wallet);
-                }
-            }
+        for (key, (age, wallet)) in &node_wallets {
+            elder.section_funds.set_node_wallet(*key, *wallet, *age)
         }
 
         let node_id = self.network_api.our_name().await;
