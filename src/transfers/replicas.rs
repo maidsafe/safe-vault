@@ -64,7 +64,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let instance = Self {
             root_dir,
             info,
-            locks: Default::default(),
+            locks: DashMap::new(),
             self_lock: Arc::new(Mutex::new(0)),
         };
         instance.setup(user_wallets).await?;

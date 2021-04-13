@@ -131,13 +131,13 @@ impl Node {
         let user_wallets = if let Some(transfers) = &self.transfers {
             transfers.user_wallets()
         } else {
-            Default::default()
+            BTreeMap::new()
         };
 
         let node_rewards = match &self.section_funds {
             Some(SectionFunds::KeepingNodeWallets { wallets, .. })
             | Some(SectionFunds::Churning { wallets, .. }) => wallets.node_wallets(),
-            None => Default::default(),
+            None => BTreeMap::new(),
         };
 
         // only push that what should be in dst

@@ -16,6 +16,7 @@ use crate::{
     Error, Node, Result,
 };
 use crdts::Actor;
+use dashmap::DashMap;
 use itertools::Itertools;
 use log::{debug, info};
 use sn_data_types::{
@@ -67,7 +68,7 @@ impl Node {
         // start handling node rewards
         self.section_funds = Some(SectionFunds::KeepingNodeWallets {
             wallets: RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new()),
-            payments: Default::default(),
+            payments: DashMap::new(),
         });
 
         Ok(())

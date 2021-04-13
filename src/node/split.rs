@@ -72,7 +72,7 @@ impl Node {
         self.section_funds = Some(SectionFunds::Churning {
             process,
             wallets,
-            payments: Default::default(),
+            payments: DashMap::new(),
         });
 
         Ok(())
@@ -140,7 +140,7 @@ impl Node {
             self.section_funds = Some(SectionFunds::Churning {
                 process,
                 wallets: wallets.clone(),
-                payments: Default::default(), // clear old payments
+                payments: DashMap::new(), // clear old payments
             });
         } else {
             debug!("Not paying out rewards, as no payments have been received since last split.");

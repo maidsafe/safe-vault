@@ -87,7 +87,7 @@ impl Transfers {
         Self {
             replicas,
             rate_limit,
-            recently_validated_transfers: Default::default(),
+            recently_validated_transfers: Arc::default(),
         }
     }
 

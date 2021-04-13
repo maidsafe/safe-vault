@@ -126,7 +126,7 @@ impl RewardProcess {
     ) -> Result<RewardAccumulationDetails> {
         let mut accumulation = RewardAccumulationDetails {
             pk_set: self.signing.public_key_set().await?,
-            rewards: Default::default(),
+            rewards: BTreeMap::new(),
         };
         for acc in rewards {
             let _ = accumulation.rewards.insert(*acc.id(), acc);
@@ -162,7 +162,7 @@ impl RewardProcess {
                         recipient: wallet,
                         msg: format!("Reward at age {}, from {}", age, section_key),
                     },
-                    signatures: Default::default(),
+                    signatures: BTreeMap::new(),
                     pending_agreement: None,
                 }
             })
@@ -182,7 +182,7 @@ impl RewardProcess {
                     .iter()
                     .map(|share| CreditProposal {
                         proposal: share.credit.clone(),
-                        signatures: Default::default(),
+                        signatures: BTreeMap::new(),
                         pending_agreement: None,
                     })
                     .collect();
@@ -212,14 +212,14 @@ impl RewardProcess {
                     // replicas signatures over > signed_credit <
                     let mut our_acc = RewardAccumulationDetails {
                         pk_set: proposal_details.pk_set,
-                        rewards: Default::default(),
+                        rewards: BTreeMap::new(),
                     };
 
                     let rewards = rewards
                         .into_iter()
                         .map(|(_, signed_credit)| CreditAccumulation {
                             agreed_proposal: signed_credit,
-                            signatures: Default::default(),
+                            signatures: BTreeMap::new(),
                             pending_agreement: None,
                         })
                         .collect();
@@ -259,7 +259,7 @@ impl RewardProcess {
                     .iter()
                     .map(|reward| CreditAccumulation {
                         agreed_proposal: reward.signed_credit.clone(),
-                        signatures: Default::default(),
+                        signatures: BTreeMap::new(),
                         pending_agreement: None,
                     })
                     .collect();
@@ -282,7 +282,7 @@ impl RewardProcess {
                 // create our acc details
                 let mut our_acc = RewardAccumulationDetails {
                     pk_set: proposal_details.pk_set,
-                    rewards: Default::default(),
+                    rewards: BTreeMap::new(),
                 };
 
                 let rewards = new_acc
@@ -290,7 +290,7 @@ impl RewardProcess {
                     .iter()
                     .map(|reward| CreditAccumulation {
                         agreed_proposal: reward.signed_credit.clone(),
-                        signatures: Default::default(),
+                        signatures: BTreeMap::new(),
                         pending_agreement: None,
                     })
                     .collect();

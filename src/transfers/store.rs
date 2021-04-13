@@ -87,12 +87,15 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::super::test_utils::get_genesis;
-    use super::*;
-    use crate::Result;
-    use bls::SecretKey;
+    use super::TransferStore;
+    use crate::{Error, Result};
     use bls::SecretKeySet;
-    use sn_data_types::{PublicKey, ReplicaEvent, TransferPropagated};
+    use bls::{PublicKeySet, SecretKey, SecretKeyShare};
+    use sn_data_types::{
+        Credit, CreditAgreementProof, CreditId, PublicKey, ReplicaEvent, SignedCredit, Token,
+        TransferPropagated,
+    };
+    use std::collections::BTreeMap;
     use tempdir::TempDir;
 
     #[test]
@@ -104,7 +107,7 @@ mod test {
         let wallet_id = get_random_pk();
         let mut rng = rand::thread_rng();
         let bls_secret_key = SecretKeySet::random(0, &mut rng);
-        let genesis_credit_proof = get_genesis(
+        let genesis_credit_proof = get_credit(
             10,
             wallet_id,
             bls_secret_key.public_keys(),
@@ -134,5 +137,64 @@ mod test {
 
     fn get_random_pk() -> PublicKey {
         PublicKey::from(SecretKey::random().public_key())
+    }
+
+    /// Produces a genesis balance for a new network.
+    fn get_credit(
+        balance: u64,
+        id: PublicKey,
+        peer_replicas: PublicKeySet,
+        secret_key_share: SecretKeyShare,
+    ) -> Result<CreditAgreementProof> {
+        let credit = Credit {
+            id: CreditId::default(),
+            amount: Token::from_nano(balance),
+            recipient: id,
+            msg: "genesis".to_string(),
+        };
+
+        // actor instances' signatures over > credit <
+
+        let serialised_credit = bincode::serialize(&credit).map_err(Error::Bincode)?;
+
+        let mut credit_sig_shares = BTreeMap::new();
+        let credit_sig_share = secret_key_share.sign(serialised_credit);
+        let _ = credit_sig_shares.insert(0, credit_sig_share);
+
+        println!("Aggregating actor signature..");
+
+        // Combine shares to produce the main signature.
+        let actor_signature = sn_data_types::Signature::Bls(
+            peer_replicas
+                .combine_signatures(&credit_sig_shares)
+                .map_err(|_| Error::CouldNotCombineSignatures)?,
+        );
+
+        let signed_credit = SignedCredit {
+            credit,
+            actor_signature,
+        };
+
+        // replicas signatures over > signed_credit <
+
+        let serialised_credit = bincode::serialize(&signed_credit).map_err(Error::Bincode)?;
+
+        let mut credit_sig_shares = BTreeMap::new();
+        let credit_sig_share = secret_key_share.sign(serialised_credit);
+        let _ = credit_sig_shares.insert(0, credit_sig_share);
+
+        println!("Aggregating replica signature..");
+
+        let debiting_replicas_sig = sn_data_types::Signature::Bls(
+            peer_replicas
+                .combine_signatures(&credit_sig_shares)
+                .map_err(|_| Error::CouldNotCombineSignatures)?,
+        );
+
+        Ok(CreditAgreementProof {
+            signed_credit,
+            debiting_replicas_sig,
+            debiting_replicas_keys: peer_replicas,
+        })
     }
 }

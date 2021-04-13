@@ -81,7 +81,7 @@ fn distribute(
     reward_buckets: BTreeMap<NodeAge, BTreeMap<XorName, PublicKey>>,
 ) -> BTreeMap<XorName, (NodeAge, PublicKey, Token)> {
     if reward_buckets.is_empty() {
-        return Default::default();
+        return BTreeMap::new();
     }
     let mut counters = BTreeMap::new();
     let mut remaining_amount = amount.as_nano();
