@@ -9,7 +9,7 @@
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     metadata::{adult_reader::AdultReader, Metadata},
-    node::ElderNode,
+    node::{ElderRole, Role},
     node_ops::NodeDuty,
     section_funds::{reward_wallets::RewardWallets, SectionFunds},
     transfers::get_replicas::{replica_info, transfer_replicas},
@@ -35,18 +35,14 @@ impl Node {
     /// If we are an oldie we'll have a transfer instance,
     /// This updates the replica info on it.
     pub async fn update_replicas(&mut self) -> Result<()> {
-        if let Some(elder_state) = &mut self.elder_state {
-            let info = replica_info(&self.node_info, &self.network_api).await?;
-            elder_state.transfers.update_replica_info(info);
-        }
+        let elder = self.role.as_elder_mut()?;
+        let info = replica_info(&self.node_info, &self.network_api).await?;
+        elder.transfers.update_replica_info(info);
         Ok(())
     }
 
     /// Level up a newbie to an oldie on promotion
     pub async fn level_up(&mut self) -> Result<()> {
-        //
-        // do not hande immutable chunks anymore
-        self.adult_state = None;
         self.used_space.reset().await; // TODO(drusu): should this be part of adult_state?
 
         //
@@ -71,7 +67,7 @@ impl Node {
             payments: DashMap::new(),
         };
 
-        self.elder_state = Some(ElderNode {
+        self.role = Role::Elder(ElderRole {
             meta_data,
             transfers,
             section_funds,
@@ -87,18 +83,13 @@ impl Node {
         node_wallets: BTreeMap<XorName, (NodeAge, PublicKey)>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     ) -> Result<NodeDuty> {
-        let elder_state = match &mut self.elder_state {
-            Some(elder_state) => elder_state,
-            None => {
-                return Err(Error::Logic("Must be an elder to sync state".to_string()));
-            }
-        };
+        let elder = self.role.as_elder_mut()?;
 
         // merge in provided user wallets
-        elder_state.transfers.merge(user_wallets);
+        elder.transfers.merge(user_wallets);
 
         //  merge in provided node reward stages
-        match &mut elder_state.section_funds {
+        match &mut elder.section_funds {
             SectionFunds::KeepingNodeWallets { wallets, .. }
             | SectionFunds::Churning { wallets, .. } => {
                 for (key, (age, wallet)) in &node_wallets {

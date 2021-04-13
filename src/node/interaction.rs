@@ -128,14 +128,14 @@ impl Node {
     pub fn push_state(&self, prefix: Prefix, msg_id: MessageId) -> NodeDuty {
         let dst = DstLocation::Section(prefix.name());
 
-        let user_wallets = if let Some(elder_state) = &self.elder_state {
-            elder_state.transfers.user_wallets()
+        let user_wallets = if let Ok(elder) = &self.role.as_elder() {
+            elder.transfers.user_wallets()
         } else {
             BTreeMap::new()
         };
 
-        let node_rewards = if let Some(elder_state) = &self.elder_state {
-            match &elder_state.section_funds {
+        let node_rewards = if let Ok(elder) = &self.role.as_elder() {
+            match &elder.section_funds {
                 SectionFunds::KeepingNodeWallets { wallets, .. }
                 | SectionFunds::Churning { wallets, .. } => wallets.node_wallets(),
             }

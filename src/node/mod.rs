@@ -65,18 +65,53 @@ impl NodeInfo {
     }
 }
 
-struct AdultNode {
+struct AdultRole {
     // immutable chunks
     chunks: Chunks,
 }
 
-struct ElderNode {
+struct ElderRole {
     // data operations
     meta_data: Metadata,
     // transfers
     transfers: Transfers,
     // reward payouts
     section_funds: SectionFunds,
+}
+
+enum Role {
+    Adult(AdultRole),
+    Elder(ElderRole),
+}
+
+impl Role {
+    fn as_adult(&self) -> Result<&AdultRole> {
+        match self {
+            Self::Adult(adult_state) => Ok(adult_state),
+            _ => Err(Error::NotAnAdult),
+        }
+    }
+
+    fn as_adult_mut(&mut self) -> Result<&mut AdultRole> {
+        match self {
+            Self::Adult(adult_state) => Ok(adult_state),
+            _ => Err(Error::NotAnAdult),
+        }
+    }
+
+    fn as_elder(&self) -> Result<&ElderRole> {
+        match self {
+            Self::Elder(elder_state) => Ok(elder_state),
+            _ => Err(Error::NotAnElder),
+        }
+    }
+
+    fn as_elder_mut(&mut self) -> Result<&mut ElderRole> {
+        match self {
+            Self::Elder(elder_state) => Ok(elder_state),
+            _ => Err(Error::NotAnElder),
+        }
+    }
 }
 
 /// Main node struct.
@@ -86,8 +121,7 @@ pub struct Node {
     node_info: NodeInfo,
     used_space: UsedSpace,
     prefix: Prefix,
-    adult_state: Option<AdultNode>,
-    elder_state: Option<ElderNode>,
+    role: Role,
 }
 
 impl Node {
@@ -132,7 +166,7 @@ impl Node {
 
         let node = Self {
             prefix: network_api.our_prefix().await,
-            adult_state: Some(AdultNode {
+            role: Role::Adult(AdultRole {
                 chunks: Chunks::new(
                     node_info.node_name,
                     node_info.root_dir.as_path(),
@@ -144,7 +178,6 @@ impl Node {
             used_space,
             network_api,
             network_events,
-            elder_state: None,
         };
 
         messaging::send(node.register_wallet().await, &node.network_api).await;

@@ -17,6 +17,12 @@ use xor_name::XorName;
 #[non_exhaustive]
 /// Node error variants.
 pub enum Error {
+    /// Attempted to perform an operation meant only for Adults when we are not one.
+    #[error("Attempted Adult operation when not an Adult")]
+    NotAnAdult,
+    /// Attempted to perform an operation meant only for Elders when we are not one.
+    #[error("Attempted Elder operation when not an Elder")]
+    NotAnElder,
     /// The key balance already exists when it was expected to be empty (during section genesis)
     #[error("Balance already exists.")]
     BalanceExists,
