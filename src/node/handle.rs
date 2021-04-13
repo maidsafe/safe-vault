@@ -79,44 +79,38 @@ impl Node {
             }
             NodeDuty::ReceiveRewardProposal(proposal) => {
                 let elder = self.role.as_elder_mut()?;
-
-                if let SectionFunds::Churning { process, .. } = &mut elder.section_funds {
-                    info!("Handling Churn proposal as an Elder");
-                    Ok(vec![process.receive_churn_proposal(proposal).await?])
-                } else {
-                    Err(Error::NotChurningFunds)
-                }
+                info!("Handling Churn proposal as an Elder");
+                let (churn_process, _, _) = elder.section_funds.as_churning_mut()?;
+                Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
             }
             NodeDuty::ReceiveRewardAccumulation(accumulation) => {
                 let elder = self.role.as_elder_mut()?;
 
-                if let SectionFunds::Churning {
-                    process,
-                    wallets,
-                    payments,
-                } = &mut elder.section_funds
-                {
-                    let mut ops = vec![process.receive_wallet_accumulation(accumulation).await?];
+                let (churn_process, reward_wallets, payments) =
+                    elder.section_funds.as_churning_mut()?;
 
-                    if let RewardStage::Completed(credit_proofs) = process.stage().clone() {
-                        let reward_sum = credit_proofs.sum();
-                        ops.extend(Self::propagate_credits(credit_proofs)?);
-                        // update state
-                        elder.section_funds = SectionFunds::KeepingNodeWallets {
-                            wallets: wallets.clone(),
-                            payments: payments.clone(),
-                        };
-                        let section_key = &self.network_api.section_public_key().await?;
-                        info!(
-                            "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
-                            section_key, reward_sum
-                        );
-                    }
+                let mut ops = vec![
+                    churn_process
+                        .receive_wallet_accumulation(accumulation)
+                        .await?,
+                ];
 
-                    Ok(ops)
-                } else {
-                    Err(Error::NotChurningFunds)
+                if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
+                    let reward_sum = credit_proofs.sum();
+                    ops.extend(Self::propagate_credits(credit_proofs)?);
+                    // update state
+                    elder.section_funds = SectionFunds::KeepingNodeWallets {
+                        wallets: reward_wallets.clone(),
+                        payments: payments.clone(),
+                    };
+                    let section_key = &self.network_api.section_public_key().await?;
+                    info!(
+                        "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
+                        section_key, reward_sum
+                    );
                 }
+
+                Ok(ops)
             }
             //
             // ------- reward reg -------

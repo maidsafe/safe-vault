@@ -14,7 +14,7 @@ pub mod reward_wallets;
 
 use self::{reward_process::RewardProcess, reward_wallets::RewardWallets};
 use super::node_ops::{NodeDuty, OutgoingMsg};
-use crate::Result;
+use crate::{Error, Result};
 use dashmap::DashMap;
 use log::info;
 use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, SectionElders, Token};
@@ -41,6 +41,19 @@ pub enum SectionFunds {
 }
 
 impl SectionFunds {
+    pub fn as_churning_mut(
+        &mut self,
+    ) -> Result<(&mut RewardProcess, &mut RewardWallets, &mut Payments)> {
+        match self {
+            Self::Churning {
+                process,
+                wallets,
+                payments,
+            } => Ok((process, wallets, payments)),
+            _ => Err(Error::NotChurningFunds),
+        }
+    }
+
     /// Adds payment
     pub fn add_payment(&self, credit: CreditAgreementProof) {
         // todo: validate
