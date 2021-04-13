@@ -72,33 +72,20 @@ impl Chunks {
     }
 
     ///
-    pub async fn replicate_chunk(
-        &self,
-        address: BlobAddress,
-        current_holders: BTreeSet<XorName>,
-        msg_id: MessageId,
-    ) -> Result<NodeDuty> {
-        info!("Creating new Message for acquiring chunk from current_holders");
-        self.chunk_storage
-            .replicate_chunk(address, current_holders, msg_id)
-            .await
-    }
-
-    ///
     pub async fn get_chunk_for_replication(
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        new_holder: XorName,
+        section: XorName,
     ) -> Result<NodeDuty> {
-        info!("Send blob for replication to the new holder.");
+        info!("Send blob for replication to the Elders.");
         self.chunk_storage
-            .get_for_replication(address, msg_id, new_holder)
+            .get_for_replication(address, msg_id, section)
             .await
     }
 
     ///
-    pub async fn store_replicated_chunk(&mut self, blob: Blob) -> Result<NodeDuty> {
+    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<NodeDuty> {
         self.chunk_storage.store_for_replication(blob).await
     }
 }

@@ -276,34 +276,20 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         //
         // ------ chunk replication ------
         Message::NodeQuery {
-            query:
-                NodeQuery::System(NodeSystemQuery::GetChunk {
-                    new_holder,
-                    address,
-                    current_holders,
-                }),
+            query: NodeQuery::System(NodeSystemQuery::GetChunk(address)),
             id,
             ..
-        } => NodeDuty::GetChunkForReplication {
+        } => NodeDuty::ReturnChunkToElders {
             address: *address,
-            new_holder: *new_holder,
+            section: origin.name(),
             id: *id,
         },
         // this cmd is accumulated, thus has authority
         Message::NodeCmd {
-            cmd:
-                NodeCmd::System(NodeSystemCmd::ReplicateChunk {
-                    address,
-                    current_holders,
-                    ..
-                }),
+            cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
             id,
             ..
-        } => NodeDuty::ReplicateChunk {
-            address: *address,
-            current_holders: current_holders.clone(),
-            id: *id,
-        },
+        } => NodeDuty::ReplicateChunk(data.clone()),
         // Aggregated by us, for security
         Message::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
@@ -332,12 +318,8 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             correlation_id,
             ..
         } => {
-            log::info!("Verifying GetChunk NodeQueryResponse!");
             if let Ok(data) = result {
-                NodeDuty::StoreChunkForReplication {
-                    data: data.clone(),
-                    correlation_id: *correlation_id,
-                }
+                NodeDuty::FinishReplication(data.clone())
             } else {
                 log::warn!("Got error when reading chunk for replication: {:?}", result);
                 NodeDuty::NoOp

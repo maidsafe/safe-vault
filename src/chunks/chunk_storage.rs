@@ -118,36 +118,36 @@ impl ChunkStorage {
         }))
     }
 
-    pub async fn replicate_chunk(
-        &self,
-        address: BlobAddress,
-        current_holders: BTreeSet<XorName>,
-        msg_id: MessageId,
-    ) -> Result<NodeDuty> {
-        let msg = Message::NodeQuery {
-            query: NodeQuery::System(NodeSystemQuery::GetChunk {
-                address,
-                new_holder: self.node_name,
-                current_holders: BTreeSet::default(), //TODO: remove this in sn_messaging
-            }),
-            id: msg_id,
-            target_section_pk: None,
-        };
-        info!("Sending NodeSystemQuery::GetChunk to existing holders");
+    // pub async fn replicate_chunk(
+    //     &self,
+    //     address: BlobAddress,
+    //     current_holders: BTreeSet<XorName>,
+    //     msg_id: MessageId,
+    // ) -> Result<NodeDuty> {
+    //     let msg = Message::NodeQuery {
+    //         query: NodeQuery::System(NodeSystemQuery::GetChunk {
+    //             address,
+    //             new_holder: self.node_name,
+    //             current_holders: BTreeSet::default(), //TODO: remove this in sn_messaging
+    //         }),
+    //         id: msg_id,
+    //         target_section_pk: None,
+    //     };
+    //     info!("Sending NodeSystemQuery::GetChunk to existing holders");
 
-        Ok(NodeDuty::SendToNodes {
-            msg,
-            targets: current_holders,
-            aggregation: Aggregation::None,
-        })
-    }
+    //     Ok(NodeDuty::SendToNodes {
+    //         msg,
+    //         targets: current_holders,
+    //         aggregation: Aggregation::None,
+    //     })
+    // }
 
     ///
     pub async fn get_for_replication(
         &self,
         address: BlobAddress,
         msg_id: MessageId,
-        new_holder: XorName,
+        section: XorName,
     ) -> Result<NodeDuty> {
         let result = match self.chunks.get(&address) {
             Ok(res) => Ok(res),
@@ -162,9 +162,9 @@ impl ChunkStorage {
                     correlation_id: msg_id,
                     target_section_pk: None,
                 },
-                section_source: false, // sent as single node
-                dst: DstLocation::Node(new_holder),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+                section_source: false,              // sent as single node
+                dst: DstLocation::Section(section), // send it back to section Elders
+                aggregation: Aggregation::None,
             }))
         } else {
             log::warn!("Could not read chunk for replication: {:?}", result);

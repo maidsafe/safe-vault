@@ -18,7 +18,7 @@ use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey, Result as Nd
 use sn_messaging::{
     client::{
         BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd, NodeQuery,
-        NodeSystemCmd, QueryResponse,
+        NodeSystemCmd, NodeSystemQuery, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
@@ -101,12 +101,13 @@ impl BlobRegister {
 
         info!("Storing {} copies of the data", target_holders.len());
 
+        let mut owner = None;
+        if data.address().is_private() {
+            owner = Some(*origin.id());
+        }
         for holder in &target_holders {
             // TODO: This error needs to be handled in some way.
-            if let Err(e) = self
-                .set_chunk_holder(*data.address(), *holder, origin)
-                .await
-            {
+            if let Err(e) = self.set_chunk_holder(*data.address(), *holder, owner).await {
                 warn!(
                     "Error ({:?}) setting chunk holder ({:?}) of {:?}, sent by origin: {:?}",
                     e,
@@ -201,7 +202,7 @@ impl BlobRegister {
         &mut self,
         blob_address: BlobAddress,
         holder: XorName,
-        origin: EndUser,
+        owner: Option<PublicKey>,
     ) -> Result<()> {
         // TODO -
         // - if Err, we need to flag this sender as "full" (i.e. add to self.full_adults, try on
@@ -214,10 +215,8 @@ impl BlobRegister {
             .get_metadata_for(blob_address)
             .await
             .unwrap_or_default();
-        if blob_address.is_private() {
-            metadata.owner = Some(*origin.id());
-        }
 
+        metadata.owner = owner;
         let _ = metadata.holders.insert(holder);
 
         if let Err(error) = self.dbs.metadata.lock().await.set(&db_key, &metadata) {
@@ -296,7 +295,7 @@ impl BlobRegister {
         Ok(())
     }
 
-    pub(super) async fn replicate_chunks(&mut self, holder: XorName) -> Result<NodeDuties> {
+    pub(super) async fn begin_replicate_chunks(&mut self, holder: XorName) -> Result<NodeDuties> {
         info!("Replicating chunks");
         let chunks_stored = match self.remove_holder(holder).await {
             Ok(chunks) => chunks,
@@ -304,37 +303,137 @@ impl BlobRegister {
         };
         let mut cmds = Vec::new();
         for (address, holders) in chunks_stored {
-            cmds.extend(self.get_replication_msgs(address, holders).await?);
+            cmds.extend(self.get_chunk_queries(address, holders).await?);
         }
         Ok(cmds)
     }
 
-    async fn get_replication_msgs(
+    pub(super) async fn replicate_chunk(&mut self, data: Blob) -> Result<NodeDuty> {
+        info!("Replicating chunk");
+        // If the data already exist, check the existing no of copies.
+        // If no of copies are less then required, then continue with the put request.
+        let (owner, target_holders) =
+            if let Ok(metadata) = self.get_metadata_for(*data.address()).await {
+                if metadata.holders.len() < CHUNK_COPY_COUNT {
+                    (
+                        metadata.owner,
+                        self.get_new_holders_for_chunk(data.address()).await,
+                    )
+                } else {
+                    trace!(
+                        "{}: All good, {:?}, chunk copy count already satisfied.",
+                        self,
+                        data
+                    );
+                    return Ok(NodeDuty::NoOp);
+                }
+            } else {
+                trace!(
+                    "{}: Did not find any metadata for the chunk, {:?}. No replication performed.",
+                    self,
+                    data
+                );
+                return Ok(NodeDuty::NoOp);
+            };
+
+        info!("Storing {} copies of the data", target_holders.len());
+
+        for holder in &target_holders {
+            // TODO: This error needs to be handled in some way.
+            if let Err(e) = self.set_chunk_holder(*data.address(), *holder, owner).await {
+                warn!(
+                    "Error ({:?}) when replicating chunk and setting chunk holder ({:?}) of {:?}, owned by: {:?}",
+                    e,
+                    *holder,
+                    *data.address(),
+                    owner
+                )
+            }
+        }
+
+        // deterministic msg id for aggregation
+        let msg_id = MessageId::from_content(&(*data.name(), owner))?;
+
+        Ok(NodeDuty::SendToNodes {
+            targets: target_holders,
+            msg: Message::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
+                id: msg_id,
+                target_section_pk: None,
+            },
+            aggregation: Aggregation::AtDestination,
+        })
+    }
+
+    async fn get_chunk_replication_cmd(
         &mut self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
     ) -> Result<NodeDuties> {
         use NodeCmd::*;
         let mut node_ops = Vec::new();
-        let new_holders = self.get_new_holders_for_chunk(&address).await;
-        for holder in &new_holders {
-            self.update_holders(address, *holder).await?;
-        }
-        let messages = new_holders
+        // let new_holders = self.get_new_holders_for_chunk(&address).await;
+        // for holder in &new_holders {
+        //     self.update_holders(address, *holder).await?;
+        // }
+        let messages = current_holders
             .into_iter()
-            .map(|new_holder| {
-                info!("Sending replicate-chunk cmd to NewHolder {:?}", new_holder);
+            .map(|holder| {
+                info!("Sending get-chunk query to holder {:?}", holder);
                 (
-                    Message::NodeCmd {
-                        cmd: System(NodeSystemCmd::ReplicateChunk {
-                            new_holder,
-                            address,
-                            current_holders: current_holders.clone(),
-                        }),
-                        id: MessageId::combine(vec![*address.name(), new_holder]),
+                    Message::NodeQuery {
+                        query: NodeQuery::System(NodeSystemQuery::GetChunk(address)),
+                        id: MessageId::combine(vec![*address.name(), holder]),
                         target_section_pk: None,
                     },
-                    new_holder,
+                    holder,
+                    // Ok(NodeDuty::SendToNodes {
+                    //     msg,
+                    //     targets: current_holders,
+                    //     aggregation: Aggregation::None,
+                    // })
+                    // Message::NodeCmd {
+                    //     cmd: System(NodeSystemCmd::ReplicateChunk {
+                    //         new_holder,
+                    //         address,
+                    //         current_holders: current_holders.clone(),
+                    //     }),
+                    //     id: MessageId::combine(vec![*address.name(), new_holder]),
+                    //     target_section_pk: None,
+                    // },
+                    // new_holder,
+                )
+            })
+            .collect::<Vec<_>>();
+        for (msg, dst) in messages {
+            node_ops.push(NodeDuty::Send(OutgoingMsg {
+                msg,
+                section_source: true, // i.e. errors go to our section
+                dst: DstLocation::Node(dst),
+                aggregation: Aggregation::AtDestination,
+            }));
+        }
+        Ok(node_ops)
+    }
+
+    async fn get_chunk_queries(
+        &mut self,
+        address: BlobAddress,
+        current_holders: BTreeSet<XorName>,
+    ) -> Result<NodeDuties> {
+        use NodeCmd::*;
+        let mut node_ops = Vec::new();
+        let messages = current_holders
+            .into_iter()
+            .map(|holder| {
+                info!("Sending get-chunk query to holder {:?}", holder);
+                (
+                    Message::NodeQuery {
+                        query: NodeQuery::System(NodeSystemQuery::GetChunk(address)),
+                        id: MessageId::combine(vec![*address.name(), holder]),
+                        target_section_pk: None,
+                    },
+                    holder,
                 )
             })
             .collect::<Vec<_>>();

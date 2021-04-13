@@ -23,6 +23,7 @@ use blob_register::BlobRegister;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use sequence_storage::SequenceStorage;
+use sn_data_types::Blob;
 use sn_messaging::{
     client::{DataCmd, DataQuery},
     EndUser, MessageId,
@@ -71,12 +72,24 @@ impl Metadata {
     }
 
     // This should be called whenever a node leaves the section. It fetches the list of data that was
-    // previously held by the node and requests the other holders to store an additional copy.
+    // previously held by the node and requests the remaining holders to return that chunk to us.
     // The list of holders is also updated by removing the node that left.
+    // When receiving the chunk from remaining holders, we ask new holders to store it.
     pub async fn trigger_chunk_replication(&mut self, node: XorName) -> Result<NodeDuties> {
         self.elder_stores
             .blob_register_mut()
-            .replicate_chunks(node)
+            .begin_replicate_chunks(node)
+            .await
+    }
+
+    // This should be called whenever a node leaves the section. It fetches the list of data that was
+    // previously held by the node and requests the remaining holders to return that chunk to us.
+    // The list of holders is also updated by removing the node that left.
+    // When receiving the chunk from remaining holders, we ask new holders to store it.
+    pub async fn finish_chunk_replication(&mut self, data: Blob) -> Result<NodeDuty> {
+        self.elder_stores
+            .blob_register_mut()
+            .replicate_chunk(data)
             .await
     }
 }
