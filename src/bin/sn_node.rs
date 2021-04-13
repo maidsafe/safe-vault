@@ -103,14 +103,21 @@ async fn run_node() {
     );
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    let mut node = match Node::new(&config).await {
-        Ok(node) => node,
-        Err(e) => {
-            println!("Cannot start node due to error: {:?}", e);
-            error!("Cannot start node due to error: {:?}", e);
-            process::exit(1);
+    let mut node = loop {
+        match Node::new(&config).await {
+            Ok(node) => break node,
+            Err(sn_node::Error::Routing(sn_routing::Error::TryJoinLater)) => {
+                println!("The network is not accepting nodes right now. Retrying after 3 minutes");
+                tokio::time::sleep(tokio::time::Duration::from_secs(180)).await;
+            }
+            Err(e) => {
+                println!("Cannot start node due to error: {:?}", e);
+                error!("Cannot start node due to error: {:?}", e);
+                process::exit(1);
+            }
         }
     };
+
     let node_prefix = node.our_prefix().await;
     let node_name = node.our_name().await;
     let our_conn_info = node.our_connection_info();
