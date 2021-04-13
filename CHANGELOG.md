@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.37.0](https://github.com/maidsafe/sn_node/compare/v0.36.2...v0.37.0) (2021-04-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** Members of node cmds changed.
+
+### Bug Fixes
+
+* **msgs:** add aggregation scheme to SendToNodes ([ca19c7d](https://github.com/maidsafe/sn_node/commit/ca19c7d8dec0b4b89dd24f923a8d3cac4092de27))
+
+
+* **deps:** update sn_messaging and sn_routing ([0913819](https://github.com/maidsafe/sn_node/commit/09138195c2ca3f5962a351bfbaa0268d07ac2132))
+
 ### [0.36.2](https://github.com/maidsafe/sn_node/compare/v0.36.1...v0.36.2) (2021-04-13)
 
 
