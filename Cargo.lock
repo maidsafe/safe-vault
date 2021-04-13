@@ -959,8 +959,8 @@ dependencies = [
  "http",
  "indexmap",
  "slab",
- "tokio 1.4.0",
- "tokio-util 0.6.5",
+ "tokio 1.5.0",
+ "tokio-util 0.6.6",
  "tracing",
 ]
 
@@ -1098,7 +1098,7 @@ dependencies = [
  "itoa",
  "pin-project",
  "socket2 0.4.0",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "tower-service",
  "tracing",
  "want",
@@ -1161,7 +1161,7 @@ dependencies = [
  "hyper 0.14.5",
  "log",
  "rand 0.8.3",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "url",
  "xmltree",
 ]
@@ -1659,7 +1659,7 @@ dependencies = [
  "serde_json",
  "structopt",
  "thiserror",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "webpki",
 ]
 
@@ -1699,7 +1699,7 @@ dependencies = [
  "rustls 0.19.0",
  "socket2 0.3.19",
  "thiserror",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "tracing",
  "webpki",
 ]
@@ -2311,15 +2311,15 @@ dependencies = [
  "tempdir",
  "thiserror",
  "threshold_crypto",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "xor_name",
 ]
 
 [[package]]
 name = "sn_routing"
-version = "0.58.2"
+version = "0.59.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6448a76eb0e660d73c1548018ed484745c95bbb9d30101157bc67d59876788d8"
+checksum = "36f5272314916e8e793a1dcd978a70aaa5b7a5b6c2c558d94c51172fd9bb37cb"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2340,7 +2340,7 @@ dependencies = [
  "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
- "tokio 1.4.0",
+ "tokio 1.5.0",
  "tracing",
  "xor_name",
 ]
@@ -2638,9 +2638,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "134af885d758d645f0f0505c9a8b3f9bf8a348fd822e112ab5248138348f1722"
+checksum = "83f0c8e7c0addab50b663055baf787d0af7f413a46e6e7fb9559a4e4db7137a5"
 dependencies = [
  "autocfg",
  "bytes 1.0.1",
@@ -2691,16 +2691,16 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.5"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5143d049e85af7fbc36f5454d990e62c2df705b3589f123b71f441b6b59f443f"
+checksum = "940a12c99365c31ea8dd9ba04ec1be183ffe4920102bb7122c2f515437601e8e"
 dependencies = [
  "bytes 1.0.1",
  "futures-core",
  "futures-sink",
  "log",
  "pin-project-lite 0.2.6",
- "tokio 1.4.0",
+ "tokio 1.5.0",
 ]
 
 [[package]]
