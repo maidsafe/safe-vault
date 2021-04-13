@@ -82,9 +82,6 @@ impl Metadata {
             .await
     }
 
-    // This should be called whenever a node leaves the section. It fetches the list of data that was
-    // previously held by the node and requests the remaining holders to return that chunk to us.
-    // The list of holders is also updated by removing the node that left.
     // When receiving the chunk from remaining holders, we ask new holders to store it.
     pub async fn finish_chunk_replication(&mut self, data: Blob) -> Result<NodeDuty> {
         self.elder_stores

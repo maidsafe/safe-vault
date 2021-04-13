@@ -207,12 +207,6 @@ pub enum NodeDuty {
         id: MessageId,
         section: XorName,
     },
-    // /// Store a chunk that is a result of data replication
-    // /// on `MemberLeft`
-    // StoreChunkForReplication {
-    //     data: Blob,
-    //     correlation_id: MessageId,
-    // },
     NoOp,
 }
 

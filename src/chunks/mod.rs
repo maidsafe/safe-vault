@@ -71,7 +71,7 @@ impl Chunks {
         }
     }
 
-    ///
+    /// Returns a chunk to the Elders of a section.
     pub async fn get_chunk_for_replication(
         &self,
         address: BlobAddress,
@@ -84,8 +84,8 @@ impl Chunks {
             .await
     }
 
-    ///
-    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<NodeDuty> {
+    /// Stores a chunk that Elders sent to it for replication.
+    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<()> {
         self.chunk_storage.store_for_replication(blob).await
     }
 }

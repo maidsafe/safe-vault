@@ -118,31 +118,7 @@ impl ChunkStorage {
         }))
     }
 
-    // pub async fn replicate_chunk(
-    //     &self,
-    //     address: BlobAddress,
-    //     current_holders: BTreeSet<XorName>,
-    //     msg_id: MessageId,
-    // ) -> Result<NodeDuty> {
-    //     let msg = Message::NodeQuery {
-    //         query: NodeQuery::System(NodeSystemQuery::GetChunk {
-    //             address,
-    //             new_holder: self.node_name,
-    //             current_holders: BTreeSet::default(), //TODO: remove this in sn_messaging
-    //         }),
-    //         id: msg_id,
-    //         target_section_pk: None,
-    //     };
-    //     info!("Sending NodeSystemQuery::GetChunk to existing holders");
-
-    //     Ok(NodeDuty::SendToNodes {
-    //         msg,
-    //         targets: current_holders,
-    //         aggregation: Aggregation::None,
-    //     })
-    // }
-
-    ///
+    /// Returns a chunk to the Elders of a section.
     pub async fn get_for_replication(
         &self,
         address: BlobAddress,
@@ -172,20 +148,20 @@ impl ChunkStorage {
         }
     }
 
-    ///
-    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<NodeDuty> {
+    /// Stores a chunk that Elders sent to it for replication.
+    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<()> {
         if self.chunks.has(blob.address()) {
             info!(
                 "{}: Immutable chunk already exists, not storing: {:?}",
                 self,
                 blob.address()
             );
-            return Ok(NodeDuty::NoOp);
+            return Ok(());
         }
 
         self.chunks.put(&blob).await?;
 
-        Ok(NodeDuty::NoOp)
+        Ok(())
     }
 
     pub async fn used_space_ratio(&self) -> f64 {

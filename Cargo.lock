@@ -2248,8 +2248,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "13.1.0"
-source = "git+https://github.com/oetyng/sn_messaging?branch=refactor-replication-flow#efdf754969da89abc4d57f981ff5cedca94a083c"
+version = "14.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b41d562c8f2d89dce55b911daad0df7dd27aa21a49f54c5ef417679b02fd944c"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2316,8 +2317,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.59.1"
-source = "git+https://github.com/oetyng/sn_routing?branch=refactor-replication-flow#b2b052473c15293ab56ceddadd555d36fbc11cff"
+version = "0.60.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "349bd20d557ab1c900a8699607be8f943ee6b1d5b97b978acba6703724ef0d55"
 dependencies = [
  "bincode",
  "bls_dkg",

@@ -372,10 +372,6 @@ impl BlobRegister {
     ) -> Result<NodeDuties> {
         use NodeCmd::*;
         let mut node_ops = Vec::new();
-        // let new_holders = self.get_new_holders_for_chunk(&address).await;
-        // for holder in &new_holders {
-        //     self.update_holders(address, *holder).await?;
-        // }
         let messages = current_holders
             .into_iter()
             .map(|holder| {
@@ -387,21 +383,6 @@ impl BlobRegister {
                         target_section_pk: None,
                     },
                     holder,
-                    // Ok(NodeDuty::SendToNodes {
-                    //     msg,
-                    //     targets: current_holders,
-                    //     aggregation: Aggregation::None,
-                    // })
-                    // Message::NodeCmd {
-                    //     cmd: System(NodeSystemCmd::ReplicateChunk {
-                    //         new_holder,
-                    //         address,
-                    //         current_holders: current_holders.clone(),
-                    //     }),
-                    //     id: MessageId::combine(vec![*address.name(), new_holder]),
-                    //     target_section_pk: None,
-                    // },
-                    // new_holder,
                 )
             })
             .collect::<Vec<_>>();
