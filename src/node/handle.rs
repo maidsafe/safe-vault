@@ -304,8 +304,12 @@ impl Node {
                 send(msg, &self.network_api).await?;
                 Ok(vec![])
             }
-            NodeDuty::SendToNodes { targets, msg } => {
-                send_to_nodes(targets, &msg, &self.network_api).await?;
+            NodeDuty::SendToNodes {
+                msg,
+                targets,
+                aggregation,
+            } => {
+                send_to_nodes(&msg, targets, aggregation, &self.network_api).await?;
                 Ok(vec![])
             }
             NodeDuty::SetNodeJoinsAllowed(joins_allowed) => {

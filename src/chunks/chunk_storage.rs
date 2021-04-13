@@ -138,6 +138,7 @@ impl ChunkStorage {
         Ok(NodeDuty::SendToNodes {
             msg,
             targets: current_holders,
+            aggregation: Aggregation::None,
         })
     }
 

@@ -127,6 +127,7 @@ impl BlobRegister {
                 id: msg_id,
                 target_section_pk: None,
             },
+            aggregation: Aggregation::AtDestination,
         })
     }
 
@@ -190,8 +191,9 @@ impl BlobRegister {
             target_section_pk: None,
         };
         Ok(NodeDuty::SendToNodes {
-            targets: metadata.holders,
             msg,
+            targets: metadata.holders,
+            aggregation: Aggregation::AtDestination,
         })
     }
 
@@ -400,8 +402,9 @@ impl BlobRegister {
             target_section_pk: None,
         };
         Ok(NodeDuty::SendToNodes {
-            targets: metadata.holders,
             msg,
+            targets: metadata.holders,
+            aggregation: Aggregation::AtDestination,
         })
     }
 

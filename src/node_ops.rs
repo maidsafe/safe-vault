@@ -173,8 +173,9 @@ pub enum NodeDuty {
     Send(OutgoingMsg),
     /// Send the same request to each individual node.
     SendToNodes {
-        targets: BTreeSet<XorName>,
         msg: Message,
+        targets: BTreeSet<XorName>,
+        aggregation: Aggregation,
     },
     /// Process read of data
     ProcessRead {
@@ -261,8 +262,16 @@ impl Debug for NodeDuty {
             Self::IncrementFullNodeCount { .. } => write!(f, "IncrementFullNodeCount"),
             Self::SetNodeJoinsAllowed(_) => write!(f, "SetNodeJoinsAllowed"),
             Self::Send(msg) => write!(f, "Send [ msg: {:?} ]", msg),
-            Self::SendToNodes { targets, msg } => {
-                write!(f, "SendToNodes [ targets: {:?}, msg: {:?} ]", targets, msg)
+            Self::SendToNodes {
+                msg,
+                targets,
+                aggregation,
+            } => {
+                write!(
+                    f,
+                    "SendToNodes [ msg: {:?}, targets: {:?}, aggregation: {:?} ]",
+                    msg, targets, aggregation
+                )
             }
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
