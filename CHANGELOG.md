@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.36.0](https://github.com/maidsafe/sn_node/compare/v0.35.7...v0.36.0) (2021-04-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** sn_routing major version bump
+* **join:** this updates to the latest version of routing and qp2p
+which have breaking changes
+
+### Bug Fixes
+
+* **join:** automatic retry when RoutingError::TryJoinLater is ([3ce6180](https://github.com/maidsafe/sn_node/commit/3ce6180785ac110557a143fc2100649c78acbb49))
+
+
+* **deps:** cargo update ([ccc5e19](https://github.com/maidsafe/sn_node/commit/ccc5e191a5671659583e25c172876fd69192a620))
+
 ### [0.35.7](https://github.com/maidsafe/sn_node/compare/v0.35.6...v0.35.7) (2021-04-13)
 
 ### [0.35.6](https://github.com/maidsafe/sn_node/compare/v0.35.5...v0.35.6) (2021-04-13)
