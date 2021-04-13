@@ -115,8 +115,7 @@ impl Node {
 
                     Ok(ops)
                 } else {
-                    // else we are not churning so ignore this message
-                    Ok(vec![])
+                    Err(Error::NotChurningFunds)
                 }
             }
             //
