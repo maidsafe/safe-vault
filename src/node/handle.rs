@@ -84,8 +84,7 @@ impl Node {
                     info!("Handling Churn proposal as an Elder");
                     Ok(vec![process.receive_churn_proposal(proposal).await?])
                 } else {
-                    // we are not churning, so ignore this msg
-                    Ok(vec![])
+                    Err(Error::NotChurningFunds)
                 }
             }
             NodeDuty::ReceiveRewardAccumulation(accumulation) => {

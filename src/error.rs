@@ -62,6 +62,9 @@ pub enum Error {
     /// Key, Value pair not found in `ChunkStore`.
     #[error("No such chunk")]
     NoSuchChunk,
+    /// Unable to process fund churn message.
+    #[error("Cannot process fund churn message")]
+    NotChurningFunds,
     /// Creating temp directory failed.
     #[error("Could not create temp store: {0}")]
     TempDirCreationFailed(String),
