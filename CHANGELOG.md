@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.36.2](https://github.com/maidsafe/sn_node/compare/v0.36.1...v0.36.2) (2021-04-13)
+
+
+### Bug Fixes
+
+* post-rebase issues + clippy ([dffd5c3](https://github.com/maidsafe/sn_node/commit/dffd5c332ad3fc7658c1744b8359812a34456943))
+
 ### [0.36.1](https://github.com/maidsafe/sn_node/compare/v0.36.0...v0.36.1) (2021-04-13)
 
 ## [0.36.0](https://github.com/maidsafe/sn_node/compare/v0.35.7...v0.36.0) (2021-04-13)
