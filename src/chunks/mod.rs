@@ -29,7 +29,8 @@ use std::{
 };
 use xor_name::XorName;
 
-pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.8;
+/// At 50% full, the node will report that it's reaching full capacity.
+pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;
 
 /// Operations on data chunks.
 pub(crate) struct Chunks {

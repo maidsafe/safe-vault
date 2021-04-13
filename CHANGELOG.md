@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.35.5](https://github.com/maidsafe/sn_node/compare/v0.35.4...v0.35.5) (2021-04-12)
+
+
+### Features
+
+* **chunks:** report full when at 50% ([23e1fdb](https://github.com/maidsafe/sn_node/commit/23e1fdb56baa5b2ba703b1f88ac6c22787d37308))
+
+### [0.35.4](https://github.com/maidsafe/sn_node/compare/v0.35.3...v0.35.4) (2021-04-12)
+
+
+### Bug Fixes
+
+* **replication:** update holders ([aff4370](https://github.com/maidsafe/sn_node/commit/aff4370746e851bd27c6d504485e238388ee5eb1))
+
+### [0.35.3](https://github.com/maidsafe/sn_node/compare/v0.35.2...v0.35.3) (2021-04-12)
+
+### [0.35.2](https://github.com/maidsafe/sn_node/compare/v0.35.1...v0.35.2) (2021-04-09)
+
+### [0.35.1](https://github.com/maidsafe/sn_node/compare/v0.35.0...v0.35.1) (2021-04-08)
+
+## [0.35.0](https://github.com/maidsafe/sn_node/compare/v0.34.10...v0.35.0) (2021-04-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** new version of sn_messaging
+- This removes the unused `AtSource` aggregation scheme.
+
+* **deps:** update sn_messaging ([d75c343](https://github.com/maidsafe/sn_node/commit/d75c343099e2c864bcc54aaaa73f53d639dc2ae7))
+
 ### [0.34.10](https://github.com/maidsafe/sn_node/compare/v0.34.9...v0.34.10) (2021-04-08)
 
 ### [0.34.9](https://github.com/maidsafe/sn_node/compare/v0.34.8...v0.34.9) (2021-04-08)

@@ -16,6 +16,7 @@ use self::{reward_process::RewardProcess, reward_wallets::RewardWallets};
 use super::node_ops::{NodeDuty, OutgoingMsg};
 use crate::Result;
 use dashmap::DashMap;
+use log::info;
 use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, SectionElders, Token};
 use sn_messaging::{
     client::{Message, NodeQuery, NodeSystemQuery},
@@ -81,6 +82,7 @@ impl SectionFunds {
     /// When the section becomes aware that a node has left,
     /// its reward key is removed.
     pub fn remove_node_wallet(&self, node_name: XorName) {
+        info!("Removing node wallet");
         match &self {
             Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
                 wallets.remove_wallet(node_name)

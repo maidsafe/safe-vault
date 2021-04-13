@@ -47,6 +47,12 @@ pub enum Error {
     /// Node not found for rewarding
     #[error("Node not found for rewards")]
     NodeNotFoundForReward,
+    /// Node not found in holders db.
+    #[error("No chunks held at node")]
+    NodeDoesNotHoldChunks,
+    /// No holders of chunk in metadata db.
+    #[error("No holders found for chunk")]
+    NoHoldersOfChunk,
     /// Key, Value pair not found in `ChunkStore`.
     #[error("No such chunk")]
     NoSuchChunk,
