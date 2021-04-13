@@ -238,10 +238,8 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let elder = self.role.as_elder()?;
-                Ok(vec![
-                    elder.transfers.get_store_cost(bytes, msg_id, origin).await,
-                ])
+                let elder = self.role.as_elder_mut()?;
+                Ok(elder.transfers.get_store_cost(bytes, msg_id, origin).await)
             }
             NodeDuty::RegisterTransfer { proof, msg_id } => {
                 let elder = self.role.as_elder_mut()?;

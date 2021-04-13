@@ -79,6 +79,7 @@ struct ElderRole {
     section_funds: SectionFunds,
 }
 
+#[allow(clippy::large_enum_variant)]
 enum Role {
     Adult(AdultRole),
     Elder(ElderRole),
