@@ -216,14 +216,14 @@ impl<T: ReplicaSigning> Replicas<T> {
     ///
     pub async fn balance(&self, id: PublicKey) -> Result<Token> {
         debug!("Replica: Getting balance of: {:?}", id);
-        let store = match TransferStore::new(id.into(), &self.root_dir) {
-            Ok(store) => store,
-            // store load failed, so we return 0 balance
-            Err(_) => return Ok(Token::from_nano(0)),
-        };
 
-        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
-        Ok(wallet.balance())
+        match TransferStore::new(id.into(), &self.root_dir) {
+            Ok(store) => {
+                let wallet = self.load_wallet(&store, OwnerType::Single(id))?;
+                Ok(wallet.balance())
+            }
+            _ => return Ok(Token::from_nano(0)),
+        }
     }
 
     /// Get the replica's PK set
@@ -286,7 +286,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id))?;
 
         debug!("Wallet loaded");
         let _ = wallet.validate(&signed_transfer.debit, &signed_transfer.credit)?;
@@ -331,7 +331,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id))?;
         match wallet.register(transfer_proof)? {
             None => {
                 info!("transfer already registered!");
@@ -386,7 +386,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id))?;
         let propagation_result = wallet.receive_propagated(credit_proof);
         if propagation_result.is_ok() {
             // update state
@@ -416,7 +416,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         }
     }
 
-    async fn load_wallet(
+    fn load_wallet(
         &self,
         store: &TransferStore<ReplicaEvent>,
         id: OwnerType,
@@ -484,7 +484,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let store = self.get_load_or_create_store(id).await?;
         let mut store = store.lock().await;
 
-        let mut wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
+        let mut wallet = self.load_wallet(&store, OwnerType::Single(id))?;
 
         debug!("wallet loaded");
         wallet.credit_without_proof(credit.clone())?;
@@ -531,7 +531,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let mut wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
+        let mut wallet = self.load_wallet(&store, OwnerType::Single(id))?;
         wallet.debit_without_proof(debit)?;
         Ok(NodeDuty::NoOp)
     }
@@ -546,7 +546,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         let mut store = key_lock.lock().await;
 
         // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
+        let wallet = self.load_wallet(&store, OwnerType::Single(id))?;
         let _ = wallet.test_validate_transfer(&signed_transfer.debit, &signed_transfer.credit)?;
         // sign + update state
         let (replica_debit_sig, replica_credit_sig) =

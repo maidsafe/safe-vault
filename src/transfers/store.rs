@@ -42,34 +42,26 @@ where
     }
 
     ///
+    #[inline]
     pub fn id(&self) -> XorName {
         self.id
     }
 
     ///
     pub fn get_all(&self) -> Vec<TEvent> {
-        let keys = self.db.get_all();
-
-        let mut events: Vec<(usize, TEvent)> = keys
+        let mut events = self
+            .db
             .iter()
-            .filter_map(|key| {
-                let value = self.db.get::<TEvent>(key);
-                let key = key.parse::<usize>();
-                match value {
-                    Some(v) => match key {
-                        Ok(k) => Some((k, v)),
-                        _ => None,
-                    },
-                    None => None,
-                }
-            })
-            .collect();
+            .filter_map(
+                |entry| match (entry.get_key().parse::<usize>(), entry.get_value()) {
+                    (Ok(k), Some(v)) => Some((k, v)),
+                    _ => None,
+                },
+            )
+            .collect::<Vec<(usize, TEvent)>>();
 
-        events.sort_by(|(key_a, _), (key_b, _)| key_a.partial_cmp(key_b).unwrap());
-
-        let events: Vec<TEvent> = events.into_iter().map(|(_, val)| val).collect();
-
-        events
+        let _ = &events[..].sort_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
+        events.into_iter().map(|(k, v)| v).collect()
     }
 
     ///
