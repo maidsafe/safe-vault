@@ -9,8 +9,8 @@
 use crate::{utils, Result};
 use futures::lock::Mutex;
 use pickledb::PickleDb;
+use std::path::Path;
 use std::sync::Arc;
-use std::{cell::RefCell, path::Path, rc::Rc};
 
 const BLOB_META_DB_NAME: &str = "immutable_data.db";
 const HOLDER_META_DB_NAME: &str = "holder_data.db";

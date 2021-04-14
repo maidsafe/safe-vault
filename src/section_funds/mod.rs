@@ -13,15 +13,10 @@ pub mod reward_stage;
 pub mod reward_wallets;
 
 use self::{reward_process::RewardProcess, reward_wallets::RewardWallets};
-use super::node_ops::{NodeDuty, OutgoingMsg};
 use crate::{Error, Result};
 use dashmap::DashMap;
 use log::info;
-use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, SectionElders, Token};
-use sn_messaging::{
-    client::{Message, NodeQuery, NodeSystemQuery},
-    Aggregation, DstLocation, MessageId, SrcLocation,
-};
+use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, Token};
 use sn_routing::XorName;
 use std::collections::BTreeMap;
 
@@ -65,6 +60,7 @@ impl SectionFunds {
     }
 
     /// Returns registered wallet key of a node.
+    #[allow(unused)]
     pub fn get_node_wallet(&self, node_name: &XorName) -> Option<PublicKey> {
         match &self {
             Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
@@ -122,17 +118,3 @@ impl Credits for Rewards {
         Token::from_nano(self.iter().map(|(_, c)| c.amount().as_nano()).sum())
     }
 }
-
-//     let to_remove = self
-//         .rewards
-//         .all_nodes()
-//         .into_iter()
-//         .filter(|c| !prefix.matches(&XorName(c.0)))
-//         .collect();
-//     self.rewards.remove(to_remove);
-
-// /// At section split, all Elders get their reward payout.
-// pub async fn reward_elders(&mut self, prefix: Prefix) -> Result<NetworkDuties> {
-// let elders = self.rewards_and_wallets.elder_names();
-// self.rewards.payout_rewards(elders).await
-// }

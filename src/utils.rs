@@ -11,7 +11,6 @@
 use crate::{config_handler::Config, Error, Result};
 use bytes::Bytes;
 use flexi_logger::{DeferredNow, Logger};
-use log::debug;
 use log::{Log, Metadata, Record};
 use pickledb::{PickleDb, PickleDbDumpPolicy};
 use rand::{distributions::Standard, CryptoRng, Rng};

@@ -7,37 +7,22 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::NodeDuties,
     section_funds::{self, SectionFunds},
-    transfers::{
-        get_replicas::replica_info,
-        replica_signing::ReplicaSigningImpl,
-        replicas::{ReplicaInfo, Replicas},
-    },
+    transfers::get_replicas::replica_info,
     Error, Node, Result,
 };
 use dashmap::DashMap;
-use log::{debug, info};
+use log::debug;
 use section_funds::{
     elder_signing::ElderSigning,
     reward_process::{OurSection, RewardProcess},
-    reward_stage::RewardStage,
     reward_wallets::RewardWallets,
     Credits,
 };
-use sn_data_types::{
-    ActorHistory, CreditAgreementProof, CreditId, NodeAge, PublicKey, SectionElders, Token,
-    WalletHistory,
-};
-use sn_messaging::{
-    client::{
-        Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeRewardQuery, NodeSystemCmd,
-        NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
-    },
-    Aggregation, DstLocation, MessageId, SrcLocation,
-};
+use sn_data_types::{NodeAge, PublicKey, Token};
+use sn_messaging::MessageId;
 use sn_routing::{Prefix, XorName};
-use sn_transfers::TransferActor;
 use std::collections::BTreeMap;
 
 impl Node {
@@ -66,7 +51,7 @@ impl Node {
 
         let elder = self.role.as_elder_mut()?;
 
-        let mut process =
+        let process =
             RewardProcess::new(section, ElderSigning::new(self.network_api.clone()).await?);
 
         let wallets = RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new());
@@ -89,9 +74,8 @@ impl Node {
     ) -> Result<NodeDuties> {
         let elder = self.role.as_elder_mut()?;
 
-        let info = replica_info(&self.node_info, &self.network_api).await?;
+        let info = replica_info(&self.network_api).await?;
         elder.transfers.update_replica_info(info);
-        let user_wallets = elder.transfers.user_wallets();
 
         let (wallets, payments) = match &mut elder.section_funds {
             SectionFunds::KeepingNodeWallets { wallets, payments }

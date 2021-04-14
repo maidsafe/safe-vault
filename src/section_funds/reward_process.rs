@@ -16,19 +16,18 @@ use super::{
 };
 use crate::{
     capacity::MAX_SUPPLY,
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
 };
-use log::{debug, info, warn};
+use log::{debug, info};
 use sn_data_types::{
-    Credit, NodeAge, PublicKey, RewardAccumulation, RewardProposal, SectionElders, Signature,
-    SignatureShare, SignedCredit, SignedCreditShare, Signing, Token, TransferPropagated,
+    Credit, NodeAge, PublicKey, RewardAccumulation, RewardProposal, Signature, Signing, Token,
 };
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeQuery, NodeSystemCmd, NodeSystemQuery},
+    client::{Message, NodeCmd, NodeSystemCmd},
     Aggregation, DstLocation, MessageId,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use xor_name::{Prefix, XorName};
 
 ///
@@ -83,8 +82,8 @@ impl RewardProcess {
         section_managed: Token,
         our_nodes: BTreeMap<XorName, (NodeAge, PublicKey)>,
     ) -> Result<NodeDuty> {
-        /// Max supply is the proportional supply for a section in a network of a certain size.
-        /// The network size is derived from the prefix len.
+        // Max supply is the proportional supply for a section in a network of a certain size.
+        // The network size is derived from the prefix len.
         let max_supply =
             Token::from_nano(MAX_SUPPLY / 2_u64.pow(self.section.our_prefix.bit_count() as u32));
         // derive an amount to pay out in rewards, i.e. payments + newly minted tokens
@@ -175,7 +174,7 @@ impl RewardProcess {
             return Err(Error::Transfer(sn_transfers::Error::InvalidOwner));
         }
         match self.stage.clone() {
-            RewardStage::None | RewardStage::AwaitingThreshold => {
+            RewardStage::AwaitingThreshold => {
                 debug!("@ receive_churn_proposal when RewardStage::None | RewardStage::AwaitingThreshold");
                 let rewards = proposal
                     .rewards
@@ -209,12 +208,6 @@ impl RewardProcess {
 
                 if let Some(rewards) = proposal_details.pending_agreements() {
                     info!("******* there is an agreement for reward proposal.");
-                    // replicas signatures over > signed_credit <
-                    let mut our_acc = RewardAccumulationDetails {
-                        pk_set: proposal_details.pk_set,
-                        rewards: BTreeMap::new(),
-                    };
-
                     let rewards = rewards
                         .into_iter()
                         .map(|(_, signed_credit)| CreditAccumulation {
@@ -240,7 +233,6 @@ impl RewardProcess {
             }
             RewardStage::AccumulatingCredits(_) => Ok(NodeDuty::NoOp),
             RewardStage::Completed(_) => Ok(NodeDuty::NoOp),
-            RewardStage::None => Err(Error::InvalidRewardStage),
         }
     }
 
@@ -278,13 +270,8 @@ impl RewardProcess {
 
                 Ok(send_acc_msg(to_send, self.section.address()))
             }
-            RewardStage::ProposingCredits(proposal_details) => {
-                // create our acc details
-                let mut our_acc = RewardAccumulationDetails {
-                    pk_set: proposal_details.pk_set,
-                    rewards: BTreeMap::new(),
-                };
-
+            RewardStage::ProposingCredits(_proposal_details) => {
+                // TODO: validate on existing proposal details?
                 let rewards = new_acc
                     .rewards
                     .iter()
@@ -325,7 +312,6 @@ impl RewardProcess {
                 Ok(NodeDuty::NoOp)
             }
             RewardStage::Completed(_) => Ok(NodeDuty::NoOp),
-            RewardStage::None => Err(Error::InvalidRewardStage),
         }
     }
 }

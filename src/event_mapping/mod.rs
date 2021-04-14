@@ -8,16 +8,14 @@
 
 mod map_msg;
 
-use super::node_ops::{NodeDuties, NodeDuty};
-use crate::{network::Network, Result};
-use hex_fmt::HexFmt;
-use log::{debug, info, trace};
+use super::node_ops::NodeDuty;
+use crate::network::Network;
+use log::{info, trace};
 use map_msg::{map_node_msg, match_user_sent_msg};
 use sn_data_types::PublicKey;
-use sn_messaging::{client::Message, DstLocation, SrcLocation};
-use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
-use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
-use std::collections::HashSet;
+use sn_messaging::{client::Message, SrcLocation};
+use sn_routing::XorName;
+use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use std::{thread::sleep, time::Duration};
 
 #[derive(Debug)]
@@ -60,17 +58,13 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 
             map_node_msg(msg, src, dst)
         }
-        RoutingEvent::ClientMessageReceived { msg, user } => match_user_sent_msg(
-            *msg.clone(),
-            DstLocation::Node(network_api.our_name().await),
-            user,
-        ),
+        RoutingEvent::ClientMessageReceived { msg, user } => match_user_sent_msg(*msg, user),
         RoutingEvent::EldersChanged {
             prefix,
             key,
             sibling_key,
-            elders,
             self_status_change,
+            ..
         } => {
             let first_section = network_api.our_prefix().await.is_empty();
             let first_elder = network_api.our_elder_names().await.len() == 1;
@@ -101,7 +95,10 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                                 }
                             }
                             Err(e) => {
-                                trace!("******Elders changed, should NOT be an error here...!");
+                                trace!(
+                                    "******Elders changed, should NOT be an error here...! ({})",
+                                    e
+                                );
                                 sanity_counter += 1;
                             }
                         }
@@ -173,13 +170,8 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             },
             ctx: None,
         },
-        RoutingEvent::MemberJoined {
-            name,
-            previous_name,
-            age,
-            ..
-        } => {
-            let op = if let Some(prev_name) = previous_name {
+        RoutingEvent::MemberJoined { previous_name, .. } => {
+            let op = if previous_name.is_some() {
                 trace!("A relocated node has joined the section.");
                 // Switch joins_allowed off a new adult joining.
                 NodeDuty::SetNodeJoinsAllowed(false)

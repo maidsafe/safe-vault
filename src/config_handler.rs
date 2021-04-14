@@ -12,11 +12,8 @@ use crate::{Error, Result};
 use log::{debug, Level};
 use serde::{Deserialize, Serialize};
 use sn_routing::TransportConfig as NetworkConfig;
-use std::convert::Infallible;
-use std::net::AddrParseError;
-use std::num::ParseIntError;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs::{self, File},
     io::{self, BufReader},
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -149,7 +146,7 @@ impl Config {
     }
 
     fn validate(&mut self) -> Result<(), Error> {
-        if let Some(external_addr) = self.public_addr {
+        if let Some(_external_addr) = self.public_addr {
             if self.first.is_none() && self.local_addr.is_none() {
                 return Err(Error::Configuration("--public-addr passed without specifing local address using --first or --local-addr".to_string()));
             }

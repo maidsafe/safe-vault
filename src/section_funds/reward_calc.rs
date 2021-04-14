@@ -6,11 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::capacity::MAX_SUPPLY;
-use log::debug;
 use sn_data_types::{NodeAge, PublicKey, Token};
-use sn_routing::{Prefix, XorName};
-use std::collections::{BTreeMap, BTreeSet};
+use sn_routing::XorName;
+use std::collections::BTreeMap;
 
 const MIN_REWARD_AGE: u8 = 6;
 
@@ -87,7 +85,7 @@ fn distribute(
     let mut remaining_amount = amount.as_nano();
 
     // shorten iterations
-    let max_age = (*reward_buckets.keys().max().unwrap_or(&1) as u64);
+    let max_age = *reward_buckets.keys().max().unwrap_or(&1) as u64;
     let node_count = reward_buckets.values().map(|b| b.len() as u64).sum::<u64>();
     let share = remaining_amount / (max_age * node_count);
     let divisor = max_age * remaining_amount.to_string().len() as u64;

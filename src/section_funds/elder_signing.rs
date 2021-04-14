@@ -9,7 +9,7 @@
 use crate::{network::Network, Error, Result};
 use bls::PublicKeySet;
 use futures::executor::block_on as block;
-use sn_data_types::{OwnerType, Result as DtResult, SignatureShare, Signing};
+use sn_data_types::{OwnerType, Result as DtResult, Signing};
 
 #[derive(Clone)]
 pub struct ElderSigning {

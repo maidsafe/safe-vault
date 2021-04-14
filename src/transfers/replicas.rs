@@ -216,6 +216,11 @@ impl<T: ReplicaSigning> Replicas<T> {
     ///
     pub async fn balance(&self, id: PublicKey) -> Result<Token> {
         debug!("Replica: Getting balance of: {:?}", id);
+        let store = match TransferStore::new(id.into(), &self.root_dir) {
+            Ok(store) => store,
+            // store load failed, so we return 0 balance
+            Err(_) => return Ok(Token::from_nano(0)),
+        };
 
         match TransferStore::new(id.into(), &self.root_dir) {
             Ok(store) => {
@@ -263,6 +268,7 @@ impl<T: ReplicaSigning> Replicas<T> {
         self.info = info;
     }
 
+    #[allow(unused)]
     pub async fn keep_keys_of(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         let keys: Vec<PublicKey> = self.locks.iter().map(|r| *r.key()).collect();
@@ -352,12 +358,12 @@ impl<T: ReplicaSigning> Replicas<T> {
     /// (Since this leads to a credit, there is no requirement on order.)
     pub async fn receive_propagated(
         &self,
-        debiting_replicas_name: xor_name::XorName,
+        _debiting_replicas_name: xor_name::XorName,
         credit_proof: &CreditAgreementProof,
     ) -> Result<TransferPropagated> {
         // Acquire lock of the wallet.
         let id = credit_proof.recipient();
-        let debiting_replicas_key = credit_proof.replica_keys().public_key();
+        let _debiting_replicas_key = credit_proof.replica_keys().public_key();
 
         // TODO: check the debiting_replicas_key, needs reverse AE implemented
 

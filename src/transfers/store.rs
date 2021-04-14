@@ -7,14 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{to_db_key::ToDbKey, utils, Error, Result};
-use log::{debug, trace};
 use pickledb::PickleDb;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{
-    fmt::Debug,
-    marker::PhantomData,
-    path::{Path, PathBuf},
-};
+use std::{fmt::Debug, marker::PhantomData, path::Path};
 use xor_name::XorName;
 
 const TRANSFERS_DIR_NAME: &str = "transfers";
@@ -22,7 +17,6 @@ const DB_EXTENSION: &str = ".db";
 
 /// Disk storage for transfers.
 pub struct TransferStore<TEvent: Debug + Serialize + DeserializeOwned> {
-    id: XorName,
     db: PickleDb,
     _phantom: PhantomData<TEvent>,
 }
@@ -35,16 +29,9 @@ where
         let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME));
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
         Ok(Self {
-            id,
             db: utils::new_auto_dump_db(db_dir.as_path(), db_name)?,
             _phantom: PhantomData::default(),
         })
-    }
-
-    ///
-    #[inline]
-    pub fn id(&self) -> XorName {
-        self.id
     }
 
     ///

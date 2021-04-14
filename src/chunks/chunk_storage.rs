@@ -10,21 +10,18 @@ use crate::{
     chunk_store::{BlobChunkStore, UsedSpace},
     error::convert_to_error_message,
     node_ops::{NodeDuty, OutgoingMsg},
-    section_funds::elder_signing,
     Error, Result,
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     client::{
-        CmdError, Error as ErrorMessage, Message, NodeDataQueryResponse, NodeQuery,
-        NodeQueryResponse, NodeSystemQuery, QueryResponse,
+        CmdError, Error as ErrorMessage, Message, NodeDataQueryResponse, NodeQueryResponse,
+        QueryResponse,
     },
-    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
+    Aggregation, DstLocation, EndUser, MessageId,
 };
 use std::{
-    collections::BTreeSet,
-    env::current_dir,
     fmt::{self, Display, Formatter},
     path::Path,
 };
@@ -32,18 +29,13 @@ use xor_name::XorName;
 
 /// Storage of data chunks.
 pub(crate) struct ChunkStorage {
-    node_name: XorName,
     chunks: BlobChunkStore,
 }
 
 impl ChunkStorage {
-    pub(crate) async fn new(
-        node_name: XorName,
-        path: &Path,
-        used_space: UsedSpace,
-    ) -> Result<Self> {
+    pub(crate) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         let chunks = BlobChunkStore::new(path, used_space).await?;
-        Ok(Self { chunks, node_name })
+        Ok(Self { chunks })
     }
 
     pub(crate) async fn store(
@@ -231,10 +223,8 @@ mod tests {
     use crate::error::Result;
     use bls::SecretKey;
     use sn_data_types::{PrivateBlob, PublicBlob, PublicKey};
-    use sn_messaging::MessageId;
     use std::path::PathBuf;
     use tempdir::TempDir;
-    use xor_name::XorName;
 
     fn temp_dir() -> Result<TempDir> {
         TempDir::new("test").map_err(|e| Error::TempDirCreationFailed(e.to_string()))
@@ -246,9 +236,8 @@ mod tests {
 
     #[tokio::test]
     pub async fn try_store_stores_public_blob() -> Result<()> {
-        let xor_name = XorName::random();
         let path = PathBuf::from(temp_dir()?.path());
-        let mut storage = ChunkStorage::new(xor_name, &path, UsedSpace::new(u64::MAX)).await?;
+        let mut storage = ChunkStorage::new(&path, UsedSpace::new(u64::MAX)).await?;
         let value = "immutable data value".to_owned().into_bytes();
         let blob = Blob::Public(PublicBlob::new(value));
         assert!(storage
@@ -262,9 +251,8 @@ mod tests {
 
     #[tokio::test]
     pub async fn try_store_stores_private_blob() -> Result<()> {
-        let xor_name = XorName::random();
         let path = PathBuf::from(temp_dir()?.path());
-        let mut storage = ChunkStorage::new(xor_name, &path, UsedSpace::new(u64::MAX)).await?;
+        let mut storage = ChunkStorage::new(&path, UsedSpace::new(u64::MAX)).await?;
         let value = "immutable data value".to_owned().into_bytes();
         let key = get_random_pk();
         let blob = Blob::Private(PrivateBlob::new(value, key));
@@ -279,9 +267,8 @@ mod tests {
 
     #[tokio::test]
     pub async fn try_store_errors_if_end_user_doesnt_own_data() -> Result<()> {
-        let xor_name = XorName::random();
         let path = PathBuf::from(temp_dir()?.path());
-        let mut storage = ChunkStorage::new(xor_name, &path, UsedSpace::new(u64::MAX)).await?;
+        let mut storage = ChunkStorage::new(&path, UsedSpace::new(u64::MAX)).await?;
         let value = "immutable data value".to_owned().into_bytes();
         let data_owner = get_random_pk();
         let end_user = get_random_pk();
@@ -289,7 +276,7 @@ mod tests {
         let result = storage
             .try_store(&blob, EndUser::AllClients(end_user))
             .await;
-        assert!(matches!(result, Err(InvalidOwners(end_user))));
+        assert!(matches!(result, Err(InvalidOwners(_))));
         Ok(())
     }
 }

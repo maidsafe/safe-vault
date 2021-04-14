@@ -20,10 +20,9 @@ use log::info;
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     client::{BlobRead, BlobWrite},
-    EndUser, MessageId, SrcLocation,
+    EndUser, MessageId,
 };
 use std::{
-    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     path::Path,
 };
@@ -38,9 +37,9 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    pub async fn new(node_name: XorName, path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            chunk_storage: ChunkStorage::new(node_name, path, used_space).await?,
+            chunk_storage: ChunkStorage::new(path, used_space).await?,
         })
     }
 

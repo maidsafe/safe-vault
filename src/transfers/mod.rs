@@ -12,10 +12,7 @@ pub mod replicas;
 pub mod store;
 mod test_utils;
 
-use self::{
-    replica_signing::ReplicaSigning,
-    replicas::{ReplicaInfo, Replicas},
-};
+use self::replicas::{ReplicaInfo, Replicas};
 use crate::{
     capacity::RateLimit,
     error::{convert_dt_error_to_error_message, convert_to_error_message},
@@ -31,12 +28,12 @@ use std::collections::{BTreeMap, HashSet};
 
 use futures::lock::Mutex;
 use sn_data_types::{
-    ActorHistory, CreditAgreementProof, DebitId, PublicKey, ReplicaEvent, SignedTransfer,
-    SignedTransferShare, Token, TransferAgreementProof, TransferPropagated,
+    ActorHistory, CreditAgreementProof, DebitId, PublicKey, SignedTransfer, Token,
+    TransferAgreementProof,
 };
 use sn_messaging::{
     client::{
-        Cmd, CmdError, Error as ErrorMessage, Event, Message, NodeCmd, NodeCmdError, NodeEvent,
+        Cmd, CmdError, Error as ErrorMessage, Event, Message, NodeCmd, NodeCmdError,
         NodeQueryResponse, NodeTransferCmd, NodeTransferError, NodeTransferQueryResponse,
         QueryResponse, TransferError,
     },
@@ -102,14 +99,15 @@ impl Transfers {
         self.replicas.user_wallets()
     }
 
-    pub fn merge(&mut self, user_wallets: BTreeMap<PublicKey, ActorHistory>) {
-        self.replicas.merge(user_wallets);
+    pub async fn merge(&mut self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
+        self.replicas.merge(user_wallets).await
     }
 
     /// When section splits, the Replicas in either resulting section
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that
     /// the other group is now responsible for.
+    #[allow(unused)]
     pub async fn split_section(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         self.replicas.keep_keys_of(prefix).await
@@ -154,14 +152,6 @@ impl Transfers {
     ///
     pub fn update_replica_info(&mut self, info: ReplicaInfo<ReplicaSigningImpl>) {
         self.replicas.update_replica_info(info);
-    }
-
-    /// Initiates a new Replica with the
-    /// state of existing Replicas in the group.
-    pub async fn initiate_replica(&self, events: &[ReplicaEvent]) -> Result<NodeDuty> {
-        // We must be able to initiate the replica, otherwise this node cannot function.
-        self.replicas.initiate(events).await?;
-        Ok(NodeDuty::NoOp)
     }
 
     /// Makes sure the payment contained
@@ -505,14 +495,7 @@ impl Transfers {
     }
 
     #[cfg(feature = "simulated-payouts")]
-    pub async fn pay(&mut self, transfer: Transfer) -> Result<NodeDuty> {
-        // self.replicas.credit_without_proof(transfer).await
-        self.replicas.debit_without_proof(transfer).await
-    }
-
-    #[cfg(feature = "simulated-payouts")]
     pub async fn credit_without_proof(&mut self, transfer: Transfer) -> Result<NodeDuty> {
-        // self.replicas.credit_without_proof(transfer).await
         self.replicas.credit_without_proof(transfer).await
     }
 }

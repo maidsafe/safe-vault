@@ -9,12 +9,10 @@
 use super::replica_signing::ReplicaSigning;
 use crate::{Error, Result};
 use async_trait::async_trait;
-use bls::{PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare};
+use bls::{PublicKeySet, PublicKeyShare, SecretKeyShare};
 use sn_data_types::{
-    Credit, CreditAgreementProof, PublicKey, SignatureShare, SignedCredit, SignedDebit,
-    SignedTransfer, Token,
+    CreditAgreementProof, SignatureShare, SignedCredit, SignedDebit, SignedTransfer,
 };
-use std::collections::BTreeMap;
 
 /// An impl of ReplicaSigningTrait.
 #[derive(Debug, Clone, PartialEq, Eq)]
