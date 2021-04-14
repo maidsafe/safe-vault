@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.5](https://github.com/maidsafe/sn_node/compare/v0.37.4...v0.37.5) (2021-04-14)
+
+
+### Bug Fixes
+
+* change stack size to 8mb for all windows builds ([27b4c4e](https://github.com/maidsafe/sn_node/commit/27b4c4ea9b3d37bb947961229c3b29e48b014586))
+
 ### [0.37.4](https://github.com/maidsafe/sn_node/compare/v0.37.3...v0.37.4) (2021-04-14)
 
 
