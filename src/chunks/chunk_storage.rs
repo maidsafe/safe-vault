@@ -11,7 +11,7 @@ use crate::{
     error::convert_to_error_message,
     node_ops::{NodeDuty, OutgoingMsg},
     section_funds::elder_signing,
-    Error, NodeInfo, Result,
+    Error, Result,
 };
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress};

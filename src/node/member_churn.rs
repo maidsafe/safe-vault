@@ -12,8 +12,10 @@ use crate::{
     node::{ElderRole, Role},
     node_ops::NodeDuty,
     section_funds::{reward_wallets::RewardWallets, SectionFunds},
-    transfers::get_replicas::{replica_info, transfer_replicas},
-    transfers::Transfers,
+    transfers::{
+        get_replicas::{replica_info, transfer_replicas},
+        Transfers,
+    },
     Error, Node, Result,
 };
 use crdts::Actor;

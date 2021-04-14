@@ -9,8 +9,10 @@
 use crate::{
     capacity::ChunkHolderDbs,
     error::convert_to_error_message,
+    network::Network,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    Error, Network, Result, ToDbKey,
+    to_db_key::ToDbKey,
+    Error, Result,
 };
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};

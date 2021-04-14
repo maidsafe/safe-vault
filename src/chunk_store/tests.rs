@@ -10,7 +10,7 @@ use super::{
     chunk::{Chunk, ChunkId},
     ChunkStore, Result as ChunkStoreResult, Subdir, UsedSpace,
 };
-use crate::{Error, Result, ToDbKey};
+use crate::{to_db_key::ToDbKey, Error, Result};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, u64};

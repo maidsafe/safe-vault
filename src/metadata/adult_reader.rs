@@ -1,6 +1,6 @@
 use sn_routing::XorName;
 
-use crate::Network;
+use crate::network::Network;
 
 // Copyright 2021 MaidSafe.net limited.
 //

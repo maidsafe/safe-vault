@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Error, Network, Result};
+use crate::{network::Network, Error, Result};
 use bls::PublicKeySet;
 use futures::executor::block_on as block;
 use sn_data_types::{OwnerType, Result as DtResult, SignatureShare, Signing};

@@ -18,12 +18,12 @@ use crate::{
     chunks::Chunks,
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
+    network::Network,
     node_ops::{NodeDuties, NodeDuty},
     section_funds::SectionFunds,
     state_db::store_new_reward_keypair,
-    transfers::get_replicas::transfer_replicas,
-    transfers::Transfers,
-    Config, Error, Network, Result,
+    transfers::{get_replicas::transfer_replicas, Transfers},
+    Config, Error, Result,
 };
 use bls::SecretKey;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;

@@ -40,22 +40,18 @@ mod event_mapping;
 mod metadata;
 mod network;
 mod node;
+mod node_ops;
 mod section_funds;
 mod to_db_key;
 mod transfers;
 
-pub(crate) mod node_ops;
 /// Docs
 pub mod state_db;
 
 pub mod utils;
 
-pub(crate) use to_db_key::ToDbKey;
-
 pub use crate::{
     config_handler::{add_connection_info, set_connection_info, Config},
     error::{Error, Result},
-    network::Network,
     node::Node,
-    node::NodeInfo,
 };

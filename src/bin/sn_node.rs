@@ -106,7 +106,7 @@ async fn run_node() {
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
     let log = format!(
-        "The network is not accepting nodes right now. Retrying after {:?} minutes",
+        "The network is not accepting nodes right now. Retrying after {} minutes",
         BOOTSTRAP_RETRY_TIME
     );
 
@@ -114,8 +114,8 @@ async fn run_node() {
         match Node::new(&config).await {
             Ok(node) => break node,
             Err(sn_node::Error::Routing(sn_routing::Error::TryJoinLater)) => {
-                println!("{:?}", log);
-                info!("{:?}", log);
+                println!("{}", log);
+                info!("{}", log);
                 tokio::time::sleep(tokio::time::Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60))
                     .await;
             }
@@ -144,11 +144,11 @@ async fn run_node() {
 
     if config.is_first() {
         set_connection_info(our_conn_info).unwrap_or_else(|err| {
-            log::error!("Unable to write our connection info to disk: {}", err);
+            error!("Unable to write our connection info to disk: {}", err);
         });
     } else {
         add_connection_info(our_conn_info).unwrap_or_else(|err| {
-            log::error!("Unable to add our connection info to disk: {}", err);
+            error!("Unable to add our connection info to disk: {}", err);
         });
     }
 
