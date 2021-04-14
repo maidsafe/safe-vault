@@ -6,26 +6,29 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::messaging::{send, send_error, send_to_nodes};
+use super::messaging::{send, send_error, send_support, send_to_nodes};
 use crate::{
     chunks::Chunks,
     event_mapping::MsgContext,
-    metadata::Metadata,
     node::{AdultRole, Role},
-node_ops::{NodeDuties, NodeDuty, OutgoingMsg, OutgoingSupportingInfo},
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
 };
-use log::{debug, info, trace};
+use log::{debug, info};
 use sn_messaging::{
-    client::{NodeCmd, NodeEvent, NodeQuery, ProcessMsg, Query, SupportingInfo, SupportingInfoFor},
+    client::{NodeQuery, ProcessMsg},
     Aggregation, DstLocation, MessageId,
 };
 use xor_name::XorName;
 
 impl Node {
     ///
-    pub async fn handle(&mut self, duty: NodeDuty, ctx: &Option<MsgContext>) -> Result<NodeDuties> {
+    pub async fn handle(
+        &mut self,
+        duty: NodeDuty,
+        _ctx: &Option<MsgContext>,
+    ) -> Result<NodeDuties> {
         info!("Handling NodeDuty: {:?}", duty);
         match duty {
             NodeDuty::Genesis => {
@@ -370,59 +373,6 @@ impl Node {
             NodeDuty::FinishReplication(data) => {
                 let elder = self.role.as_elder_mut()?;
                 Ok(vec![elder.meta_data.finish_chunk_replication(data).await?])
-            }
-            NodeDuty::ReceiveSectionWalletHistory {
-                wallet_history,
-                origin,
-                ..
-            } => {
-                trace!("Handling received section wallet history");
-                let mut section_funds = self.section_funds.as_mut().ok_or(Error::NoSectionFunds)?;
-                let duty = section_funds
-                    .sync_section_wallet_history(wallet_history)
-                    .await?;
-                Ok(vec![duty])
-            }
-            NodeDuty::ProvideSectionWalletSupportingInfo => {
-                trace!("No funds section error being handled");
-
-                let mut ops = vec![];
-                let is_forming_genesis = is_forming_genesis(&self.network_api).await;
-
-                if is_forming_genesis || !self.network_api.is_elder().await {
-                    trace!("Genesis not yet reached... so we ignore this");
-
-                    Ok(ops)
-                } else {
-                    if let Some(ctx) = ctx {
-                        debug!("ProcessingError context found, sending updates to failing node...");
-                        if let MsgContext::Msg { msg, src } = ctx {
-                            // This will map to the error that triggered this duty
-                            // and until we are updated, this will loop between these two nodes...
-                            let section_funds =
-                                self.section_funds.as_ref().ok_or(Error::NoSectionFunds)?;
-
-                            let wallet_history = section_funds.section_wallet_history();
-
-                            let source_message = msg
-                                .get_process()
-                                .ok_or(Error::NoSourceMessageForProcessingError)?
-                                .clone();
-
-                            ops.push(NodeDuty::SendSupport(OutgoingSupportingInfo {
-                                msg: SupportingInfo {
-                                    info: SupportingInfoFor::SectionWallet(wallet_history),
-                                    source_message,
-                                    correlation_id: msg.id(),
-                                    id: MessageId::new(),
-                                },
-                                dst: DstLocation::Node(src.name()),
-                            }));
-                        }
-                    }
-
-                    Ok(ops)
-                }
             }
             NodeDuty::NoOp => Ok(vec![]),
         }

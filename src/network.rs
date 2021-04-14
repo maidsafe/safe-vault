@@ -12,7 +12,7 @@ use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
-use sn_messaging::{client::ProcessMsg, Itinerary};
+use sn_messaging::Itinerary;
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
     SectionChain,

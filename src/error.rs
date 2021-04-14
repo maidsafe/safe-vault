@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use log::debug;
 use sn_data_types::{Error as DtError, PublicKey};
 use sn_messaging::{
     client::{Error as ErrorMessage, Message},
@@ -81,9 +80,6 @@ pub enum Error {
     /// Node cannot be updated, message cannot be resent
     #[error("Process error could not be handled. We cannot update the problem node.")]
     CannotUpdateProcessErrorNode,
-    /// Not Section PublicKey.
-    #[error("Not section public key returned from routing for xorname {0}")]
-    NoSectionPublicKeyKnown(XorName),
     /// Not a Section PublicKeyShare.
     #[error("PublicKey provided for signing as elder is not a BLS PublicKeyShare")]
     ProvidedPkIsNotBlsShare,

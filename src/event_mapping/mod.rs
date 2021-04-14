@@ -9,14 +9,11 @@
 mod map_msg;
 
 use super::node_ops::NodeDuty;
-use crate::network::Network;
-use log::{info, trace, warn};
+use crate::{network::Network, Error};
+use log::{debug, info, trace, warn};
 use map_msg::{map_node_msg, map_node_process_err_msg, match_user_sent_msg};
 use sn_data_types::PublicKey;
-use sn_messaging::{
-    client::{Message, ProcessMsg, ProcessingError},
-    SrcLocation,
-};
+use sn_messaging::{client::Message, SrcLocation};
 use sn_routing::XorName;
 use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use std::{thread::sleep, time::Duration};

@@ -13,7 +13,7 @@ use sn_data_types::{
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, Message, ProcessMsg, ProcessingError, SupportingInfo},
+    client::{BlobRead, BlobWrite, ProcessMsg, ProcessingError, SupportingInfo},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::Prefix;
@@ -206,9 +206,6 @@ pub enum NodeDuty {
         id: MessageId,
         section: XorName,
     },
-    /// Send section history to erroring node.
-    /// This should also trigger resending of the original message.
-    ProvideSectionWalletSupportingInfo,
     NoOp,
 }
 
@@ -273,12 +270,6 @@ impl Debug for NodeDuty {
             Self::ReturnChunkToElders { .. } => write!(f, "ReturnChunkToElders"),
             Self::FinishReplication(_) => write!(f, "FinishReplication"),
             Self::ReplicateChunk(_) => write!(f, "ReplicateChunk"),
-            Self::UpdateErroringNodeSectionState { .. } => {
-                write!(f, "UpdateErroringNodeSectionState")
-            }
-            Self::ProvideSectionWalletSupportingInfo { .. } => {
-                write!(f, "ProvideSectionWalletSupportingInfo")
-            }
         }
     }
 }

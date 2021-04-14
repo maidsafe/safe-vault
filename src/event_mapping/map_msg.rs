@@ -8,12 +8,12 @@
 
 use super::{Mapping, MsgContext};
 use crate::{node_ops::NodeDuty, Error};
-use log::{debug, warn};
+use log::warn;
 use sn_messaging::{
     client::{
         Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeQuery, NodeQueryResponse,
         NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
-        ProcessMsg, Query, TransferCmd, TransferQuery,
+        ProcessMsg, ProcessingError, Query, TransferCmd, TransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
@@ -177,18 +177,18 @@ pub fn map_node_process_err_msg(
 }
 
 fn match_process_err(msg: ProcessingError, src: SrcLocation) -> Mapping {
-    if let Some(reason) = msg.clone().reason() {
+    if let Some(reason) = msg.reason() {
         // debug!("ProcessingError with reason")
         match reason {
-            ErrorMessage::NoSectionFunds => {
-                return Mapping::Ok {
-                    op: NodeDuty::ProvideSectionWalletSupportingInfo,
-                    ctx: Some(MsgContext::Msg {
-                        msg: Message::ProcessingError(msg),
-                        src,
-                    }),
-                };
-            }
+            // ErrorMessage::NoSectionFunds => {
+            //     return Mapping::Ok {
+            //         op: NodeDuty::ProvideSectionWalletSupportingInfo,
+            //         ctx: Some(MsgContext::Msg {
+            //             msg: Message::ProcessingError(msg),
+            //             src,
+            //         }),
+            //     };
+            // }
             _ => {
                 warn!(
                     "TODO: We do not handle this process error reason yet. {:?}",
@@ -262,30 +262,21 @@ fn match_section_msg(msg: ProcessMsg, origin: SrcLocation) -> NodeDuty {
             node_rewards: node_rewards.to_owned(),
             user_wallets: user_wallets.to_owned(),
         },
-        Message::NodeCmd {
+        ProcessMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             ..
         } => NodeDuty::ReceiveRewardProposal(proposal.clone()),
-        Message::NodeCmd {
+        ProcessMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             ..
         } => NodeDuty::ReceiveRewardAccumulation(accumulation.clone()),
         // ------ section funds -----
-        Message::NodeQuery {
+        ProcessMsg::NodeQuery {
             query: NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletKey(node_name)),
             id,
             ..
         } => NodeDuty::GetNodeWalletKey {
             node_name: *node_name,
-            msg_id: *id,
-            origin,
-        },
-        ProcessMsg::NodeEvent {
-            event: NodeEvent::SectionWalletCreated(wallet_history),
-            id,
-            ..
-        } => NodeDuty::ReceiveSectionWalletHistory {
-            wallet_history: wallet_history.clone(),
             msg_id: *id,
             origin,
         },
@@ -341,7 +332,7 @@ fn match_section_msg(msg: ProcessMsg, origin: SrcLocation) -> NodeDuty {
         },
         //
         // ------ chunk replication ------
-        Message::NodeQuery {
+        ProcessMsg::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetChunk(address)),
             id,
             ..
@@ -351,7 +342,7 @@ fn match_section_msg(msg: ProcessMsg, origin: SrcLocation) -> NodeDuty {
             id: *id,
         },
         // this cmd is accumulated, thus has authority
-        Message::NodeCmd {
+        ProcessMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
             ..
         } => NodeDuty::ReplicateChunk(data.clone()),

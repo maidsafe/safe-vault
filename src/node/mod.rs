@@ -19,7 +19,7 @@ use crate::{
     event_mapping::{map_routing_event, Mapping, MsgContext},
     metadata::Metadata,
     network::Network,
-    node_ops::{NodeDuty, OutgoingLazyError, OutgoingMsg},
+    node_ops::{NodeDuty, OutgoingLazyError},
     section_funds::SectionFunds,
     state_db::{get_reward_pk, store_new_reward_keypair},
     transfers::Transfers,
@@ -27,9 +27,12 @@ use crate::{
 };
 use bls::SecretKey;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
-use log::{error, info, warn};
+use log::{error, warn};
 use sn_data_types::PublicKey;
-use sn_messaging::client::{Error as ErrorMessage, Message, ProcessMsg, ProcessingError};
+use sn_messaging::{
+    client::{Error as ErrorMessage, Message, ProcessingError},
+    DstLocation, MessageId, SrcLocation,
+};
 use sn_routing::{EventStream, Prefix, XorName};
 use std::path::{Path, PathBuf};
 use std::{
@@ -261,18 +264,18 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
                             dst,
                         })
                     }
-                    Message::ProcessingError(err) => {
+                    Message::ProcessingError(_err) => {
                         // TODO: handle error as a result of handling processing error...
                         NodeDuty::NoOp
                     }
-                    Message::SupportingInfo(msg) => {
+                    Message::SupportingInfo(_msg) => {
                         // TODO: handle error as a result of supporting info msg
                         NodeDuty::NoOp
                     }
                 }
             }
             // An error decoding a message
-            MsgContext::Bytes { msg, src } => {
+            MsgContext::Bytes { src, .. } => {
                 warn!("Error decoding msg bytes, sent from {:?}", src);
                 let dst = get_dst_from_src(src);
 

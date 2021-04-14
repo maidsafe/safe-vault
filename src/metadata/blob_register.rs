@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey};
 use sn_messaging::{
     client::{
-        BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd, NodeQuery,
-        NodeSystemCmd, NodeSystemQuery, ProcessMsg, QueryResponse,
+        BlobRead, BlobWrite, CmdError, Error as ErrorMessage, NodeCmd, NodeQuery, NodeSystemCmd,
+        NodeSystemQuery, ProcessMsg, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
@@ -81,11 +81,10 @@ impl BlobRegister {
                 return Ok(NodeDuty::NoOp);
             } else {
                 return Ok(NodeDuty::Send(OutgoingMsg {
-                    msg: Message::CmdError {
+                    msg: ProcessMsg::CmdError {
                         error: CmdError::Data(ErrorMessage::DataExists),
                         id: MessageId::in_response_to(&msg_id),
                         correlation_id: msg_id,
-                        target_section_pk: None,
                     },
                     section_source: false, // strictly this is not correct, but we don't expect responses to an error..
                     dst: DstLocation::EndUser(origin),
@@ -121,13 +120,12 @@ impl BlobRegister {
 
         Ok(NodeDuty::SendToNodes {
             targets: target_holders,
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: BlobWrite::New(data),
                     origin,
                 },
                 id: msg_id,
-                target_section_pk: None,
             },
             aggregation: Aggregation::AtDestination,
         })
@@ -361,10 +359,9 @@ impl BlobRegister {
 
         Ok(NodeDuty::SendToNodes {
             targets: target_holders,
-            msg: Message::NodeCmd {
+            msg: ProcessMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
                 id: msg_id,
-                target_section_pk: None,
             },
             aggregation: Aggregation::AtDestination,
         })
@@ -384,7 +381,6 @@ impl BlobRegister {
                     ProcessMsg::NodeQuery {
                         query: NodeQuery::System(NodeSystemQuery::GetChunk(address)),
                         id: MessageId::combine(vec![*address.name(), holder]),
-                        target_section_pk: None,
                     },
                     holder,
                 )

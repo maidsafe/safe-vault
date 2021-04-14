@@ -16,8 +16,8 @@ use log::{error, info};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     client::{
-        CmdError, Error as ErrorMessage, Message, NodeDataQueryResponse, NodeQueryResponse,
-        ProcessMsg, QueryResponse,
+        CmdError, Error as ErrorMessage, NodeDataQueryResponse, NodeQueryResponse, ProcessMsg,
+        QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
