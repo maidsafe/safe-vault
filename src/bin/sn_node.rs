@@ -60,7 +60,7 @@ async fn run_node() {
         Ok(cfg) => cfg,
         Err(e) => {
             println!("Failed to create Config: {:?}", e);
-            process::exit(1);
+            return exit(1);
         }
     };
 
@@ -87,14 +87,14 @@ async fn run_node() {
             Ok(status) => {
                 if let Status::Updated { .. } = status {
                     println!("Node has been updated. Please restart.");
-                    process::exit(0);
+                    exit(0);
                 }
             }
             Err(e) => error!("Updating node failed: {:?}", e),
         }
 
         if config.update_only() {
-            process::exit(0);
+            exit(0);
         }
     }
 
@@ -122,7 +122,7 @@ async fn run_node() {
             Err(e) => {
                 println!("Cannot start node due to error: {:?}. Exiting", e);
                 error!("Cannot start node due to error: {:?}. Exiting", e);
-                process::exit(1);
+                exit(1);
             }
         }
     };
@@ -153,13 +153,18 @@ async fn run_node() {
     }
 
     match node.run().await {
-        Ok(()) => process::exit(0),
+        Ok(()) => exit(0),
         Err(e) => {
             println!("Cannot start node due to error: {:?}", e);
             error!("Cannot start node due to error: {:?}", e);
-            process::exit(1);
+            exit(1);
         }
     }
+}
+
+fn exit(exit_code: i32) {
+    log::logger().flush();
+    process::exit(exit_code);
 }
 
 fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
