@@ -6,9 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::DutyHandler;
 use crate::{
+    network::Network,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{self, SectionFunds},
+    state::ElderStateCommand,
+    state::State,
     transfers::{
         get_replicas::replica_info,
         replica_signing::ReplicaSigningImpl,
@@ -40,7 +44,7 @@ use sn_routing::{Prefix, XorName};
 use sn_transfers::TransferActor;
 use std::collections::BTreeMap;
 
-impl Node {
+impl DutyHandler {
     /// Called on split reported from routing layer.
     pub(crate) async fn begin_split_as_newbie(
         &mut self,
@@ -64,18 +68,19 @@ impl Node {
             our_key,
         };
 
-        let elder = self.role.as_elder_mut()?;
-
         let mut process =
             RewardProcess::new(section, ElderSigning::new(self.network_api.clone()).await?);
 
         let wallets = RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new());
 
-        elder.section_funds = SectionFunds::Churning {
-            process,
-            wallets,
-            payments: DashMap::new(),
-        };
+        let _ = self
+            .state
+            .elder_command(ElderStateCommand::SetSectionFunds(SectionFunds::Churning {
+                process,
+                wallets,
+                payments: DashMap::new(),
+            }))
+            .await?;
 
         Ok(())
     }
@@ -87,18 +92,14 @@ impl Node {
         our_key: PublicKey,
         sibling_key: PublicKey,
     ) -> Result<NodeDuties> {
-        let elder = self.role.as_elder_mut()?;
+        let info = replica_info(&self.network_api).await?;
+        let _ = self
+            .state
+            .elder_command(ElderStateCommand::UpdateReplicaInfo(info))
+            .await?;
+        let user_wallets = self.state.user_wallets().await;
 
-        let info = replica_info(&self.node_info, &self.network_api).await?;
-        elder.transfers.update_replica_info(info);
-        let user_wallets = elder.transfers.user_wallets();
-
-        let (wallets, payments) = match &mut elder.section_funds {
-            SectionFunds::KeepingNodeWallets { wallets, payments }
-            | SectionFunds::Churning {
-                wallets, payments, ..
-            } => (wallets.clone(), payments.sum()),
-        };
+        let (wallets, payments) = self.state.wallets_and_payments().await?;
 
         let sibling_prefix = our_prefix.sibling();
 
@@ -114,7 +115,7 @@ impl Node {
         let mut ops = vec![];
 
         if payments > Token::zero() {
-            let section_managed = elder.transfers.managed_amount().await?;
+            let section_managed = self.state.transfers_managed_amount().await?;
 
             // payments made since last churn
             debug!("Payments: {}", payments);
@@ -136,20 +137,23 @@ impl Node {
                     .await?,
             );
 
-            elder.section_funds = SectionFunds::Churning {
-                process,
-                wallets: wallets.clone(),
-                payments: DashMap::new(), // clear old payments
-            };
+            let _ = self
+                .state
+                .elder_command(ElderStateCommand::SetSectionFunds(SectionFunds::Churning {
+                    process,
+                    wallets: wallets.clone(),
+                    payments: DashMap::new(), // clear old payments
+                }))
+                .await?;
         } else {
             debug!("Not paying out rewards, as no payments have been received since last split.");
         }
 
         let msg_id = MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-        ops.push(self.push_state(our_prefix, msg_id));
+        ops.push(self.push_state(our_prefix, msg_id).await);
 
         let msg_id = MessageId::combine(vec![sibling_prefix.name(), XorName::from(sibling_key)]);
-        ops.push(self.push_state(sibling_prefix, msg_id));
+        ops.push(self.push_state(sibling_prefix, msg_id).await);
 
         Ok(ops)
     }

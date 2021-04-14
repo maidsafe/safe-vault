@@ -13,7 +13,7 @@ mod writing;
 use crate::{
     chunk_store::UsedSpace,
     node_ops::{NodeDuties, NodeDuty},
-    NodeInfo, Result,
+    Result,
 };
 use chunk_storage::ChunkStorage;
 use log::info;

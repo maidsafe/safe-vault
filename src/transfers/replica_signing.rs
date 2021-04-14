@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Network, Result};
+use crate::{network::Network, Result};
 use async_trait::async_trait;
 use bls::PublicKeySet;
 use sn_data_types::{

@@ -6,14 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{handle::DutyHandler, interaction::register_wallet};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     metadata::{adult_reader::AdultReader, Metadata},
-    node::{ElderRole, Role},
+    network::Network,
     node_ops::NodeDuty,
     section_funds::{reward_wallets::RewardWallets, SectionFunds},
-    transfers::get_replicas::{replica_info, transfer_replicas},
-    transfers::Transfers,
+    state::ElderStateCommand,
+    state::State,
+    transfers::{
+        get_replicas::{replica_info, transfer_replicas},
+        Transfers,
+    },
     Error, Node, Result,
 };
 use crdts::Actor;
@@ -31,76 +36,79 @@ use sn_messaging::{
 use sn_routing::XorName;
 use std::collections::BTreeMap;
 
-impl Node {
+impl DutyHandler {
     /// If we are an oldie we'll have a transfer instance,
     /// This updates the replica info on it.
-    pub async fn update_replicas(&mut self) -> Result<()> {
-        let elder = self.role.as_elder_mut()?;
-        let info = replica_info(&self.node_info, &self.network_api).await?;
-        elder.transfers.update_replica_info(info);
+    pub(crate) async fn update_replicas(&mut self) -> Result<()> {
+        let info = replica_info(&self.network_api).await?;
+        let _ = self
+            .state
+            .elder_command(ElderStateCommand::UpdateReplicaInfo(info))
+            .await?;
         Ok(())
     }
 
-    /// Level up a newbie to an oldie on promotion
-    pub async fn level_up(&mut self) -> Result<()> {
-        self.used_space.reset().await; // TODO(drusu): should this be part of adult_state?
+    // Level up a newbie to an oldie on promotion
+    pub(crate) async fn level_up(&mut self) -> Result<()> {
+        self.state.reset_used_space().await; // TODO(drusu): should this be part of adult_state?
 
-        //
         // start handling metadata
-        let dbs = ChunkHolderDbs::new(self.node_info.path())?;
+        let node_root_dir = self.state.node_root_dir().await;
+        let dbs = ChunkHolderDbs::new(node_root_dir.as_path())?;
         let reader = AdultReader::new(self.network_api.clone());
-        let meta_data =
-            Metadata::new(&self.node_info.path(), &self.used_space, dbs, reader).await?;
+        let used_space = self.state.used_space().await;
+        let meta_data = Metadata::new(node_root_dir.as_path(), used_space, dbs, reader).await?;
 
-        //
         // start handling transfers
-        let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
+        let node_root_dir = self.state.node_root_dir().await;
+        let dbs = ChunkHolderDbs::new(node_root_dir.as_path())?;
         let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs.clone()));
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
-        let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
+        let replicas = transfer_replicas(node_root_dir, &self.network_api, user_wallets).await?;
         let transfers = Transfers::new(replicas, rate_limit);
 
-        //
         // start handling node rewards
         let section_funds = SectionFunds::KeepingNodeWallets {
             wallets: RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new()),
             payments: DashMap::new(),
         };
 
-        self.role = Role::Elder(ElderRole {
-            meta_data,
-            transfers,
-            section_funds,
-        });
+        self.state
+            .set_elder_role(meta_data, transfers, section_funds)
+            .await;
 
-        // TODO(drusu): return a  mutable reference to elder state?
         Ok(())
     }
 
     /// Continue the level up and handle more responsibilities.
-    pub async fn synch_state(
+    pub(crate) async fn synch_state(
         &mut self,
         node_wallets: BTreeMap<XorName, (NodeAge, PublicKey)>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
     ) -> Result<NodeDuty> {
-        let elder = self.role.as_elder_mut()?;
-
         // merge in provided user wallets
-        elder.transfers.merge(user_wallets);
-
-        //  merge in provided node reward stages
-        for (key, (age, wallet)) in &node_wallets {
-            elder.section_funds.set_node_wallet(*key, *wallet, *age)
-        }
+        let _ = self
+            .state
+            .elder_command(ElderStateCommand::MergeUserWallets(user_wallets))
+            .await?;
 
         let node_id = self.network_api.our_name().await;
         let no_wallet_found = node_wallets.get(&node_id).is_none();
+
+        //  merge in provided node reward stages
+        let _ = self
+            .state
+            .elder_command(ElderStateCommand::SetNodeRewardsWallets(node_wallets))
+            .await?;
+
         if no_wallet_found {
             info!(
                 "Registering wallet of node: {} (since not found in received state)",
                 node_id,
             );
-            Ok(NodeDuty::Send(self.register_wallet().await))
+            Ok(NodeDuty::Send(
+                register_wallet(&self.network_api, &self.state).await,
+            ))
         } else {
             Ok(NodeDuty::NoOp)
         }

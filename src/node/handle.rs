@@ -10,7 +10,7 @@ use super::messaging::{send, send_to_nodes};
 use crate::{
     chunks::Chunks,
     metadata::Metadata,
-    node::{AdultRole, Role},
+    network::Network,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{
         reward_process::RewardProcess,
@@ -18,12 +18,15 @@ use crate::{
         reward_wallets::RewardWallets,
         Credits, SectionFunds,
     },
+    state::{AdultStateCommand, ElderStateCommand, State},
     transfers::Transfers,
     Error, Node, Result,
 };
 use dashmap::DashMap;
 use log::{debug, info};
-use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders, WalletHistory};
+use sn_data_types::{
+    CreditAgreementProof, CreditId, NodeAge, PublicKey, SectionElders, WalletHistory,
+};
 use sn_messaging::{
     client::{Message, NodeCmd, NodeQuery, Query},
     Aggregation, DstLocation, MessageId,
@@ -31,8 +34,12 @@ use sn_messaging::{
 use std::collections::{BTreeMap, VecDeque};
 use xor_name::XorName;
 
-impl Node {
-    ///
+pub(crate) struct DutyHandler {
+    pub network_api: Network,
+    pub state: State,
+}
+
+impl DutyHandler {
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         info!("Handling NodeDuty: {:?}", duty);
         match duty {
@@ -54,7 +61,8 @@ impl Node {
                     self.update_replicas().await?;
                     let msg_id =
                         MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-                    Ok(vec![self.push_state(our_prefix, msg_id)])
+
+                    Ok(vec![self.push_state(our_prefix, msg_id).await])
                 }
             }
             NodeDuty::SectionSplit {
@@ -78,39 +86,27 @@ impl Node {
                 Ok(vec![self.get_section_elders(msg_id, origin).await?])
             }
             NodeDuty::ReceiveRewardProposal(proposal) => {
-                let elder = self.role.as_elder_mut()?;
-                info!("Handling Churn proposal as an Elder");
-                let (churn_process, _, _) = elder.section_funds.as_churning_mut()?;
-                Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
+                // if it fails it means we are an adult, so ignore this msg
+                self.state
+                    .elder_command(ElderStateCommand::ReceiveChurnProposal(proposal))
+                    .await
+                    .or_else(|_| Ok(vec![]))
             }
             NodeDuty::ReceiveRewardAccumulation(accumulation) => {
-                let elder = self.role.as_elder_mut()?;
-
-                let (churn_process, reward_wallets, payments) =
-                    elder.section_funds.as_churning_mut()?;
-
-                let mut ops = vec![
-                    churn_process
-                        .receive_wallet_accumulation(accumulation)
-                        .await?,
-                ];
-
-                if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
-                    let reward_sum = credit_proofs.sum();
-                    ops.extend(Self::propagate_credits(credit_proofs)?);
-                    // update state
-                    elder.section_funds = SectionFunds::KeepingNodeWallets {
-                        wallets: reward_wallets.clone(),
-                        payments: payments.clone(),
-                    };
-                    let section_key = &self.network_api.section_public_key().await?;
-                    info!(
-                        "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
-                        section_key, reward_sum
-                    );
+                let section_key = self.network_api.section_public_key().await?;
+                if let Ok(ops) = self
+                    .state
+                    .elder_command(ElderStateCommand::ReceiveWalletAccumulation {
+                        accumulation,
+                        section_key,
+                    })
+                    .await
+                {
+                    Ok(ops)
+                } else {
+                    // we are an adult, so ignore this error
+                    Ok(vec![])
                 }
-
-                Ok(ops)
             }
             //
             // ------- reward reg -------
@@ -120,13 +116,14 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let elder = self.role.as_elder_mut()?;
                 let members = self.network_api.our_members().await;
                 if let Some(age) = members.get(&node_id) {
-                    elder
-                        .section_funds
-                        .set_node_wallet(node_id, wallet_id, *age);
-                    Ok(vec![])
+                    let mut node_wallets = BTreeMap::<XorName, (NodeAge, PublicKey)>::new();
+                    let _ = node_wallets.insert(node_id, (*age, wallet_id));
+
+                    self.state
+                        .elder_command(ElderStateCommand::SetNodeRewardsWallets(node_wallets))
+                        .await
                 } else {
                     debug!(
                         "{:?}: Couldn't find node id {} when adding wallet {}",
@@ -149,14 +146,22 @@ impl Node {
                 info!("Setting JoinsAllowed to `True` for replacing the member left");
                 ops.push(NodeDuty::SetNodeJoinsAllowed(true));
 
-                let elder = self.role.as_elder_mut()?;
-                elder.section_funds.remove_node_wallet(name);
-                elder
-                    .transfers
-                    .decrease_full_node_count_if_present(name)
+                let _ = self
+                    .state
+                    .elder_command(ElderStateCommand::RemoveNodeWallet(name))
                     .await?;
 
-                ops.extend(elder.meta_data.trigger_chunk_replication(name).await?);
+                let _ = self
+                    .state
+                    .elder_command(ElderStateCommand::DecreaseFullNodeCount(name))
+                    .await?;
+
+                let additional_ops = self
+                    .state
+                    .elder_command(ElderStateCommand::TriggerChunkReplication(name))
+                    .await?;
+
+                ops.extend(additional_ops);
 
                 Ok(ops)
             }
@@ -168,55 +173,51 @@ impl Node {
             } => Ok(vec![self.synch_state(node_rewards, user_wallets).await?]),
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
-                self.role = Role::Adult(AdultRole {
-                    chunks: Chunks::new(
-                        self.node_info.node_name,
-                        self.node_info.root_dir.as_path(),
-                        self.used_space.clone(),
-                    )
-                    .await?,
-                });
+                self.state.demote_to_adult_role().await?;
+
                 Ok(vec![])
             }
             //
             // ----------- Transfers -----------
             NodeDuty::GetTransferReplicaEvents { msg_id, origin } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.transfers.all_events(msg_id, origin).await?])
+                self.state
+                    .elder_command(ElderStateCommand::GetTransferReplicaEvents { msg_id, origin })
+                    .await
             }
             NodeDuty::PropagateTransfer {
                 proof,
                 msg_id,
                 origin,
             } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![
-                    elder
-                        .transfers
-                        .receive_propagated(&proof, msg_id, origin)
-                        .await?,
-                ])
+                self.state
+                    .elder_command(ElderStateCommand::ReceivePropagated {
+                        proof,
+                        msg_id,
+                        origin,
+                    })
+                    .await
             }
             NodeDuty::ValidateClientTransfer {
                 signed_transfer,
                 msg_id,
                 origin,
             } => {
-                let elder = self.role.as_elder()?;
-                Ok(vec![
-                    elder
-                        .transfers
-                        .validate(signed_transfer, msg_id, origin)
-                        .await?,
-                ])
+                self.state
+                    .elder_command(ElderStateCommand::ValidateTransfer {
+                        signed_transfer,
+                        msg_id,
+                        origin,
+                    })
+                    .await
             }
             NodeDuty::SimulatePayout {
                 transfer,
                 msg_id,
                 origin,
             } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.transfers.credit_without_proof(transfer).await?])
+                self.state
+                    .elder_command(ElderStateCommand::CreditWithoutProof(transfer))
+                    .await
             }
             NodeDuty::GetTransfersHistory {
                 at,
@@ -225,12 +226,14 @@ impl Node {
                 origin,
             } => {
                 debug!(">>>> TODO: GET TRANSFER HISTORY, ADD limit with since_version....");
-                let elder = self.role.as_elder()?;
-                Ok(vec![elder.transfers.history(&at, msg_id, origin).await?])
+                self.state
+                    .elder_command(ElderStateCommand::GetTransfersHistory { at, msg_id, origin })
+                    .await
             }
             NodeDuty::GetBalance { at, msg_id, origin } => {
-                let elder = self.role.as_elder()?;
-                Ok(vec![elder.transfers.balance(at, msg_id, origin).await?])
+                self.state
+                    .elder_command(ElderStateCommand::GetTransfersBalance { at, msg_id, origin })
+                    .await
             }
             NodeDuty::GetStoreCost {
                 requester,
@@ -238,12 +241,18 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(elder.transfers.get_store_cost(bytes, msg_id, origin).await)
+                self.state
+                    .elder_command(ElderStateCommand::GetStoreCost {
+                        bytes,
+                        msg_id,
+                        origin,
+                    })
+                    .await
             }
             NodeDuty::RegisterTransfer { proof, msg_id } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.transfers.register(&proof, msg_id).await?])
+                self.state
+                    .elder_command(ElderStateCommand::RegisterTransfer { proof, msg_id })
+                    .await
             }
             //
             // -------- Immutable chunks --------
@@ -261,10 +270,21 @@ impl Node {
                     .await
                     .matches(&&data_section_addr)
                 {
-                    let adult = self.role.as_adult_mut()?;
-                    let read = adult.chunks.read(&read, msg_id, origin).await?;
-                    let mut ops = adult.chunks.check_storage().await?;
-                    ops.insert(0, read);
+                    let mut ops = self
+                        .state
+                        .adult_command(AdultStateCommand::ReadChunk {
+                            read,
+                            msg_id,
+                            origin,
+                        })
+                        .await?;
+
+                    ops.extend(
+                        self.state
+                            .adult_command(AdultStateCommand::CheckStorage)
+                            .await?,
+                    );
+
                     Ok(ops)
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
@@ -288,15 +308,22 @@ impl Node {
                 msg_id,
                 origin,
             } => {
-                let adult = self.role.as_adult_mut()?;
-                Ok(vec![adult.chunks.write(&write, msg_id, origin).await?])
+                self.state
+                    .adult_command(AdultStateCommand::WriteChunk {
+                        write,
+                        msg_id,
+                        origin,
+                    })
+                    .await
             }
             NodeDuty::ReachingMaxCapacity => Ok(vec![self.notify_section_of_our_storage().await?]),
             //
             // ------- Misc ------------
             NodeDuty::IncrementFullNodeCount { node_id } => {
-                let elder = self.role.as_elder_mut()?;
-                elder.transfers.increase_full_node_count(node_id).await?;
+                let _ = self
+                    .state
+                    .elder_command(ElderStateCommand::IncreaseFullNodeCount(node_id))
+                    .await?;
                 // Accept a new node in place for the full node.
                 Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
             }
@@ -328,8 +355,9 @@ impl Node {
                     .await
                     .matches(&data_section_addr)
                 {
-                    let elder = self.role.as_elder()?;
-                    Ok(vec![elder.meta_data.read(query, id, origin).await?])
+                    self.state
+                        .elder_command(ElderStateCommand::ReadDataCmd { query, id, origin })
+                        .await
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
                         msg: Message::NodeQuery {
@@ -345,39 +373,42 @@ impl Node {
                 }
             }
             NodeDuty::ProcessWrite { cmd, id, origin } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.meta_data.write(cmd, id, origin).await?])
+                self.state
+                    .elder_command(ElderStateCommand::WriteDataCmd { cmd, id, origin })
+                    .await
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
-                let elder = self.role.as_elder_mut()?;
-                elder.transfers.process_payment(&msg, origin).await
+                self.state
+                    .elder_command(ElderStateCommand::ProcessPayment { msg, origin })
+                    .await
             }
             NodeDuty::AddPayment(credit) => {
-                let elder = self.role.as_elder_mut()?;
-                elder.section_funds.add_payment(credit);
-                Ok(vec![])
+                self.state
+                    .elder_command(ElderStateCommand::AddPayment(credit))
+                    .await
             }
             NodeDuty::ReplicateChunk(data) => {
-                let adult = self.role.as_adult_mut()?;
-                adult.chunks.store_for_replication(data).await?;
-                Ok(vec![])
+                self.state
+                    .adult_command(AdultStateCommand::StoreChunkForReplication(data))
+                    .await
             }
             NodeDuty::ReturnChunkToElders {
                 address,
                 id,
                 section,
             } => {
-                let adult = self.role.as_adult()?;
-                Ok(vec![
-                    adult
-                        .chunks
-                        .get_chunk_for_replication(address, id, section)
-                        .await?,
-                ])
+                self.state
+                    .adult_command(AdultStateCommand::GetChunkForReplication {
+                        address,
+                        id,
+                        section,
+                    })
+                    .await
             }
             NodeDuty::FinishReplication(data) => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.meta_data.finish_chunk_replication(data).await?])
+                self.state
+                    .elder_command(ElderStateCommand::FinishChunkReplication(data))
+                    .await
             }
             NodeDuty::NoOp => Ok(vec![]),
         }

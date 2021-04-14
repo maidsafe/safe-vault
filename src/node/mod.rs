@@ -18,124 +18,52 @@ use crate::{
     chunks::Chunks,
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
     metadata::{adult_reader::AdultReader, Metadata},
+    network::Network,
     node_ops::{NodeDuties, NodeDuty},
     section_funds::SectionFunds,
+    state::State,
     state_db::store_new_reward_keypair,
     transfers::get_replicas::transfer_replicas,
     transfers::Transfers,
-    Config, Error, Network, Result,
+    Config, Error, Result,
 };
 use bls::SecretKey;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use futures::lock::Mutex;
+use handle::DutyHandler;
 use hex_fmt::HexFmt;
+use interaction::register_wallet;
 use log::{debug, error, info, trace, warn};
 use sn_data_types::{ActorHistory, PublicKey, TransferPropagated, WalletHistory};
 use sn_messaging::{client::Message, DstLocation, SrcLocation};
-use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
-use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
+use sn_routing::{
+    Event as RoutingEvent, EventStream, NodeElderChange, Prefix, XorName,
+    ELDER_SIZE as GENESIS_ELDER_COUNT, MIN_AGE,
+};
 use sn_transfers::{TransferActor, Wallet};
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::{
+    collections::BTreeMap,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
+    path::{Path, PathBuf},
+    sync::Arc,
 };
-
-/// Static info about the node.
-#[derive(Clone)]
-pub struct NodeInfo {
-    ///
-    pub genesis: bool,
-    ///
-    pub root_dir: PathBuf,
-    ///
-    pub node_name: XorName,
-    ///
-    pub node_id: Ed25519PublicKey,
-    /// The key used by the node to receive earned rewards.
-    pub reward_key: PublicKey,
-}
-
-impl NodeInfo {
-    ///
-    pub fn path(&self) -> &Path {
-        self.root_dir.as_path()
-    }
-}
-
-struct AdultRole {
-    // immutable chunks
-    chunks: Chunks,
-}
-
-struct ElderRole {
-    // data operations
-    meta_data: Metadata,
-    // transfers
-    transfers: Transfers,
-    // reward payouts
-    section_funds: SectionFunds,
-}
-
-#[allow(clippy::large_enum_variant)]
-enum Role {
-    Adult(AdultRole),
-    Elder(ElderRole),
-}
-
-impl Role {
-    fn as_adult(&self) -> Result<&AdultRole> {
-        match self {
-            Self::Adult(adult_state) => Ok(adult_state),
-            _ => Err(Error::NotAnAdult),
-        }
-    }
-
-    fn as_adult_mut(&mut self) -> Result<&mut AdultRole> {
-        match self {
-            Self::Adult(adult_state) => Ok(adult_state),
-            _ => Err(Error::NotAnAdult),
-        }
-    }
-
-    fn as_elder(&self) -> Result<&ElderRole> {
-        match self {
-            Self::Elder(elder_state) => Ok(elder_state),
-            _ => Err(Error::NotAnElder),
-        }
-    }
-
-    fn as_elder_mut(&mut self) -> Result<&mut ElderRole> {
-        match self {
-            Self::Elder(elder_state) => Ok(elder_state),
-            _ => Err(Error::NotAnElder),
-        }
-    }
-}
 
 /// Main node struct.
 pub struct Node {
     network_api: Network,
     network_events: EventStream,
-    node_info: NodeInfo,
-    used_space: UsedSpace,
-    prefix: Prefix,
-    role: Role,
+    state: State,
 }
 
 impl Node {
     /// Initialize a new node.
-    /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
-    #[allow(clippy::eval_order_dependence)]
     pub async fn new(config: &Config) -> Result<Self> {
-        // TODO: STARTUP all things
-        let root_dir_buf = config.root_dir()?;
-        let root_dir = root_dir_buf.as_path();
-        std::fs::create_dir_all(root_dir)?;
+        let root_dir = config.root_dir()?;
+        let root_dir_path = root_dir.as_path();
+        std::fs::create_dir_all(root_dir_path)?;
 
-        let reward_key_task = async move {
+        let reward_key = async move {
             let res: Result<PublicKey>;
             match config.wallet_id() {
                 Some(public_key) => {
@@ -144,44 +72,26 @@ impl Node {
                 None => {
                     let secret = SecretKey::random();
                     let public = secret.public_key();
-                    store_new_reward_keypair(root_dir, &secret, &public).await?;
+                    store_new_reward_keypair(root_dir_path, &secret, &public).await?;
                     res = Ok(PublicKey::Bls(public));
                 }
             };
             res
         }
-        .await;
+        .await?;
 
-        let reward_key = reward_key_task?;
         let (network_api, network_events) = Network::new(config).await?;
 
-        let node_info = NodeInfo {
-            genesis: config.is_first(),
-            root_dir: root_dir_buf,
-            node_name: network_api.our_name().await,
-            node_id: network_api.public_key().await,
-            reward_key,
-        };
+        let mut state =
+            State::new(root_dir, &network_api, config.max_capacity(), reward_key).await?;
 
-        let used_space = UsedSpace::new(config.max_capacity());
+        messaging::send(register_wallet(&network_api, &state).await, &network_api).await;
 
         let node = Self {
-            prefix: network_api.our_prefix().await,
-            role: Role::Adult(AdultRole {
-                chunks: Chunks::new(
-                    node_info.node_name,
-                    node_info.root_dir.as_path(),
-                    used_space.clone(),
-                )
-                .await?,
-            }),
-            node_info,
-            used_space,
             network_api,
             network_events,
+            state,
         };
-
-        messaging::send(node.register_wallet().await, &node.network_api).await;
 
         Ok(node)
     }
@@ -206,30 +116,42 @@ impl Node {
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
         while let Some(event) = self.network_events.next().await {
-            // tokio spawn should only be needed around intensive tasks, ie sign/verify
-            match map_routing_event(event, &self.network_api).await {
-                Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,
-                Mapping::Error(error) => handle_error(error),
-            }
+            let network_api = self.network_api.clone();
+            let state = self.state.clone();
+            let _ = tokio::spawn(async move {
+                match map_routing_event(event, &network_api).await {
+                    Mapping::Ok { op, ctx } => process_while_any(network_api, state, op, ctx).await,
+                    Mapping::Error(error) => handle_error(error),
+                }
+            })
+            .await;
         }
 
         Ok(())
     }
+}
 
-    /// Keeps processing resulting node operations.
-    async fn process_while_any(&mut self, op: NodeDuty, ctx: Option<MsgContext>) {
-        let mut next_ops = vec![op];
+/// Keeps processing resulting node operations.
+async fn process_while_any(
+    network_api: Network,
+    state: State,
+    op: NodeDuty,
+    ctx: Option<MsgContext>,
+) {
+    let mut next_ops = vec![op];
+    let mut duty_handler = DutyHandler { network_api, state };
 
-        while !next_ops.is_empty() {
-            let mut pending_node_ops: Vec<NodeDuty> = vec![];
-            for duty in next_ops {
-                match self.handle(duty).await {
-                    Ok(new_ops) => pending_node_ops.extend(new_ops),
-                    Err(e) => try_handle_error(e, ctx.clone()),
-                };
+    while !next_ops.is_empty() {
+        let mut pending_node_ops: Vec<NodeDuty> = vec![];
+        for duty in next_ops {
+            // TODO: additional tasks spawning around intensive tasks, ie sign/verify
+            // and/or for each new node duty
+            match duty_handler.handle(duty).await {
+                Ok(new_ops) => pending_node_ops.extend(new_ops),
+                Err(e) => try_handle_error(e, ctx.clone()),
             }
-            next_ops = pending_node_ops;
         }
+        next_ops = pending_node_ops;
     }
 }
 

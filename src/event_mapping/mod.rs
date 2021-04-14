@@ -9,7 +9,7 @@
 mod map_msg;
 
 use super::node_ops::{NodeDuties, NodeDuty};
-use crate::{Network, Result};
+use crate::{network::Network, Result};
 use hex_fmt::HexFmt;
 use log::{debug, info, trace};
 use map_msg::{map_node_msg, match_user_sent_msg};

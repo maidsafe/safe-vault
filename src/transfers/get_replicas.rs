@@ -7,24 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{replica_signing::ReplicaSigningImpl, replicas::Replicas, ReplicaInfo};
-use crate::{Error, Network, NodeInfo, Result};
+use crate::{network::Network, Error, Result};
 use sn_data_types::{ActorHistory, Credit, CreditAgreementProof, PublicKey, SignedCredit, Token};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 pub async fn transfer_replicas(
-    node_info: &NodeInfo,
+    root_dir: PathBuf,
     network: &Network,
     user_wallets: BTreeMap<PublicKey, ActorHistory>,
 ) -> Result<Replicas<ReplicaSigningImpl>> {
-    let root_dir = node_info.root_dir.clone();
-    let info = replica_info(node_info, network).await?;
+    let info = replica_info(network).await?;
     Replicas::new(root_dir, info, user_wallets).await
 }
 
-pub async fn replica_info(
-    node_info: &NodeInfo,
-    network: &Network,
-) -> Result<ReplicaInfo<ReplicaSigningImpl>> {
+pub async fn replica_info(network: &Network) -> Result<ReplicaInfo<ReplicaSigningImpl>> {
     let id = network
         .our_public_key_share()
         .await?

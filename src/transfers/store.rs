@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Error, Result, ToDbKey};
+use crate::{to_db_key::ToDbKey, utils, Error, Result};
 use log::{debug, trace};
 use pickledb::PickleDb;
 use serde::{de::DeserializeOwned, Serialize};
