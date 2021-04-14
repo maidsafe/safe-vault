@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.4](https://github.com/maidsafe/sn_node/compare/v0.37.3...v0.37.4) (2021-04-14)
+
+
+### Bug Fixes
+
+* do not overwrite existing reward key ([eee066b](https://github.com/maidsafe/sn_node/commit/eee066b3b300162deabff1bf48958713fbb3fb0d))
+
 ### [0.37.3](https://github.com/maidsafe/sn_node/compare/v0.37.2...v0.37.3) (2021-04-14)
 
 ### [0.37.2](https://github.com/maidsafe/sn_node/compare/v0.37.1...v0.37.2) (2021-04-14)
