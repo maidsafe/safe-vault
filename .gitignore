@@ -17,7 +17,6 @@ target/release/*
 *.sublime-*
 *.bootstrap.cache
 /bin/
-.cargo/
 packages/
 .DS_Store
 *.back.aip
