@@ -6,18 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node_ops::{NodeDuties, NodeDuty, OutgoingMsg};
-use crate::{Error, Result};
 use dashmap::DashMap;
-use log::{debug, error, info, warn};
-use sn_data_types::{
-    Error as DtError, NodeAge, PublicKey, Token, TransferValidated, WalletHistory,
-};
-use sn_messaging::{
-    client::{Error as ErrorMessage, NodeQuery, NodeQueryResponse, NodeRewardQuery},
-    Aggregation, DstLocation, MessageId, SrcLocation,
-};
-use sn_transfers::TransferActor;
+use sn_data_types::{NodeAge, PublicKey};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
@@ -40,11 +30,13 @@ impl RewardWallets {
     }
 
     /// Returns the stage of a specific node.
+    #[allow(unused)]
     pub fn get(&self, node_name: &XorName) -> Option<(NodeAge, PublicKey)> {
         Some(*self.node_rewards.get(node_name)?)
     }
 
     /// Returns the node ids of all nodes.
+    #[allow(unused)]
     pub fn all_nodes(&self) -> Vec<XorName> {
         self.node_rewards.iter().map(|r| *r.key()).collect()
     }
@@ -62,6 +54,7 @@ impl RewardWallets {
     /// Removes a subset of the nodes,
     /// more specifically those no longer
     /// part of this section, after a split.
+    #[allow(unused)]
     pub fn remove_wallets(&mut self, split_nodes: BTreeSet<XorName>) {
         for node in split_nodes {
             let _ = self.node_rewards.remove(&node);

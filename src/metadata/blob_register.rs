@@ -9,20 +9,19 @@
 use crate::{
     capacity::ChunkHolderDbs,
     error::convert_to_error_message,
-    network::Network,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     to_db_key::ToDbKey,
     Error, Result,
 };
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
-use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey, Result as NdResult};
+use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey};
 use sn_messaging::{
     client::{
         BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd, NodeQuery,
         NodeSystemCmd, NodeSystemQuery, QueryResponse,
     },
-    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
+    Aggregation, DstLocation, EndUser, MessageId,
 };
 
 use std::{
@@ -218,6 +217,12 @@ impl BlobRegister {
             .await
             .unwrap_or_default();
 
+        if metadata.owner.is_some() && owner != metadata.owner {
+            return Err(Error::Logic(format!(
+                "Failed to set holder: owner({:?}) != metadata.owner({:?})",
+                owner, metadata.owner
+            )));
+        }
         metadata.owner = owner;
         let _ = metadata.holders.insert(holder);
 
@@ -367,44 +372,11 @@ impl BlobRegister {
         })
     }
 
-    async fn get_chunk_replication_cmd(
-        &mut self,
-        address: BlobAddress,
-        current_holders: BTreeSet<XorName>,
-    ) -> Result<NodeDuties> {
-        use NodeCmd::*;
-        let mut node_ops = Vec::new();
-        let messages = current_holders
-            .into_iter()
-            .map(|holder| {
-                info!("Sending get-chunk query to holder {:?}", holder);
-                (
-                    Message::NodeQuery {
-                        query: NodeQuery::System(NodeSystemQuery::GetChunk(address)),
-                        id: MessageId::combine(vec![*address.name(), holder]),
-                        target_section_pk: None,
-                    },
-                    holder,
-                )
-            })
-            .collect::<Vec<_>>();
-        for (msg, dst) in messages {
-            node_ops.push(NodeDuty::Send(OutgoingMsg {
-                msg,
-                section_source: true, // i.e. errors go to our section
-                dst: DstLocation::Node(dst),
-                aggregation: Aggregation::AtDestination,
-            }));
-        }
-        Ok(node_ops)
-    }
-
     async fn get_chunk_queries(
         &mut self,
         address: BlobAddress,
         current_holders: BTreeSet<XorName>,
     ) -> Result<NodeDuties> {
-        use NodeCmd::*;
         let mut node_ops = Vec::new();
         let messages = current_holders
             .into_iter()
@@ -488,39 +460,6 @@ impl BlobRegister {
             targets: metadata.holders,
             aggregation: Aggregation::AtDestination,
         })
-    }
-
-    async fn update_holders(&mut self, address: BlobAddress, holder: XorName) -> Result<()> {
-        let mut chunk_metadata = self.get_metadata_for(address).await.unwrap_or_default();
-        let _ = chunk_metadata.holders.insert(holder);
-        if let Err(error) = self
-            .dbs
-            .metadata
-            .lock()
-            .await
-            .set(&address.to_db_key()?, &chunk_metadata)
-        {
-            warn!("{}: Failed to write metadata to DB: {:?}", self, error);
-        }
-        let mut holders_metadata = self.get_holder(holder).await.unwrap_or_default();
-        let _ = holders_metadata.chunks.insert(address);
-        if let Err(error) = self
-            .dbs
-            .holders
-            .lock()
-            .await
-            .set(&holder.to_db_key()?, &holders_metadata)
-        {
-            warn!(
-                "{}: Failed to write holder metadata to DB: {:?}",
-                self, error
-            );
-        }
-        info!(
-            "Requested replication of chunk {:?} to new holder {:?}",
-            address, holder
-        );
-        Ok(())
     }
 
     // Updates the metadata of the chunks help by a node that left.

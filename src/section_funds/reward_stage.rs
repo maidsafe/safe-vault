@@ -7,17 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{Error, Result};
-use log::{debug, info, warn};
+use log::{debug, warn};
 use sn_data_types::{
     Credit, CreditAgreementProof, CreditId, PublicKey, ReplicaPublicKeySet, SignatureShare,
-    SignedCredit, SignedCreditShare, Token, TransferPropagated,
+    SignedCredit, SignedCreditShare,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum RewardStage {
-    None,
     AwaitingThreshold,
     ProposingCredits(RewardProposalDetails),
     AccumulatingCredits(RewardAccumulationDetails),
@@ -40,10 +39,6 @@ pub struct CreditProposal {
 impl CreditProposal {
     pub fn id(&self) -> &CreditId {
         self.proposal.id()
-    }
-
-    pub fn amount(&self) -> Token {
-        self.proposal.amount
     }
 }
 
@@ -97,7 +92,7 @@ impl RewardProposalDetails {
             rewards: self
                 .rewards
                 .iter()
-                .map(|(id, credit)| {
+                .map(|(_, credit)| {
                     let share = credit.signatures.get(&index)?;
                     Some(SignedCreditShare {
                         credit: credit.proposal.clone(),
@@ -184,7 +179,7 @@ impl RewardAccumulationDetails {
             rewards: self
                 .rewards
                 .iter()
-                .map(|(id, credit)| {
+                .map(|(_, credit)| {
                     let share = credit.signatures.get(&index)?;
                     Some(sn_data_types::AccumulatingReward {
                         signed_credit: credit.agreed_proposal.clone(),

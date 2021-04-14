@@ -8,35 +8,17 @@
 
 use crate::{
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    section_funds::{self, SectionFunds},
-    transfers::{
-        replica_signing::ReplicaSigningImpl,
-        replicas::{ReplicaInfo, Replicas},
-    },
-    Error, Node, Result,
+    Node, Result,
 };
-use dashmap::DashMap;
-use log::{debug, info};
-use section_funds::{
-    elder_signing::ElderSigning,
-    reward_process::{OurSection, RewardProcess},
-    reward_stage::RewardStage,
-    reward_wallets::RewardWallets,
-    Credits,
-};
-use sn_data_types::{
-    ActorHistory, CreditAgreementProof, CreditId, NodeAge, PublicKey, SectionElders, Token,
-    WalletHistory,
-};
+use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
 use sn_messaging::{
     client::{
-        Message, NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse, NodeSystemCmd, NodeSystemQuery,
-        NodeSystemQueryResponse, NodeTransferCmd,
+        Message, NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse,
+        NodeTransferCmd,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use sn_routing::{Prefix, XorName};
-use sn_transfers::TransferActor;
 use std::collections::BTreeMap;
 
 impl Node {

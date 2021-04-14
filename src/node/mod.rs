@@ -13,31 +13,24 @@ mod messaging;
 mod split;
 
 use crate::{
-    capacity::{Capacity, ChunkHolderDbs, RateLimit},
     chunk_store::UsedSpace,
     chunks::Chunks,
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
-    metadata::{adult_reader::AdultReader, Metadata},
+    metadata::Metadata,
     network::Network,
-    node_ops::{NodeDuties, NodeDuty},
+    node_ops::NodeDuty,
     section_funds::SectionFunds,
     state_db::store_new_reward_keypair,
-    transfers::{get_replicas::transfer_replicas, Transfers},
+    transfers::Transfers,
     Config, Error, Result,
 };
 use bls::SecretKey;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
-use futures::lock::Mutex;
-use hex_fmt::HexFmt;
-use log::{debug, error, info, trace, warn};
-use sn_data_types::{ActorHistory, PublicKey, TransferPropagated, WalletHistory};
-use sn_messaging::{client::Message, DstLocation, SrcLocation};
-use sn_routing::{Event as RoutingEvent, EventStream, NodeElderChange, MIN_AGE};
-use sn_routing::{Prefix, XorName, ELDER_SIZE as GENESIS_ELDER_COUNT};
-use sn_transfers::{TransferActor, Wallet};
-use std::collections::BTreeMap;
+use log::{error, info};
+use sn_data_types::PublicKey;
+use sn_routing::EventStream;
+use sn_routing::{Prefix, XorName};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -121,7 +114,6 @@ pub struct Node {
     network_events: EventStream,
     node_info: NodeInfo,
     used_space: UsedSpace,
-    prefix: Prefix,
     role: Role,
 }
 
@@ -166,14 +158,8 @@ impl Node {
         let used_space = UsedSpace::new(config.max_capacity());
 
         let node = Self {
-            prefix: network_api.our_prefix().await,
             role: Role::Adult(AdultRole {
-                chunks: Chunks::new(
-                    node_info.node_name,
-                    node_info.root_dir.as_path(),
-                    used_space.clone(),
-                )
-                .await?,
+                chunks: Chunks::new(node_info.root_dir.as_path(), used_space.clone()).await?,
             }),
             node_info,
             used_space,
@@ -181,7 +167,7 @@ impl Node {
             network_events,
         };
 
-        messaging::send(node.register_wallet().await, &node.network_api).await;
+        messaging::send(node.register_wallet().await, &node.network_api).await?;
 
         Ok(node)
     }
@@ -248,7 +234,7 @@ fn handle_error(err: LazyError) {
 fn try_handle_error(err: Error, ctx: Option<MsgContext>) {
     use std::error::Error;
     if let Some(source) = err.source() {
-        if let Some(ctx) = ctx {
+        if let Some(_ctx) = ctx {
             info!(
                 "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
                 err

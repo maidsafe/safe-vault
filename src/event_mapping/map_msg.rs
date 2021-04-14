@@ -6,24 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::thread::current;
-
 use super::{LazyError, Mapping, MsgContext};
-use crate::{
-    node_ops::{NodeDuties, NodeDuty},
-    Error, Result,
-};
-use log::debug;
+use crate::{node_ops::NodeDuty, Error};
 use sn_messaging::{
     client::{
-        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeSystemQueryResponse, NodeTransferCmd,
-        NodeTransferQuery, NodeTransferQueryResponse, Query, TransferCmd, TransferQuery,
+        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeQuery, NodeQueryResponse,
+        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery, Query,
+        TransferCmd, TransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
 
-pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> Mapping {
+pub fn match_user_sent_msg(msg: Message, origin: EndUser) -> Mapping {
     match msg.to_owned() {
         Message::Query {
             query: Query::Data(query),
@@ -38,7 +32,6 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
         },
         Message::Cmd {
             cmd: Cmd::Data { .. },
-            id,
             ..
         } => Mapping::Ok {
             op: NodeDuty::ProcessDataPayment {
@@ -125,12 +118,11 @@ pub fn match_user_sent_msg(msg: Message, dst: DstLocation, origin: EndUser) -> M
             }),
         },
         Message::Query {
-            query: Query::Transfer(TransferQuery::GetStoreCost { requester, bytes }),
+            query: Query::Transfer(TransferQuery::GetStoreCost { bytes, .. }),
             id,
             ..
         } => Mapping::Ok {
             op: NodeDuty::GetStoreCost {
-                requester,
                 bytes,
                 origin: SrcLocation::EndUser(origin),
                 msg_id: id,
@@ -185,13 +177,10 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         // ------ wallet register ------
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet)),
-            id,
             ..
         } => NodeDuty::SetNodeWallet {
             wallet_id: *wallet,
-            node_id: origin.to_dst().name().unwrap(),
-            msg_id: *id,
-            origin,
+            node_id: origin.name(),
         },
         // Churn synch
         Message::NodeCmd {
@@ -287,7 +276,6 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         // this cmd is accumulated, thus has authority
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
-            id,
             ..
         } => NodeDuty::ReplicateChunk(data.clone()),
         // Aggregated by us, for security
@@ -315,7 +303,6 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         // query response from adult cannot be accumulated
         Message::NodeQueryResponse {
             response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
-            correlation_id,
             ..
         } => {
             if let Ok(data) = result {

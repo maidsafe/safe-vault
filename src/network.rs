@@ -6,25 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node_ops::OutgoingMsg;
 use crate::{utils, Config as NodeConfig, Error, Result};
+use bls::PublicKeySet;
 use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
-
-// TODO: use only sn_data_types
-use bls::{PublicKeySet, PublicKeyShare as BlsPublicKeyShare};
-
-use log::{debug, error};
 use serde::Serialize;
-use sn_data_types::{Error as DtError, PublicKey, Result as DtResult, Signature, SignatureShare};
-use sn_messaging::{client::Message, Aggregation, DstLocation, Itinerary, SrcLocation};
+use sn_data_types::{PublicKey, Signature, SignatureShare};
+use sn_messaging::Itinerary;
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
     SectionChain,
 };
 use std::sync::Arc;
-use std::{collections::BTreeMap, net::SocketAddr};
-use std::{collections::BTreeSet, path::PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+};
 use xor_name::{Prefix, XorName};
 
 ///
@@ -52,6 +49,7 @@ impl Network {
     }
 
     /// Sign with our node's ED25519 key
+    #[allow(unused)]
     pub async fn sign_as_node<T: Serialize>(&self, data: &T) -> Result<Signature> {
         let data = utils::serialise(data)?;
         let sig = self.routing.sign_as_node(&data).await;
@@ -82,6 +80,7 @@ impl Network {
     }
 
     /// Sign with our BLS PK Share
+    #[allow(unused)]
     pub async fn sign_as_elder_raw<T: Serialize>(&self, data: &T) -> Result<bls::SignatureShare> {
         let bls_pk = self
             .routing
@@ -116,6 +115,7 @@ impl Network {
         ))
     }
 
+    #[allow(unused)]
     pub async fn sibling_public_key(&self) -> Option<PublicKey> {
         let sibling_prefix = self.our_prefix().await.sibling();
         self.routing
@@ -133,6 +133,7 @@ impl Network {
         self.routing.public_key_set().await.map_err(Error::Routing)
     }
 
+    #[allow(unused)]
     pub async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
         let (pk, elders) = self.routing.matching_section(name).await;
         if let Some(pk) = pk {
@@ -147,6 +148,7 @@ impl Network {
         self.routing.name().await
     }
 
+    #[allow(unused)]
     pub async fn our_age(&self) -> u8 {
         self.routing.age().await
     }
@@ -163,6 +165,7 @@ impl Network {
         self.routing.section_chain().await
     }
 
+    #[allow(unused)]
     pub async fn matches_our_prefix(&self, name: XorName) -> bool {
         self.routing.matches_our_prefix(&XorName(name.0)).await
     }
@@ -209,6 +212,7 @@ impl Network {
             .collect::<BTreeSet<_>>()
     }
 
+    #[allow(unused)]
     pub async fn our_elder_addresses(&self) -> Vec<(XorName, SocketAddr)> {
         self.routing
             .our_elders()
@@ -218,6 +222,7 @@ impl Network {
             .collect::<Vec<_>>()
     }
 
+    #[allow(unused)]
     pub async fn our_elder_addresses_sorted_by_distance_to(
         &self,
         name: &XorName,
@@ -230,6 +235,7 @@ impl Network {
             .collect::<Vec<_>>()
     }
 
+    #[allow(unused)]
     pub async fn our_elder_names_sorted_by_distance_to(
         &self,
         name: &XorName,
@@ -240,16 +246,6 @@ impl Network {
             .await
             .into_iter()
             .take(count)
-            .map(|p2p_node| XorName(p2p_node.name().0))
-            .collect::<Vec<_>>()
-    }
-
-    pub async fn age_of_node(&self, node: XorName) -> Vec<XorName> {
-        self.routing
-            .our_adults_sorted_by_distance_to(&XorName::default())
-            .await
-            .into_iter()
-            .take(u8::MAX as usize)
             .map(|p2p_node| XorName(p2p_node.name().0))
             .collect::<Vec<_>>()
     }

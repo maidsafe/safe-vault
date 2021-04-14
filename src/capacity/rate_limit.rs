@@ -8,7 +8,6 @@
 
 use super::{Capacity, MAX_CHUNK_SIZE, MAX_SUPPLY};
 use crate::{network::Network, Result};
-use log::info;
 use sn_data_types::{PublicKey, Token};
 use xor_name::XorName;
 

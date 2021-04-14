@@ -22,11 +22,6 @@ impl AdultReader {
     }
 
     /// Dynamic state
-    pub async fn our_adults(&self) -> Vec<XorName> {
-        self.network.our_adults().await
-    }
-
-    /// Dynamic state
     pub async fn our_adults_sorted_by_distance_to(
         &self,
         name: &XorName,

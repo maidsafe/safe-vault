@@ -13,11 +13,10 @@ use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::info;
 use sn_data_types::{
-    ActorHistory, CreditAgreementProof, OwnerType, PublicKey, ReplicaEvent, SignedTransfer,
-    SignedTransferShare, Token, TransferAgreementProof, TransferPropagated, TransferRegistered,
-    TransferValidated,
+    ActorHistory, CreditAgreementProof, OwnerType, PublicKey, ReplicaEvent, SignedTransfer, Token,
+    TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
 };
-use sn_transfers::{Error as TransfersError, WalletReplica};
+use sn_transfers::WalletReplica;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use xor_name::Prefix;
 
@@ -71,8 +70,8 @@ impl<T: ReplicaSigning> Replicas<T> {
         Ok(instance)
     }
 
-    pub fn merge(&mut self, user_wallets: BTreeMap<PublicKey, ActorHistory>) {
-        self.setup(user_wallets); // TODO: fix this!!!! (this duplciates entries in db)
+    pub async fn merge(&mut self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
+        self.setup(user_wallets).await // TODO: fix this!!!! (this duplciates entries in db)
     }
 
     async fn setup(&self, user_wallets: BTreeMap<PublicKey, ActorHistory>) -> Result<()> {
@@ -235,34 +234,12 @@ impl<T: ReplicaSigning> Replicas<T> {
     /// ---------------------- Cmds -------------------------------------
     /// -----------------------------------------------------------------
 
-    pub async fn initiate(&self, events: &[ReplicaEvent]) -> Result<()> {
-        use ReplicaEvent::*;
-        if events.is_empty() {
-            info!("No events provided..");
-            return Ok(());
-        }
-        for e in events {
-            let id = match e {
-                TransferValidationProposed(e) => e.sender(),
-                TransferValidated(e) => e.sender(),
-                TransferRegistered(e) => e.sender(),
-                TransferPropagated(e) => e.recipient(),
-            };
-
-            // Acquire lock of the wallet.
-            let key_lock = self.get_load_or_create_store(id).await?;
-            let mut store = key_lock.lock().await;
-            // Access to the specific wallet is now serialised!
-            store.try_insert(e.to_owned())?;
-        }
-        Ok(())
-    }
-
     ///
     pub fn update_replica_info(&mut self, info: ReplicaInfo<T>) {
         self.info = info;
     }
 
+    #[allow(unused)]
     pub async fn keep_keys_of(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         let keys: Vec<PublicKey> = self.locks.iter().map(|r| *r.key()).collect();
@@ -352,12 +329,12 @@ impl<T: ReplicaSigning> Replicas<T> {
     /// (Since this leads to a credit, there is no requirement on order.)
     pub async fn receive_propagated(
         &self,
-        debiting_replicas_name: xor_name::XorName,
+        _debiting_replicas_name: xor_name::XorName,
         credit_proof: &CreditAgreementProof,
     ) -> Result<TransferPropagated> {
         // Acquire lock of the wallet.
         let id = credit_proof.recipient();
-        let debiting_replicas_key = credit_proof.replica_keys().public_key();
+        let _debiting_replicas_key = credit_proof.replica_keys().public_key();
 
         // TODO: check the debiting_replicas_key, needs reverse AE implemented
 
@@ -520,43 +497,5 @@ impl<T: ReplicaSigning> Replicas<T> {
         }))?;
 
         Ok(NodeDuty::NoOp)
-    }
-
-    #[cfg(feature = "simulated-payouts")]
-    pub async fn debit_without_proof(&self, transfer: Transfer) -> Result<NodeDuty> {
-        // Acquire lock of the wallet.
-        let debit = transfer.debit();
-        let id = debit.sender();
-        let key_lock = self.load_key_lock(id).await?;
-        let store = key_lock.lock().await;
-
-        // Access to the specific wallet is now serialised!
-        let mut wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
-        wallet.debit_without_proof(debit)?;
-        Ok(NodeDuty::NoOp)
-    }
-
-    /// For now, with test tokens there is no from wallet.., tokens is created from thin air.
-    #[allow(unused)] // TODO: Can this be removed?
-    #[cfg(feature = "simulated-payouts")]
-    pub async fn test_validate_transfer(&self, signed_transfer: SignedTransfer) -> Result<()> {
-        let id = signed_transfer.sender();
-        // Acquire lock of the wallet.
-        let key_lock = self.load_key_lock(id).await?;
-        let mut store = key_lock.lock().await;
-
-        // Access to the specific wallet is now serialised!
-        let wallet = self.load_wallet(&store, OwnerType::Single(id)).await?;
-        let _ = wallet.test_validate_transfer(&signed_transfer.debit, &signed_transfer.credit)?;
-        // sign + update state
-        let (replica_debit_sig, replica_credit_sig) =
-            self.info.signing.sign_transfer(&signed_transfer).await?;
-        store.try_insert(ReplicaEvent::TransferValidated(TransferValidated {
-            signed_credit: signed_transfer.credit,
-            signed_debit: signed_transfer.debit,
-            replica_debit_sig,
-            replica_credit_sig,
-            replicas: self.info.peer_replicas.clone(),
-        }))
     }
 }

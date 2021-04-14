@@ -6,13 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Error, Result};
+use crate::{Error, Result};
 use bls::{self, serde_impl::SerdeSecret, PublicKey, SecretKey, PK_SIZE};
-use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs;
 
-const AGE_GROUP_FILENAME: &str = "age_group";
 const REWARD_PUBLIC_KEY_FILENAME: &str = "reward_public_key";
 const REWARD_SECRET_KEY_FILENAME: &str = "reward_secret_key";
 

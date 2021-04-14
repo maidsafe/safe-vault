@@ -9,26 +9,16 @@
 use super::messaging::{send, send_to_nodes};
 use crate::{
     chunks::Chunks,
-    metadata::Metadata,
     node::{AdultRole, Role},
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    section_funds::{
-        reward_process::RewardProcess,
-        reward_stage::{CreditAccumulation, RewardStage},
-        reward_wallets::RewardWallets,
-        Credits, SectionFunds,
-    },
-    transfers::Transfers,
+    section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
 };
-use dashmap::DashMap;
 use log::{debug, info};
-use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders, WalletHistory};
 use sn_messaging::{
-    client::{Message, NodeCmd, NodeQuery, Query},
+    client::{Message, NodeQuery},
     Aggregation, DstLocation, MessageId,
 };
-use std::collections::{BTreeMap, VecDeque};
 use xor_name::XorName;
 
 impl Node {
@@ -114,12 +104,7 @@ impl Node {
             }
             //
             // ------- reward reg -------
-            NodeDuty::SetNodeWallet {
-                wallet_id,
-                node_id,
-                msg_id,
-                origin,
-            } => {
+            NodeDuty::SetNodeWallet { wallet_id, node_id } => {
                 let elder = self.role.as_elder_mut()?;
                 let members = self.network_api.our_members().await;
                 if let Some(age) = members.get(&node_id) {
@@ -137,11 +122,21 @@ impl Node {
                     Err(Error::NodeNotFoundForReward)
                 }
             }
-            NodeDuty::GetNodeWalletKey {
-                node_name,
-                msg_id,
-                origin,
-            } => Ok(vec![]),
+            NodeDuty::GetNodeWalletKey { node_name, .. } => {
+                let elder = self.role.as_elder_mut()?;
+                let members = self.network_api.our_members().await;
+                if members.get(&node_name).is_some() {
+                    let _wallet = elder.section_funds.get_node_wallet(&node_name);
+                    Ok(vec![]) // not yet implemented
+                } else {
+                    debug!(
+                        "{:?}: Couldn't find node {} when getting wallet.",
+                        self.network_api.our_prefix().await,
+                        node_name,
+                    );
+                    Err(Error::NodeNotFoundForReward)
+                }
+            }
             NodeDuty::ProcessLostMember { name, .. } => {
                 info!("Member Lost: {:?}", name);
                 let mut ops = vec![];
@@ -169,12 +164,8 @@ impl Node {
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
                 self.role = Role::Adult(AdultRole {
-                    chunks: Chunks::new(
-                        self.node_info.node_name,
-                        self.node_info.root_dir.as_path(),
-                        self.used_space.clone(),
-                    )
-                    .await?,
+                    chunks: Chunks::new(self.node_info.root_dir.as_path(), self.used_space.clone())
+                        .await?,
                 });
                 Ok(vec![])
             }
@@ -210,21 +201,14 @@ impl Node {
                         .await?,
                 ])
             }
-            NodeDuty::SimulatePayout {
-                transfer,
-                msg_id,
-                origin,
-            } => {
+            NodeDuty::SimulatePayout { transfer, .. } => {
                 let elder = self.role.as_elder_mut()?;
                 Ok(vec![elder.transfers.credit_without_proof(transfer).await?])
             }
             NodeDuty::GetTransfersHistory {
-                at,
-                since_version,
-                msg_id,
-                origin,
+                at, msg_id, origin, ..
             } => {
-                debug!(">>>> TODO: GET TRANSFER HISTORY, ADD limit with since_version....");
+                // TODO: add limit with since_version
                 let elder = self.role.as_elder()?;
                 Ok(vec![elder.transfers.history(&at, msg_id, origin).await?])
             }
@@ -233,10 +217,10 @@ impl Node {
                 Ok(vec![elder.transfers.balance(at, msg_id, origin).await?])
             }
             NodeDuty::GetStoreCost {
-                requester,
                 bytes,
                 msg_id,
                 origin,
+                ..
             } => {
                 let elder = self.role.as_elder_mut()?;
                 Ok(elder.transfers.get_store_cost(bytes, msg_id, origin).await)

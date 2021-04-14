@@ -9,7 +9,6 @@
 use crate::{
     chunk_store::{MapChunkStore, UsedSpace},
     error::convert_to_error_message,
-    network::Network,
     node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
 };
@@ -20,7 +19,7 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{CmdError, MapRead, MapWrite, Message, QueryResponse},
-    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
+    Aggregation, DstLocation, EndUser, MessageId,
 };
 
 use std::{
