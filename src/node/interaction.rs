@@ -12,10 +12,8 @@ use crate::{
 };
 use sn_data_types::{CreditAgreementProof, CreditId, PublicKey, SectionElders};
 use sn_messaging::{
-    client::{
-        NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse, NodeTransferCmd,
-        ProcessMsg,
-    },
+    client::ProcessMsg,
+    node::{NodeCmd, NodeQueryResponse, NodeSystemCmd, NodeSystemQueryResponse, NodeTransferCmd},
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use sn_routing::{Prefix, XorName};

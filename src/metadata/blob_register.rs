@@ -17,10 +17,8 @@ use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey};
 use sn_messaging::{
-    client::{
-        BlobRead, BlobWrite, CmdError, Error as ErrorMessage, NodeCmd, NodeQuery, NodeSystemCmd,
-        NodeSystemQuery, ProcessMsg, QueryResponse,
-    },
+    client::{BlobRead, BlobWrite, CmdError, Error as ErrorMessage, ProcessMsg, QueryResponse},
+    node::{NodeCmd, NodeQuery, NodeSystemCmd, NodeSystemQuery},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 

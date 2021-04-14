@@ -15,10 +15,8 @@ use crate::{
 use log::{error, info};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
-    client::{
-        CmdError, Error as ErrorMessage, NodeDataQueryResponse, NodeQueryResponse, ProcessMsg,
-        QueryResponse,
-    },
+    client::{CmdError, Error as ErrorMessage, ProcessMsg, QueryResponse},
+    node::{NodeCmdMessage, NodeDataQueryResponse, NodeQueryResponse},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 use std::{

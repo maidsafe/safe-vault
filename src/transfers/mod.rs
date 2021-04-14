@@ -33,9 +33,11 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{
-        Cmd, CmdError, Error as ErrorMessage, Event, NodeCmd, NodeCmdError, NodeQueryResponse,
-        NodeTransferCmd, NodeTransferError, NodeTransferQueryResponse, ProcessMsg, QueryResponse,
-        TransferError,
+        Cmd, CmdError, Error as ErrorMessage, Event, ProcessMsg, QueryResponse, TransferError,
+    },
+    node::{
+        NodeCmd, NodeCmdError, NodeQueryResponse, NodeTransferCmd, NodeTransferError,
+        NodeTransferQueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };

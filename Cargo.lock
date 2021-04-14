@@ -2249,7 +2249,7 @@ dependencies = [
 [[package]]
 name = "sn_messaging"
 version = "14.0.0"
-source = "git+https://github.com/maidsafe/sn_messaging?branch=anti-entropy#629be8a64c440c34b908f38b76b3bd5e02c3d2e4"
+source = "git+https://github.com/maidsafe/sn_messaging?branch=anti-entropy#5b446f416e90e99613250a2e4edaa0371287af84"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2317,7 +2317,7 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.60.3"
-source = "git+https://github.com/oetyng/sn_routing?branch=anti-entropy#d79f5c17327d7c22e7a79b13f4ffd4d634de0fd3"
+source = "git+https://github.com/bochaco/sn_routing?branch=anti-entropy#3fb58cdbe850d6f415977ec13d4221fef805ffa1"
 dependencies = [
  "bincode",
  "bls_dkg",

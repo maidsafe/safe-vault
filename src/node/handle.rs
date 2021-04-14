@@ -16,10 +16,7 @@ use crate::{
     Error, Node, Result,
 };
 use log::{debug, info};
-use sn_messaging::{
-    client::{NodeQuery, ProcessMsg},
-    Aggregation, DstLocation, MessageId,
-};
+use sn_messaging::{client::ProcessMsg, node::NodeQuery, Aggregation, DstLocation, MessageId};
 use xor_name::XorName;
 
 impl Node {

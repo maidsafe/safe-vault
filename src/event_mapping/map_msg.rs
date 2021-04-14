@@ -10,10 +10,10 @@ use super::{Mapping, MsgContext};
 use crate::{node_ops::NodeDuty, Error};
 use log::warn;
 use sn_messaging::{
-    client::{
-        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
-        ProcessMsg, ProcessingError, Query, TransferCmd, TransferQuery,
+    client::{Cmd, Message, ProcessMsg, ProcessingError, Query, TransferCmd, TransferQuery},
+    node::{
+        NodeCmd, NodeDataQueryResponse, NodeQuery, NodeQueryResponse, NodeRewardQuery,
+        NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
