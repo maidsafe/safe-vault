@@ -1,8 +1,8 @@
 # sn_node
 
-|Crate|Documentation|Safe Rust|
+|Documentation|Safe Rust|
 |:---:|:-----------:|:-------:|
-|[![](http://meritbadge.herokuapp.com/sn_node)](https://crates.io/crates/sn_node)|[![Documentation](https://docs.rs/sn_node/badge.svg)](https://docs.rs/sn_node)|[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
+|[![Documentation](https://docs.rs/sn_node/badge.svg)](https://docs.rs/sn_node)|[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 
 | [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
 |:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
