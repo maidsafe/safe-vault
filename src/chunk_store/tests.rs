@@ -94,16 +94,16 @@ async fn successful_put() -> Result<()> {
             id: Id(index as u64),
             value: data.clone(),
         };
-        let used_space_before = chunk_store.total_used_space().await;
+        let used_space_before = chunk_store.total_used_space();
         assert!(!chunk_store.has(&the_data.id));
         chunk_store.put(the_data).await?;
-        let used_space_after = chunk_store.total_used_space().await;
+        let used_space_after = chunk_store.total_used_space();
         assert_eq!(used_space_after, used_space_before + size);
         assert!(chunk_store.has(&the_data.id));
         assert!(used_space_after <= chunks.total_size);
     }
 
-    assert_eq!(chunk_store.total_used_space().await, chunks.total_size);
+    assert_eq!(chunk_store.total_used_space(), chunks.total_size);
 
     let mut keys = chunk_store.keys();
     keys.sort();
@@ -156,11 +156,11 @@ async fn delete() -> Result<()> {
             value: data.clone(),
         };
         chunk_store.put(the_data).await?;
-        assert_eq!(chunk_store.total_used_space().await, *size);
+        assert_eq!(chunk_store.total_used_space(), *size);
         assert!(chunk_store.has(&the_data.id));
         chunk_store.delete(&the_data.id).await?;
         assert!(!chunk_store.has(&the_data.id));
-        assert_eq!(chunk_store.total_used_space().await, 0);
+        assert_eq!(chunk_store.total_used_space(), 0);
     }
 
     Ok(())
@@ -208,7 +208,7 @@ async fn overwrite_value() -> Result<()> {
                 value: data.clone(),
             })
             .await?;
-        assert_eq!(chunk_store.total_used_space().await, size);
+        assert_eq!(chunk_store.total_used_space(), size);
         let retrieved_data = chunk_store.get(&Id(0))?;
         assert_eq!(data, retrieved_data.value);
     }
