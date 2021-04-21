@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.10](https://github.com/maidsafe/sn_node/compare/v0.37.9...v0.37.10) (2021-04-21)
+
+
+### Bug Fixes
+
+* remove duplicate cargo.lock version line ([e749a5f](https://github.com/maidsafe/sn_node/commit/e749a5f2dc342e0ad484607d85d719fb4cbbe939))
+
 ### [0.37.9](https://github.com/maidsafe/sn_node/compare/v0.37.8...v0.37.9) (2021-04-21)
 
 
