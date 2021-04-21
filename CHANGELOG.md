@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.9](https://github.com/maidsafe/sn_node/compare/v0.37.8...v0.37.9) (2021-04-21)
+
+
+### Features
+
+* write network keypair to disk ([ad4c3ab](https://github.com/maidsafe/sn_node/commit/ad4c3ab2df7379e199bd1b1f53161321fe2e5af0))
+
 ### [0.37.8](https://github.com/maidsafe/sn_node/compare/v0.37.7...v0.37.8) (2021-04-15)
 
 ### [0.37.7](https://github.com/maidsafe/sn_node/compare/v0.37.6...v0.37.7) (2021-04-14)
