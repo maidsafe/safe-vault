@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.38.1](https://github.com/maidsafe/sn_node/compare/v0.38.0...v0.38.1) (2021-04-21)
+
+
+### Bug Fixes
+
+* **adult_ops:** avoid underflowing decrement ([896e6b0](https://github.com/maidsafe/sn_node/commit/896e6b00db5377b610c7f0946e25cdcb8d75cc3d))
+
 ## [0.38.0](https://github.com/maidsafe/sn_node/compare/v0.37.14...v0.38.0) (2021-04-21)
 
 
