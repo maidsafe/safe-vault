@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.11](https://github.com/maidsafe/sn_node/compare/v0.37.10...v0.37.11) (2021-04-21)
+
+
+### Features
+
+* **data_section:** track responsiveness of Adults to data requests so ([bcad135](https://github.com/maidsafe/sn_node/commit/bcad135bfaa85851a04ab8dc1613ef2964b9179f))
+
 ### [0.37.10](https://github.com/maidsafe/sn_node/compare/v0.37.9...v0.37.10) (2021-04-21)
 
 
