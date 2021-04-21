@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.38.0](https://github.com/maidsafe/sn_node/compare/v0.37.14...v0.38.0) (2021-04-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **data_sync:** sn_messaging and sn_routing breaking changes.
+
+* **data_sync:** follow up PR to the data loss PR ([2cb863f](https://github.com/maidsafe/sn_node/commit/2cb863f271ef33655ebe752b6156f2cd40d2d74e))
+
 ### [0.37.14](https://github.com/maidsafe/sn_node/compare/v0.37.13...v0.37.14) (2021-04-21)
 
 
