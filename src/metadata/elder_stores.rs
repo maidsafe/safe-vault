@@ -7,16 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob_register::BlobRegister, map_storage::MapStorage, register_storage::RegisterStorage,
+    blob_records::BlobRecords, map_storage::MapStorage, register_storage::RegisterStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::node::{MapDataExchange, SequenceDataExchange};
-use crate::Error;
+use crate::{Error, Result};
+use sn_messaging::client::DataExchange;
 
 /// The various data type stores,
 /// that are only managed at Elders.
 pub(super) struct ElderStores {
-    blob_register: BlobRegister,
+    blob_records: BlobRecords,
     map_storage: MapStorage,
     sequence_storage: SequenceStorage,
     register_storage: RegisterStorage,
@@ -24,13 +24,13 @@ pub(super) struct ElderStores {
 
 impl ElderStores {
     pub fn new(
-        blob_register: BlobRegister,
+        blob_records: BlobRecords,
         map_storage: MapStorage,
         sequence_storage: SequenceStorage,
         register_storage: RegisterStorage,
     ) -> Self {
         Self {
-            blob_register,
+            blob_records,
             map_storage,
             sequence_storage,
             register_storage,
@@ -49,8 +49,8 @@ impl ElderStores {
         &self.register_storage
     }
 
-    pub fn blob_register_mut(&mut self) -> &mut BlobRegister {
-        &mut self.blob_register
+    pub fn blob_records_mut(&mut self) -> &mut BlobRecords {
+        &mut self.blob_records
     }
 
     pub fn map_storage_mut(&mut self) -> &mut MapStorage {
@@ -65,18 +65,23 @@ impl ElderStores {
         &mut self.register_storage
     }
 
-    pub fn fetch_map_and_sequence(&self) -> Result<(MapDataExchange, SequenceDataExchange), Error> {
-        let map_data = self.map_storage.fetch_map_data()?;
-        let seq_data = self.sequence_storage.fetch_seq_data()?;
-        Ok((map_data, seq_data))
+    // NB: Not yet including Register metadata.
+    pub async fn get_all_data(&self) -> Result<DataExchange> {
+        // Prepare blob_records, map and sequence data
+        let blob_data = self.blob_records.get_all_data().await?;
+        let map_data = self.map_storage.get_all_data()?;
+        let seq_data = self.sequence_storage.get_all_data()?;
+        Ok(DataExchange {
+            blob_data,
+            map_data,
+            seq_data,
+        })
     }
 
-    pub async fn update_map_and_sequence(
-        &mut self,
-        data: (MapDataExchange, SequenceDataExchange),
-    ) -> Result<(), Error> {
-        self.map_storage.update_map_data(data.0).await?;
-        self.sequence_storage.update_seq_data(data.1).await?;
+    pub async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
+        self.map_storage.update(data.map_data).await?;
+        self.sequence_storage.update(data.seq_data).await?;
+        self.blob_records.update(data.blob_data).await?;
         Ok(())
     }
 }

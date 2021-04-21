@@ -26,7 +26,6 @@ use sn_data_types::Transfer;
 use sn_routing::XorName;
 use std::collections::{BTreeMap, HashSet};
 
-use crate::node::BlobDataExchange;
 use futures::lock::Mutex;
 use sn_data_types::{
     ActorHistory, CreditAgreementProof, DebitId, PublicKey, SignedTransfer, Token,
@@ -157,14 +156,6 @@ impl Transfers {
     ///
     pub fn update_replica_info(&mut self, info: ReplicaInfo<ReplicaSigningImpl>) {
         self.replicas.update_replica_info(info);
-    }
-
-    pub async fn fetch_blob_register(&self) -> Result<BlobDataExchange> {
-        self.rate_limit.fetch_register().await
-    }
-
-    pub async fn update_blob_register(&self, data: BlobDataExchange) -> Result<()> {
-        self.rate_limit.update_register(data).await
     }
 
     /// Makes sure the payment contained

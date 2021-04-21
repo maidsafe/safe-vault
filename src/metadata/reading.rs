@@ -9,11 +9,10 @@
 //! Read operations on data.
 
 use super::{
-    blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
+    blob_records::BlobRecords, elder_stores::ElderStores, map_storage::MapStorage,
     register_storage::RegisterStorage, sequence_storage::SequenceStorage,
 };
-use crate::node_ops::NodeDuty;
-use crate::Result;
+use crate::{node_ops::NodeDuty, Result};
 use sn_messaging::{
     client::{BlobRead, DataQuery, MapRead, RegisterRead, SequenceRead},
     EndUser, MessageId,
@@ -27,7 +26,7 @@ pub(super) async fn get_result(
 ) -> Result<NodeDuty> {
     use DataQuery::*;
     match &query {
-        Blob(read) => blob(read, stores.blob_register_mut(), msg_id, origin).await,
+        Blob(read) => blob(read, stores.blob_records_mut(), msg_id, origin).await,
         Map(read) => map(read, stores.map_storage(), msg_id, origin).await,
         Sequence(read) => sequence(read, stores.sequence_storage(), msg_id, origin).await,
         Register(read) => register(read, stores.register_storage(), msg_id, origin).await,
@@ -36,7 +35,7 @@ pub(super) async fn get_result(
 
 async fn blob(
     read: &BlobRead,
-    register: &mut BlobRegister,
+    register: &mut BlobRecords,
     msg_id: MessageId,
     origin: EndUser,
 ) -> Result<NodeDuty> {

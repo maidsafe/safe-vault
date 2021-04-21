@@ -18,11 +18,10 @@ use sn_data_types::{
     SequenceOp, SequenceUser,
 };
 use sn_messaging::{
-    client::{CmdError, Message, QueryResponse, SequenceRead, SequenceWrite},
+    client::{CmdError, Message, QueryResponse, SequenceDataExchange, SequenceRead, SequenceWrite},
     Aggregation, DstLocation, EndUser, MessageId,
 };
 
-use crate::node::SequenceDataExchange;
 use std::collections::BTreeMap;
 use std::{
     fmt::{self, Display, Formatter},
@@ -40,7 +39,7 @@ impl SequenceStorage {
         Ok(Self { chunks })
     }
 
-    pub fn fetch_seq_data(&self) -> Result<SequenceDataExchange> {
+    pub fn get_all_data(&self) -> Result<SequenceDataExchange> {
         let store = &self.chunks;
         let all_keys = store.keys();
         let mut sequence: BTreeMap<SequenceAddress, Sequence> = BTreeMap::new();
@@ -50,7 +49,7 @@ impl SequenceStorage {
         Ok(SequenceDataExchange(sequence))
     }
 
-    pub async fn update_seq_data(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
+    pub async fn update(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
         debug!("Updating Sequence chunkstore");
         let chunkstore = &mut self.chunks;
         let SequenceDataExchange(data) = seq_data;

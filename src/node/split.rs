@@ -31,7 +31,7 @@ impl Node {
         &mut self,
         our_key: PublicKey,
         our_prefix: Prefix,
-    ) -> Result<NodeDuties> {
+    ) -> Result<()> {
         let section_key = self.network_api.section_public_key().await?;
         if our_key != section_key {
             return Err(Error::Logic(format!(
@@ -42,7 +42,7 @@ impl Node {
 
         debug!("begin_split_as_newbie");
 
-        let duty = self.level_up(false).await?;
+        self.level_up().await?;
 
         let section = OurSection {
             our_prefix,
@@ -62,7 +62,7 @@ impl Node {
             payments: DashMap::new(),
         };
 
-        Ok(duty)
+        Ok(())
     }
 
     /// Called on split reported from routing layer.

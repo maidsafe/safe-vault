@@ -8,7 +8,7 @@
 
 mod adult_ops;
 pub mod adult_reader;
-mod blob_register;
+mod blob_records;
 mod elder_stores;
 mod map_storage;
 mod reading;
@@ -18,17 +18,15 @@ mod writing;
 
 use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
-use crate::node::{MapDataExchange, SequenceDataExchange};
 use crate::{capacity::ChunkHolderDbs, chunk_store::UsedSpace, node_ops::NodeDuties, Result};
-use blob_register::BlobRegister;
-pub use blob_register::{ChunkMetadata, HolderMetadata};
+use blob_records::BlobRecords;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use register_storage::RegisterStorage;
 use sequence_storage::SequenceStorage;
 use sn_data_types::Blob;
 use sn_messaging::{
-    client::{DataCmd, DataQuery, NodeCmdResult, QueryResponse},
+    client::{DataCmd, DataExchange, DataQuery, NodeCmdResult, QueryResponse},
     EndUser, MessageId,
 };
 use std::{
@@ -54,12 +52,12 @@ impl Metadata {
         dbs: ChunkHolderDbs,
         reader: AdultReader,
     ) -> Result<Self> {
-        let blob_register = BlobRegister::new(dbs, reader);
+        let blob_records = BlobRecords::new(dbs, reader);
         let map_storage = MapStorage::new(path, used_space.clone()).await?;
         let sequence_storage = SequenceStorage::new(path, used_space.clone()).await?;
         let register_storage = RegisterStorage::new(path, used_space.clone()).await?;
         let elder_stores = ElderStores::new(
-            blob_register,
+            blob_records,
             map_storage,
             sequence_storage,
             register_storage,
@@ -83,7 +81,7 @@ impl Metadata {
         src: XorName,
     ) -> Result<NodeDuty> {
         self.elder_stores
-            .blob_register_mut()
+            .blob_records_mut()
             .process_blob_write_result(msg_id, result, src)
             .await
     }
@@ -95,7 +93,7 @@ impl Metadata {
         src: XorName,
     ) -> Result<NodeDuty> {
         self.elder_stores
-            .blob_register_mut()
+            .blob_records_mut()
             .process_blob_read_result(msg_id, response, src)
             .await
     }
@@ -115,7 +113,7 @@ impl Metadata {
     // When receiving the chunk from remaining holders, we ask new holders to store it.
     pub async fn trigger_chunk_replication(&mut self, node: XorName) -> Result<NodeDuties> {
         self.elder_stores
-            .blob_register_mut()
+            .blob_records_mut()
             .begin_replicate_chunks(node)
             .await
     }
@@ -123,20 +121,17 @@ impl Metadata {
     // When receiving the chunk from remaining holders, we ask new holders to store it.
     pub async fn finish_chunk_replication(&mut self, data: Blob) -> Result<NodeDuty> {
         self.elder_stores
-            .blob_register_mut()
+            .blob_records_mut()
             .replicate_chunk(data)
             .await
     }
 
-    pub fn fetch_map_and_sequence(&self) -> Result<(MapDataExchange, SequenceDataExchange)> {
-        self.elder_stores.fetch_map_and_sequence()
+    pub async fn get_data_exchange_packet(&self) -> Result<DataExchange> {
+        self.elder_stores.get_all_data().await
     }
 
-    pub async fn update_map_and_sequence(
-        &mut self,
-        data: (MapDataExchange, SequenceDataExchange),
-    ) -> Result<()> {
-        self.elder_stores.update_map_and_sequence(data).await
+    pub async fn update(&mut self, data: DataExchange) -> Result<()> {
+        self.elder_stores.update(data).await
     }
 }
 

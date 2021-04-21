@@ -18,11 +18,9 @@ use sn_data_types::{
     PublicKey, Result as NdResult,
 };
 use sn_messaging::{
-    client::{CmdError, MapRead, MapWrite, Message, QueryResponse},
+    client::{CmdError, MapDataExchange, MapRead, MapWrite, Message, QueryResponse},
     Aggregation, DstLocation, EndUser, MessageId,
 };
-
-use crate::node::MapDataExchange;
 use std::collections::BTreeMap;
 use std::{
     fmt::{self, Display, Formatter},
@@ -40,7 +38,7 @@ impl MapStorage {
         Ok(Self { chunks })
     }
 
-    pub(super) fn fetch_map_data(&self) -> Result<MapDataExchange> {
+    pub(super) fn get_all_data(&self) -> Result<MapDataExchange> {
         let store = &self.chunks;
         let all_keys = self.chunks.keys();
         let mut map: BTreeMap<MapAddress, Map> = BTreeMap::new();
@@ -50,7 +48,7 @@ impl MapStorage {
         Ok(MapDataExchange(map))
     }
 
-    pub async fn update_map_data(&mut self, map_data: MapDataExchange) -> Result<()> {
+    pub async fn update(&mut self, map_data: MapDataExchange) -> Result<()> {
         debug!("Updating Map chunkstore");
         let chunkstore = &mut self.chunks;
         let MapDataExchange(data) = map_data;

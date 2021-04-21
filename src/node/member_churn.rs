@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{BlobDataExchange, MapDataExchange, SequenceDataExchange};
-use crate::node_ops::NodeDuties;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     metadata::{adult_reader::AdultReader, Metadata},
@@ -18,11 +16,12 @@ use crate::{
         get_replicas::{replica_info, transfer_replicas},
         Transfers,
     },
-    Error, Node, Result,
+    Node, Result,
 };
 use dashmap::DashMap;
 use log::info;
 use sn_data_types::{ActorHistory, NodeAge, PublicKey};
+use sn_messaging::client::DataExchange;
 use sn_routing::XorName;
 use std::collections::BTreeMap;
 
@@ -37,7 +36,7 @@ impl Node {
     }
 
     /// Level up a newbie to an oldie on promotion
-    pub async fn level_up(&mut self, is_genesis: bool) -> Result<NodeDuties> {
+    pub async fn level_up(&mut self) -> Result<()> {
         self.used_space.reset().await?;
 
         //
@@ -70,10 +69,10 @@ impl Node {
             meta_data,
             transfers,
             section_funds,
-            is_caught_up: is_genesis,
+            received_initial_sync: false,
         });
 
-        Ok(vec![])
+        Ok(())
     }
 
     /// Continue the level up and handle more responsibilities.
@@ -81,23 +80,29 @@ impl Node {
         &mut self,
         node_wallets: BTreeMap<XorName, (NodeAge, PublicKey)>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
-        data: BTreeMap<String, Vec<u8>>,
+        metadata: DataExchange,
     ) -> Result<NodeDuty> {
         let elder = self.role.as_elder_mut()?;
 
-        // merge in provided user wallets
-        elder.transfers.merge(user_wallets).await?;
+        if elder.received_initial_sync {
+            info!("We are already received the initial sync from our section. Ignoring update");
+            return Ok(NodeDuty::NoOp);
+        }
 
-        //  merge in provided node reward stages
+        // --------- merge in provided user wallets ---------
+        elder.transfers.merge(user_wallets).await?;
+        // --------- merge in provided node reward stages ---------
         for (key, (age, wallet)) in &node_wallets {
             elder.section_funds.set_node_wallet(*key, *wallet, *age)
         }
+        // --------- merge in provided metadata ---------
+        elder.meta_data.update(metadata).await?;
 
-        // Update ourself with the data
-        self.furnish(data).await?;
+        elder.received_initial_sync = true;
 
         let node_id = self.network_api.our_name().await;
         let no_wallet_found = node_wallets.get(&node_id).is_none();
+
         if no_wallet_found {
             info!(
                 "Registering wallet of node: {} (since not found in received state)",
@@ -107,56 +112,5 @@ impl Node {
         } else {
             Ok(NodeDuty::NoOp)
         }
-    }
-
-    ///
-    pub async fn fetch_all_data(&self) -> Result<BTreeMap<String, Vec<u8>>> {
-        let elder_role = self.role.as_elder()?;
-
-        // Prepare blob_register, map and sequence data
-        let blob_register = elder_role.transfers.fetch_blob_register().await?;
-        let (map_list, seq_list) = elder_role.meta_data.fetch_map_and_sequence()?;
-
-        // Create an aggregated map of all the data
-        let mut aggregated_map = BTreeMap::new();
-        let _ = aggregated_map.insert(
-            "BlobRegister".to_string(),
-            bincode::serialize(&blob_register)?,
-        );
-        let _ = aggregated_map.insert("MapData".to_string(), bincode::serialize(&map_list)?);
-        let _ = aggregated_map.insert("SequenceData".to_string(), bincode::serialize(&seq_list)?);
-        Ok(aggregated_map)
-    }
-
-    ///
-    pub async fn furnish(&mut self, data: BTreeMap<String, Vec<u8>>) -> Result<()> {
-        info!("Furnishing Chunkstores with received data");
-        let elder_role = self.role.as_elder_mut()?;
-
-        if !elder_role.is_caught_up {
-            let serialized_blob_reg = data.get("BlobRegister").ok_or_else(|| {
-                Error::Logic("Cannot find Blob_register on received data".to_string())
-            })?;
-            let serialized_map_list = data
-                .get("MapData")
-                .ok_or_else(|| Error::Logic("Cannot find MapData on received data".to_string()))?;
-            let serialized_seq_list = data.get("SequenceData").ok_or_else(|| {
-                Error::Logic("Cannot find SequenceData on received data".to_string())
-            })?;
-
-            let blob_reg: BlobDataExchange = bincode::deserialize(serialized_blob_reg)?;
-            let map_list: MapDataExchange = bincode::deserialize(serialized_map_list)?;
-            let seq_list: SequenceDataExchange = bincode::deserialize(serialized_seq_list)?;
-
-            elder_role.transfers.update_blob_register(blob_reg).await?;
-            elder_role
-                .meta_data
-                .update_map_and_sequence((map_list, seq_list))
-                .await?;
-            elder_role.is_caught_up = true;
-        } else {
-            info!("We are caught up with the section already. Ignoring update");
-        }
-        Ok(())
     }
 }

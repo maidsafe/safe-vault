@@ -185,16 +185,16 @@ fn match_section_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         // Churn synch
         Message::NodeCmd {
             cmd:
-                NodeCmd::System(NodeSystemCmd::ReceiveExistingTransfers {
+                NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                     node_rewards,
                     user_wallets,
-                    data,
+                    metadata,
                 }),
             ..
         } => NodeDuty::SynchState {
             node_rewards: node_rewards.to_owned(),
             user_wallets: user_wallets.to_owned(),
-            data: data.to_owned(),
+            metadata: metadata.to_owned(),
         },
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),

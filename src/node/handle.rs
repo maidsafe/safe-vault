@@ -27,7 +27,12 @@ impl Node {
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         info!("Handling NodeDuty: {:?}", duty);
         match duty {
-            NodeDuty::Genesis => self.level_up(true).await,
+            NodeDuty::Genesis => {
+                self.level_up().await?;
+                let elder = self.role.as_elder_mut()?;
+                elder.received_initial_sync = true;
+                Ok(vec![])
+            }
             NodeDuty::EldersChanged {
                 our_key,
                 our_prefix,
@@ -35,13 +40,14 @@ impl Node {
             } => {
                 if newbie {
                     info!("Promoted to Elder on Churn");
+                    self.level_up().await?;
                     if self.network_api.our_prefix().await.is_empty()
                         && self.network_api.section_chain().await.len() <= ELDER_SIZE
                     {
-                        self.level_up(true).await
-                    } else {
-                        self.level_up(false).await
+                        let elder = self.role.as_elder_mut()?;
+                        elder.received_initial_sync = true;
                     }
+                    Ok(vec![])
                 } else {
                     info!("Updating our replicas on Churn");
                     self.update_replicas().await?;
@@ -63,7 +69,8 @@ impl Node {
             } => {
                 if newbie {
                     info!("Beginning split as Newbie");
-                    self.begin_split_as_newbie(our_key, our_prefix).await
+                    self.begin_split_as_newbie(our_key, our_prefix).await?;
+                    Ok(vec![])
                 } else {
                     info!("Beginning split as Oldie");
                     self.begin_split_as_oldie(our_prefix, our_key, sibling_key)
@@ -173,9 +180,10 @@ impl Node {
             NodeDuty::SynchState {
                 node_rewards,
                 user_wallets,
-                data,
+                metadata,
             } => Ok(vec![
-                self.synch_state(node_rewards, user_wallets, data).await?,
+                self.synch_state(node_rewards, user_wallets, metadata)
+                    .await?,
             ]),
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");

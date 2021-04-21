@@ -13,13 +13,13 @@ use crate::{
     to_db_key::ToDbKey,
     Error, Result,
 };
-use log::{error, info, trace, warn};
-use serde::{Deserialize, Serialize};
+use log::{debug, error, info, trace, warn};
 use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey};
 use sn_messaging::{
     client::{
-        BlobRead, BlobWrite, CmdError, Error as ErrorMessage, Message, NodeCmd, NodeCmdResult,
-        NodeQuery, NodeSystemCmd, NodeSystemQuery, QueryResponse,
+        BlobDataExchange, BlobRead, BlobWrite, ChunkMetadata, CmdError, Error as ErrorMessage,
+        HolderMetadata, Message, NodeCmd, NodeCmdResult, NodeQuery, NodeSystemCmd, NodeSystemQuery,
+        QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
@@ -36,31 +36,90 @@ use super::adult_reader::AdultReader;
 // The number of separate copies of a blob chunk which should be maintained.
 const CHUNK_COPY_COUNT: usize = 4;
 
-#[derive(Default, Debug, Serialize, Deserialize)]
-pub struct ChunkMetadata {
-    holders: BTreeSet<XorName>,
-    owner: Option<PublicKey>,
-}
-
-#[derive(Default, Debug, Serialize, Deserialize)]
-pub struct HolderMetadata {
-    chunks: BTreeSet<BlobAddress>,
-}
-
 /// Operations over the data type Blob.
-pub(super) struct BlobRegister {
+pub(super) struct BlobRecords {
     dbs: ChunkHolderDbs,
     reader: AdultReader,
     adult_ops: AdultOps,
 }
 
-impl BlobRegister {
+impl BlobRecords {
     pub(super) fn new(dbs: ChunkHolderDbs, reader: AdultReader) -> Self {
         Self {
             dbs,
             reader,
             adult_ops: AdultOps::new(),
         }
+    }
+
+    pub async fn get_all_data(&self) -> Result<BlobDataExchange> {
+        // Prepare full_adult details
+        debug!("Fetching full_adults");
+        let adult_details = &self.dbs.full_adults.lock().await;
+        let all_full_adults_keys = adult_details.get_all();
+        let mut full_adults = BTreeMap::new();
+        for key in all_full_adults_keys {
+            let val: String = adult_details
+                .get(&key)
+                .ok_or_else(|| Error::Logic("Error fetching full Adults".to_string()))?;
+            let _ = full_adults.insert(key, val);
+        }
+
+        // Prepare older Details
+        debug!("Fetching holders");
+        let holder_details = self.dbs.holders.lock().await;
+        let all_holder_keys = holder_details.get_all();
+        let mut holders = BTreeMap::new();
+        for key in all_holder_keys {
+            let val: HolderMetadata = holder_details
+                .get(&key)
+                .ok_or_else(|| Error::Logic("Error fetching Holder".to_string()))?;
+            let _ = holders.insert(key, val);
+        }
+
+        // Prepare Metadata Details
+        debug!("Fetching Metadata");
+        let metadata_details = self.dbs.metadata.lock().await;
+        let all_metadata_keys = metadata_details.get_all();
+        let mut metadata = BTreeMap::new();
+        for key in all_metadata_keys {
+            let val: ChunkMetadata = metadata_details
+                .get(&key)
+                .ok_or_else(|| Error::Logic("Error fetching Metadata".to_string()))?;
+            let _ = metadata.insert(key, val);
+        }
+
+        Ok(BlobDataExchange {
+            full_adults,
+            holders,
+            metadata,
+        })
+    }
+
+    pub async fn update(&self, blob_data: BlobDataExchange) -> Result<()> {
+        debug!("Updating Blob Registers");
+        let mut orig_full_adults = self.dbs.full_adults.lock().await;
+        let mut orig_holders = self.dbs.holders.lock().await;
+        let mut orig_meta = self.dbs.metadata.lock().await;
+
+        let BlobDataExchange {
+            metadata,
+            holders,
+            full_adults,
+        } = blob_data;
+
+        for (key, value) in full_adults {
+            orig_full_adults.set(&key, &value)?;
+        }
+
+        for (key, value) in holders {
+            orig_holders.set(&key, &value)?;
+        }
+
+        for (key, value) in metadata {
+            orig_meta.set(&key, &value)?;
+        }
+        Ok(())
     }
 
     pub(super) async fn write(
@@ -677,8 +736,8 @@ impl BlobRegister {
     }
 }
 
-impl Display for BlobRegister {
+impl Display for BlobRecords {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "BlobRegister")
+        write!(formatter, "BlobRecords")
     }
 }

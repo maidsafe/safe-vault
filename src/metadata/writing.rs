@@ -7,11 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    blob_register::BlobRegister, elder_stores::ElderStores, map_storage::MapStorage,
+    blob_records::BlobRecords, elder_stores::ElderStores, map_storage::MapStorage,
     register_storage::RegisterStorage, sequence_storage::SequenceStorage,
 };
-use crate::node_ops::NodeDuty;
-use crate::Result;
+use crate::{node_ops::NodeDuty, Result};
 use log::info;
 use sn_messaging::{
     client::{BlobWrite, DataCmd, MapWrite, RegisterWrite, SequenceWrite},
@@ -29,7 +28,7 @@ pub(super) async fn get_result(
     match cmd {
         Blob(write) => {
             info!("Writing Blob");
-            blob(write, stores.blob_register_mut(), msg_id, origin).await
+            blob(write, stores.blob_records_mut(), msg_id, origin).await
         }
         Map(write) => {
             info!("Writing Map");
@@ -48,7 +47,7 @@ pub(super) async fn get_result(
 
 async fn blob(
     write: BlobWrite,
-    register: &mut BlobRegister,
+    register: &mut BlobRecords,
     msg_id: MessageId,
     origin: EndUser,
 ) -> Result<NodeDuty> {

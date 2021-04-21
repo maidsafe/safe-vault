@@ -109,18 +109,9 @@ impl Node {
     /// Push our state to the given dst
     pub async fn push_state(&self, prefix: Prefix, msg_id: MessageId) -> Result<NodeDuty> {
         let dst = DstLocation::Section(prefix.name());
-
-        let user_wallets = if let Ok(elder) = &self.role.as_elder() {
-            elder.transfers.user_wallets()
-        } else {
-            BTreeMap::new()
-        };
-
-        let node_rewards = if let Ok(elder) = &self.role.as_elder() {
-            elder.section_funds.node_wallets()
-        } else {
-            BTreeMap::new()
-        };
+        let elder = self.role.as_elder()?;
+        let user_wallets = elder.transfers.user_wallets();
+        let node_rewards = elder.section_funds.node_wallets();
 
         // only push that what should be in dst
         let user_wallets = user_wallets
@@ -131,15 +122,15 @@ impl Node {
             .into_iter()
             .filter(|(name, _)| dst.contains(name, &prefix))
             .collect();
-
-        let data = self.fetch_all_data().await?;
+        // Create an aggregated map of all the metadata
+        let metadata = elder.meta_data.get_data_exchange_packet().await?;
 
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingTransfers {
+                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                     node_rewards,
                     user_wallets,
-                    data,
+                    metadata,
                 }),
                 id: msg_id,
                 target_section_pk: None,

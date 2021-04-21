@@ -13,7 +13,7 @@ use sn_data_types::{
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use sn_messaging::{
-    client::{BlobRead, BlobWrite, Message, NodeCmdResult, QueryResponse},
+    client::{BlobRead, BlobWrite, DataExchange, Message, NodeCmdResult, QueryResponse},
     Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::Prefix;
@@ -159,8 +159,8 @@ pub enum NodeDuty {
         node_rewards: BTreeMap<XorName, (NodeAge, PublicKey)>,
         /// The wallets of users on the network.
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
-        /// Data that needs to be shared to new Elders
-        data: BTreeMap<String, Vec<u8>>,
+        /// The metadata stored on Elders.
+        metadata: DataExchange,
     },
     /// As members are lost for various reasons
     /// there are certain things nodes need
