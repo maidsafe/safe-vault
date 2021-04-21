@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.14](https://github.com/maidsafe/sn_node/compare/v0.37.13...v0.37.14) (2021-04-21)
+
+
+### Features
+
+* **storage:** changes to support the new Register data type in storage ([717bb01](https://github.com/maidsafe/sn_node/commit/717bb012539de0e1cf0a1f48e5a87bab3c623248))
+
 ### [0.37.13](https://github.com/maidsafe/sn_node/compare/v0.37.12...v0.37.13) (2021-04-21)
 
 
