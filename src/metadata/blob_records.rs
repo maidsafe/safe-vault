@@ -53,8 +53,8 @@ impl BlobRecords {
     }
 
     pub async fn get_all_data(&self) -> Result<BlobDataExchange> {
+        debug!("Getting Blob records");
         // Prepare full_adult details
-        debug!("Fetching full_adults");
         let adult_details = &self.dbs.full_adults.lock().await;
         let all_full_adults_keys = adult_details.get_all();
         let mut full_adults = BTreeMap::new();
@@ -66,7 +66,6 @@ impl BlobRecords {
         }
 
         // Prepare older Details
-        debug!("Fetching holders");
         let holder_details = self.dbs.holders.lock().await;
         let all_holder_keys = holder_details.get_all();
         let mut holders = BTreeMap::new();
@@ -78,7 +77,6 @@ impl BlobRecords {
         }
 
         // Prepare Metadata Details
-        debug!("Fetching Metadata");
         let metadata_details = self.dbs.metadata.lock().await;
         let all_metadata_keys = metadata_details.get_all();
         let mut metadata = BTreeMap::new();
@@ -97,7 +95,7 @@ impl BlobRecords {
     }
 
     pub async fn update(&self, blob_data: BlobDataExchange) -> Result<()> {
-        debug!("Updating Blob Registers");
+        debug!("Updating Blob records");
         let mut orig_full_adults = self.dbs.full_adults.lock().await;
         let mut orig_holders = self.dbs.holders.lock().await;
         let mut orig_meta = self.dbs.metadata.lock().await;

@@ -97,8 +97,11 @@ impl AdultOps {
     }
 
     pub fn remove_target(&mut self, msg_id: MessageId, name: XorName) {
-        if let Some(entry) = self.pending_ops.get_mut(&name) {
-            *entry -= 1;
+        if let Some(count) = self.pending_ops.get_mut(&name) {
+            let counter = *count;
+            if counter > 0 {
+                *count -= 1;
+            }
         }
         let complete = if let Some(operation) = self.ops.get_mut(&msg_id) {
             match operation {
