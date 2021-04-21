@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.12](https://github.com/maidsafe/sn_node/compare/v0.37.11...v0.37.12) (2021-04-21)
+
+
+### Features
+
+* **data_section:** propose unresponsive Adult as offline using Routing ([339dd13](https://github.com/maidsafe/sn_node/commit/339dd1370bb3eeb6da0aef19c09b7dcb4c80ca5b)), closes [#1433](https://github.com/maidsafe/sn_node/issues/1433)
+
 ### [0.37.11](https://github.com/maidsafe/sn_node/compare/v0.37.10...v0.37.11) (2021-04-21)
 
 
