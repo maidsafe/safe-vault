@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.37.13](https://github.com/maidsafe/sn_node/compare/v0.37.12...v0.37.13) (2021-04-21)
+
+
+### Features
+
+* **data:** share data on churn to New Elders ([8b101d9](https://github.com/maidsafe/sn_node/commit/8b101d9496375403f0803ec9c55db90d8ede9c9d))
+
+
+### Bug Fixes
+
+* **data:** multiple fixes on usage of chunkstore and sharing of data ([ae12c29](https://github.com/maidsafe/sn_node/commit/ae12c29f7cdfd29faa4500a5616b00de31aa4d4d))
+* **data:** skip data sharing on network startup ([a6a6beb](https://github.com/maidsafe/sn_node/commit/a6a6beb30c1a2662d914a05f96d4eb98ebd1f33c))
+* **full_nodes:** retain members only on full_node db during splits and churns ([2ff4ff8](https://github.com/maidsafe/sn_node/commit/2ff4ff8c93631adb823ac5539e6545615f03c17d))
+
 ### [0.37.12](https://github.com/maidsafe/sn_node/compare/v0.37.11...v0.37.12) (2021-04-21)
 
 
