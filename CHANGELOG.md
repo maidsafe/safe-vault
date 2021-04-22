@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.38.5](https://github.com/maidsafe/sn_node/compare/v0.38.4...v0.38.5) (2021-04-22)
+
+
+### Bug Fixes
+
+* **metadata:** stop tracking adults when promoted ([44a4a19](https://github.com/maidsafe/sn_node/commit/44a4a19b64443bb210127af6ff38a83414a155f5))
+
 ### [0.38.4](https://github.com/maidsafe/sn_node/compare/v0.38.3...v0.38.4) (2021-04-22)
 
 ### [0.38.3](https://github.com/maidsafe/sn_node/compare/v0.38.2...v0.38.3) (2021-04-22)
