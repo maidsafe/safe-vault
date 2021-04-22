@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.38.3](https://github.com/maidsafe/sn_node/compare/v0.38.2...v0.38.3) (2021-04-22)
+
+
+### Bug Fixes
+
+* **data_section:** remove offline nodes from the pending adult ([63498b6](https://github.com/maidsafe/sn_node/commit/63498b6e0e131adea4cf56b4c591b4bff8c36ec2))
+
 ### [0.38.2](https://github.com/maidsafe/sn_node/compare/v0.38.1...v0.38.2) (2021-04-21)
 
 ### [0.38.1](https://github.com/maidsafe/sn_node/compare/v0.38.0...v0.38.1) (2021-04-21)
