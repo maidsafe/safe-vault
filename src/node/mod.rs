@@ -24,15 +24,16 @@ use crate::{
     transfers::Transfers,
     Config, Error, Result,
 };
-use bls::SecretKey;
 use log::{error, info};
+use rand::rngs::OsRng;
 use sn_data_types::PublicKey;
-use sn_routing::EventStream;
-use sn_routing::{Prefix, XorName};
-use std::path::{Path, PathBuf};
+use sn_routing::{
+    EventStream, {Prefix, XorName},
+};
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
+    path::{Path, PathBuf},
 };
 
 /// Static info about the node.
@@ -123,12 +124,12 @@ impl Node {
         std::fs::create_dir_all(root_dir)?;
 
         let reward_key = match get_reward_pk(root_dir).await? {
-            Some(public_key) => PublicKey::Bls(public_key),
+            Some(public_key) => PublicKey::Ed25519(public_key),
             None => {
-                let secret = SecretKey::random();
-                let public = secret.public_key();
-                store_new_reward_keypair(root_dir, &secret, &public).await?;
-                PublicKey::Bls(public)
+                let mut rng = OsRng;
+                let keypair = ed25519_dalek::Keypair::generate(&mut rng);
+                store_new_reward_keypair(root_dir, &keypair).await?;
+                PublicKey::Ed25519(keypair.public)
             }
         };
 
