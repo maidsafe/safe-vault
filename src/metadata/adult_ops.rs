@@ -96,6 +96,17 @@ impl AdultOps {
         new_operation
     }
 
+    pub fn remove_lost_member(&mut self, name: XorName) {
+        let _ = self.pending_ops.remove(&name);
+        let _ = self.closest_adults.remove(&name);
+        let message_ids = self.ops.keys().cloned().collect::<Vec<_>>();
+        // TODO(after T4): For write operations perhaps we need to write it to a different Adult
+        for msg_id in message_ids {
+            self.remove_target(msg_id, name);
+        }
+        self.recompute_closest_adults();
+    }
+
     pub fn remove_target(&mut self, msg_id: MessageId, name: XorName) {
         if let Some(count) = self.pending_ops.get_mut(&name) {
             let counter = *count;

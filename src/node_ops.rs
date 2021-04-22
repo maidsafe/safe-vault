@@ -296,7 +296,7 @@ impl Debug for NodeDuty {
             Self::ReturnChunkToElders { .. } => write!(f, "ReturnChunkToElders"),
             Self::FinishReplication(_) => write!(f, "FinishReplication"),
             Self::ReplicateChunk(_) => write!(f, "ReplicateChunk"),
-            Self::ProposeOffline(_) => write!(f, "ProposeOffline"),
+            Self::ProposeOffline(nodes) => write!(f, "ProposeOffline({:?})", nodes),
         }
     }
 }

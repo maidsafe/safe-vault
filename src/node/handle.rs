@@ -170,6 +170,7 @@ impl Node {
                     .transfers
                     .decrease_full_node_count_if_present(name)
                     .await?;
+                elder.meta_data.remove_lost_member(name);
 
                 ops.extend(elder.meta_data.trigger_chunk_replication(name).await?);
 

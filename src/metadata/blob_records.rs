@@ -94,6 +94,10 @@ impl BlobRecords {
         })
     }
 
+    pub fn remove_lost_member(&mut self, name: XorName) {
+        self.adult_ops.remove_lost_member(name);
+    }
+
     pub async fn update(&self, blob_data: BlobDataExchange) -> Result<()> {
         debug!("Updating Blob records");
         let mut orig_full_adults = self.dbs.full_adults.lock().await;

@@ -98,6 +98,12 @@ impl Metadata {
             .await
     }
 
+    pub fn remove_lost_member(&mut self, name: XorName) {
+        self.elder_stores
+            .blob_records_mut()
+            .remove_lost_member(name)
+    }
+
     pub async fn write(
         &mut self,
         cmd: DataCmd,
