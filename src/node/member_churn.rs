@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::chunk_store::UsedSpace;
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     metadata::{adult_reader::AdultReader, Metadata},
@@ -42,8 +43,9 @@ impl Node {
         // start handling metadata
         let dbs = ChunkHolderDbs::new(self.node_info.path())?;
         let reader = AdultReader::new(self.network_api.clone());
+        let mut used_space = UsedSpace::from_existing_used_space(&mut self.used_space);
         let meta_data =
-            Metadata::new(&self.node_info.path(), &self.used_space, dbs, reader).await?;
+            Metadata::from_used_space(&self.node_info.path(), &mut used_space, dbs, reader).await?;
 
         //
         // start handling transfers

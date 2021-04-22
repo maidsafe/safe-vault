@@ -37,9 +37,15 @@ pub(crate) struct Chunks {
 }
 
 impl Chunks {
-    pub async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
         Ok(Self {
-            chunk_storage: ChunkStorage::new(path, used_space).await?,
+            chunk_storage: ChunkStorage::new(path, max_capacity).await?,
+        })
+    }
+
+    pub async fn from_used_space(path: &Path, used_space: &mut UsedSpace) -> Result<Self> {
+        Ok(Self {
+            chunk_storage: ChunkStorage::from_used_space(path, used_space).await?,
         })
     }
 

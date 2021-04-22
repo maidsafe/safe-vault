@@ -33,8 +33,14 @@ pub(crate) struct ChunkStorage {
 }
 
 impl ChunkStorage {
-    pub(crate) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        let chunks = BlobChunkStore::new(path, used_space).await?;
+    pub(crate) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
+        let chunks = BlobChunkStore::new(path, max_capacity).await?;
+        Ok(Self { chunks })
+    }
+
+    pub(crate) async fn from_used_space(path: &Path, used_space: &mut UsedSpace) -> Result<Self> {
+        let chunks = BlobChunkStore::from_used_space(path, used_space).await?;
+
         Ok(Self { chunks })
     }
 
@@ -237,7 +243,7 @@ mod tests {
     #[tokio::test]
     pub async fn try_store_stores_public_blob() -> Result<()> {
         let path = PathBuf::from(temp_dir()?.path());
-        let mut storage = ChunkStorage::new(&path, UsedSpace::new(u64::MAX)).await?;
+        let mut storage = ChunkStorage::new(&path, u64::MAX).await?;
         let value = "immutable data value".to_owned().into_bytes();
         let blob = Blob::Public(PublicBlob::new(value));
         assert!(storage
@@ -252,7 +258,7 @@ mod tests {
     #[tokio::test]
     pub async fn try_store_stores_private_blob() -> Result<()> {
         let path = PathBuf::from(temp_dir()?.path());
-        let mut storage = ChunkStorage::new(&path, UsedSpace::new(u64::MAX)).await?;
+        let mut storage = ChunkStorage::new(&path, u64::MAX).await?;
         let value = "immutable data value".to_owned().into_bytes();
         let key = get_random_pk();
         let blob = Blob::Private(PrivateBlob::new(value, key));
@@ -268,7 +274,7 @@ mod tests {
     #[tokio::test]
     pub async fn try_store_errors_if_end_user_doesnt_own_data() -> Result<()> {
         let path = PathBuf::from(temp_dir()?.path());
-        let mut storage = ChunkStorage::new(&path, UsedSpace::new(u64::MAX)).await?;
+        let mut storage = ChunkStorage::new(&path, u64::MAX).await?;
         let value = "immutable data value".to_owned().into_bytes();
         let data_owner = get_random_pk();
         let end_user = get_random_pk();

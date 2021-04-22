@@ -45,13 +45,27 @@ pub struct Metadata {
 impl Metadata {
     pub async fn new(
         path: &Path,
-        used_space: &UsedSpace,
+        max_capacity: u64,
         dbs: ChunkHolderDbs,
         reader: AdultReader,
     ) -> Result<Self> {
         let blob_register = BlobRegister::new(dbs, reader);
-        let map_storage = MapStorage::new(path, used_space.clone()).await?;
-        let sequence_storage = SequenceStorage::new(path, used_space.clone()).await?;
+        let map_storage = MapStorage::new(path, max_capacity).await?;
+        let sequence_storage = SequenceStorage::new(path, max_capacity).await?;
+        let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
+        Ok(Self { elder_stores })
+    }
+
+    pub async fn from_used_space(
+        path: &Path,
+        used_space: &mut UsedSpace,
+        dbs: ChunkHolderDbs,
+        reader: AdultReader,
+    ) -> Result<Self> {
+        let blob_register = BlobRegister::new(dbs, reader);
+        let map_storage = MapStorage::from_used_space(path, used_space).await?;
+        let mut used_space = UsedSpace::from_existing_used_space(used_space);
+        let sequence_storage = SequenceStorage::from_used_space(path, &mut used_space).await?;
         let elder_stores = ElderStores::new(blob_register, map_storage, sequence_storage);
         Ok(Self { elder_stores })
     }

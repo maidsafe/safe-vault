@@ -33,8 +33,13 @@ pub(super) struct SequenceStorage {
 }
 
 impl SequenceStorage {
-    pub(super) async fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        let chunks = SequenceChunkStore::new(path, used_space).await?;
+    pub(super) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
+        let chunks = SequenceChunkStore::new(path, max_capacity).await?;
+        Ok(Self { chunks })
+    }
+
+    pub(super) async fn from_used_space(path: &Path, used_space: &mut UsedSpace) -> Result<Self> {
+        let chunks = SequenceChunkStore::from_used_space(path, used_space).await?;
         Ok(Self { chunks })
     }
 

@@ -141,7 +141,7 @@ impl Node {
 
         let node = Self {
             role: Role::Adult(AdultRole {
-                chunks: Chunks::new(node_info.root_dir.as_path(), used_space.clone()).await?,
+                chunks: Chunks::new(node_info.root_dir.as_path(), config.max_capacity()).await?,
             }),
             node_info,
             used_space,

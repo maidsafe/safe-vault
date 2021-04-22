@@ -24,7 +24,7 @@ use xor_name::XorName;
 impl Node {
     ///
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
-        info!("Handling NodeDuty: {:?}", duty);
+        info!("Handling NodeD   uty: {:?}", duty);
         match duty {
             NodeDuty::Genesis => {
                 self.level_up().await?;
@@ -164,8 +164,11 @@ impl Node {
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
                 self.role = Role::Adult(AdultRole {
-                    chunks: Chunks::new(self.node_info.root_dir.as_path(), self.used_space.clone())
-                        .await?,
+                    chunks: Chunks::from_used_space(
+                        self.node_info.root_dir.as_path(),
+                        &mut self.used_space,
+                    )
+                    .await?,
                 });
                 Ok(vec![])
             }

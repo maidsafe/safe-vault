@@ -32,19 +32,6 @@ pub struct UsedSpace {
     next_id: AtomicU64,
 }
 
-// Atomic types do not implement Clone so this is a hack done by creating new atomic type from the
-// inner value.
-impl Clone for UsedSpace {
-    fn clone(&self) -> Self {
-        Self {
-            max_capacity: AtomicU64::new(self.max_capacity.load(Ordering::SeqCst)),
-            total_value: AtomicU64::new(self.max_capacity.load(Ordering::SeqCst)),
-            local_stores: self.local_stores.clone(),
-            next_id: AtomicU64::new(self.next_id.load(Ordering::SeqCst)),
-        }
-    }
-}
-
 impl UsedSpace {
     pub fn new(max_capacity: u64) -> UsedSpace {
         UsedSpace {
@@ -55,7 +42,21 @@ impl UsedSpace {
         }
     }
 
-    /// Clears the storage, setting total value ot zero
+    pub fn from_existing_used_space(used_space: &mut UsedSpace) -> UsedSpace {
+        let mut capacity = AtomicU64::new(0);
+        std::mem::swap(&mut capacity, &mut used_space.max_capacity);
+        let mut total_value = AtomicU64::new(0);
+        std::mem::swap(&mut total_value, &mut used_space.total_value);
+
+        Self {
+            max_capacity: capacity,
+            total_value,
+            local_stores: used_space.local_stores.clone(),
+            next_id: AtomicU64::default(),
+        }
+    }
+
+    /// Clears the storage, setting total value to zero
     /// and dropping local stores, but leaves
     /// the capacity and next_id unchanged
     pub async fn reset(&self) -> Result<()> {
@@ -91,6 +92,11 @@ impl UsedSpace {
             .await
             .get(&id)
             .map_or(0, |res| res.local_value)
+    }
+
+    #[inline]
+    pub fn next_id(&self) -> u64 {
+        self.next_id.load(Ordering::SeqCst)
     }
 
     /// Adds a new record for tracking the actions
@@ -135,23 +141,24 @@ impl UsedSpace {
     }
 
     async fn change_value(&self, id: u64, consumed: u64, reverse: bool) -> Result<()> {
-        let total = self.total_value.load(Ordering::SeqCst);
-        if total <= self.max_capacity.load(Ordering::SeqCst) {
-            let _ = self
-                .total_value
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |t| {
-                    if reverse {
-                        Some(t.saturating_sub(consumed))
-                    } else {
-                        t.checked_add(consumed)
-                    }
-                })
-                .map_err(|_| Error::NotEnoughSpace)?;
-        } else {
+        let _ = self
+            .total_value
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |t| {
+                if reverse {
+                    Some(t.saturating_sub(consumed))
+                } else {
+                    t.checked_add(consumed)
+                }
+            })
+            .map_err(|_| {
+                dbg!("here");
+                Error::NotEnoughSpace
+            })?;
+        if self.total_value.load(Ordering::SeqCst) > self.max_capacity.load(Ordering::SeqCst) {
             return Err(Error::NotEnoughSpace);
         }
-        let mut local_stores = self.local_stores.write().await;
 
+        let mut local_stores = self.local_stores.write().await;
         let local_used_space = local_stores.get(&id).ok_or(Error::NoStoreId)?;
         let new_local = if reverse {
             local_used_space.local_value.saturating_sub(consumed)
@@ -159,7 +166,10 @@ impl UsedSpace {
             local_used_space
                 .local_value
                 .checked_add(consumed)
-                .ok_or(Error::NotEnoughSpace)?
+                .ok_or_else(|| {
+                    dbg!("yee");
+                    Error::NotEnoughSpace
+                })?
         };
         let record = &mut local_stores
             .get_mut(&id)
