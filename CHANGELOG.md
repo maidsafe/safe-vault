@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.38.8](https://github.com/maidsafe/sn_node/compare/v0.38.7...v0.38.8) (2021-04-23)
+
+
+### Bug Fixes
+
+* **storecost:** storecost always at least 1 ([df887e3](https://github.com/maidsafe/sn_node/commit/df887e3eb46b00cf023ad5929ac5cfba20fbd50e))
+
 ### [0.38.7](https://github.com/maidsafe/sn_node/compare/v0.38.6...v0.38.7) (2021-04-23)
 
 ### [0.38.6](https://github.com/maidsafe/sn_node/compare/v0.38.5...v0.38.6) (2021-04-23)
