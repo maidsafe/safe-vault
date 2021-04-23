@@ -207,13 +207,10 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 }
 
 pub async fn log_network_stats(network_api: &Network) {
+    info!("Our section {:?}", network_api.our_prefix().await);
     info!(
-        "\
-            \n-----------------------\n\
-            | No. of Elders: {:?}    |\n\
-            | No. of Adults: {:?}    |\n\
-            -----------------------",
-        network_api.our_elder_names().await.len(),
-        network_api.our_adults().await.len()
+        "No. of Elders : {:?}",
+        network_api.our_elder_names().await.len()
     );
+    info!("No. of Adults: {:?}", network_api.our_adults().await.len());
 }
