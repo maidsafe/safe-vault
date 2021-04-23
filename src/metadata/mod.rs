@@ -43,6 +43,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    #[allow(dead_code)]
     pub async fn new(
         path: &Path,
         max_capacity: u64,

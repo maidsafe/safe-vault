@@ -33,6 +33,7 @@ pub(super) struct SequenceStorage {
 }
 
 impl SequenceStorage {
+    #[allow(dead_code)]
     pub(super) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
         let chunks = SequenceChunkStore::new(path, max_capacity).await?;
         Ok(Self { chunks })

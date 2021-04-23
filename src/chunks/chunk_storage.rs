@@ -224,7 +224,6 @@ impl Display for ChunkStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chunk_store::UsedSpace;
     use crate::error::Error::InvalidOwners;
     use crate::error::Result;
     use bls::SecretKey;

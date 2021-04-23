@@ -33,6 +33,7 @@ pub(super) struct MapStorage {
 }
 
 impl MapStorage {
+    #[allow(dead_code)]
     pub(super) async fn new(path: &Path, max_capacity: u64) -> Result<Self> {
         let chunks = MapChunkStore::new(path, max_capacity).await?;
         Ok(Self { chunks })

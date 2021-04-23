@@ -8,7 +8,7 @@
 
 use super::{
     chunk::{Chunk, ChunkId},
-    ChunkStore, Result as ChunkStoreResult, Subdir, UsedSpace,
+    ChunkStore, Result as ChunkStoreResult, Subdir,
 };
 use crate::{to_db_key::ToDbKey, Error, Result};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
@@ -145,7 +145,6 @@ async fn delete() -> Result<()> {
     let chunks = Chunks::gen(&mut rng)?;
 
     let root = temp_dir()?;
-    let used_space = UsedSpace::new(u64::MAX);
     let mut chunk_store = ChunkStore::new(root.path(), u64::MAX).await?;
 
     for (index, (data, size)) in chunks.data_and_sizes.iter().enumerate() {
