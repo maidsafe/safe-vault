@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.39.0](https://github.com/maidsafe/sn_node/compare/v0.38.10...v0.39.0) (2021-04-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **queries:** `NodeCmdResult` removed from `Message` enum.
+
+### Bug Fixes
+
+* **queries:** restore client as recipient of chunk query response ([113daee](https://github.com/maidsafe/sn_node/commit/113daee9f8551a4c5a2c50c2eafb3c8a7a873dae))
+
 ### [0.38.10](https://github.com/maidsafe/sn_node/compare/v0.38.9...v0.38.10) (2021-04-23)
 
 ### [0.38.9](https://github.com/maidsafe/sn_node/compare/v0.38.8...v0.38.9) (2021-04-23)
