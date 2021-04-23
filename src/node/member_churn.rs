@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::role::{ElderRole, Role};
 use crate::{
     capacity::{Capacity, ChunkHolderDbs, RateLimit},
     metadata::{adult_reader::AdultReader, Metadata},
-    node::{ElderRole, Role},
     node_ops::NodeDuty,
     section_funds::{reward_wallets::RewardWallets, SectionFunds},
     transfers::{

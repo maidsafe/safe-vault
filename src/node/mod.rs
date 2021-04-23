@@ -10,22 +10,21 @@ mod handle;
 mod interaction;
 mod member_churn;
 mod messaging;
+mod role;
 mod split;
 
 use crate::{
     chunk_store::UsedSpace,
     chunks::Chunks,
     event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
-    metadata::Metadata,
     network::Network,
     node_ops::NodeDuty,
-    section_funds::SectionFunds,
     state_db::{get_reward_pk, store_new_reward_keypair},
-    transfers::Transfers,
     Config, Error, Result,
 };
 use log::{error, info};
 use rand::rngs::OsRng;
+use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
 use sn_routing::{
     EventStream, {Prefix, XorName},
@@ -49,58 +48,6 @@ impl NodeInfo {
     ///
     pub fn path(&self) -> &Path {
         self.root_dir.as_path()
-    }
-}
-
-struct AdultRole {
-    // immutable chunks
-    chunks: Chunks,
-}
-
-struct ElderRole {
-    // data operations
-    meta_data: Metadata,
-    // transfers
-    transfers: Transfers,
-    // reward payouts
-    section_funds: SectionFunds,
-    // denotes if we received initial sync
-    received_initial_sync: bool,
-}
-
-#[allow(clippy::large_enum_variant)]
-enum Role {
-    Adult(AdultRole),
-    Elder(ElderRole),
-}
-
-impl Role {
-    fn as_adult(&self) -> Result<&AdultRole> {
-        match self {
-            Self::Adult(adult) => Ok(adult),
-            _ => Err(Error::NotAnAdult),
-        }
-    }
-
-    fn as_adult_mut(&mut self) -> Result<&mut AdultRole> {
-        match self {
-            Self::Adult(adult) => Ok(adult),
-            _ => Err(Error::NotAnAdult),
-        }
-    }
-
-    fn as_elder(&self) -> Result<&ElderRole> {
-        match self {
-            Self::Elder(elder) => Ok(elder),
-            _ => Err(Error::NotAnElder),
-        }
-    }
-
-    fn as_elder_mut(&mut self) -> Result<&mut ElderRole> {
-        match self {
-            Self::Elder(elder) => Ok(elder),
-            _ => Err(Error::NotAnElder),
-        }
     }
 }
 
@@ -158,17 +105,17 @@ impl Node {
     }
 
     /// Returns our connection info.
-    pub fn our_connection_info(&mut self) -> SocketAddr {
+    pub fn our_connection_info(&self) -> SocketAddr {
         self.network_api.our_connection_info()
     }
 
     /// Returns our name.
-    pub async fn our_name(&mut self) -> XorName {
+    pub async fn our_name(&self) -> XorName {
         self.network_api.our_name().await
     }
 
     /// Returns our prefix.
-    pub async fn our_prefix(&mut self) -> Prefix {
+    pub async fn our_prefix(&self) -> Prefix {
         self.network_api.our_prefix().await
     }
 
@@ -177,6 +124,14 @@ impl Node {
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
         while let Some(event) = self.network_events.next().await {
+            info!(
+                "New RoutingEvent received. Current role: {}, section prefix: {:?}, age: {}, node name: {}",
+                self.role,
+                self.our_prefix().await,
+                self.network_api.age().await,
+                self.our_name().await
+            );
+
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
             match map_routing_event(event, &self.network_api).await {
                 Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,
