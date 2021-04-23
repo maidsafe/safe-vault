@@ -187,6 +187,46 @@ impl BlobRecords {
         Ok(())
     }
 
+    /// Adds a given node to the list of full nodes.
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+        info!("No. of Full Nodes: {:?}", self.full_nodes().await);
+        info!("Increasing full_node count");
+        let _ = self
+            .dbs
+            .full_adults
+            .lock()
+            .await
+            .lcreate(&XorName::from(node_id).to_string())?
+            .ladd(&"Node Full");
+        Ok(())
+    }
+
+    /// Removes a given node from the list of full nodes.
+    pub async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
+        info!("No. of Full Nodes: {:?}", self.full_nodes().await);
+        info!("Checking if {:?} is present as full_node", node_name);
+        match self
+            .dbs
+            .full_adults
+            .lock()
+            .await
+            .rem(&node_name.to_string())
+        {
+            Ok(true) => {
+                info!("Node present in DB, remove successful");
+                Ok(())
+            }
+            Ok(false) => {
+                info!("Node not found on full_nodes db");
+                Ok(())
+            }
+            Err(e) => {
+                error!("Error removing from full_nodes db");
+                Err(Error::PickleDb(e))
+            }
+        }
+    }
+
     pub(super) async fn write(
         &mut self,
         write: BlobWrite,
@@ -198,6 +238,11 @@ impl BlobRecords {
             New(data) => self.store(data, msg_id, origin).await,
             DeletePrivate(address) => self.delete(address, msg_id, origin).await,
         }
+    }
+
+    /// Number of full chunk storing nodes in the section.
+    async fn full_nodes(&self) -> u8 {
+        self.dbs.full_adults.lock().await.total_keys() as u8
     }
 
     async fn store(&mut self, data: Blob, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
@@ -694,6 +739,8 @@ impl BlobRecords {
         // stop tracking liveness of removed holder
         self.adult_liveness
             .stop_tracking(vec![name].into_iter().collect());
+        // remove from full_nodes if present
+        self.decrease_full_node_count_if_present(name).await?;
 
         let mut blob_addresses: BTreeMap<BlobAddress, BTreeSet<XorName>> = BTreeMap::new();
         let chunk_holder = self.get_holder(name).await;

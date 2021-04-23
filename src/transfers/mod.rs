@@ -23,7 +23,6 @@ use log::{debug, error, info, trace, warn};
 use replica_signing::ReplicaSigningImpl;
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
-use sn_routing::XorName;
 use std::collections::{BTreeMap, HashSet};
 
 use futures::lock::Mutex;
@@ -111,18 +110,6 @@ impl Transfers {
     pub async fn split_section(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         self.replicas.keep_keys_of(prefix).await
-    }
-
-    ///
-    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
-        self.rate_limit.increase_full_node_count(node_id).await
-    }
-
-    ///
-    pub async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
-        self.rate_limit
-            .decrease_full_node_count_if_present(node_name)
-            .await
     }
 
     /// Get latest StoreCost for the given number of bytes.

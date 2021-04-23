@@ -120,6 +120,7 @@ impl Node {
                         "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
                         section_key, reward_sum
                     );
+                    ops.push(NodeDuty::SetNodeJoinsAllowed(true));
                 }
 
                 Ok(ops)
@@ -169,7 +170,7 @@ impl Node {
                 let elder = self.role.as_elder_mut()?;
                 elder.section_funds.remove_node_wallet(name);
                 elder
-                    .transfers
+                    .meta_data
                     .decrease_full_node_count_if_present(name)
                     .await?;
 
@@ -306,7 +307,7 @@ impl Node {
             // ------- Misc ------------
             NodeDuty::IncrementFullNodeCount { node_id } => {
                 let elder = self.role.as_elder_mut()?;
-                elder.transfers.increase_full_node_count(node_id).await?;
+                elder.meta_data.increase_full_node_count(node_id).await?;
                 // Accept a new node in place for the full node.
                 Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
             }

@@ -24,7 +24,7 @@ use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use register_storage::RegisterStorage;
 use sequence_storage::SequenceStorage;
-use sn_data_types::Blob;
+use sn_data_types::{Blob, PublicKey};
 use sn_messaging::{
     client::{DataCmd, DataExchange, DataQuery, NodeCmdResult, QueryResponse},
     EndUser, MessageId,
@@ -113,6 +113,22 @@ impl Metadata {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         writing::get_result(cmd, id, origin, &mut self.elder_stores).await
+    }
+
+    /// Adds a given node to the list of full nodes.
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+        self.elder_stores
+            .blob_records_mut()
+            .increase_full_node_count(node_id)
+            .await
+    }
+
+    /// Removes a given node from the list of full nodes.
+    pub async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
+        self.elder_stores
+            .blob_records_mut()
+            .decrease_full_node_count_if_present(node_name)
+            .await
     }
 
     // This should be called whenever a node leaves the section. It fetches the list of data that was
