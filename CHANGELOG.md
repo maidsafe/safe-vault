@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.38.9](https://github.com/maidsafe/sn_node/compare/v0.38.8...v0.38.9) (2021-04-23)
+
+
+### Bug Fixes
+
+* **capacity:** allow joins after split ([45fc453](https://github.com/maidsafe/sn_node/commit/45fc453817894e430051eb9a81dba7d94ecbf369))
+
 ### [0.38.8](https://github.com/maidsafe/sn_node/compare/v0.38.7...v0.38.8) (2021-04-23)
 
 
