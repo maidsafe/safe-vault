@@ -8,6 +8,7 @@
 
 use super::{Capacity, MAX_CHUNK_SIZE, MAX_SUPPLY};
 use crate::{network::Network, Result};
+use log::info;
 use sn_data_types::{PublicKey, Token};
 use xor_name::XorName;
 
@@ -38,14 +39,23 @@ impl RateLimit {
 
     /// Adds this node to the list of full nodes.
     pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
-        self.capacity.increase_full_node_count(node_id).await
+        self.capacity.increase_full_node_count(node_id).await?;
+        info!("No. of Full Nodes: {:?}", self.full_nodes().await);
+        Ok(())
     }
 
-    /// Adds this node to the list of full nodes.
+    /// Removes a given node from the list of full nodes.
     pub async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
         self.capacity
             .decrease_full_node_count_if_present(node_name)
-            .await
+            .await?;
+        info!("No. of Full Nodes: {:?}", self.full_nodes().await);
+        Ok(())
+    }
+
+    /// Returns the count of full_nodes.
+    pub async fn full_nodes(&self) -> u8 {
+        self.capacity.full_nodes().await
     }
 
     fn rate_limit(bytes: u64, full_nodes: u8, all_nodes: u8, prefix_len: usize) -> Token {

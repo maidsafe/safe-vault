@@ -66,6 +66,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             self_status_change,
             ..
         } => {
+            log_network_stats(network_api).await;
             let first_section = network_api.our_prefix().await.is_empty();
             let first_elder = network_api.our_elder_names().await.len() == 1;
             if first_section && first_elder {
@@ -96,7 +97,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                             }
                             Err(e) => {
                                 trace!(
-                                    "******Elders changed, should NOT be an error here...! ({})",
+                                    "******Elders changed, should NOT be an error here...! ({:?})",
                                     e
                                 );
                                 sanity_counter += 1;
@@ -163,14 +164,18 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                 },
             }
         }
-        RoutingEvent::MemberLeft { name, age } => Mapping::Ok {
-            op: NodeDuty::ProcessLostMember {
-                name: XorName(name.0),
-                age,
-            },
-            ctx: None,
-        },
+        RoutingEvent::MemberLeft { name, age } => {
+            log_network_stats(network_api).await;
+            Mapping::Ok {
+                op: NodeDuty::ProcessLostMember {
+                    name: XorName(name.0),
+                    age,
+                },
+                ctx: None,
+            }
+        }
         RoutingEvent::MemberJoined { previous_name, .. } => {
+            log_network_stats(network_api).await;
             let op = if previous_name.is_some() {
                 trace!("A relocated node has joined the section.");
                 // Switch joins_allowed off a new adult joining.
@@ -199,4 +204,16 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             ctx: None,
         },
     }
+}
+
+pub async fn log_network_stats(network_api: &Network) {
+    info!(
+        "\
+            \n-----------------------\n\
+            | No. of Elders: {:?}    |\n\
+            | No. of Adults: {:?}    |\n\
+            -----------------------",
+        network_api.our_elder_names().await.len(),
+        network_api.our_adults().await.len()
+    );
 }
