@@ -74,7 +74,7 @@ jobs:
 
       # Our basic test: create an account
       - name: Create Account
-        run: ~/.safe/cli/safe auth create --test-coins
+        run: ~/.safe/cli/safe auth create --test-coins --for-cli
 
       - run: ~/.safe/cli/safe auth unlock --self-auth
 
