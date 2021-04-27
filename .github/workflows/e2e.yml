@@ -76,10 +76,7 @@ jobs:
       - name: Create Account
         run: ~/.safe/cli/safe keys create --test-coins --for-cli
 
-      - run: ~/.safe/cli/safe auth unlock --self-auth
-
       # TODO: Add more tests/scripts to run here (or use CLI tests directly somehow...)
-
 
       # TODO: Upload all logs as artifacts....
       - name: Node Logs
