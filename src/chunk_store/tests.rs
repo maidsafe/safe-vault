@@ -13,6 +13,8 @@ use super::{
 use crate::{to_db_key::ToDbKey, Error, Result};
 use rand::{distributions::Standard, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
+use sn_data_types::{BlobAddress, DataAddress};
+use sn_routing::XorName;
 use std::{path::Path, u64};
 use tempdir::TempDir;
 
@@ -34,7 +36,13 @@ impl Chunk for Data {
 struct Id(u64);
 
 impl ToDbKey for Id {}
-impl ChunkId for Id {}
+impl ChunkId for Id {
+    fn to_data_address(&self) -> DataAddress {
+        DataAddress::Blob(BlobAddress::Public(XorName::from_content(&[&self
+            .0
+            .to_be_bytes()])))
+    }
+}
 
 impl Subdir for ChunkStore<Data> {
     fn subdir() -> &'static Path {
@@ -224,7 +232,7 @@ async fn get_fails_when_key_does_not_exist() -> Result<()> {
 
     let id = Id(new_rng().gen());
     match chunk_store.get(&id) {
-        Err(Error::NoSuchChunk) => (),
+        Err(Error::NoSuchChunk(_)) => (),
         x => return Err(crate::Error::Logic(format!("Unexpected {:?}", x))),
     }
 

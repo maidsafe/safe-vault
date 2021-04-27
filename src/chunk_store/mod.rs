@@ -158,7 +158,8 @@ impl<T: Chunk> ChunkStore<T> {
     ///
     /// If the data file can't be accessed, it returns `Error::NoSuchChunk`.
     pub fn get(&self, id: &T::Id) -> Result<T> {
-        let mut file = File::open(self.file_path(id)?).map_err(|_| Error::NoSuchChunk)?;
+        let mut file = File::open(self.file_path(id)?)
+            .map_err(|_| Error::NoSuchChunk(id.to_data_address()))?;
         let mut contents = vec![];
         let _ = file.read_to_end(&mut contents)?;
         let chunk = bincode::deserialize::<T>(&contents)?;
@@ -166,7 +167,7 @@ impl<T: Chunk> ChunkStore<T> {
         if chunk.id() == id {
             Ok(chunk)
         } else {
-            Err(Error::NoSuchChunk)
+            Err(Error::NoSuchChunk(id.to_data_address()))
         }
     }
 

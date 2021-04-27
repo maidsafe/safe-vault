@@ -14,7 +14,7 @@ use crate::{
     Error, Result,
 };
 use log::{debug, error, info, trace, warn};
-use sn_data_types::{Blob, BlobAddress, Error as DtError, PublicKey};
+use sn_data_types::{Blob, BlobAddress, DataAddress, Error as DtError, PublicKey};
 use sn_messaging::{
     client::{
         BlobDataExchange, BlobRead, BlobWrite, ChunkMetadata, CmdError, Error as ErrorMessage,
@@ -819,7 +819,7 @@ impl BlobRecords {
                     "{}: Did not find metadata in DB for chunk: {:?}",
                     self, address
                 );
-                Err(Error::NoSuchChunk)
+                Err(Error::NoSuchChunk(DataAddress::Blob(address)))
             }
         }
     }

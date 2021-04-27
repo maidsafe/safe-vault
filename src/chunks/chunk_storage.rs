@@ -13,7 +13,7 @@ use crate::{
     Error, Result,
 };
 use log::{error, info};
-use sn_data_types::{Blob, BlobAddress};
+use sn_data_types::{Blob, BlobAddress, DataAddress};
 use sn_messaging::{
     client::{
         CmdError, Error as ErrorMessage, Message, NodeDataQueryResponse, NodeEvent,
@@ -94,7 +94,7 @@ impl ChunkStorage {
         let result = self
             .chunks
             .get(address)
-            .map_err(|_| ErrorMessage::NoSuchData);
+            .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Blob(*address)));
 
         // Sent back to data's metadata section, who will then
         // forward it to client after having recorded the adult liveness.

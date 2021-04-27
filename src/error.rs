@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_data_types::{Error as DtError, PublicKey};
+use sn_data_types::{DataAddress, Error as DtError, PublicKey};
 use sn_messaging::{client::Error as ErrorMessage, MessageId};
 use std::io;
 use thiserror::Error;
@@ -60,8 +60,8 @@ pub enum Error {
     #[error("No holders found for chunk")]
     NoHoldersOfChunk,
     /// Key, Value pair not found in `ChunkStore`.
-    #[error("No such chunk")]
-    NoSuchChunk,
+    #[error("No such chunk: {0:?}")]
+    NoSuchChunk(DataAddress),
     /// Unable to process fund churn message.
     #[error("Cannot process fund churn message")]
     NotChurningFunds,
@@ -142,7 +142,7 @@ pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::cli
         Error::InvalidOwners(key) => Ok(ErrorMessage::InvalidOwners(key)),
         Error::InvalidSignedTransfer(_) => Ok(ErrorMessage::InvalidSignature),
         Error::TransferAlreadyRegistered => Ok(ErrorMessage::TransactionIdExists),
-        Error::NoSuchChunk => Ok(ErrorMessage::NoSuchData),
+        Error::NoSuchChunk(address) => Ok(ErrorMessage::DataNotFound(address)),
         Error::NotEnoughSpace => Ok(ErrorMessage::NotEnoughSpace),
         Error::BalanceExists => Ok(ErrorMessage::BalanceExists),
         Error::TempDirCreationFailed(_) => Ok(ErrorMessage::FailedToWriteFile),

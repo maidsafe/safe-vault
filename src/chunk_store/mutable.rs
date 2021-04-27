@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::chunk::{Chunk, ChunkId};
-use sn_data_types::{Map, MapAddress};
+use sn_data_types::{DataAddress, Map, MapAddress};
 
 impl Chunk for Map {
     type Id = MapAddress;
@@ -19,4 +19,8 @@ impl Chunk for Map {
     }
 }
 
-impl ChunkId for MapAddress {}
+impl ChunkId for MapAddress {
+    fn to_data_address(&self) -> DataAddress {
+        DataAddress::Map(*self)
+    }
+}

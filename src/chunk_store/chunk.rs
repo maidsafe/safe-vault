@@ -8,13 +8,13 @@
 
 use crate::to_db_key::ToDbKey;
 use serde::{de::DeserializeOwned, Serialize};
-use xor_name::XorName;
+use sn_data_types::DataAddress;
 
 pub(crate) trait Chunk: Serialize + DeserializeOwned {
     type Id: ChunkId;
     fn id(&self) -> &Self::Id;
 }
 
-pub(crate) trait ChunkId: ToDbKey + PartialEq + Eq + DeserializeOwned {}
-
-impl ChunkId for XorName {}
+pub(crate) trait ChunkId: ToDbKey + PartialEq + Eq + DeserializeOwned {
+    fn to_data_address(&self) -> DataAddress;
+}
