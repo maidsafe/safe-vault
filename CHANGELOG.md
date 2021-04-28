@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.40.0](https://github.com/maidsafe/sn_node/compare/v0.39.2...v0.40.0) (2021-04-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **err:** updates to sn_messaging 19.0.0 and sn_data_types 0.18.3
+and sn_routing 0.64.0
+
+* **err:** return chunk address along with DataNotFound error ([74e2b3e](https://github.com/maidsafe/sn_node/commit/74e2b3e73ab1a3100c4794ea048d66bd416883a1))
+
 ### [0.39.2](https://github.com/maidsafe/sn_node/compare/v0.39.1...v0.39.2) (2021-04-27)
 
 ### [0.39.1](https://github.com/maidsafe/sn_node/compare/v0.39.0...v0.39.1) (2021-04-26)
