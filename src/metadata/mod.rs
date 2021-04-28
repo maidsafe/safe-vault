@@ -11,10 +11,8 @@ pub mod adult_reader;
 mod blob_records;
 mod elder_stores;
 mod map_storage;
-mod reading;
 mod register_storage;
 mod sequence_storage;
-mod writing;
 
 use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
@@ -71,7 +69,7 @@ impl Metadata {
         id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        reading::get_result(query, id, origin, &mut self.elder_stores).await
+        self.elder_stores.read(query, id, origin).await
     }
 
     pub async fn record_adult_write_liveness(
@@ -112,7 +110,7 @@ impl Metadata {
         id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        writing::get_result(cmd, id, origin, &mut self.elder_stores).await
+        self.elder_stores.write(cmd, id, origin).await
     }
 
     /// Adds a given node to the list of full nodes.

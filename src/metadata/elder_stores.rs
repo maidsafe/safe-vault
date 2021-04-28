@@ -10,8 +10,12 @@ use super::{
     blob_records::BlobRecords, map_storage::MapStorage, register_storage::RegisterStorage,
     sequence_storage::SequenceStorage,
 };
-use crate::{Error, Result};
-use sn_messaging::client::DataExchange;
+use crate::{node_ops::NodeDuty, Error, Result};
+use log::info;
+use sn_messaging::{
+    client::{DataCmd, DataExchange, DataQuery},
+    EndUser, MessageId,
+};
 
 /// The various data type stores,
 /// that are only managed at Elders.
@@ -37,32 +41,49 @@ impl ElderStores {
         }
     }
 
-    pub fn map_storage(&self) -> &MapStorage {
-        &self.map_storage
+    pub async fn read(
+        &mut self,
+        query: DataQuery,
+        msg_id: MessageId,
+        origin: EndUser,
+    ) -> Result<NodeDuty> {
+        match &query {
+            DataQuery::Blob(read) => self.blob_records.read(read, msg_id, origin).await,
+            DataQuery::Map(read) => self.map_storage.read(read, msg_id, origin).await,
+            DataQuery::Sequence(read) => self.sequence_storage.read(read, msg_id, origin).await,
+            DataQuery::Register(read) => self.register_storage.read(read, msg_id, origin).await,
+        }
     }
 
-    pub fn sequence_storage(&self) -> &SequenceStorage {
-        &self.sequence_storage
-    }
-
-    pub fn register_storage(&self) -> &RegisterStorage {
-        &self.register_storage
+    pub async fn write(
+        &mut self,
+        cmd: DataCmd,
+        msg_id: MessageId,
+        origin: EndUser,
+    ) -> Result<NodeDuty> {
+        info!("Writing Data");
+        match cmd {
+            DataCmd::Blob(write) => {
+                info!("Writing Blob");
+                self.blob_records.write(write, msg_id, origin).await
+            }
+            DataCmd::Map(write) => {
+                info!("Writing Map");
+                self.map_storage.write(write, msg_id, origin).await
+            }
+            DataCmd::Sequence(write) => {
+                info!("Writing Sequence");
+                self.sequence_storage.write(write, msg_id, origin).await
+            }
+            DataCmd::Register(write) => {
+                info!("Writing Register");
+                self.register_storage.write(write, msg_id, origin).await
+            }
+        }
     }
 
     pub fn blob_records_mut(&mut self) -> &mut BlobRecords {
         &mut self.blob_records
-    }
-
-    pub fn map_storage_mut(&mut self) -> &mut MapStorage {
-        &mut self.map_storage
-    }
-
-    pub fn sequence_storage_mut(&mut self) -> &mut SequenceStorage {
-        &mut self.sequence_storage
-    }
-
-    pub fn register_storage_mut(&mut self) -> &mut RegisterStorage {
-        &mut self.register_storage
     }
 
     // NB: Not yet including Register metadata.
@@ -71,6 +92,7 @@ impl ElderStores {
         let blob_data = self.blob_records.get_all_data().await?;
         let map_data = self.map_storage.get_all_data()?;
         let seq_data = self.sequence_storage.get_all_data()?;
+
         Ok(DataExchange {
             blob_data,
             map_data,
@@ -82,6 +104,7 @@ impl ElderStores {
         self.map_storage.update(data.map_data).await?;
         self.sequence_storage.update(data.seq_data).await?;
         self.blob_records.update(data.blob_data).await?;
+
         Ok(())
     }
 }

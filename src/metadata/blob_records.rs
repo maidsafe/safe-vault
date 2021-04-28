@@ -667,9 +667,8 @@ impl BlobRecords {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        use BlobRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin).await,
+            BlobRead::Get(address) => self.get(*address, msg_id, origin).await,
         }
     }
 
@@ -679,7 +678,7 @@ impl BlobRecords {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let query_error = |error: Error| async {
+        let query_error = |error: Error| {
             Ok(NodeDuty::Send(OutgoingMsg {
                 msg: Message::QueryResponse {
                     response: QueryResponse::GetBlob(Err(convert_to_error_message(error)?)),
@@ -694,14 +693,15 @@ impl BlobRecords {
 
         let metadata = match self.get_metadata_for(address).await {
             Ok(metadata) => metadata,
-            Err(error) => return query_error(error).await,
+            Err(error) => return query_error(error),
         };
 
         if let Some(data_owner) = metadata.owner {
             if &data_owner != origin.id() {
-                return query_error(Error::NetworkData(DtError::AccessDenied(*origin.id()))).await;
+                return query_error(Error::NetworkData(DtError::AccessDenied(*origin.id())));
             }
         };
+
         if self
             .adult_liveness
             .new_read(msg_id, address, origin, metadata.holders.clone())
@@ -713,10 +713,11 @@ impl BlobRecords {
                 },
                 id: msg_id,
             };
+
             Ok(NodeDuty::SendToNodes {
                 msg,
                 targets: metadata.holders,
-                aggregation: Aggregation::AtDestination,
+                aggregation: Aggregation::None,
             })
         } else {
             info!(
