@@ -30,6 +30,7 @@ use sn_routing::{
     EventStream, {Prefix, XorName},
 };
 use std::{
+    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -87,6 +88,7 @@ impl Node {
         let node = Self {
             role: Role::Adult(AdultRole {
                 chunks: Chunks::new(node_info.root_dir.as_path(), config.max_capacity()).await?,
+                adult_list: BTreeSet::new(),
             }),
             node_info,
             used_space: UsedSpace::new(config.max_capacity()),

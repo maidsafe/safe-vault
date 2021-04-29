@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::collections::BTreeSet;
+
 use super::{
     messaging::{send, send_to_nodes},
     role::{AdultRole, Role},
@@ -190,6 +192,7 @@ impl Node {
                 let capacity = self.used_space.max_capacity().await;
                 self.role = Role::Adult(AdultRole {
                     chunks: Chunks::new(self.node_info.root_dir.as_path(), capacity).await?,
+                    adult_list: BTreeSet::new(),
                 });
                 Ok(vec![])
             }
@@ -274,19 +277,8 @@ impl Node {
                     ops.extend(adult.chunks.check_storage().await?);
                     Ok(ops)
                 } else {
-                    Ok(vec![NodeDuty::Send(OutgoingMsg {
-                        msg: Message::NodeQuery {
-                            query: NodeQuery::Chunks {
-                                query: read,
-                                origin,
-                            },
-                            id: msg_id,
-                        },
-                        dst: DstLocation::Section(data_section_addr),
-                        // TBD
-                        section_source: false,
-                        aggregation: Aggregation::None,
-                    })])
+                    log::error!("MessageId: {:?} NodeCmd::Chunks {:?} should not have reached a wrong Adult", msg_id, read);
+                    Ok(vec![])
                 }
             }
             NodeDuty::WriteChunk {

@@ -6,27 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use sn_routing::XorName;
+
 use crate::{
     chunks::Chunks, metadata::Metadata, section_funds::SectionFunds, transfers::Transfers, Error,
     Result,
 };
-use std::fmt;
+use std::{collections::BTreeSet, fmt};
 
-pub(crate) struct AdultRole {
-    // immutable chunks
-    pub chunks: Chunks,
-}
+pub(crate) use adult_role::AdultRole;
+pub(crate) use elder_role::ElderRole;
 
-pub(crate) struct ElderRole {
-    // data operations
-    pub meta_data: Metadata,
-    // transfers
-    pub transfers: Transfers,
-    // reward payouts
-    pub section_funds: SectionFunds,
-    // denotes if we received initial sync
-    pub received_initial_sync: bool,
-}
+mod adult_role;
+mod elder_role;
 
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum Role {
