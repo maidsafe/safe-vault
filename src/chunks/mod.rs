@@ -15,7 +15,7 @@ use crate::{
     Result,
 };
 use chunk_storage::ChunkStorage;
-use log::info;
+use log::{info, warn};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     client::{BlobRead, BlobWrite},
@@ -42,8 +42,20 @@ impl Chunks {
         })
     }
 
-    pub async fn read(&mut self, read: &BlobRead, msg_id: MessageId) -> Result<NodeDuties> {
-        reading::get_result(read, msg_id, &self.chunk_storage).await
+    pub fn keys(&self) -> Vec<BlobAddress> {
+        self.chunk_storage.keys()
+    }
+
+    pub async fn remove_chunk(&mut self, address: &BlobAddress) -> Result<Blob> {
+        let chunk = self.chunk_storage.get_chunk(address)?;
+        if let Err(err) = self.chunk_storage.delete_chunk(address).await {
+            warn!("Error deleting chunk at {:?}: {:?}", address, err);
+        }
+        Ok(chunk)
+    }
+
+    pub fn read(&mut self, read: &BlobRead, msg_id: MessageId) -> Result<NodeDuties> {
+        reading::get_result(read, msg_id, &self.chunk_storage)
     }
 
     pub async fn write(

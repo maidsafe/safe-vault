@@ -39,6 +39,10 @@ impl ChunkStorage {
         Ok(Self { chunks })
     }
 
+    pub fn keys(&self) -> Vec<BlobAddress> {
+        self.chunks.keys()
+    }
+
     pub(crate) async fn store(
         &mut self,
         data: &Blob,
@@ -90,11 +94,18 @@ impl ChunkStorage {
         self.chunks.put(&data).await
     }
 
-    pub(crate) async fn get(&self, address: &BlobAddress, msg_id: MessageId) -> Result<NodeDuties> {
+    pub(crate) fn get_chunk(&self, address: &BlobAddress) -> Result<Blob> {
+        self.chunks.get(address)
+    }
+
+    pub(crate) async fn delete_chunk(&mut self, address: &BlobAddress) -> Result<()> {
+        self.chunks.delete(&address).await
+    }
+
+    pub(crate) fn get(&self, address: &BlobAddress, msg_id: MessageId) -> Result<NodeDuties> {
         let mut ops = vec![];
         let result = self
-            .chunks
-            .get(address)
+            .get_chunk(address)
             .map_err(|_| ErrorMessage::DataNotFound(DataAddress::Blob(*address)));
 
         // Sent back to data's metadata section, who will then
@@ -176,8 +187,7 @@ impl ChunkStorage {
         let result = match self.chunks.get(&address) {
             Ok(Blob::Private(data)) => {
                 if data.owner() == origin.id() {
-                    self.chunks
-                        .delete(&address)
+                    self.delete_chunk(&address)
                         .await
                         .map_err(|_error| ErrorMessage::FailedToDelete)
                 } else {

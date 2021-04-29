@@ -65,7 +65,14 @@ impl Node {
                     Ok(vec![self.push_state(our_prefix, msg_id).await?])
                 }
             }
-            NodeDuty::AdultsChanged(_adults) => Ok(vec![]),
+            NodeDuty::AdultsChanged(adults) => {
+                let our_name = self.our_name().await;
+                Ok(self
+                    .role
+                    .as_adult_mut()?
+                    .handle_adults_changed(adults, our_name)
+                    .await)
+            }
             NodeDuty::SectionSplit {
                 our_key,
                 our_prefix,
@@ -258,11 +265,7 @@ impl Node {
             }
             //
             // -------- Immutable chunks --------
-            NodeDuty::ReadChunk {
-                read,
-                msg_id,
-                origin,
-            } => {
+            NodeDuty::ReadChunk { read, msg_id, .. } => {
                 // TODO: remove this conditional branching
                 // routing should take care of this
                 let data_section_addr = read.dst_address();
@@ -273,7 +276,7 @@ impl Node {
                     .matches(&&data_section_addr)
                 {
                     let adult = self.role.as_adult_mut()?;
-                    let mut ops = adult.chunks.read(&read, msg_id).await?;
+                    let mut ops = adult.chunks.read(&read, msg_id)?;
                     ops.extend(adult.chunks.check_storage().await?);
                     Ok(ops)
                 } else {

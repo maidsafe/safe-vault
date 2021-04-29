@@ -13,11 +13,11 @@ use sn_messaging::{client::BlobRead, MessageId};
 
 /// Read operations on data chunks.
 
-pub(super) async fn get_result(
+pub(super) fn get_result(
     read: &BlobRead,
     msg_id: MessageId,
     storage: &ChunkStorage,
 ) -> Result<NodeDuties> {
     let BlobRead::Get(address) = read;
-    storage.get(address, msg_id).await
+    storage.get(address, msg_id)
 }
