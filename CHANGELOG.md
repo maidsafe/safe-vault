@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.40.1](https://github.com/maidsafe/sn_node/compare/v0.40.0...v0.40.1) (2021-04-29)
+
+
+### Bug Fixes
+
+* **chunk:** remove message aggregation for Chunks queries ([20dd687](https://github.com/maidsafe/sn_node/commit/20dd6872e68e2ae42ce3a7a7e15f0bc2bb59df37))
+
 ## [0.40.0](https://github.com/maidsafe/sn_node/compare/v0.39.2...v0.40.0) (2021-04-28)
 
 
