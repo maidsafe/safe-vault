@@ -198,6 +198,10 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                 ctx: None,
             }
         }
+        RoutingEvent::AdultsChanged(adults) => {
+            let op = NodeDuty::AdultsChanged(adults);
+            Mapping::Ok { op, ctx: None }
+        }
         // Ignore all other events
         _ => Mapping::Ok {
             op: NodeDuty::NoOp,

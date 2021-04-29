@@ -141,6 +141,7 @@ pub enum NodeDuty {
         /// oldie or newbie?
         newbie: bool,
     },
+    AdultsChanged(BTreeSet<XorName>),
     SectionSplit {
         /// Our section prefix.
         our_prefix: Prefix,
@@ -272,6 +273,7 @@ impl Debug for NodeDuty {
             Self::LevelDown => write!(f, "LevelDown"),
             Self::SynchState { .. } => write!(f, "SynchState"),
             Self::EldersChanged { .. } => write!(f, "EldersChanged"),
+            Self::AdultsChanged { .. } => write!(f, "AdultsChanged"),
             Self::SectionSplit { .. } => write!(f, "SectionSplit"),
             Self::GetSectionElders { .. } => write!(f, "GetSectionElders"),
             Self::NoOp => write!(f, "No op."),

@@ -12,26 +12,18 @@ use pickledb::PickleDb;
 use std::path::Path;
 use std::sync::Arc;
 
-const BLOB_META_DB_NAME: &str = "immutable_data.db";
-const HOLDER_META_DB_NAME: &str = "holder_data.db";
 const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
 
 #[derive(Clone)]
 pub struct ChunkHolderDbs {
-    pub metadata: Arc<Mutex<PickleDb>>,
-    pub holders: Arc<Mutex<PickleDb>>,
     pub full_adults: Arc<Mutex<PickleDb>>,
 }
 
 impl ChunkHolderDbs {
     ///
     pub fn new(path: &Path) -> Result<Self> {
-        let metadata = utils::new_auto_dump_db(path, BLOB_META_DB_NAME)?;
-        let holders = utils::new_auto_dump_db(path, HOLDER_META_DB_NAME)?;
         let full_adults = utils::new_auto_dump_db(path, FULL_ADULTS_DB_NAME)?;
         Ok(Self {
-            metadata: Arc::new(Mutex::new(metadata)),
-            holders: Arc::new(Mutex::new(holders)),
             full_adults: Arc::new(Mutex::new(full_adults)),
         })
     }

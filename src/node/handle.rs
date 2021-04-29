@@ -63,6 +63,7 @@ impl Node {
                     Ok(vec![self.push_state(our_prefix, msg_id).await?])
                 }
             }
+            NodeDuty::AdultsChanged(_adults) => Ok(vec![]),
             NodeDuty::SectionSplit {
                 our_key,
                 our_prefix,
