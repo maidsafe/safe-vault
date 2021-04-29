@@ -43,7 +43,7 @@ impl Node {
         // start handling metadata
         let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
         let reader = AdultReader::new(self.network_api.clone());
-        let capacity = self.used_space.max_capacity().await;
+        let capacity = self.used_space.max_capacity();
         let meta_data =
             Metadata::new(&self.node_info.path(), capacity, dbs.clone(), reader).await?;
 

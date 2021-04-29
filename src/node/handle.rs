@@ -186,7 +186,7 @@ impl Node {
             ]),
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
-                let capacity = self.used_space.max_capacity().await;
+                let capacity = self.used_space.max_capacity();
                 self.role = Role::Adult(AdultRole {
                     chunks: Chunks::new(self.node_info.root_dir.as_path(), capacity).await?,
                 });

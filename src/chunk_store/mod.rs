@@ -70,7 +70,7 @@ where
             Self::create_new_root(&dir)?
         }
 
-        let used_space = UsedSpace::new(max_capacity);
+        let mut used_space = UsedSpace::new(max_capacity);
         let id = used_space.add_local_store(&dir).await?;
         Ok(ChunkStore {
             dir,
@@ -105,18 +105,15 @@ impl<T: Chunk> ChunkStore<T> {
         let consumed_space = serialised_chunk.len() as u64;
 
         info!("consumed space: {:?}", consumed_space);
-        info!("max : {:?}", self.used_space.max_capacity().await);
-        info!("use space total : {:?}", self.used_space.total().await);
+        info!("max : {:?}", self.used_space.max_capacity());
+        info!("use space total : {:?}", self.used_space.total());
 
         let file_path = self.file_path(chunk.id())?;
         self.do_delete(&file_path).await?;
 
         // pre-reserve space
         self.used_space.increase(self.id, consumed_space).await?;
-        trace!(
-            "use space total after add: {:?}",
-            self.used_space.total().await
-        );
+        trace!("use space total after add: {:?}", self.used_space.total());
 
         let res = File::create(&file_path).and_then(|mut file| {
             file.write_all(&serialised_chunk)?;
@@ -147,7 +144,7 @@ impl<T: Chunk> ChunkStore<T> {
     /// Used space to max space ratio.
     pub async fn used_space_ratio(&self) -> f64 {
         let used = self.total_used_space().await;
-        let total = self.used_space.max_capacity().await;
+        let total = self.used_space.max_capacity();
         let used_space_ratio = used as f64 / total as f64;
         info!("Used space: {:?}", used);
         info!("Total space: {:?}", total);
@@ -173,7 +170,7 @@ impl<T: Chunk> ChunkStore<T> {
     }
 
     pub async fn total_used_space(&self) -> u64 {
-        self.used_space.total().await
+        self.used_space.total()
     }
 
     /// Tests if a data chunk has been previously stored under `id`.
