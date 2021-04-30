@@ -11,6 +11,7 @@ use crate::{
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
 };
 use itertools::Itertools;
+use log::{info, warn};
 use sn_data_types::BlobAddress;
 use sn_messaging::{
     client::{Message, NodeCmd, NodeSystemCmd},
@@ -29,18 +30,37 @@ pub(crate) struct AdultRole {
 impl AdultRole {
     pub async fn handle_adults_changed(
         &mut self,
-        new_adults: BTreeSet<XorName>,
+        new_adult_list: BTreeSet<XorName>,
         our_name: XorName,
     ) -> NodeDuties {
-        self.adult_list = new_adults;
-        self.reorganize_chunks(our_name).await
+        let new_adults = new_adult_list
+            .difference(&self.adult_list)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let lost_adults = self
+            .adult_list
+            .difference(&new_adult_list)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let old_adult_list = std::mem::replace(&mut self.adult_list, new_adult_list);
+        self.reorganize_chunks(our_name, new_adults, lost_adults, old_adult_list)
+            .await
     }
 
-    async fn reorganize_chunks(&mut self, our_name: XorName) -> NodeDuties {
+    async fn reorganize_chunks(
+        &mut self,
+        our_name: XorName,
+        new_adults: BTreeSet<XorName>,
+        lost_adults: BTreeSet<XorName>,
+        old_adult_list: BTreeSet<XorName>,
+    ) -> NodeDuties {
         let keys = self.chunks.keys();
         let mut ops = vec![];
         for addr in keys.iter() {
-            if let Some(operation) = self.republish_and_cache(addr, &our_name).await {
+            if let Some(operation) = self
+                .republish_and_cache(addr, &our_name, &new_adults, &lost_adults, &old_adult_list)
+                .await
+            {
                 ops.push(operation);
             }
         }
@@ -51,15 +71,32 @@ impl AdultRole {
         &mut self,
         addr: &BlobAddress,
         our_name: &XorName,
+        new_adults: &BTreeSet<XorName>,
+        lost_adults: &BTreeSet<XorName>,
+        old_adult_list: &BTreeSet<XorName>,
     ) -> Option<NodeDuty> {
-        let holders = self.compute_new_holders(addr);
-        if !holders.contains(our_name) {
-            let chunk = self.chunks.remove_chunk(addr).await.ok()?;
+        let new_holders = self.compute_holders(addr, &self.adult_list);
+        let old_holders = self.compute_holders(addr, old_adult_list);
+
+        let we_are_not_holder_anymore = !new_holders.contains(our_name);
+        let new_adult_is_holder = !new_holders.is_disjoint(new_adults);
+        let lost_old_holder = !old_holders.is_disjoint(lost_adults);
+
+        if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
+            let id = MessageId::new();
+            info!("Republishing chunk at {:?} with MessageId {:?}", addr, id);
+            info!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
+            let chunk = self.chunks.get_chunk(addr).ok()?;
+            if we_are_not_holder_anymore {
+                if let Err(err) = self.chunks.remove_chunk(addr).await {
+                    warn!("Error deleting chunk during republish: {:?}", err);
+                }
+            }
             // TODO: Push to LRU cache
             Some(NodeDuty::Send(OutgoingMsg {
                 msg: Message::NodeCmd {
                     cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk)),
-                    id: MessageId::new(),
+                    id,
                 },
                 dst: DstLocation::Section(*addr.name()),
                 section_source: false,
@@ -70,10 +107,15 @@ impl AdultRole {
         }
     }
 
-    fn compute_new_holders(&self, addr: &BlobAddress) -> BTreeSet<&XorName> {
-        self.adult_list
+    fn compute_holders(
+        &self,
+        addr: &BlobAddress,
+        adult_list: &BTreeSet<XorName>,
+    ) -> BTreeSet<XorName> {
+        adult_list
             .iter()
             .sorted_by(|lhs, rhs| addr.name().cmp_distance(lhs, rhs))
+            .cloned()
             .collect()
     }
 }
