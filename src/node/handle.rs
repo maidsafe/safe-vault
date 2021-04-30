@@ -292,6 +292,10 @@ impl Node {
                 let adult = self.role.as_adult_mut()?;
                 Ok(vec![adult.chunks.write(&write, msg_id, origin).await?])
             }
+            NodeDuty::ProcessRepublish { chunk } => {
+                let elder = self.role.as_elder_mut()?;
+                Ok(vec![elder.meta_data.finish_chunk_replication(chunk).await?])
+            }
             NodeDuty::ReachingMaxCapacity => Ok(vec![self.notify_section_of_our_storage().await?]),
             //
             // ------- Misc ------------

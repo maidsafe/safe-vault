@@ -26,7 +26,6 @@ enum Operation {
     },
     Write {
         blob_write: Box<BlobWrite>,
-        origin: EndUser,
         targets: BTreeSet<XorName>,
     },
 }
@@ -52,13 +51,11 @@ impl AdultLiveness {
         &mut self,
         msg_id: MessageId,
         blob_write: BlobWrite,
-        origin: EndUser,
         targets: BTreeSet<XorName>,
     ) -> bool {
         let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
             let _ = entry.insert(Operation::Write {
                 blob_write: Box::new(blob_write),
-                origin,
                 targets: targets.clone(),
             });
             true

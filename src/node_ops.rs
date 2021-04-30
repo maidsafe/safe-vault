@@ -88,6 +88,9 @@ pub enum NodeDuty {
         msg_id: MessageId,
         origin: EndUser,
     },
+    ProcessRepublish {
+        chunk: Blob,
+    },
     /// Run at data-section Elders on receiving the result of
     /// write operations from Adults
     RecordAdultWriteLiveness {
@@ -249,6 +252,7 @@ impl Debug for NodeDuty {
             Self::GetTransfersHistory { .. } => write!(f, "GetTransfersHistory"),
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
+            Self::ProcessRepublish { .. } => write!(f, "ProcessRepublish"),
             Self::RecordAdultWriteLiveness {
                 correlation_id,
                 result,

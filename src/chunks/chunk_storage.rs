@@ -69,16 +69,11 @@ impl ChunkStorage {
     }
 
     async fn try_store(&mut self, data: &Blob, origin: EndUser) -> Result<()> {
-        info!("TRYING TO STORE BLOB");
         if data.is_private() {
             let data_owner = data
                 .owner()
                 .ok_or_else(|| Error::InvalidOwners(*origin.id()))?;
-            info!("Blob is unpub");
-            info!("DATA OWNER: {:?}", data_owner);
-            info!("ORIGIN: {:?}", origin);
             if data_owner != origin.id() {
-                info!("INVALID OWNER! Returning error");
                 return Err(Error::InvalidOwners(*origin.id()));
             }
         }

@@ -10,9 +10,9 @@ use super::{LazyError, Mapping, MsgContext};
 use crate::{node_ops::NodeDuty, Error};
 use sn_messaging::{
     client::{
-        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery, Query,
-        QueryResponse, TransferCmd, TransferQuery,
+        BlobWrite, Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery,
+        NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd,
+        NodeTransferQuery, Query, QueryResponse, TransferCmd, TransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
@@ -238,6 +238,10 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             id: *id,
             origin: *origin,
         },
+        Message::NodeCmd {
+            cmd: NodeCmd::Republish { chunk },
+            id,
+        } => NodeDuty::ReplicateChunk(chunk.clone()),
         //
         // ------ adult ------
         Message::NodeQuery {

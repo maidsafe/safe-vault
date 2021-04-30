@@ -164,7 +164,12 @@ impl BlobRecords {
         self.dbs.full_adults.lock().await.total_keys() as u8
     }
 
-    async fn store(&mut self, data: Blob, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
+    async fn send_chunks_to_adults(
+        &mut self,
+        data: Blob,
+        msg_id: MessageId,
+        origin: EndUser,
+    ) -> Result<NodeDuty> {
         // TODO: filter out full adults
         let target_holders = self
             .get_holders_for_chunk(data.name())
@@ -179,7 +184,7 @@ impl BlobRecords {
 
         if self
             .adult_liveness
-            .new_write(msg_id, blob_write.clone(), origin, target_holders.clone())
+            .new_write(msg_id, blob_write.clone(), target_holders.clone())
         {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
@@ -199,6 +204,15 @@ impl BlobRecords {
             );
             Ok(NodeDuty::NoOp)
         }
+    }
+
+    async fn store(&mut self, data: Blob, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
+        let result = validate_data_owner(&data, &origin);
+        if result.is_err() {
+            return self.ok_or_error(result, msg_id, origin);
+        }
+
+        self.send_chunks_to_adults(data, msg_id, origin).await
     }
 
     pub async fn record_adult_write_liveness(
@@ -302,12 +316,10 @@ impl BlobRecords {
         // .chain(full_adults) TODO
         .collect::<BTreeSet<_>>();
 
-        if self.adult_liveness.new_write(
-            msg_id,
-            BlobWrite::DeletePrivate(address),
-            origin,
-            targets.clone(),
-        ) {
+        if self
+            .adult_liveness
+            .new_write(msg_id, BlobWrite::DeletePrivate(address), targets.clone())
+        {
             let msg = Message::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: BlobWrite::DeletePrivate(address),
@@ -347,59 +359,26 @@ impl BlobRecords {
 
     pub(super) async fn replicate_chunk(&mut self, data: Blob) -> Result<NodeDuty> {
         info!("Replicating chunk");
-        // // If the data already exist, check the existing no of copies.
-        // // If no of copies are less then required, then continue with the put request.
-        // let (owner, target_holders) =
-        //     if let Ok(metadata) = self.get_metadata_for(*data.address()).await {
-        //         if metadata.holders.len() < CHUNK_COPY_COUNT {
-        //             (
-        //                 metadata.owner,
-        //                 self.get_new_holders_for_chunk(data.address()).await,
-        //             )
-        //         } else {
-        //             trace!(
-        //                 "{}: All good, {:?}, chunk copy count already satisfied.",
-        //                 self,
-        //                 data
-        //             );
-        //             return Ok(NodeDuty::NoOp);
-        //         }
-        //     } else {
-        //         trace!(
-        //             "{}: Did not find any metadata for the chunk, {:?}. No replication performed.",
-        //             self,
-        //             data
-        //         );
-        //         return Ok(NodeDuty::NoOp);
-        //     };
+        let owner = data.owner();
 
-        // info!("Storing {} copies of the data", target_holders.len());
+        // deterministic msg id for aggregation
+        let msg_id = MessageId::from_content(&(*data.name(), owner))?;
 
-        // for holder in &target_holders {
-        //     // TODO: This error needs to be handled in some way.
-        //     if let Err(e) = self.set_chunk_holder(*data.address(), *holder, owner).await {
-        //         warn!(
-        //             "Error ({:?}) when replicating chunk and setting chunk holder ({:?}) of {:?}, owned by: {:?}",
-        //             e,
-        //             *holder,
-        //             *data.address(),
-        //             owner
-        //         )
-        //     }
-        // }
+        let target_holders = self
+            .get_holders_for_chunk(data.name())
+            .await
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
 
-        // // deterministic msg id for aggregation
-        // let msg_id = MessageId::from_content(&(*data.name(), owner))?;
-
-        // Ok(NodeDuty::SendToNodes {
-        //     targets: target_holders,
-        //     msg: Message::NodeCmd {
-        //         cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
-        //         id: msg_id,
-        //     },
-        //     aggregation: Aggregation::AtDestination,
-        // })
-        Ok(NodeDuty::NoOp)
+        Ok(NodeDuty::SendToNodes {
+            targets: target_holders,
+            msg: Message::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
+                id: msg_id,
+            },
+            aggregation: Aggregation::AtDestination,
+        })
     }
 
     async fn get_chunk_queries(
@@ -487,6 +466,47 @@ impl BlobRecords {
         self.reader
             .our_adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
             .await
+    }
+
+    fn ok_or_error(
+        &self,
+        result: Result<()>,
+        msg_id: MessageId,
+        origin: EndUser,
+    ) -> Result<NodeDuty> {
+        if let Err(error) = result {
+            info!("BlobRecords: Writing chunk Failed. {:?}", error);
+            let messaging_error = convert_to_error_message(error)?;
+
+            Ok(NodeDuty::Send(OutgoingMsg {
+                msg: Message::CmdError {
+                    error: CmdError::Data(messaging_error),
+                    id: MessageId::in_response_to(&msg_id),
+                    correlation_id: msg_id,
+                },
+                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+                dst: DstLocation::EndUser(origin),
+                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
+            }))
+        } else {
+            Ok(NodeDuty::NoOp)
+        }
+    }
+}
+
+fn validate_data_owner(data: &Blob, origin: &EndUser) -> Result<()> {
+    if data.is_private() {
+        data.owner()
+            .ok_or_else(|| Error::InvalidOwners(*origin.id()))
+            .and_then(|data_owner| {
+                if data_owner != origin.id() {
+                    Err(Error::InvalidOwners(*origin.id()))
+                } else {
+                    Ok(())
+                }
+            })
+    } else {
+        Ok(())
     }
 }
 
