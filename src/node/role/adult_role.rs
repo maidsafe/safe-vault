@@ -32,13 +32,6 @@ impl AdultRole {
         new_adults: BTreeSet<XorName>,
         our_name: XorName,
     ) -> NodeDuties {
-        let _adults_added = new_adults
-            .difference(&self.adult_list)
-            .collect::<BTreeSet<_>>();
-        let _adults_removed = self
-            .adult_list
-            .difference(&new_adults)
-            .collect::<BTreeSet<_>>();
         self.adult_list = new_adults;
         self.reorganize_chunks(our_name).await
     }

@@ -260,6 +260,13 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         },
         // this cmd is accumulated, thus has authority
         Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
+            id,
+        } => NodeDuty::ReplicateChunk {
+            data: data.clone(),
+            id: *id,
+        },
+        Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(data)),
             ..
         } => NodeDuty::ProcessRepublish {

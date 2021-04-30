@@ -178,7 +178,6 @@ impl Display for ChunkStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::Error::InvalidOwners;
     use crate::error::Result;
     use bls::SecretKey;
     use sn_data_types::{PrivateBlob, PublicBlob, PublicKey};
@@ -215,18 +214,6 @@ mod tests {
         assert!(storage.try_store(&blob).await.is_ok());
         assert!(storage.chunks.has(blob.address()));
 
-        Ok(())
-    }
-
-    #[tokio::test]
-    pub async fn try_store_errors_if_end_user_doesnt_own_data() -> Result<()> {
-        let path = PathBuf::from(temp_dir()?.path());
-        let mut storage = ChunkStorage::new(&path, u64::MAX).await?;
-        let value = "immutable data value".to_owned().into_bytes();
-        let data_owner = get_random_pk();
-        let blob = Blob::Private(PrivateBlob::new(value, data_owner));
-        let result = storage.try_store(&blob).await;
-        assert!(matches!(result, Err(InvalidOwners(_))));
         Ok(())
     }
 }

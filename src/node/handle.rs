@@ -386,10 +386,9 @@ impl Node {
                 elder.section_funds.add_payment(credit);
                 Ok(vec![])
             }
-            NodeDuty::ReplicateChunk(data) => {
+            NodeDuty::ReplicateChunk { data, id } => {
                 let adult = self.role.as_adult_mut()?;
-                adult.chunks.store_for_replication(data).await?;
-                Ok(vec![])
+                Ok(vec![adult.chunks.store_for_replication(data, id).await?])
             }
             NodeDuty::NoOp => Ok(vec![]),
         }

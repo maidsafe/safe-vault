@@ -209,7 +209,10 @@ pub enum NodeDuty {
     },
     /// Receive a chunk that is being replicated.
     /// This is run at an Adult (the new holder).
-    ReplicateChunk(Blob),
+    ReplicateChunk {
+        data: Blob,
+        id: MessageId,
+    },
     /// Create proposals to vote unresponsive nodes as offline
     ProposeOffline(Vec<XorName>),
     NoOp,
@@ -289,7 +292,7 @@ impl Debug for NodeDuty {
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
             Self::ProcessDataPayment { .. } => write!(f, "ProcessDataPayment"),
-            Self::ReplicateChunk(_) => write!(f, "ReplicateChunk"),
+            Self::ReplicateChunk { .. } => write!(f, "ReplicateChunk"),
             Self::ProposeOffline(nodes) => write!(f, "ProposeOffline({:?})", nodes),
         }
     }

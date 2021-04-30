@@ -342,14 +342,7 @@ impl BlobRecords {
     }
 
     pub(super) async fn republish_chunk(&mut self, data: Blob) -> Result<NodeDuty> {
-        info!(
-            "Republishing chunk {:?} at it's data section",
-            data.address()
-        );
         let owner = data.owner();
-
-        // deterministic msg id for aggregation
-        let msg_id = MessageId::from_content(&(*data.name(), owner))?;
 
         let target_holders = self
             .get_holders_for_chunk(data.name())
@@ -358,14 +351,33 @@ impl BlobRecords {
             .cloned()
             .collect::<BTreeSet<_>>();
 
-        Ok(NodeDuty::SendToNodes {
-            targets: target_holders,
-            msg: Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
-                id: msg_id,
-            },
-            aggregation: Aggregation::AtDestination,
-        })
+        // deterministic msg id for aggregation
+        let msg_id = MessageId::from_content(&(*data.name(), owner, target_holders.clone()))?;
+
+        info!(
+            "Republishing chunk {:?} to holders {:?} with MessageId {:?}",
+            data.address(),
+            &target_holders,
+            msg_id
+        );
+
+        if self.adult_liveness.new_write(
+            msg_id,
+            BlobWrite::New(data.clone()),
+            target_holders.clone(),
+        ) {
+            Ok(NodeDuty::SendToNodes {
+                targets: target_holders,
+                msg: Message::NodeCmd {
+                    cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
+                    id: msg_id,
+                },
+                aggregation: Aggregation::AtDestination,
+            })
+        } else {
+            info!("Skipping chunk republish since it's already in progress");
+            Ok(NodeDuty::NoOp)
+        }
     }
 
     pub(super) async fn read(

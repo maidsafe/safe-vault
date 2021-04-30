@@ -9,15 +9,16 @@
 mod chunk_storage;
 
 use crate::{
-    node_ops::{NodeDuties, NodeDuty},
+    error::convert_to_error_message,
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     Result,
 };
 use chunk_storage::ChunkStorage;
 use log::{info, warn};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
-    client::{BlobRead, BlobWrite},
-    EndUser, MessageId,
+    client::{BlobRead, BlobWrite, CmdError, Message, NodeEvent},
+    Aggregation, DstLocation, EndUser, MessageId,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -81,8 +82,27 @@ impl Chunks {
     }
 
     /// Stores a chunk that Elders sent to it for replication.
-    pub async fn store_for_replication(&mut self, blob: Blob) -> Result<()> {
-        self.chunk_storage.store_for_replication(blob).await
+    pub async fn store_for_replication(
+        &mut self,
+        blob: Blob,
+        msg_id: MessageId,
+    ) -> Result<NodeDuty> {
+        let data_name = *blob.address().name();
+        let result = match self.chunk_storage.store_for_replication(blob).await {
+            Ok(()) => Ok(()),
+            Err(err) => Err(CmdError::Data(convert_to_error_message(err)?)),
+        };
+        Ok(NodeDuty::Send(OutgoingMsg {
+            msg: Message::NodeEvent {
+                event: NodeEvent::ChunkWriteHandled(result),
+                id: MessageId::in_response_to(&msg_id),
+                correlation_id: msg_id,
+            },
+            section_source: false, // sent as single node
+            // Data's metadata section
+            dst: DstLocation::Section(data_name),
+            aggregation: Aggregation::None,
+        }))
     }
 }
 
