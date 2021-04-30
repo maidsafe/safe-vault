@@ -6,13 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_routing::XorName;
-
-use crate::{
-    chunks::Chunks, metadata::Metadata, section_funds::SectionFunds, transfers::Transfers, Error,
-    Result,
-};
-use std::{collections::BTreeSet, fmt};
+use crate::{Error, Result};
+use std::fmt;
 
 pub(crate) use adult_role::AdultRole;
 pub(crate) use elder_role::ElderRole;
@@ -27,6 +22,7 @@ pub(crate) enum Role {
 }
 
 impl Role {
+    #[allow(unused)]
     pub fn as_adult(&self) -> Result<&AdultRole> {
         match self {
             Self::Adult(adult) => Ok(adult),

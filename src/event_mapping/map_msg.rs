@@ -10,9 +10,9 @@ use super::{LazyError, Mapping, MsgContext};
 use crate::{node_ops::NodeDuty, Error};
 use sn_messaging::{
     client::{
-        BlobWrite, Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery,
-        NodeQueryResponse, NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd,
-        NodeTransferQuery, Query, QueryResponse, TransferCmd, TransferQuery,
+        Cmd, Message, NodeCmd, NodeEvent, NodeQuery, NodeRewardQuery, NodeSystemCmd,
+        NodeSystemQuery, NodeTransferCmd, NodeTransferQuery, Query, QueryResponse, TransferCmd,
+        TransferQuery,
     },
     DstLocation, EndUser, SrcLocation,
 };
@@ -238,10 +238,6 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             id: *id,
             origin: *origin,
         },
-        Message::NodeCmd {
-            cmd: NodeCmd::Republish { chunk },
-            id,
-        } => NodeDuty::ReplicateChunk(chunk.clone()),
         //
         // ------ adult ------
         Message::NodeQuery {
@@ -262,22 +258,13 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             msg_id: *id,
             origin: *origin,
         },
-        //
-        // ------ chunk replication ------
-        Message::NodeQuery {
-            query: NodeQuery::System(NodeSystemQuery::GetChunk(address)),
-            id,
-            ..
-        } => NodeDuty::ReturnChunkToElders {
-            address: *address,
-            section: origin.name(),
-            id: *id,
-        },
         // this cmd is accumulated, thus has authority
         Message::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
+            cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(data)),
             ..
-        } => NodeDuty::ReplicateChunk(data.clone()),
+        } => NodeDuty::ProcessRepublish {
+            chunk: data.clone(),
+        },
         // Aggregated by us, for security
         Message::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
@@ -293,19 +280,6 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
             cmd: NodeCmd::System(NodeSystemCmd::StorageFull { node_id, .. }),
             ..
         } => NodeDuty::IncrementFullNodeCount { node_id: *node_id },
-        // ------ chunk replication ------
-        // query response from adult cannot be accumulated
-        Message::NodeQueryResponse {
-            response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(result)),
-            ..
-        } => {
-            if let Ok(data) = result {
-                NodeDuty::FinishReplication(data.clone())
-            } else {
-                log::warn!("Got error when reading chunk for replication: {:?}", result);
-                NodeDuty::NoOp
-            }
-        }
         //
         // ------ transfers ------
         Message::NodeQuery {

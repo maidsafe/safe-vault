@@ -16,7 +16,7 @@ mod sequence_storage;
 
 use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
-use crate::{capacity::ChunkHolderDbs, node_ops::NodeDuties, Result};
+use crate::{capacity::ChunkHolderDbs, Result};
 use blob_records::BlobRecords;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
@@ -121,22 +121,11 @@ impl Metadata {
             .await
     }
 
-    // This should be called whenever a node leaves the section. It fetches the list of data that was
-    // previously held by the node and requests the remaining holders to return that chunk to us.
-    // The list of holders is also updated by removing the node that left.
     // When receiving the chunk from remaining holders, we ask new holders to store it.
-    pub async fn remove_and_replicate_chunks(&mut self, node: XorName) -> Result<NodeDuties> {
+    pub async fn republish_chunk(&mut self, data: Blob) -> Result<NodeDuty> {
         self.elder_stores
             .blob_records_mut()
-            .remove_and_replicate_chunks(node)
-            .await
-    }
-
-    // When receiving the chunk from remaining holders, we ask new holders to store it.
-    pub async fn finish_chunk_replication(&mut self, data: Blob) -> Result<NodeDuty> {
-        self.elder_stores
-            .blob_records_mut()
-            .replicate_chunk(data)
+            .republish_chunk(data)
             .await
     }
 

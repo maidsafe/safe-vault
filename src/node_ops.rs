@@ -9,7 +9,7 @@
 #[cfg(feature = "simulated-payouts")]
 use sn_data_types::Transfer;
 use sn_data_types::{
-    ActorHistory, Blob, BlobAddress, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
+    ActorHistory, Blob, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
 use sn_messaging::{
@@ -207,19 +207,9 @@ pub enum NodeDuty {
         msg: Message,
         origin: EndUser,
     },
-    ///
-    FinishReplication(Blob),
     /// Receive a chunk that is being replicated.
     /// This is run at an Adult (the new holder).
     ReplicateChunk(Blob),
-    /// Retrieve a chunk
-    /// and send it back to to the requesting Elders
-    /// for them to replicate it on new nodes.
-    ReturnChunkToElders {
-        address: BlobAddress,
-        id: MessageId,
-        section: XorName,
-    },
     /// Create proposals to vote unresponsive nodes as offline
     ProposeOffline(Vec<XorName>),
     NoOp,
@@ -299,8 +289,6 @@ impl Debug for NodeDuty {
             Self::ProcessRead { .. } => write!(f, "ProcessRead"),
             Self::ProcessWrite { .. } => write!(f, "ProcessWrite"),
             Self::ProcessDataPayment { .. } => write!(f, "ProcessDataPayment"),
-            Self::ReturnChunkToElders { .. } => write!(f, "ReturnChunkToElders"),
-            Self::FinishReplication(_) => write!(f, "FinishReplication"),
             Self::ReplicateChunk(_) => write!(f, "ReplicateChunk"),
             Self::ProposeOffline(nodes) => write!(f, "ProposeOffline({:?})", nodes),
         }

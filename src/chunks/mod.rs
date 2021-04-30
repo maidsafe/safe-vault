@@ -7,8 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod chunk_storage;
-mod reading;
-mod writing;
 
 use crate::{
     node_ops::{NodeDuties, NodeDuty},
@@ -25,7 +23,6 @@ use std::{
     fmt::{self, Display, Formatter},
     path::Path,
 };
-use xor_name::XorName;
 
 /// At 50% full, the node will report that it's reaching full capacity.
 pub const MAX_STORAGE_USAGE_RATIO: f64 = 0.5;
@@ -54,8 +51,9 @@ impl Chunks {
         Ok(chunk)
     }
 
-    pub fn read(&mut self, read: &BlobRead, msg_id: MessageId) -> Result<NodeDuties> {
-        reading::get_result(read, msg_id, &self.chunk_storage)
+    pub fn read(&mut self, read: &BlobRead, msg_id: MessageId) -> NodeDuties {
+        let BlobRead::Get(address) = read;
+        self.chunk_storage.get(address, msg_id)
     }
 
     pub async fn write(
@@ -64,7 +62,13 @@ impl Chunks {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        writing::get_result(write, msg_id, origin, &mut self.chunk_storage).await
+        match &write {
+            BlobWrite::New(data) => self.chunk_storage.store(&data, msg_id).await,
+            // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
+            BlobWrite::DeletePrivate(address) => {
+                self.chunk_storage.delete(*address, msg_id, origin).await
+            }
+        }
     }
 
     pub async fn check_storage(&self) -> Result<NodeDuties> {
@@ -74,19 +78,6 @@ impl Chunks {
         } else {
             Ok(vec![])
         }
-    }
-
-    /// Returns a chunk to the Elders of a section.
-    pub async fn get_chunk_for_replication(
-        &self,
-        address: BlobAddress,
-        msg_id: MessageId,
-        section: XorName,
-    ) -> Result<NodeDuty> {
-        info!("Send blob for replication to the Elders.");
-        self.chunk_storage
-            .get_for_replication(address, msg_id, section)
-            .await
     }
 
     /// Stores a chunk that Elders sent to it for replication.

@@ -180,8 +180,6 @@ impl Node {
                 let elder = self.role.as_elder_mut()?;
                 elder.section_funds.remove_node_wallet(name);
 
-                ops.extend(elder.meta_data.remove_and_replicate_chunks(name).await?);
-
                 Ok(ops)
             }
             //
@@ -276,7 +274,7 @@ impl Node {
                     .matches(&&data_section_addr)
                 {
                     let adult = self.role.as_adult_mut()?;
-                    let mut ops = adult.chunks.read(&read, msg_id)?;
+                    let mut ops = adult.chunks.read(&read, msg_id);
                     ops.extend(adult.chunks.check_storage().await?);
                     Ok(ops)
                 } else {
@@ -294,7 +292,7 @@ impl Node {
             }
             NodeDuty::ProcessRepublish { chunk } => {
                 let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.meta_data.finish_chunk_replication(chunk).await?])
+                Ok(vec![elder.meta_data.republish_chunk(chunk).await?])
             }
             NodeDuty::ReachingMaxCapacity => Ok(vec![self.notify_section_of_our_storage().await?]),
             //
@@ -392,23 +390,6 @@ impl Node {
                 let adult = self.role.as_adult_mut()?;
                 adult.chunks.store_for_replication(data).await?;
                 Ok(vec![])
-            }
-            NodeDuty::ReturnChunkToElders {
-                address,
-                id,
-                section,
-            } => {
-                let adult = self.role.as_adult()?;
-                Ok(vec![
-                    adult
-                        .chunks
-                        .get_chunk_for_replication(address, id, section)
-                        .await?,
-                ])
-            }
-            NodeDuty::FinishReplication(data) => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.meta_data.finish_chunk_replication(data).await?])
             }
             NodeDuty::NoOp => Ok(vec![]),
         }

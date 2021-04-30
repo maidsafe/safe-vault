@@ -9,16 +9,15 @@
 use crate::{
     capacity::ChunkHolderDbs,
     error::convert_to_error_message,
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
-    to_db_key::{from_db_key, ToDbKey},
+    node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
 };
-use log::{debug, error, info, trace, warn};
-use sn_data_types::{Blob, BlobAddress, DataAddress, Error as DtError, PublicKey};
+use log::{debug, error, info, warn};
+use sn_data_types::{Blob, BlobAddress, PublicKey};
 use sn_messaging::{
     client::{
-        BlobDataExchange, BlobRead, BlobWrite, ChunkMetadata, CmdError, Error as ErrorMessage,
-        HolderMetadata, Message, NodeCmd, NodeQuery, NodeSystemCmd, NodeSystemQuery, QueryResponse,
+        BlobDataExchange, BlobRead, BlobWrite, CmdError, Message, NodeCmd, NodeQuery,
+        NodeSystemCmd, QueryResponse,
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
@@ -86,7 +85,7 @@ impl BlobRecords {
         let member_names_as_string = members
             .iter()
             .map(|name| name.to_string())
-            .collect::<Vec<_>>();
+            .collect::<BTreeSet<_>>();
 
         // full adults
         let mut full_adults_db = self.dbs.full_adults.lock().await;
@@ -100,8 +99,9 @@ impl BlobRecords {
             let _ = full_adults_db.rem(&adult);
         }
 
-        // // stop tracking liveness of absent holders
-        // self.adult_liveness.stop_tracking(absent_holders);
+        // stop tracking liveness of absent holders
+        self.adult_liveness
+            .stop_tracking(members.iter().collect::<BTreeSet<_>>());
 
         Ok(())
     }
@@ -134,6 +134,7 @@ impl BlobRecords {
     }
 
     /// Removes a given node from the list of full nodes.
+    #[allow(unused)] // TODO: Remove node from full list at 50% ?
     async fn decrease_full_node_count_if_present(&mut self, node_name: XorName) -> Result<()> {
         info!("No. of Full Nodes: {:?}", self.full_nodes().await);
         info!("Checking if {:?} is present as full_node", node_name);
@@ -207,9 +208,8 @@ impl BlobRecords {
     }
 
     async fn store(&mut self, data: Blob, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
-        let result = validate_data_owner(&data, &origin);
-        if result.is_err() {
-            return self.ok_or_error(result, msg_id, origin);
+        if let Err(error) = validate_data_owner(&data, &origin) {
+            return self.send_blob_cmd_error(error, msg_id, origin).await;
         }
 
         self.send_chunks_to_adults(data, msg_id, origin).await
@@ -341,24 +341,11 @@ impl BlobRecords {
         }
     }
 
-    pub(super) async fn remove_and_replicate_chunks(
-        &mut self,
-        holder: XorName,
-    ) -> Result<NodeDuties> {
-        info!("Replicating chunks");
-        // let chunks_stored = match self.remove_holder(holder).await {
-        //     Ok(chunks) => chunks,
-        //     _ => return Ok(vec![]),
-        // };
-        // let mut cmds = Vec::new();
-        // for (address, holders) in chunks_stored {
-        //     cmds.extend(self.get_chunk_queries(address, holders).await?);
-        // }
-        Ok(vec![])
-    }
-
-    pub(super) async fn replicate_chunk(&mut self, data: Blob) -> Result<NodeDuty> {
-        info!("Replicating chunk");
+    pub(super) async fn republish_chunk(&mut self, data: Blob) -> Result<NodeDuty> {
+        info!(
+            "Republishing chunk {:?} at it's data section",
+            data.address()
+        );
         let owner = data.owner();
 
         // deterministic msg id for aggregation
@@ -379,36 +366,6 @@ impl BlobRecords {
             },
             aggregation: Aggregation::AtDestination,
         })
-    }
-
-    async fn get_chunk_queries(
-        &mut self,
-        address: BlobAddress,
-        current_holders: BTreeSet<XorName>,
-    ) -> Result<NodeDuties> {
-        let mut node_ops = Vec::new();
-        let messages = current_holders
-            .into_iter()
-            .map(|holder| {
-                info!("Sending get-chunk query to holder {:?}", holder);
-                (
-                    Message::NodeQuery {
-                        query: NodeQuery::System(NodeSystemQuery::GetChunk(address)),
-                        id: MessageId::combine(vec![*address.name(), holder]),
-                    },
-                    holder,
-                )
-            })
-            .collect::<Vec<_>>();
-        for (msg, dst) in messages {
-            node_ops.push(NodeDuty::Send(OutgoingMsg {
-                msg,
-                section_source: true, // i.e. errors go to our section
-                dst: DstLocation::Node(dst),
-                aggregation: Aggregation::AtDestination,
-            }));
-        }
-        Ok(node_ops)
     }
 
     pub(super) async fn read(
@@ -466,31 +423,6 @@ impl BlobRecords {
         self.reader
             .our_adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
             .await
-    }
-
-    fn ok_or_error(
-        &self,
-        result: Result<()>,
-        msg_id: MessageId,
-        origin: EndUser,
-    ) -> Result<NodeDuty> {
-        if let Err(error) = result {
-            info!("BlobRecords: Writing chunk Failed. {:?}", error);
-            let messaging_error = convert_to_error_message(error)?;
-
-            Ok(NodeDuty::Send(OutgoingMsg {
-                msg: Message::CmdError {
-                    error: CmdError::Data(messaging_error),
-                    id: MessageId::in_response_to(&msg_id),
-                    correlation_id: msg_id,
-                },
-                section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-                dst: DstLocation::EndUser(origin),
-                aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-            }))
-        } else {
-            Ok(NodeDuty::NoOp)
-        }
     }
 }
 

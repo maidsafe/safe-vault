@@ -13,7 +13,7 @@ use crate::{
 use itertools::Itertools;
 use sn_data_types::BlobAddress;
 use sn_messaging::{
-    client::{BlobWrite, Message, NodeCmd},
+    client::{Message, NodeCmd, NodeSystemCmd},
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::XorName;
@@ -65,7 +65,7 @@ impl AdultRole {
             // TODO: Push to LRU cache
             Some(NodeDuty::Send(OutgoingMsg {
                 msg: Message::NodeCmd {
-                    cmd: NodeCmd::Republish { chunk },
+                    cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(chunk)),
                     id: MessageId::new(),
                 },
                 dst: DstLocation::Section(*addr.name()),

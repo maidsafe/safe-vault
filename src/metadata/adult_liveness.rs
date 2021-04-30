@@ -93,7 +93,7 @@ impl AdultLiveness {
         new_operation
     }
 
-    pub fn stop_tracking(&mut self, names: BTreeSet<XorName>) {
+    pub fn stop_tracking(&mut self, names: BTreeSet<&XorName>) {
         for name in names {
             let _ = self.pending_ops.remove(&name);
             let _ = self.closest_adults.remove(&name);
@@ -106,8 +106,8 @@ impl AdultLiveness {
         self.recompute_closest_adults();
     }
 
-    pub fn remove_target(&mut self, msg_id: MessageId, name: XorName) {
-        if let Some(count) = self.pending_ops.get_mut(&name) {
+    pub fn remove_target(&mut self, msg_id: MessageId, name: &XorName) {
+        if let Some(count) = self.pending_ops.get_mut(name) {
             let counter = *count;
             if counter > 0 {
                 *count -= 1;
@@ -116,11 +116,11 @@ impl AdultLiveness {
         let complete = if let Some(operation) = self.ops.get_mut(&msg_id) {
             match operation {
                 Operation::Read { targets, .. } => {
-                    let _ = targets.remove(&name);
+                    let _ = targets.remove(name);
                     targets.is_empty()
                 }
                 Operation::Write { targets, .. } => {
-                    let _ = targets.remove(&name);
+                    let _ = targets.remove(name);
                     targets.is_empty()
                 }
             }
@@ -138,7 +138,7 @@ impl AdultLiveness {
         src: XorName,
     ) -> Option<BlobWrite> {
         let op = self.ops.get(&correlation_id).cloned();
-        self.remove_target(correlation_id, src);
+        self.remove_target(correlation_id, &src);
         op.and_then(|op| match op {
             Operation::Write { blob_write, .. } => Some(*blob_write),
             Operation::Read { .. } => None,
@@ -151,7 +151,7 @@ impl AdultLiveness {
         src: XorName,
     ) -> Option<(BlobAddress, EndUser)> {
         let op = self.ops.get(&correlation_id).cloned();
-        self.remove_target(correlation_id, src);
+        self.remove_target(correlation_id, &src);
         op.and_then(|op| match op {
             Operation::Read {
                 address, origin, ..
