@@ -385,7 +385,7 @@ impl BlobRecords {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let message_error = convert_to_error_message(error)?;
+        let message_error = convert_to_error_message(error);
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::CmdError {
                 error: CmdError::Data(message_error),
@@ -681,7 +681,7 @@ impl BlobRecords {
         let query_error = |error: Error| {
             Ok(NodeDuty::Send(OutgoingMsg {
                 msg: Message::QueryResponse {
-                    response: QueryResponse::GetBlob(Err(convert_to_error_message(error)?)),
+                    response: QueryResponse::GetBlob(Err(convert_to_error_message(error))),
                     id: MessageId::in_response_to(&msg_id),
                     correlation_id: msg_id,
                 },

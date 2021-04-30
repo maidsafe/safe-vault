@@ -90,7 +90,7 @@ impl RegisterStorage {
     async fn get(&self, address: Address, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
         let result = match self.get_chunk(address, Action::Read, origin) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -151,7 +151,7 @@ impl RegisterStorage {
             .and_then(|register| register.read(Some(*origin.id())).map_err(Error::from))
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -174,7 +174,7 @@ impl RegisterStorage {
     ) -> Result<NodeDuty> {
         let result = match self.get_chunk(address, Action::Read, origin) {
             Ok(res) => Ok(res.owner()),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -204,7 +204,7 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -234,7 +234,7 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -300,7 +300,7 @@ impl RegisterStorage {
             Ok(_) => return Ok(NodeDuty::NoOp),
             Err(error) => {
                 info!("Error on writing Register! {:?}", error);
-                convert_to_error_message(error)?
+                convert_to_error_message(error)
             }
         };
         Ok(NodeDuty::Send(OutgoingMsg {

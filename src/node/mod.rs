@@ -16,9 +16,10 @@ mod split;
 use crate::{
     chunk_store::UsedSpace,
     chunks::Chunks,
-    event_mapping::{map_routing_event, LazyError, Mapping, MsgContext},
+    error::convert_to_error_message,
+    event_mapping::{map_routing_event, MsgContext},
     network::Network,
-    node_ops::NodeDuty,
+    node_ops::{NodeDuty, OutgoingMsg},
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
@@ -26,6 +27,10 @@ use log::{error, info};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
+use sn_messaging::{
+    client::{CmdError, Message},
+    Aggregation, MessageId,
+};
 use sn_routing::{
     EventStream, {Prefix, XorName},
 };
@@ -128,10 +133,8 @@ impl Node {
             );
 
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
-            match map_routing_event(event, &self.network_api).await {
-                Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,
-                Mapping::Error(error) => handle_error(error),
-            }
+            let mapping = map_routing_event(event, &self.network_api).await;
+            self.process_while_any(mapping.op, mapping.ctx).await;
         }
 
         Ok(())
@@ -144,46 +147,49 @@ impl Node {
         while !next_ops.is_empty() {
             let mut pending_node_ops: Vec<NodeDuty> = vec![];
             for duty in next_ops {
-                match self.handle(duty).await {
-                    Ok(new_ops) => pending_node_ops.extend(new_ops),
-                    Err(e) => try_handle_error(e, ctx.clone()),
-                };
+                let new_ops = self
+                    .handle(duty)
+                    .await
+                    .unwrap_or_else(|e| try_handle_error(e, ctx.clone()));
+
+                pending_node_ops.extend(new_ops);
             }
             next_ops = pending_node_ops;
         }
     }
 }
 
-fn handle_error(err: LazyError) {
-    use std::error::Error;
-    info!(
-        "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
-        err
-    );
-
-    if let Some(source) = err.error.source() {
-        error!("Source of error: {:?}", source);
-    }
-}
-
-fn try_handle_error(err: Error, ctx: Option<MsgContext>) {
-    use std::error::Error;
-    if let Some(source) = err.source() {
-        if let Some(_ctx) = ctx {
-            info!(
-                "unimplemented: Handle errors. This should be return w/ lazyError to sender. {:?}",
-                err
-            );
-            error!("Source of error: {:?}", source);
-        } else {
+fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Vec<NodeDuty> {
+    let (msg_id, dst) = match ctx {
+        None => {
             error!(
-                "Erroring without a msg context. Source of error: {:?}",
-                source
-            );
+                    "Erroring when processing a message without a msg context, we cannot report it to the sender: {:?}", err
+                );
+            return vec![];
         }
-    } else {
-        info!("unimplemented: Handle errors. {:?}", err);
-    }
+        Some(MsgContext::Msg { msg, src }) => (msg.id(), src.to_dst()),
+        Some(MsgContext::Bytes { msg, src }) => {
+            // We generate a message id here since we cannot
+            // retrieve the message id from the message received
+            let msg_id = MessageId::from_content(&msg).unwrap_or_else(|_| MessageId::new());
+            (msg_id, src.to_dst())
+        }
+    };
+
+    info!("Error occurred to be returned to sender. {:?}", err);
+
+    let error_data = convert_to_error_message(err);
+
+    vec![NodeDuty::Send(OutgoingMsg {
+        msg: Message::CmdError {
+            error: CmdError::Data(error_data),
+            id: MessageId::in_response_to(&msg_id),
+            correlation_id: msg_id,
+        },
+        section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+        dst,
+        aggregation: Aggregation::None,
+    })]
 }
 
 impl Display for Node {

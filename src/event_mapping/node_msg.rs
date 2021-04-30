@@ -6,168 +6,76 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{LazyError, Mapping, MsgContext};
-use crate::{node_ops::NodeDuty, Error};
+use super::{Mapping, MsgContext};
+use crate::{
+    error::convert_to_error_message,
+    node_ops::{NodeDuty, OutgoingMsg},
+    Error,
+};
 use sn_messaging::{
     client::{
-        Cmd, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery, Query,
-        QueryResponse, TransferCmd, TransferQuery,
+        CmdError, Message, NodeCmd, NodeDataQueryResponse, NodeEvent, NodeQuery, NodeQueryResponse,
+        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
+        QueryResponse,
     },
-    DstLocation, EndUser, SrcLocation,
+    Aggregation, DstLocation, MessageId, SrcLocation,
 };
 
-pub fn match_user_sent_msg(msg: Message, origin: EndUser) -> Mapping {
-    match msg.to_owned() {
-        Message::Query {
-            query: Query::Data(query),
-            id,
-            ..
-        } => Mapping::Ok {
-            op: NodeDuty::ProcessRead { query, id, origin },
-            ctx: Some(super::MsgContext::Msg {
-                msg,
-                src: SrcLocation::EndUser(origin),
-            }),
-        },
-        Message::Cmd {
-            cmd: Cmd::Data { .. },
-            ..
-        } => Mapping::Ok {
-            op: NodeDuty::ProcessDataPayment {
-                msg: msg.clone(),
-                origin,
-            },
-            ctx: Some(MsgContext::Msg {
-                msg,
-                src: SrcLocation::EndUser(origin),
-            }),
-        },
-        Message::Cmd {
-            cmd: Cmd::Transfer(TransferCmd::ValidateTransfer(signed_transfer)),
-            id,
-            ..
-        } => Mapping::Ok {
-            op: NodeDuty::ValidateClientTransfer {
-                signed_transfer,
-                origin: SrcLocation::EndUser(origin),
-                msg_id: id,
-            },
-            ctx: Some(MsgContext::Msg {
-                msg,
-                src: SrcLocation::EndUser(origin),
-            }),
-        },
-        // TODO: Map more transfer cmds
-        Message::Cmd {
-            cmd: Cmd::Transfer(TransferCmd::SimulatePayout(transfer)),
-            id,
-            ..
-        } => Mapping::Ok {
-            op: NodeDuty::SimulatePayout {
-                transfer,
-                origin: SrcLocation::EndUser(origin),
-                msg_id: id,
-            },
-            ctx: Some(MsgContext::Msg {
-                msg,
-                src: SrcLocation::EndUser(origin),
-            }),
-        },
-        Message::Cmd {
-            cmd: Cmd::Transfer(TransferCmd::RegisterTransfer(proof)),
-            id,
-            ..
-        } => Mapping::Ok {
-            op: NodeDuty::RegisterTransfer { proof, msg_id: id },
-            ctx: Some(MsgContext::Msg {
-                msg,
-                src: SrcLocation::EndUser(origin),
-            }),
-        },
-        // TODO: Map more transfer queries
-        Message::Query {
-            query: Query::Transfer(TransferQuery::GetHistory { at, since_version }),
-            id,
-            ..
-        } => Mapping::Ok {
-            op: NodeDuty::GetTransfersHistory {
-                at,
-                since_version,
-                origin: SrcLocation::EndUser(origin),
-                msg_id: id,
-            },
-            ctx: Some(MsgContext::Msg {
-                msg,
-                src: SrcLocation::EndUser(origin),
-            }),
-        },
-        Message::Query {
-            query: Query::Transfer(TransferQuery::GetBalance(at)),
-            id,
-            ..
-        } => Mapping::Ok {
-            op: NodeDuty::GetBalance {
-                at,
-                origin: SrcLocation::EndUser(origin),
-                msg_id: id,
-            },
-            ctx: Some(MsgContext::Msg {
-                msg,
-                src: SrcLocation::EndUser(origin),
-            }),
-        },
-        Message::Query {
-            query: Query::Transfer(TransferQuery::GetStoreCost { bytes, .. }),
-            id,
-            ..
-        } => Mapping::Ok {
-            op: NodeDuty::GetStoreCost {
-                bytes,
-                origin: SrcLocation::EndUser(origin),
-                msg_id: id,
-            },
-            ctx: Some(MsgContext::Msg {
-                msg,
-                src: SrcLocation::EndUser(origin),
-            }),
-        },
-        _ => Mapping::Error(LazyError {
-            error: Error::InvalidMessage(msg.id(), format!("Unknown user msg: {:?}", msg)),
-            msg: MsgContext::Msg {
-                msg,
-                src: SrcLocation::EndUser(origin),
-            },
-        }),
-    }
-}
-
 pub fn map_node_msg(msg: Message, src: SrcLocation, dst: DstLocation) -> Mapping {
-    //debug!(">>>>>>>>>>>> Evaluating received msg. {:?}.", msg);
     match &dst {
-        DstLocation::Section(_name) | DstLocation::Node(_name) => match_or_err(msg, src),
-        _ => Mapping::Error(LazyError {
-            error: Error::InvalidMessage(msg.id(), format!("Invalid dst: {:?}", msg)),
-            msg: MsgContext::Msg { msg, src },
-        }),
-    }
-}
+        DstLocation::Section(_) | DstLocation::Node(_) => match match_node_msg(&msg, src) {
+            NodeDuty::NoOp => {
+                let msg_id = msg.id();
+                let error_data = convert_to_error_message(Error::InvalidMessage(
+                    msg.id(),
+                    format!("Unknown msg: {:?}", msg),
+                ));
 
-fn match_or_err(msg: Message, src: SrcLocation) -> Mapping {
-    match match_node_msg(msg.clone(), src) {
-        NodeDuty::NoOp => Mapping::Error(LazyError {
-            error: Error::InvalidMessage(msg.id(), format!("Unknown msg: {:?}", msg)),
-            msg: MsgContext::Msg { msg, src },
-        }),
-        op => Mapping::Ok {
-            op,
-            ctx: Some(MsgContext::Msg { msg, src }),
+                Mapping {
+                    ctx: Some(MsgContext::Msg { msg, src }),
+                    op: NodeDuty::Send(OutgoingMsg {
+                        msg: Message::CmdError {
+                            error: CmdError::Data(error_data),
+                            id: MessageId::in_response_to(&msg_id),
+                            correlation_id: msg_id,
+                        },
+                        section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                        dst: src.to_dst(),
+                        aggregation: Aggregation::None,
+                    }),
+                }
+            }
+            op => Mapping {
+                op,
+                ctx: Some(MsgContext::Msg { msg, src }),
+            },
         },
+        _ => {
+            let msg_id = msg.id();
+            let error_data = convert_to_error_message(Error::InvalidMessage(
+                msg_id,
+                format!("Invalid dst: {:?}", msg),
+            ));
+
+            Mapping {
+                ctx: Some(MsgContext::Msg { msg, src }),
+                op: NodeDuty::Send(OutgoingMsg {
+                    msg: Message::CmdError {
+                        error: CmdError::Data(error_data),
+                        id: MessageId::in_response_to(&msg_id),
+                        correlation_id: msg_id,
+                    },
+                    section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+                    dst: src.to_dst(),
+                    aggregation: Aggregation::None,
+                }),
+            }
+        }
     }
 }
 
-fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
-    match &msg {
+fn match_node_msg(msg: &Message, origin: SrcLocation) -> NodeDuty {
+    match msg {
         // ------ wallet register ------
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet)),

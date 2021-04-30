@@ -121,7 +121,7 @@ impl SequenceStorage {
     ) -> Result<NodeDuty> {
         let result = match self.get_chunk(address, SequenceAction::Read, origin) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
@@ -192,7 +192,7 @@ impl SequenceStorage {
                     .ok_or(Error::NetworkData(DtError::NoSuchEntry))
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
@@ -219,7 +219,7 @@ impl SequenceStorage {
                 None => Err(Error::NetworkData(DtError::NoSuchEntry)),
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
@@ -248,7 +248,7 @@ impl SequenceStorage {
                     .map_err(|e| e.into())
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
@@ -280,7 +280,7 @@ impl SequenceStorage {
                 Ok(res)
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
@@ -312,7 +312,7 @@ impl SequenceStorage {
                 Ok(res)
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: Message::QueryResponse {
@@ -380,7 +380,7 @@ impl SequenceStorage {
             Ok(_) => return Ok(NodeDuty::NoOp),
             Err(error) => {
                 info!("Error on writing Sequence! {:?}", error);
-                convert_to_error_message(error)?
+                convert_to_error_message(error)
             }
         };
         Ok(NodeDuty::Send(OutgoingMsg {

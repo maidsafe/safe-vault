@@ -46,7 +46,7 @@ impl ChunkStorage {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = if let Err(error) = self.try_store(data, origin).await {
-            Err(CmdError::Data(convert_to_error_message(error)?))
+            Err(CmdError::Data(convert_to_error_message(error)))
         } else {
             Ok(())
         };
@@ -122,7 +122,7 @@ impl ChunkStorage {
     ) -> Result<NodeDuty> {
         let result = match self.chunks.get(&address) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         if let Ok(data) = result {

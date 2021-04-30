@@ -281,7 +281,7 @@ impl Transfers {
     ) -> Result<NodeDuty> {
         let result = match self.replicas.all_events().await {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
         use NodeQueryResponse::*;
         use NodeTransferQueryResponse::*;
@@ -308,7 +308,7 @@ impl Transfers {
         // validate signature
         let result = match self.replicas.balance(wallet_id).await {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -370,7 +370,7 @@ impl Transfers {
                 aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
             })),
             Err(e) => {
-                let message_error = convert_to_error_message(e)?;
+                let message_error = convert_to_error_message(e);
                 Ok(NodeDuty::Send(OutgoingMsg {
                     msg: Message::CmdError {
                         id: MessageId::in_response_to(&msg_id),
@@ -409,7 +409,7 @@ impl Transfers {
                 }))
             }
             Err(e) => {
-                let message_error = convert_to_error_message(e)?;
+                let message_error = convert_to_error_message(e);
                 Ok(NodeDuty::Send(OutgoingMsg {
                     msg: Message::CmdError {
                         error: CmdError::Transfer(TransferError::TransferRegistration(
@@ -445,7 +445,7 @@ impl Transfers {
         {
             Ok(_) => return Ok(NodeDuty::NoOp),
             Err(Error::NetworkData(error)) => {
-                let message_error = convert_dt_error_to_error_message(error)?;
+                let message_error = convert_dt_error_to_error_message(error);
                 Message::NodeCmdError {
                     error: NodeCmdError::Transfers(TransferPropagation(message_error)),
                     id: MessageId::in_response_to(&msg_id),

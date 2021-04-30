@@ -28,6 +28,7 @@ impl Node {
     ///
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         info!("Handling NodeDuty: {:?}", duty);
+
         match duty {
             NodeDuty::Genesis => {
                 self.level_up().await?;

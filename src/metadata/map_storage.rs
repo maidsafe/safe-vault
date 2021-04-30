@@ -239,7 +239,7 @@ impl MapStorage {
     ) -> Result<NodeDuty> {
         let result = match self.get_chunk(&address, origin, MapAction::Read) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -266,7 +266,7 @@ impl MapStorage {
             .map(|data| data.shell())
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -293,7 +293,7 @@ impl MapStorage {
             .map(|data| data.version())
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -330,7 +330,7 @@ impl MapStorage {
                 .ok_or(Error::NetworkData(DtError::NoSuchEntry)),
         }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -357,7 +357,7 @@ impl MapStorage {
             .map(|data| data.keys())
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -385,7 +385,7 @@ impl MapStorage {
             Map::Unseq(map) => map.values().into(),
         }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -413,7 +413,7 @@ impl MapStorage {
             Map::Unseq(map) => map.entries().clone().into(),
         }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -440,7 +440,7 @@ impl MapStorage {
             .map(|data| data.permissions())
         {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -471,7 +471,7 @@ impl MapStorage {
                     .map(MapPermissionSet::clone)
             }) {
             Ok(res) => Ok(res),
-            Err(error) => Err(convert_to_error_message(error)?),
+            Err(error) => Err(convert_to_error_message(error)),
         };
 
         Ok(NodeDuty::Send(OutgoingMsg {
@@ -493,7 +493,7 @@ impl MapStorage {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         if let Err(error) = result {
-            let messaging_error = convert_to_error_message(error)?;
+            let messaging_error = convert_to_error_message(error);
             info!("MapStorage: Writing chunk FAILED!");
 
             Ok(NodeDuty::Send(OutgoingMsg {

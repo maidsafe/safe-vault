@@ -12,6 +12,9 @@ use std::io;
 use thiserror::Error;
 use xor_name::XorName;
 
+/// Specialisation of `std::Result` for Node.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -136,33 +139,29 @@ pub enum Error {
     Configuration(String),
 }
 
-pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::client::Error> {
+pub(crate) fn convert_to_error_message(error: Error) -> sn_messaging::client::Error {
     match error {
-        Error::InvalidOperation(msg) => Ok(ErrorMessage::InvalidOperation(msg)),
-        Error::InvalidOwners(key) => Ok(ErrorMessage::InvalidOwners(key)),
-        Error::InvalidSignedTransfer(_) => Ok(ErrorMessage::InvalidSignature),
-        Error::TransferAlreadyRegistered => Ok(ErrorMessage::TransactionIdExists),
-        Error::NoSuchChunk(address) => Ok(ErrorMessage::DataNotFound(address)),
-        Error::NotEnoughSpace => Ok(ErrorMessage::NotEnoughSpace),
-        Error::BalanceExists => Ok(ErrorMessage::BalanceExists),
-        Error::TempDirCreationFailed(_) => Ok(ErrorMessage::FailedToWriteFile),
-        Error::DataExists => Ok(ErrorMessage::DataExists),
+        Error::InvalidOperation(msg) => ErrorMessage::InvalidOperation(msg),
+        Error::InvalidMessage(_, msg) => ErrorMessage::InvalidOperation(msg),
+        Error::InvalidOwners(key) => ErrorMessage::InvalidOwners(key),
+        Error::InvalidSignedTransfer(_) => ErrorMessage::InvalidSignature,
+        Error::TransferAlreadyRegistered => ErrorMessage::TransactionIdExists,
+        Error::NoSuchChunk(address) => ErrorMessage::DataNotFound(address),
+        Error::NotEnoughSpace => ErrorMessage::NotEnoughSpace,
+        Error::BalanceExists => ErrorMessage::BalanceExists,
+        Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
+        Error::DataExists => ErrorMessage::DataExists,
         Error::NetworkData(error) => convert_dt_error_to_error_message(error),
-        error => Err(Error::NoErrorMapping(error.to_string())),
+        other => ErrorMessage::InvalidOperation(format!("Failed to perform operation: {}", other)),
     }
 }
-pub(crate) fn convert_dt_error_to_error_message(
-    error: DtError,
-) -> Result<sn_messaging::client::Error> {
+pub(crate) fn convert_dt_error_to_error_message(error: DtError) -> sn_messaging::client::Error {
     match error {
-        DtError::InvalidOperation => Ok(ErrorMessage::InvalidOperation(
-            "DtError::InvalidOperation".to_string(),
-        )),
-        DtError::NoSuchEntry => Ok(ErrorMessage::NoSuchEntry),
-        DtError::AccessDenied(pk) => Ok(ErrorMessage::AccessDenied(pk)),
-        error => Err(Error::NoErrorMapping(error.to_string())),
+        DtError::InvalidOperation => {
+            ErrorMessage::InvalidOperation("DtError::InvalidOperation".to_string())
+        }
+        DtError::NoSuchEntry => ErrorMessage::NoSuchEntry,
+        DtError::AccessDenied(pk) => ErrorMessage::AccessDenied(pk),
+        other => ErrorMessage::InvalidOperation(format!("DtError: {:?}", other)),
     }
 }
-
-/// Specialisation of `std::Result` for Node.
-pub type Result<T, E = Error> = std::result::Result<T, E>;
