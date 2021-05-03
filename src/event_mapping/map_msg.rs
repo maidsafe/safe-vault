@@ -268,9 +268,10 @@ fn match_node_msg(msg: Message, origin: SrcLocation) -> NodeDuty {
         },
         Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(data)),
-            ..
+            id,
         } => NodeDuty::ProcessRepublish {
             chunk: data.clone(),
+            msg_id: *id,
         },
         // Aggregated by us, for security
         Message::NodeQuery {

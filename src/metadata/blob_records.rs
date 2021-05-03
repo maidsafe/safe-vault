@@ -32,7 +32,7 @@ use super::adult_liveness::AdultLiveness;
 use super::adult_reader::AdultReader;
 
 // The number of separate copies of a blob chunk which should be maintained.
-const CHUNK_COPY_COUNT: usize = 4;
+pub(crate) const CHUNK_COPY_COUNT: usize = 4;
 
 /// Operations over the data type Blob.
 pub(super) struct BlobRecords {

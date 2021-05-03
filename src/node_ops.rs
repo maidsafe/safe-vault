@@ -90,6 +90,7 @@ pub enum NodeDuty {
     },
     ProcessRepublish {
         chunk: Blob,
+        msg_id: MessageId,
     },
     /// Run at data-section Elders on receiving the result of
     /// write operations from Adults

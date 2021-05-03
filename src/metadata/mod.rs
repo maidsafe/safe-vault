@@ -18,6 +18,7 @@ use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
 use crate::{capacity::ChunkHolderDbs, Result};
 use blob_records::BlobRecords;
+pub(crate) use blob_records::CHUNK_COPY_COUNT;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use register_storage::RegisterStorage;

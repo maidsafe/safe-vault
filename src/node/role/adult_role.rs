@@ -8,10 +8,11 @@
 
 use crate::{
     chunks::Chunks,
+    metadata::CHUNK_COPY_COUNT,
     node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
 };
 use itertools::Itertools;
-use log::{info, warn};
+use log::{info, trace, warn};
 use sn_data_types::BlobAddress;
 use sn_messaging::{
     client::{Message, NodeCmd, NodeSystemCmd},
@@ -85,7 +86,7 @@ impl AdultRole {
         if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
             let id = MessageId::new();
             info!("Republishing chunk at {:?} with MessageId {:?}", addr, id);
-            info!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
+            trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
             let chunk = self.chunks.get_chunk(addr).ok()?;
             if we_are_not_holder_anymore {
                 if let Err(err) = self.chunks.remove_chunk(addr).await {
@@ -115,6 +116,7 @@ impl AdultRole {
         adult_list
             .iter()
             .sorted_by(|lhs, rhs| addr.name().cmp_distance(lhs, rhs))
+            .take(CHUNK_COPY_COUNT)
             .cloned()
             .collect()
     }

@@ -290,7 +290,8 @@ impl Node {
                 let adult = self.role.as_adult_mut()?;
                 Ok(vec![adult.chunks.write(&write, msg_id, origin).await?])
             }
-            NodeDuty::ProcessRepublish { chunk } => {
+            NodeDuty::ProcessRepublish { chunk, msg_id } => {
+                log::info!("Processing republish with MessageId: {:?}", msg_id);
                 let elder = self.role.as_elder_mut()?;
                 Ok(vec![elder.meta_data.republish_chunk(chunk).await?])
             }
