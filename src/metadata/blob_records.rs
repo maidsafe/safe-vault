@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
-    capacity::ChunkHolderDbs,
+    capacity::AdultsStorageInfo,
     error::convert_to_error_message,
     node_ops::{NodeDuty, OutgoingMsg},
     Error, Result,
@@ -23,7 +23,7 @@ use sn_messaging::{
 };
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     fmt::{self, Display, Formatter},
 };
 use xor_name::XorName;
@@ -36,15 +36,15 @@ pub(crate) const CHUNK_COPY_COUNT: usize = 4;
 
 /// Operations over the data type Blob.
 pub(super) struct BlobRecords {
-    dbs: ChunkHolderDbs,
+    adult_storage_info: AdultsStorageInfo,
     reader: AdultReader,
     adult_liveness: AdultLiveness,
 }
 
 impl BlobRecords {
-    pub(super) fn new(dbs: ChunkHolderDbs, reader: AdultReader) -> Self {
+    pub(super) fn new(adult_storage_info: AdultsStorageInfo, reader: AdultReader) -> Self {
         Self {
-            dbs,
+            adult_storage_info,
             reader,
             adult_liveness: AdultLiveness::new(),
         }
@@ -53,55 +53,41 @@ impl BlobRecords {
     pub async fn get_all_data(&self) -> Result<BlobDataExchange> {
         debug!("Getting Blob records");
         // Prepare full_adult details
-        let adult_details = &self.dbs.full_adults.lock().await;
-        let all_full_adults_keys = adult_details.get_all();
-        let mut full_adults = BTreeMap::new();
-        for key in all_full_adults_keys {
-            let val: String = adult_details
-                .get(&key)
-                .ok_or_else(|| Error::Logic("Error fetching full Adults".to_string()))?;
-            let _ = full_adults.insert(key, val);
-        }
+        let full_adults = self.adult_storage_info.full_adults.read().await.clone();
 
         Ok(BlobDataExchange { full_adults })
     }
 
     pub async fn update(&self, blob_data: BlobDataExchange) -> Result<()> {
         debug!("Updating Blob records");
-        let mut orig_full_adults = self.dbs.full_adults.lock().await;
+        let mut orig_full_adults = self.adult_storage_info.full_adults.write().await;
 
         let BlobDataExchange { full_adults } = blob_data;
 
-        for (key, value) in full_adults {
-            orig_full_adults.set(&key, &value)?;
+        for adult in full_adults {
+            let _ = orig_full_adults.insert(adult);
         }
 
         Ok(())
     }
 
     /// Registered holders not present in provided list of members
-    /// will be removed from dbs and no longer tracked for liveness.
-    pub async fn retain_members_only(&mut self, members: Vec<XorName>) -> Result<()> {
-        let member_names_as_string = members
-            .iter()
-            .map(|name| name.to_string())
-            .collect::<BTreeSet<_>>();
-
+    /// will be removed from adult_storage_info and no longer tracked for liveness.
+    pub async fn retain_members_only(&mut self, members: BTreeSet<XorName>) -> Result<()> {
         // full adults
-        let mut full_adults_db = self.dbs.full_adults.lock().await;
-        let full_adults = full_adults_db.get_all();
+        let mut full_adults = self.adult_storage_info.full_adults.write().await;
         let absent_adults = full_adults
-            .into_iter()
-            .filter(|key| !member_names_as_string.contains(key))
+            .iter()
+            .filter(|key| !members.contains(key))
+            .cloned()
             .collect::<Vec<_>>();
 
         for adult in absent_adults {
-            let _ = full_adults_db.rem(&adult);
+            let _ = full_adults.remove(&adult);
         }
 
         // stop tracking liveness of absent holders
-        self.adult_liveness
-            .stop_tracking(members.iter().collect::<BTreeSet<_>>());
+        self.adult_liveness.stop_tracking(members);
 
         Ok(())
     }
@@ -124,12 +110,11 @@ impl BlobRecords {
         info!("No. of Full Nodes: {:?}", self.full_nodes().await);
         info!("Increasing full_node count");
         let _ = self
-            .dbs
+            .adult_storage_info
             .full_adults
-            .lock()
+            .write()
             .await
-            .lcreate(&XorName::from(node_id).to_string())?
-            .ladd(&"Node Full");
+            .insert(XorName::from(node_id));
         Ok(())
     }
 
@@ -139,30 +124,26 @@ impl BlobRecords {
         info!("No. of Full Nodes: {:?}", self.full_nodes().await);
         info!("Checking if {:?} is present as full_node", node_name);
         match self
-            .dbs
+            .adult_storage_info
             .full_adults
-            .lock()
+            .write()
             .await
-            .rem(&node_name.to_string())
+            .remove(&node_name)
         {
-            Ok(true) => {
+            true => {
                 info!("Node present in DB, remove successful");
                 Ok(())
             }
-            Ok(false) => {
+            false => {
                 info!("Node not found on full_nodes db");
                 Ok(())
-            }
-            Err(e) => {
-                error!("Error removing from full_nodes db");
-                Err(Error::PickleDb(e))
             }
         }
     }
 
     /// Number of full chunk storing nodes in the section.
     async fn full_nodes(&self) -> u8 {
-        self.dbs.full_adults.lock().await.total_keys() as u8
+        self.adult_storage_info.full_adults.read().await.len() as u8
     }
 
     async fn send_chunks_to_adults(
@@ -171,7 +152,6 @@ impl BlobRecords {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        // TODO: filter out full adults
         let target_holders = self
             .get_holders_for_chunk(data.name())
             .await
@@ -310,11 +290,13 @@ impl BlobRecords {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.get_holders_for_chunk(address.name()).await;
-        // let full_adults = self.get_full_adults();
+        let full_adults = self.adult_storage_info.full_adults.read().await;
 
-        let targets = targets.iter().cloned()
-        // .chain(full_adults) TODO
-        .collect::<BTreeSet<_>>();
+        let targets = targets
+            .iter()
+            .cloned()
+            .chain(full_adults.iter().cloned())
+            .collect::<BTreeSet<_>>();
 
         if self
             .adult_liveness
@@ -398,10 +380,12 @@ impl BlobRecords {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.get_holders_for_chunk(address.name()).await;
+        let full_adults = self.adult_storage_info.full_adults.read().await;
 
-        let targets = targets.into_iter()
-        // .chain(full_adults) TODO
-        .collect::<BTreeSet<_>>();
+        let targets = targets
+            .into_iter()
+            .chain(full_adults.iter().cloned())
+            .collect::<BTreeSet<_>>();
 
         if self
             .adult_liveness
@@ -432,8 +416,9 @@ impl BlobRecords {
     // Returns `XorName`s of the target holders for an Blob chunk.
     // Used to fetch the list of holders for a new chunk.
     async fn get_holders_for_chunk(&self, target: &XorName) -> Vec<XorName> {
+        let full_adults = self.adult_storage_info.full_adults.read().await;
         self.reader
-            .our_adults_sorted_by_distance_to(&target, CHUNK_COPY_COUNT)
+            .non_full_adults_closest_to(&target, &full_adults, CHUNK_COPY_COUNT)
             .await
     }
 }

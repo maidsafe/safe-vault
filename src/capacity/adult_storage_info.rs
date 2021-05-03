@@ -6,25 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{utils, Result};
-use futures::lock::Mutex;
-use pickledb::PickleDb;
-use std::path::Path;
+use sn_routing::XorName;
+use std::collections::BTreeSet;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
-const FULL_ADULTS_DB_NAME: &str = "full_adults.db";
-
-#[derive(Clone)]
-pub struct ChunkHolderDbs {
-    pub full_adults: Arc<Mutex<PickleDb>>,
+#[derive(Clone, Default)]
+pub struct AdultsStorageInfo {
+    pub full_adults: Arc<RwLock<BTreeSet<XorName>>>,
 }
 
-impl ChunkHolderDbs {
+impl AdultsStorageInfo {
     ///
-    pub fn new(path: &Path) -> Result<Self> {
-        let full_adults = utils::new_auto_dump_db(path, FULL_ADULTS_DB_NAME)?;
-        Ok(Self {
-            full_adults: Arc::new(Mutex::new(full_adults)),
-        })
+    pub fn new() -> Self {
+        let full_adults = Arc::new(RwLock::new(BTreeSet::new()));
+        Self { full_adults }
     }
 }

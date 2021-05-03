@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod chunk_dbs;
+mod adult_storage_info;
 mod rate_limit;
 
-pub use chunk_dbs::ChunkHolderDbs;
+pub use adult_storage_info::AdultsStorageInfo;
 pub use rate_limit::RateLimit;
 
 pub const MAX_SUPPLY: u64 = u32::MAX as u64 * 1_000_000_000_u64;
@@ -20,17 +20,17 @@ const MAX_CHUNK_SIZE: u64 = 1_000_000;
 /// chunk storing nodes in the section.
 #[derive(Clone)]
 pub struct Capacity {
-    dbs: ChunkHolderDbs,
+    adult_storage_info: AdultsStorageInfo,
 }
 
 impl Capacity {
-    /// Pass in dbs with info on chunk holders.
-    pub(super) fn new(dbs: ChunkHolderDbs) -> Self {
-        Self { dbs }
+    /// Pass in adult_storage_info with info on chunk holders.
+    pub(super) fn new(adult_storage_info: AdultsStorageInfo) -> Self {
+        Self { adult_storage_info }
     }
 
     /// Number of full chunk storing nodes in the section.
     pub async fn full_nodes(&self) -> u8 {
-        self.dbs.full_adults.lock().await.total_keys() as u8
+        self.adult_storage_info.full_adults.read().await.len() as u8
     }
 }

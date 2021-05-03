@@ -8,7 +8,7 @@
 
 use super::role::{ElderRole, Role};
 use crate::{
-    capacity::{Capacity, ChunkHolderDbs, RateLimit},
+    capacity::{AdultsStorageInfo, Capacity, RateLimit},
     metadata::{adult_reader::AdultReader, Metadata},
     node_ops::NodeDuty,
     section_funds::{reward_wallets::RewardWallets, SectionFunds},
@@ -41,15 +41,21 @@ impl Node {
 
         //
         // start handling metadata
-        let dbs = ChunkHolderDbs::new(self.node_info.root_dir.as_path())?;
+        let adult_storage_info = AdultsStorageInfo::new();
         let reader = AdultReader::new(self.network_api.clone());
         let capacity = self.used_space.max_capacity().await;
-        let meta_data =
-            Metadata::new(&self.node_info.path(), capacity, dbs.clone(), reader).await?;
+        let meta_data = Metadata::new(
+            &self.node_info.path(),
+            capacity,
+            adult_storage_info.clone(),
+            reader,
+        )
+        .await?;
 
         //
         // start handling transfers
-        let rate_limit = RateLimit::new(self.network_api.clone(), Capacity::new(dbs));
+        let rate_limit =
+            RateLimit::new(self.network_api.clone(), Capacity::new(adult_storage_info));
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
         let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
         let transfers = Transfers::new(replicas, rate_limit);

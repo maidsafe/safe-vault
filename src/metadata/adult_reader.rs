@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use sn_routing::XorName;
 
 use crate::network::Network;
@@ -22,13 +24,18 @@ impl AdultReader {
     }
 
     /// Dynamic state
-    pub async fn our_adults_sorted_by_distance_to(
+    pub async fn non_full_adults_closest_to(
         &self,
         name: &XorName,
+        full_adults: &BTreeSet<XorName>,
         count: usize,
     ) -> Vec<XorName> {
         self.network
-            .our_adults_sorted_by_distance_to(name, count)
+            .our_adults_sorted_by_distance_to(name)
             .await
+            .into_iter()
+            .filter(|name| !full_adults.contains(name))
+            .take(count)
+            .collect::<Vec<_>>()
     }
 }

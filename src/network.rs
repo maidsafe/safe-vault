@@ -288,25 +288,20 @@ impl Network {
             .collect::<BTreeMap<XorName, u8>>()
     }
 
-    pub async fn our_adults(&self) -> Vec<XorName> {
+    pub async fn our_adults(&self) -> BTreeSet<XorName> {
         self.routing
             .our_adults()
             .await
             .into_iter()
             .map(|p2p_node| *p2p_node.name())
-            .collect::<Vec<_>>()
+            .collect::<BTreeSet<_>>()
     }
 
-    pub async fn our_adults_sorted_by_distance_to(
-        &self,
-        name: &XorName,
-        count: usize,
-    ) -> Vec<XorName> {
+    pub async fn our_adults_sorted_by_distance_to(&self, name: &XorName) -> Vec<XorName> {
         self.routing
             .our_adults_sorted_by_distance_to(name)
             .await
             .into_iter()
-            .take(count)
             .map(|p2p_node| *p2p_node.name())
             .collect::<Vec<_>>()
     }

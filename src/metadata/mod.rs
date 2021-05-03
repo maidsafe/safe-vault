@@ -16,7 +16,7 @@ mod sequence_storage;
 
 use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
-use crate::{capacity::ChunkHolderDbs, Result};
+use crate::{capacity::AdultsStorageInfo, Result};
 use blob_records::BlobRecords;
 pub(crate) use blob_records::CHUNK_COPY_COUNT;
 use elder_stores::ElderStores;
@@ -29,6 +29,7 @@ use sn_messaging::{
     EndUser, MessageId,
 };
 use std::{
+    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     path::Path,
 };
@@ -48,10 +49,10 @@ impl Metadata {
     pub async fn new(
         path: &Path,
         max_capacity: u64,
-        dbs: ChunkHolderDbs,
+        adult_storage_info: AdultsStorageInfo,
         reader: AdultReader,
     ) -> Result<Self> {
-        let blob_records = BlobRecords::new(dbs, reader);
+        let blob_records = BlobRecords::new(adult_storage_info, reader);
         let map_storage = MapStorage::new(path, max_capacity).await?;
         let sequence_storage = SequenceStorage::new(path, max_capacity).await?;
         let register_storage = RegisterStorage::new(path, max_capacity).await?;
@@ -97,7 +98,7 @@ impl Metadata {
             .await
     }
 
-    pub async fn retain_members_only(&mut self, members: Vec<XorName>) -> Result<()> {
+    pub async fn retain_members_only(&mut self, members: BTreeSet<XorName>) -> Result<()> {
         self.elder_stores
             .blob_records_mut()
             .retain_members_only(members)
