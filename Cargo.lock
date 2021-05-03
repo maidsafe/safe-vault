@@ -2284,12 +2284,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "20.0.0"
-<<<<<<< HEAD
-=======
+version = "20.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ac868cf71eb9effb93267fe01655724f35bf20835135738e3c2d0fab4a6657e"
->>>>>>> feat(chunk-org): track adult liveliness for republishing of data too
+checksum = "6cf4d5fcee06a1bf3a428557837d16676c64f59ea24a1ad85dc54e4da45d046a"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2357,6 +2354,8 @@ dependencies = [
 [[package]]
 name = "sn_routing"
 version = "0.65.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d10a85da9c01f026b7625acf55fb512f85d38a9b19ca43eddb6871cd0f7226d"
 dependencies = [
  "bincode",
  "bls_dkg",
