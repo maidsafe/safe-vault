@@ -9,7 +9,7 @@
 use crate::{
     capacity::AdultsStorageInfo,
     error::convert_to_error_message,
-    node_ops::{NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
     Error, Result,
 };
 use log::{debug, error, info, warn};
@@ -163,10 +163,12 @@ impl BlobRecords {
 
         let blob_write = BlobWrite::New(data);
 
-        if self
-            .adult_liveness
-            .new_write(msg_id, blob_write.clone(), target_holders.clone())
-        {
+        if self.adult_liveness.new_write(
+            msg_id,
+            Some(origin),
+            blob_write.clone(),
+            target_holders.clone(),
+        ) {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
                 msg: Message::NodeCmd {
@@ -200,14 +202,27 @@ impl BlobRecords {
         correlation_id: MessageId,
         result: Result<(), CmdError>,
         src: XorName,
-    ) -> Result<NodeDuty> {
-        if let Some(blob_write) = self
+    ) -> NodeDuties {
+        let mut duties = vec![];
+        if let Some((blob_write, origin)) = self
             .adult_liveness
             .record_adult_write_liveness(correlation_id, src)
         {
-            if let Err(err) = result {
-                error!("Error at Adult while performing a BlobWrite: {:?}", err);
+            if let Err(error) = result {
+                error!("Error at Adult while performing a BlobWrite: {:?}", &error);
                 // Depending on error, we might have to take action here.
+                if let Some(end_user) = origin {
+                    duties.push(NodeDuty::Send(OutgoingMsg {
+                        msg: Message::CmdError {
+                            error,
+                            id: MessageId::in_response_to(&correlation_id),
+                            correlation_id,
+                        },
+                        dst: DstLocation::EndUser(end_user),
+                        section_source: false,
+                        aggregation: Aggregation::AtDestination,
+                    }))
+                }
             } else {
                 info!(
                     "AdultWrite operation {:?} MessageId {:?} at {:?} was successful",
@@ -223,7 +238,10 @@ impl BlobRecords {
             );
             unresponsive_adults.push(name);
         }
-        Ok(NodeDuty::ProposeOffline(unresponsive_adults))
+        if !unresponsive_adults.is_empty() {
+            duties.push(NodeDuty::ProposeOffline(unresponsive_adults))
+        }
+        duties
     }
 
     pub async fn record_adult_read_liveness(
@@ -298,10 +316,12 @@ impl BlobRecords {
             .chain(full_adults.iter().cloned())
             .collect::<BTreeSet<_>>();
 
-        if self
-            .adult_liveness
-            .new_write(msg_id, BlobWrite::DeletePrivate(address), targets.clone())
-        {
+        if self.adult_liveness.new_write(
+            msg_id,
+            Some(origin),
+            BlobWrite::DeletePrivate(address),
+            targets.clone(),
+        ) {
             let msg = Message::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: BlobWrite::DeletePrivate(address),
@@ -345,6 +365,7 @@ impl BlobRecords {
 
         if self.adult_liveness.new_write(
             msg_id,
+            None,
             BlobWrite::New(data.clone()),
             target_holders.clone(),
         ) {

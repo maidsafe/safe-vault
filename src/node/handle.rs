@@ -358,12 +358,10 @@ impl Node {
                 src,
             } => {
                 let elder = self.role.as_elder_mut()?;
-                Ok(vec![
-                    elder
-                        .meta_data
-                        .record_adult_write_liveness(correlation_id, result, src)
-                        .await?,
-                ])
+                Ok(elder
+                    .meta_data
+                    .record_adult_write_liveness(correlation_id, result, src)
+                    .await)
             }
             NodeDuty::RecordAdultReadLiveness {
                 response,

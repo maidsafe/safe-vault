@@ -26,6 +26,8 @@ enum Operation {
     },
     Write {
         blob_write: Box<BlobWrite>,
+        // Set to None if write was initiated by the section
+        origin: Option<EndUser>,
         targets: BTreeSet<XorName>,
     },
 }
@@ -50,12 +52,14 @@ impl AdultLiveness {
     pub fn new_write(
         &mut self,
         msg_id: MessageId,
+        origin: Option<EndUser>,
         blob_write: BlobWrite,
         targets: BTreeSet<XorName>,
     ) -> bool {
         let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
             let _ = entry.insert(Operation::Write {
                 blob_write: Box::new(blob_write),
+                origin,
                 targets: targets.clone(),
             });
             true
@@ -136,11 +140,13 @@ impl AdultLiveness {
         &mut self,
         correlation_id: MessageId,
         src: XorName,
-    ) -> Option<BlobWrite> {
+    ) -> Option<(BlobWrite, Option<EndUser>)> {
         let op = self.ops.get(&correlation_id).cloned();
         self.remove_target(correlation_id, &src);
         op.and_then(|op| match op {
-            Operation::Write { blob_write, .. } => Some(*blob_write),
+            Operation::Write {
+                blob_write, origin, ..
+            } => Some((*blob_write, origin)),
             Operation::Read { .. } => None,
         })
     }

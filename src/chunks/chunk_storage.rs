@@ -41,7 +41,13 @@ impl ChunkStorage {
 
     pub(crate) async fn store(&mut self, data: &Blob, msg_id: MessageId) -> Result<NodeDuty> {
         let result = match self.try_store(data).await {
-            Err(Error::DataExists) => Ok(()),
+            Err(Error::DataExists) => {
+                if data.is_public() {
+                    Ok(())
+                } else {
+                    Err(CmdError::Data(convert_to_error_message(Error::DataExists)?))
+                }
+            }
             Ok(()) => Ok(()),
             Err(other) => Err(CmdError::Data(convert_to_error_message(other)?)),
         };

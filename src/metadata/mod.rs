@@ -16,7 +16,7 @@ mod sequence_storage;
 
 use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
-use crate::{capacity::AdultsStorageInfo, Result};
+use crate::{capacity::AdultsStorageInfo, node_ops::NodeDuties, Result};
 use blob_records::BlobRecords;
 pub(crate) use blob_records::CHUNK_COPY_COUNT;
 use elder_stores::ElderStores;
@@ -79,7 +79,7 @@ impl Metadata {
         correlation_id: MessageId,
         result: Result<(), CmdError>,
         src: XorName,
-    ) -> Result<NodeDuty> {
+    ) -> NodeDuties {
         self.elder_stores
             .blob_records_mut()
             .record_adult_write_liveness(correlation_id, result, src)
