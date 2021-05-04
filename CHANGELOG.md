@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.41.0](https://github.com/maidsafe/sn_node/compare/v0.40.3...v0.41.0) (2021-05-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chunk-org:** updates to sn_messaging 20.0.0 and sn_routing 0.65.0
+
+### Features
+
+* **adult_ops:** compute new holders for chunks and republish them on ([75e5c6e](https://github.com/maidsafe/sn_node/commit/75e5c6e568f84f9fc603346eaa77766b31a8496e))
+* **chunk-org:** track adult liveliness for republishing of data too ([6e2eca5](https://github.com/maidsafe/sn_node/commit/6e2eca5142c0581fc95489446bd2c1030451dbd6))
+* **chunk-storage:** use CHUNK_COPY_COUNT when checking condition for ([667cf91](https://github.com/maidsafe/sn_node/commit/667cf91952a0212751def033c86a27f233862d82))
+* **data-organisation:** republish data on AdultsChanged events ([6aea15d](https://github.com/maidsafe/sn_node/commit/6aea15d719536cdf5764ad58b9af57eb8a8adaa0))
+
+
+### Bug Fixes
+
+* **blob-storage:** handle edge-cases when republishing Blob data ([aadffef](https://github.com/maidsafe/sn_node/commit/aadffef59ed36928a446fbe4cc5c0629475eab18))
+* **chunk_storage:** exclude full adults while computing closest adults ([9069b3f](https://github.com/maidsafe/sn_node/commit/9069b3fe97675eed3f45ecd179ddf9699897f5f8))
+* **chunk-ops:** propagate errors back if the blob-write was client ([7ced9d8](https://github.com/maidsafe/sn_node/commit/7ced9d863037d29de21be57cd759e9980c4df4a6))
+
 ### [0.40.3](https://github.com/maidsafe/sn_node/compare/v0.40.2...v0.40.3) (2021-04-30)
 
 ### [0.40.2](https://github.com/maidsafe/sn_node/compare/v0.40.1...v0.40.2) (2021-04-29)
