@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.41.1](https://github.com/maidsafe/sn_node/compare/v0.41.0...v0.41.1) (2021-05-05)
+
+
+### Features
+
+* **chunks:** don't return an error when trying to write a private chunk which already exists ([83f5063](https://github.com/maidsafe/sn_node/commit/83f50637b605679b601d9ea5ea44752ffb84b077))
+
 ## [0.41.0](https://github.com/maidsafe/sn_node/compare/v0.40.3...v0.41.0) (2021-05-04)
 
 
