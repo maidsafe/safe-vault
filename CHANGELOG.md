@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.41.2](https://github.com/maidsafe/sn_node/compare/v0.41.1...v0.41.2) (2021-05-06)
+
+
+### Bug Fixes
+
+* **replication:** copy and filter data before clearing ([5d6b110](https://github.com/maidsafe/sn_node/commit/5d6b11008dbd464a1622ae4d6d2330b6d0761aae))
+
 ### [0.41.1](https://github.com/maidsafe/sn_node/compare/v0.41.0...v0.41.1) (2021-05-05)
 
 
