@@ -52,7 +52,6 @@ impl BlobRecords {
     }
 
     pub async fn get_data_of(&self, prefix: Prefix) -> BlobDataExchange {
-        debug!("Getting Blob records");
         // Prepare full_adult details
         let full_adults = self
             .adult_storage_info

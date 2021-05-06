@@ -39,8 +39,6 @@ impl Node {
             )));
         }
 
-        debug!("begin_split_as_newbie");
-
         self.level_up().await?;
 
         let section = OurSection {

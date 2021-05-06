@@ -30,7 +30,9 @@ use xor_name::XorName;
 impl Node {
     ///
     pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
-        info!("Handling NodeDuty: {:?}", duty);
+        if !matches!(duty, NodeDuty::NoOp) {
+            debug!("Handling NodeDuty: {:?}", duty);
+        }
         match duty {
             NodeDuty::Genesis => {
                 self.level_up().await?;
@@ -44,7 +46,6 @@ impl Node {
                 newbie,
             } => {
                 if newbie {
-                    info!("Promoted to Elder on Churn");
                     self.level_up().await?;
                     if self.network_api.our_prefix().await.is_empty()
                         && self.network_api.section_chain().await.len() <= ELDER_SIZE
@@ -54,7 +55,6 @@ impl Node {
                     }
                     Ok(vec![])
                 } else {
-                    info!("Updating our replicas on Churn");
                     self.update_replicas().await?;
                     let elder = self.role.as_elder_mut()?;
                     let msg_id =
@@ -82,11 +82,9 @@ impl Node {
                 newbie,
             } => {
                 if newbie {
-                    info!("Beginning split as Newbie");
                     self.begin_split_as_newbie(our_key, our_prefix).await?;
                     Ok(vec![])
                 } else {
-                    info!("Beginning split as Oldie");
                     self.begin_split_as_oldie(our_prefix, our_key, sibling_key)
                         .await
                 }
@@ -103,7 +101,6 @@ impl Node {
             }
             NodeDuty::ReceiveRewardProposal(proposal) => {
                 let elder = self.role.as_elder_mut()?;
-                info!("Handling Churn proposal as an Elder");
                 let (churn_process, _) = elder.section_funds.as_churning_mut()?;
                 Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
             }
@@ -169,16 +166,9 @@ impl Node {
                 }
             }
             NodeDuty::ProcessLostMember { name, .. } => {
-                info!("Member Lost: {:?}", name);
-                let mut ops = vec![];
-
-                info!("Setting JoinsAllowed to `True` for replacing the member left");
-                ops.push(NodeDuty::SetNodeJoinsAllowed(true));
-
                 let elder = self.role.as_elder_mut()?;
                 elder.section_funds.remove_node_wallet(name);
-
-                Ok(ops)
+                Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
             }
             //
             // ---------- Levelling --------------
@@ -191,7 +181,6 @@ impl Node {
                     .await?,
             ]),
             NodeDuty::LevelDown => {
-                info!("Getting Demoted");
                 let capacity = self.used_space.max_capacity().await;
                 self.role = Role::Adult(AdultRole {
                     chunks: Chunks::new(self.node_info.root_dir.as_path(), capacity).await?,
@@ -262,23 +251,10 @@ impl Node {
             //
             // -------- Immutable chunks --------
             NodeDuty::ReadChunk { read, msg_id, .. } => {
-                // TODO: remove this conditional branching
-                // routing should take care of this
-                let data_section_addr = read.dst_address();
-                if self
-                    .network_api
-                    .our_prefix()
-                    .await
-                    .matches(&&data_section_addr)
-                {
-                    let adult = self.role.as_adult_mut()?;
-                    let mut ops = adult.chunks.read(&read, msg_id);
-                    ops.extend(adult.chunks.check_storage().await?);
-                    Ok(ops)
-                } else {
-                    log::error!("MessageId: {:?} NodeCmd::Chunks {:?} should not have reached a wrong Adult", msg_id, read);
-                    Ok(vec![])
-                }
+                let adult = self.role.as_adult_mut()?;
+                let mut ops = adult.chunks.read(&read, msg_id);
+                ops.extend(adult.chunks.check_storage().await?);
+                Ok(ops)
             }
             NodeDuty::WriteChunk {
                 write,
@@ -288,8 +264,7 @@ impl Node {
                 let adult = self.role.as_adult_mut()?;
                 Ok(vec![adult.chunks.write(&write, msg_id, origin).await?])
             }
-            NodeDuty::ProcessRepublish { chunk, msg_id } => {
-                log::info!("Processing republish with MessageId: {:?}", msg_id);
+            NodeDuty::ProcessRepublish { chunk, .. } => {
                 let elder = self.role.as_elder_mut()?;
                 Ok(vec![elder.meta_data.republish_chunk(chunk).await?])
             }
@@ -339,7 +314,6 @@ impl Node {
                             id,
                         },
                         dst: DstLocation::Section(data_section_addr),
-                        // TBD
                         section_source: false,
                         aggregation: Aggregation::None,
                     })])

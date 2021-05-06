@@ -10,7 +10,7 @@ mod map_msg;
 
 use super::node_ops::NodeDuty;
 use crate::network::Network;
-use log::{info, trace};
+use log::{debug, info, trace};
 use map_msg::{map_node_msg, match_user_sent_msg};
 use sn_data_types::PublicKey;
 use sn_messaging::{client::Message, SrcLocation};
@@ -211,10 +211,18 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 }
 
 pub async fn log_network_stats(network_api: &Network) {
-    info!("Our section {:?}", network_api.our_prefix().await);
-    info!(
-        "No. of Elders : {:?}",
-        network_api.our_elder_names().await.len()
-    );
-    info!("No. of Adults: {:?}", network_api.our_adults().await.len());
+    if network_api.is_elder().await {
+        debug!(
+            "{:?}: {:?} Elders, {:?} Adults.",
+            network_api.our_prefix().await,
+            network_api.our_elder_names().await.len(),
+            network_api.our_adults().await.len()
+        );
+    } else {
+        debug!(
+            "{:?}: {:?} Elders.",
+            network_api.our_prefix().await,
+            network_api.our_elder_names().await.len(),
+        );
+    }
 }

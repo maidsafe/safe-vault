@@ -81,7 +81,6 @@ impl SectionFunds {
     /// When the section becomes aware that a node has left,
     /// its reward key is removed.
     pub fn keep_wallets_of(&self, prefix: Prefix) {
-        info!("Removing node wallets not belonging to {:?}", prefix);
         match &self {
             Self::Churning { wallets, .. } | Self::KeepingNodeWallets(wallets) => {
                 wallets.keep_wallets_of(prefix)
