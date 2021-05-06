@@ -126,7 +126,7 @@ impl Transfers {
         } else {
             let store_cost = self.rate_limit.from(bytes).await;
             info!("StoreCost for {:?} bytes: {}", bytes, store_cost);
-            Ok(store_cost)
+            Ok((bytes, store_cost, self.section_wallet_id()))
         };
 
         let response = NodeDuty::Send(OutgoingMsg {
