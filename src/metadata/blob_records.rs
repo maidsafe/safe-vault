@@ -89,12 +89,12 @@ impl BlobRecords {
             .cloned()
             .collect::<Vec<_>>();
 
-        for adult in absent_adults {
-            let _ = full_adults.remove(&adult);
+        for adult in &absent_adults {
+            let _ = full_adults.remove(adult);
         }
 
         // stop tracking liveness of absent holders
-        self.adult_liveness.stop_tracking(members);
+        self.adult_liveness.retain_members_only(members);
 
         Ok(())
     }
@@ -256,18 +256,19 @@ impl BlobRecords {
         correlation_id: MessageId,
         response: QueryResponse,
         src: XorName,
-    ) -> Result<NodeDuty> {
+    ) -> Result<NodeDuties> {
         if !matches!(response, QueryResponse::GetBlob(_)) {
             return Err(Error::Logic(format!(
                 "Got {:?}, but only `GetBlob` query responses are supposed to exist in this flow.",
                 response
             )));
         }
+        let mut duties = vec![];
         if let Some((_address, end_user)) = self
             .adult_liveness
             .record_adult_read_liveness(correlation_id, src)
         {
-            return Ok(NodeDuty::Send(OutgoingMsg {
+            duties.push(NodeDuty::Send(OutgoingMsg {
                 msg: Message::QueryResponse {
                     response,
                     id: MessageId::in_response_to(&correlation_id),
@@ -286,7 +287,10 @@ impl BlobRecords {
             );
             unresponsive_adults.push(name);
         }
-        Ok(NodeDuty::ProposeOffline(unresponsive_adults))
+        if !unresponsive_adults.is_empty() {
+            duties.push(NodeDuty::ProposeOffline(unresponsive_adults));
+        }
+        Ok(duties)
     }
 
     async fn send_blob_cmd_error(
@@ -382,7 +386,7 @@ impl BlobRecords {
                     cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
                     id: msg_id,
                 },
-                aggregation: Aggregation::AtDestination,
+                aggregation: Aggregation::None,
             })
         } else {
             info!("Skipping chunk republish since it's already in progress");

@@ -92,7 +92,7 @@ impl Metadata {
         correlation_id: MessageId,
         result: QueryResponse,
         src: XorName,
-    ) -> Result<NodeDuty> {
+    ) -> Result<NodeDuties> {
         self.elder_stores
             .blob_records_mut()
             .record_adult_read_liveness(correlation_id, result, src)

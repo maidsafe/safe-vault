@@ -185,6 +185,10 @@ impl Node {
                 info!("Member Lost: {:?}", name);
                 let elder = self.role.as_elder_mut()?;
                 elder.section_funds.remove_node_wallet(name);
+                elder
+                    .meta_data
+                    .retain_members_only(self.network_api.our_adults().await)
+                    .await?;
                 Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
             }
             //
@@ -291,9 +295,10 @@ impl Node {
             // ------- Misc ------------
             NodeDuty::IncrementFullNodeCount { node_id } => {
                 let elder = self.role.as_elder_mut()?;
+                let propose_offline = NodeDuty::ProposeOffline(vec![node_id.into()]);
                 elder.meta_data.increase_full_node_count(node_id).await?;
                 // Accept a new node in place for the full node.
-                Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
+                Ok(vec![NodeDuty::SetNodeJoinsAllowed(true), propose_offline])
             }
             NodeDuty::Send(msg) => {
                 send(msg, &self.network_api).await?;
@@ -359,12 +364,10 @@ impl Node {
                 src,
             } => {
                 let elder = self.role.as_elder_mut()?;
-                Ok(vec![
-                    elder
-                        .meta_data
-                        .record_adult_read_liveness(correlation_id, response, src)
-                        .await?,
-                ])
+                Ok(elder
+                    .meta_data
+                    .record_adult_read_liveness(correlation_id, response, src)
+                    .await?)
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
                 let elder = self.role.as_elder_mut()?;

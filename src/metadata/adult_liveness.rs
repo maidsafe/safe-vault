@@ -9,15 +9,16 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use itertools::Itertools;
+use log::debug;
 use sn_data_types::BlobAddress;
 use sn_messaging::{client::BlobWrite, EndUser, MessageId};
 use sn_routing::XorName;
 use std::collections::hash_map::Entry;
 
-const MAX_PENDING_OP_DIFFERENCE: usize = 5;
 const NEIGHBOUR_COUNT: usize = 2;
+const MIN_PENDING_OPS: usize = 10;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Operation {
     Read {
         address: BlobAddress,
@@ -97,14 +98,17 @@ impl AdultLiveness {
         new_operation
     }
 
-    pub fn stop_tracking(&mut self, names: BTreeSet<XorName>) {
-        for name in names {
-            let _ = self.pending_ops.remove(&name);
-            let _ = self.closest_adults.remove(&name);
-            let message_ids = self.ops.keys().cloned().collect::<Vec<_>>();
-            // TODO(after T4): For write operations perhaps we need to write it to a different Adult
-            for msg_id in message_ids {
-                self.remove_target(msg_id, &name);
+    pub fn retain_members_only(&mut self, current_members: BTreeSet<XorName>) {
+        let old_members = self.closest_adults.keys().cloned().collect::<Vec<_>>();
+        for name in old_members {
+            if !current_members.contains(&name) {
+                let _ = self.pending_ops.remove(&name);
+                let _ = self.closest_adults.remove(&name);
+                let message_ids = self.ops.keys().cloned().collect::<Vec<_>>();
+                // TODO(after T4): For write operations perhaps we need to write it to a different Adult
+                for msg_id in message_ids {
+                    self.remove_target(msg_id, &name);
+                }
             }
         }
         self.recompute_closest_adults();
@@ -134,6 +138,8 @@ impl AdultLiveness {
         if complete {
             let _ = self.ops.remove(&msg_id);
         }
+        debug!("Pending op. count: {:?}", &self.pending_ops);
+        debug!("Ongoing ops: {:?}", &self.ops);
     }
 
     pub fn record_adult_write_liveness(
@@ -198,16 +204,17 @@ impl AdultLiveness {
                 .map(|neighbour| self.pending_ops.get(neighbour).cloned().unwrap_or(0))
                 .max()
             {
-                let our_pending_ops = *self.pending_ops.get(adult).unwrap_or(&0);
-                if our_pending_ops.saturating_sub(max_pending_by_neighbours)
-                    > MAX_PENDING_OP_DIFFERENCE
+                let adult_pending_ops = *self.pending_ops.get(adult).unwrap_or(&0);
+                if adult_pending_ops > MIN_PENDING_OPS
+                    && adult_pending_ops > 2 * max_pending_by_neighbours
                 {
                     log::info!(
-                        "Our pending ops: {} Neighbour max: {}",
-                        our_pending_ops,
+                        "Pending ops for {}: {} Neighbour max: {}",
+                        adult,
+                        adult_pending_ops,
                         max_pending_by_neighbours
                     );
-                    unresponsive_adults.push((*adult, our_pending_ops));
+                    unresponsive_adults.push((*adult, adult_pending_ops));
                 }
             }
         }
