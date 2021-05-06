@@ -24,45 +24,25 @@ use std::collections::BTreeMap;
 /// via the usage of a distributed AT2 Actor.
 #[allow(clippy::large_enum_variant)]
 pub enum SectionFunds {
-    KeepingNodeWallets {
-        wallets: RewardWallets,
-        payments: Payments,
-    },
+    KeepingNodeWallets(RewardWallets),
     Churning {
         process: RewardProcess,
         wallets: RewardWallets,
-        payments: Payments,
     },
 }
 
 impl SectionFunds {
-    pub fn as_churning_mut(
-        &mut self,
-    ) -> Result<(&mut RewardProcess, &mut RewardWallets, &mut Payments)> {
+    pub fn as_churning_mut(&mut self) -> Result<(&mut RewardProcess, &mut RewardWallets)> {
         match self {
-            Self::Churning {
-                process,
-                wallets,
-                payments,
-            } => Ok((process, wallets, payments)),
+            Self::Churning { process, wallets } => Ok((process, wallets)),
             _ => Err(Error::NotChurningFunds),
-        }
-    }
-
-    /// Adds payment
-    pub fn add_payment(&self, credit: CreditAgreementProof) {
-        // todo: validate
-        match &self {
-            Self::Churning { payments, .. } | Self::KeepingNodeWallets { payments, .. } => {
-                let _ = payments.insert(*credit.id(), credit);
-            }
         }
     }
 
     /// Returns registered wallet key of a node.
     pub fn get_node_wallet(&self, node_name: &XorName) -> Option<PublicKey> {
         match &self {
-            Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
+            Self::Churning { wallets, .. } | Self::KeepingNodeWallets(wallets) => {
                 let (_, key) = wallets.get(node_name)?;
                 Some(key)
             }
@@ -72,7 +52,7 @@ impl SectionFunds {
     /// Returns node wallet keys of registered nodes.
     pub fn node_wallets(&self) -> BTreeMap<XorName, (NodeAge, PublicKey)> {
         match &self {
-            Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
+            Self::Churning { wallets, .. } | Self::KeepingNodeWallets(wallets) => {
                 wallets.node_wallets()
             }
         }
@@ -81,7 +61,7 @@ impl SectionFunds {
     /// Nodes register/updates wallets for future reward payouts.
     pub fn set_node_wallet(&self, node_id: XorName, wallet: PublicKey, age: u8) {
         match &self {
-            Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
+            Self::Churning { wallets, .. } | Self::KeepingNodeWallets(wallets) => {
                 wallets.set_node_wallet(node_id, age, wallet)
             }
         }
@@ -92,7 +72,7 @@ impl SectionFunds {
     pub fn remove_node_wallet(&self, node_name: XorName) {
         info!("Removing node wallet");
         match &self {
-            Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
+            Self::Churning { wallets, .. } | Self::KeepingNodeWallets(wallets) => {
                 wallets.remove_wallet(node_name)
             }
         }
@@ -103,7 +83,7 @@ impl SectionFunds {
     pub fn keep_wallets_of(&self, prefix: Prefix) {
         info!("Removing node wallets not belonging to {:?}", prefix);
         match &self {
-            Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
+            Self::Churning { wallets, .. } | Self::KeepingNodeWallets(wallets) => {
                 wallets.keep_wallets_of(prefix)
             }
         }

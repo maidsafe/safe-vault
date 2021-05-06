@@ -104,14 +104,13 @@ impl Node {
             NodeDuty::ReceiveRewardProposal(proposal) => {
                 let elder = self.role.as_elder_mut()?;
                 info!("Handling Churn proposal as an Elder");
-                let (churn_process, _, _) = elder.section_funds.as_churning_mut()?;
+                let (churn_process, _) = elder.section_funds.as_churning_mut()?;
                 Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
             }
             NodeDuty::ReceiveRewardAccumulation(accumulation) => {
                 let elder = self.role.as_elder_mut()?;
 
-                let (churn_process, reward_wallets, payments) =
-                    elder.section_funds.as_churning_mut()?;
+                let (churn_process, reward_wallets) = elder.section_funds.as_churning_mut()?;
 
                 let mut ops = vec![
                     churn_process
@@ -123,10 +122,7 @@ impl Node {
                     let reward_sum = credit_proofs.sum();
                     ops.extend(Self::propagate_credits(credit_proofs)?);
                     // update state
-                    elder.section_funds = SectionFunds::KeepingNodeWallets {
-                        wallets: reward_wallets.clone(),
-                        payments: payments.clone(),
-                    };
+                    elder.section_funds = SectionFunds::KeepingNodeWallets(reward_wallets.clone());
                     let section_key = &self.network_api.section_public_key().await?;
                     info!(
                         "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
@@ -380,12 +376,7 @@ impl Node {
             }
             NodeDuty::ProcessDataPayment { msg, origin } => {
                 let elder = self.role.as_elder_mut()?;
-                elder.transfers.process_payment(&msg, origin).await
-            }
-            NodeDuty::AddPayment(credit) => {
-                let elder = self.role.as_elder_mut()?;
-                elder.section_funds.add_payment(credit);
-                Ok(vec![])
+                Ok(vec![elder.transfers.process_payment(&msg, origin).await?])
             }
             NodeDuty::ReplicateChunk { data, id } => {
                 let adult = self.role.as_adult_mut()?;

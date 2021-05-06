@@ -18,7 +18,6 @@ use crate::{
     },
     Node, Result,
 };
-use dashmap::DashMap;
 use log::info;
 use sn_data_types::{ActorHistory, NodeAge, PublicKey};
 use sn_messaging::client::DataExchange;
@@ -62,10 +61,10 @@ impl Node {
 
         //
         // start handling node rewards
-        let section_funds = SectionFunds::KeepingNodeWallets {
-            wallets: RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new()),
-            payments: DashMap::new(),
-        };
+        let section_funds = SectionFunds::KeepingNodeWallets(RewardWallets::new(BTreeMap::<
+            XorName,
+            (NodeAge, PublicKey),
+        >::new()));
 
         self.role = Role::Elder(ElderRole {
             meta_data,

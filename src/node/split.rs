@@ -13,13 +13,11 @@ use crate::{
     transfers::get_replicas::replica_info,
     Error, Node, Result,
 };
-use dashmap::DashMap;
 use log::debug;
 use section_funds::{
     elder_signing::ElderSigning,
     reward_process::{OurSection, RewardProcess},
     reward_wallets::RewardWallets,
-    Credits,
 };
 use sn_data_types::{NodeAge, PublicKey, Token};
 use sn_messaging::MessageId;
@@ -57,11 +55,7 @@ impl Node {
 
         let wallets = RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new());
 
-        elder.section_funds = SectionFunds::Churning {
-            process,
-            wallets,
-            payments: DashMap::new(),
-        };
+        elder.section_funds = SectionFunds::Churning { process, wallets };
 
         Ok(())
     }
@@ -75,14 +69,16 @@ impl Node {
     ) -> Result<NodeDuties> {
         let elder = self.role.as_elder_mut()?;
 
+        // get payments before updating replica info
+        let payments = elder.transfers.payments().await?;
+
         let info = replica_info(&self.network_api).await?;
         elder.transfers.update_replica_info(info);
 
-        let (wallets, payments) = match &mut elder.section_funds {
-            SectionFunds::KeepingNodeWallets { wallets, payments }
-            | SectionFunds::Churning {
-                wallets, payments, ..
-            } => (wallets.clone(), payments.sum()),
+        let wallets = match &mut elder.section_funds {
+            SectionFunds::KeepingNodeWallets(wallets) | SectionFunds::Churning { wallets, .. } => {
+                wallets.clone()
+            }
         };
 
         let sibling_prefix = our_prefix.sibling();
@@ -124,7 +120,6 @@ impl Node {
             elder.section_funds = SectionFunds::Churning {
                 process,
                 wallets: wallets.clone(),
-                payments: DashMap::new(), // clear old payments
             };
         } else {
             debug!("Not paying out rewards, as no payments have been received since last split.");
