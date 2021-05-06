@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.42.0](https://github.com/maidsafe/sn_node/compare/v0.41.2...v0.42.0) (2021-05-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **store_cost:** Updated sn_messaging query response api.
+
+### Features
+
+* **store_cost:** return section key and bytes on query ([dd12653](https://github.com/maidsafe/sn_node/commit/dd12653424b8f46d8269c971f22a684ef308e002))
+
 ### [0.41.2](https://github.com/maidsafe/sn_node/compare/v0.41.1...v0.41.2) (2021-05-06)
 
 
