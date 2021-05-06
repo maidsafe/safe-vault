@@ -21,7 +21,7 @@ use sn_messaging::{
     client::{CmdError, MapDataExchange, MapRead, MapWrite, Message, QueryResponse},
     Aggregation, DstLocation, EndUser, MessageId,
 };
-use std::collections::BTreeMap;
+use sn_routing::Prefix;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -38,14 +38,17 @@ impl MapStorage {
         Ok(Self { chunks })
     }
 
-    pub(super) fn get_all_data(&self) -> Result<MapDataExchange> {
+    pub(super) fn get_data_of(&self, prefix: Prefix) -> MapDataExchange {
         let store = &self.chunks;
-        let all_keys = self.chunks.keys();
-        let mut map: BTreeMap<MapAddress, Map> = BTreeMap::new();
-        for key in all_keys {
-            let _ = map.insert(key, store.get(&key)?);
-        }
-        Ok(MapDataExchange(map))
+        let data = self
+            .chunks
+            .keys()
+            .iter()
+            .filter(|address| prefix.matches(address.name()))
+            .filter_map(|key| store.get(&key).ok())
+            .map(|map| (*map.address(), map))
+            .collect();
+        MapDataExchange(data)
     }
 
     pub async fn update(&mut self, map_data: MapDataExchange) -> Result<()> {

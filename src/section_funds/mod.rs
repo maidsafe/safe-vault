@@ -17,7 +17,7 @@ use crate::{Error, Result};
 use dashmap::DashMap;
 use log::info;
 use sn_data_types::{CreditAgreementProof, CreditId, NodeAge, PublicKey, Token};
-use sn_routing::XorName;
+use sn_routing::{Prefix, XorName};
 use std::collections::BTreeMap;
 
 /// The management of section funds,
@@ -60,7 +60,6 @@ impl SectionFunds {
     }
 
     /// Returns registered wallet key of a node.
-    #[allow(unused)]
     pub fn get_node_wallet(&self, node_name: &XorName) -> Option<PublicKey> {
         match &self {
             Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
@@ -95,6 +94,17 @@ impl SectionFunds {
         match &self {
             Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
                 wallets.remove_wallet(node_name)
+            }
+        }
+    }
+
+    /// When the section becomes aware that a node has left,
+    /// its reward key is removed.
+    pub fn keep_wallets_of(&self, prefix: Prefix) {
+        info!("Removing node wallets not belonging to {:?}", prefix);
+        match &self {
+            Self::Churning { wallets, .. } | Self::KeepingNodeWallets { wallets, .. } => {
+                wallets.keep_wallets_of(prefix)
             }
         }
     }

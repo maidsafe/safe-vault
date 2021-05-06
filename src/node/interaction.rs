@@ -21,6 +21,8 @@ use sn_messaging::{
 use sn_routing::{Prefix, XorName};
 use std::collections::BTreeMap;
 
+use super::role::ElderRole;
+
 impl Node {
     pub(crate) fn propagate_credits(
         credit_proofs: BTreeMap<CreditId, CreditAgreementProof>,
@@ -101,38 +103,41 @@ impl Node {
             aggregation: Aggregation::None,
         }
     }
+}
 
-    /// Push our state to the given dst
-    pub async fn push_state(&self, prefix: Prefix, msg_id: MessageId) -> Result<NodeDuty> {
-        let dst = DstLocation::Section(prefix.name());
-        let elder = self.role.as_elder()?;
-        let user_wallets = elder.transfers.user_wallets();
-        let node_rewards = elder.section_funds.node_wallets();
+/// Push our state to the given dst
+pub(crate) async fn push_state(
+    elder: &mut ElderRole,
+    prefix: Prefix,
+    msg_id: MessageId,
+) -> Result<NodeDuty> {
+    let dst = DstLocation::Section(prefix.name());
+    let user_wallets = elder.transfers.user_wallets();
+    let node_rewards = elder.section_funds.node_wallets();
 
-        // only push that what should be in dst
-        let user_wallets = user_wallets
-            .into_iter()
-            .filter(|(key, _)| dst.contains(&XorName::from(*key), &prefix))
-            .collect();
-        let node_rewards = node_rewards
-            .into_iter()
-            .filter(|(name, _)| dst.contains(name, &prefix))
-            .collect();
-        // Create an aggregated map of all the metadata
-        let metadata = elder.meta_data.get_data_exchange_packet().await?;
+    // only push that what should be in dst
+    let user_wallets = user_wallets
+        .into_iter()
+        .filter(|(key, _)| dst.contains(&XorName::from(*key), &prefix))
+        .collect();
+    let node_rewards = node_rewards
+        .into_iter()
+        .filter(|(name, _)| dst.contains(name, &prefix))
+        .collect();
+    // Create an aggregated map of all the metadata of the provided prefix
+    let metadata = elder.meta_data.get_data_exchange_packet(prefix).await?;
 
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: Message::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
-                    node_rewards,
-                    user_wallets,
-                    metadata,
-                }),
-                id: msg_id,
-            },
-            section_source: false, // strictly this is not correct, but we don't expect responses to an event..
-            dst,
-            aggregation: Aggregation::None,
-        }))
-    }
+    Ok(NodeDuty::Send(OutgoingMsg {
+        msg: Message::NodeCmd {
+            cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
+                node_rewards,
+                user_wallets,
+                metadata,
+            }),
+            id: msg_id,
+        },
+        section_source: false, // strictly this is not correct, but we don't expect responses to an event..
+        dst,
+        aggregation: Aggregation::None,
+    }))
 }

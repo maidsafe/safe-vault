@@ -239,16 +239,17 @@ impl<T: ReplicaSigning> Replicas<T> {
         self.info = info;
     }
 
-    #[allow(unused)]
     pub async fn keep_keys_of(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         let keys: Vec<PublicKey> = self.locks.iter().map(|r| *r.key()).collect();
         for key in keys.into_iter() {
             if !prefix.matches(&key.into()) {
                 let key_lock = self.load_key_lock(key).await?;
-                let _store = key_lock.lock().await;
+                let mut store = key_lock.lock().await;
                 let _ = self.locks.remove(&key);
-                // todo: remove db from disk
+                if let Err(e) = store.delete() {
+                    debug!("Failed to delete db of key {}: {}", key, e);
+                }
             }
         }
         Ok(())

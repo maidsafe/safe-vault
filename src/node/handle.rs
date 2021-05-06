@@ -9,6 +9,7 @@
 use std::collections::BTreeSet;
 
 use super::{
+    interaction::push_state,
     messaging::{send, send_to_nodes},
     role::{AdultRole, Role},
 };
@@ -55,14 +56,15 @@ impl Node {
                 } else {
                     info!("Updating our replicas on Churn");
                     self.update_replicas().await?;
-                    self.role
-                        .as_elder_mut()?
+                    let elder = self.role.as_elder_mut()?;
+                    let msg_id =
+                        MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
+                    let ops = vec![push_state(elder, our_prefix, msg_id).await?];
+                    elder
                         .meta_data
                         .retain_members_only(self.network_api.our_adults().await)
                         .await?;
-                    let msg_id =
-                        MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-                    Ok(vec![self.push_state(our_prefix, msg_id).await?])
+                    Ok(ops)
                 }
             }
             NodeDuty::AdultsChanged(adults) => {

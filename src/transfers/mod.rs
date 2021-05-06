@@ -106,8 +106,7 @@ impl Transfers {
     /// also split the responsibility of the accounts.
     /// Thus, both Replica groups need to drop the accounts that
     /// the other group is now responsible for.
-    #[allow(unused)]
-    pub async fn split_section(&self, prefix: Prefix) -> Result<()> {
+    pub async fn keep_keys_of(&self, prefix: Prefix) -> Result<()> {
         // Removes keys that are no longer our section responsibility.
         self.replicas.keep_keys_of(prefix).await
     }

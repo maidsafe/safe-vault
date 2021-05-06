@@ -28,6 +28,7 @@ use sn_messaging::{
     client::{CmdError, DataCmd, DataExchange, DataQuery, QueryResponse},
     EndUser, MessageId,
 };
+use sn_routing::Prefix;
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -131,8 +132,8 @@ impl Metadata {
             .await
     }
 
-    pub async fn get_data_exchange_packet(&self) -> Result<DataExchange> {
-        self.elder_stores.get_all_data().await
+    pub async fn get_data_exchange_packet(&self, prefix: Prefix) -> Result<DataExchange> {
+        self.elder_stores.get_data_of(prefix).await
     }
 
     pub async fn update(&mut self, data: DataExchange) -> Result<()> {

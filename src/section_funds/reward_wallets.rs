@@ -7,8 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use dashmap::DashMap;
+use log::debug;
 use sn_data_types::{NodeAge, PublicKey};
-use std::collections::{BTreeMap, BTreeSet};
+use sn_routing::Prefix;
+use std::collections::BTreeMap;
 use xor_name::XorName;
 
 /// The accumulation and paying
@@ -30,7 +32,6 @@ impl RewardWallets {
     }
 
     /// Returns the stage of a specific node.
-    #[allow(unused)]
     pub fn get(&self, node_name: &XorName) -> Option<(NodeAge, PublicKey)> {
         Some(*self.node_rewards.get(node_name)?)
     }
@@ -54,10 +55,16 @@ impl RewardWallets {
     /// Removes a subset of the nodes,
     /// more specifically those no longer
     /// part of this section, after a split.
-    #[allow(unused)]
-    pub fn remove_wallets(&mut self, split_nodes: BTreeSet<XorName>) {
-        for node in split_nodes {
-            let _ = self.node_rewards.remove(&node);
+    pub fn keep_wallets_of(&self, prefix: Prefix) {
+        // Removes keys that are no longer our section responsibility.
+        let keys = self.node_rewards.iter().map(|info| *info.key());
+
+        for key in keys {
+            if !prefix.matches(&key) {
+                if let Some((name, _)) = self.node_rewards.remove(&key) {
+                    debug!("Removed node {} from rewards list.", name);
+                }
+            }
         }
     }
 

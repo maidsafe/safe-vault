@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    node::interaction::push_state,
     node_ops::NodeDuties,
     section_funds::{self, SectionFunds},
     transfers::get_replicas::replica_info,
@@ -77,11 +78,6 @@ impl Node {
         let info = replica_info(&self.network_api).await?;
         elder.transfers.update_replica_info(info);
 
-        elder
-            .meta_data
-            .retain_members_only(self.network_api.our_adults().await)
-            .await?;
-
         let (wallets, payments) = match &mut elder.section_funds {
             SectionFunds::KeepingNodeWallets { wallets, payments }
             | SectionFunds::Churning {
@@ -134,11 +130,25 @@ impl Node {
             debug!("Not paying out rewards, as no payments have been received since last split.");
         }
 
+        // replicate state to our new elders
         let msg_id = MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-        ops.push(self.push_state(our_prefix, msg_id).await?);
+        ops.push(push_state(elder, our_prefix, msg_id).await?);
 
+        // replicate state to our neighbour's new elders
         let msg_id = MessageId::combine(vec![sibling_prefix.name(), XorName::from(sibling_key)]);
-        ops.push(self.push_state(sibling_prefix, msg_id).await?);
+        ops.push(push_state(elder, sibling_prefix, msg_id).await?);
+
+        // drop metadata state
+        elder
+            .meta_data
+            .retain_members_only(self.network_api.our_adults().await)
+            .await?;
+
+        // drop transfers state
+        elder.transfers.keep_keys_of(our_prefix).await?;
+
+        // drop reward wallets state
+        elder.section_funds.keep_wallets_of(our_prefix);
 
         Ok(ops)
     }

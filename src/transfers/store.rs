@@ -9,7 +9,11 @@
 use crate::{to_db_key::ToDbKey, utils, Error, Result};
 use pickledb::PickleDb;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, marker::PhantomData, path::Path};
+use std::{
+    fmt::Debug,
+    marker::PhantomData,
+    path::{Path, PathBuf},
+};
 use xor_name::XorName;
 
 const TRANSFERS_DIR_NAME: &str = "transfers";
@@ -18,6 +22,7 @@ const DB_EXTENSION: &str = ".db";
 /// Disk storage for transfers.
 pub struct TransferStore<TEvent: Debug + Serialize + DeserializeOwned> {
     db: PickleDb,
+    db_path: PathBuf,
     _phantom: PhantomData<TEvent>,
 }
 
@@ -28,10 +33,16 @@ where
     pub fn new(id: XorName, root_dir: &Path) -> Result<Self> {
         let db_dir = root_dir.join(Path::new(TRANSFERS_DIR_NAME));
         let db_name = format!("{}{}", id.to_db_key()?, DB_EXTENSION);
+        let db_path = db_dir.join(db_name.clone());
         Ok(Self {
             db: utils::new_auto_dump_db(db_dir.as_path(), db_name)?,
+            db_path,
             _phantom: PhantomData::default(),
         })
+    }
+
+    pub fn delete(&mut self) -> Result<()> {
+        std::fs::remove_file(self.db_path.as_path()).map_err(Error::Io)
     }
 
     ///

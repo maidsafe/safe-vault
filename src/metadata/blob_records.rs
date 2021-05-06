@@ -21,6 +21,7 @@ use sn_messaging::{
     },
     Aggregation, DstLocation, EndUser, MessageId,
 };
+use sn_routing::Prefix;
 
 use std::{
     collections::BTreeSet,
@@ -50,12 +51,19 @@ impl BlobRecords {
         }
     }
 
-    pub async fn get_all_data(&self) -> Result<BlobDataExchange> {
+    pub async fn get_data_of(&self, prefix: Prefix) -> BlobDataExchange {
         debug!("Getting Blob records");
         // Prepare full_adult details
-        let full_adults = self.adult_storage_info.full_adults.read().await.clone();
-
-        Ok(BlobDataExchange { full_adults })
+        let full_adults = self
+            .adult_storage_info
+            .full_adults
+            .read()
+            .await
+            .iter()
+            .filter(|name| prefix.matches(name))
+            .copied()
+            .collect();
+        BlobDataExchange { full_adults }
     }
 
     pub async fn update(&self, blob_data: BlobDataExchange) -> Result<()> {

@@ -16,6 +16,7 @@ use sn_messaging::{
     client::{DataCmd, DataExchange, DataQuery},
     EndUser, MessageId,
 };
+use sn_routing::Prefix;
 
 /// The various data type stores,
 /// that are only managed at Elders.
@@ -87,11 +88,11 @@ impl ElderStores {
     }
 
     // NB: Not yet including Register metadata.
-    pub async fn get_all_data(&self) -> Result<DataExchange> {
+    pub async fn get_data_of(&self, prefix: Prefix) -> Result<DataExchange> {
         // Prepare blob_records, map and sequence data
-        let blob_data = self.blob_records.get_all_data().await?;
-        let map_data = self.map_storage.get_all_data()?;
-        let seq_data = self.sequence_storage.get_all_data()?;
+        let blob_data = self.blob_records.get_data_of(prefix).await;
+        let map_data = self.map_storage.get_data_of(prefix);
+        let seq_data = self.sequence_storage.get_data_of(prefix);
 
         Ok(DataExchange {
             blob_data,

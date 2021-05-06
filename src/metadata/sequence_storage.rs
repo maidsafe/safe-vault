@@ -21,8 +21,7 @@ use sn_messaging::{
     client::{CmdError, Message, QueryResponse, SequenceDataExchange, SequenceRead, SequenceWrite},
     Aggregation, DstLocation, EndUser, MessageId,
 };
-
-use std::collections::BTreeMap;
+use sn_routing::Prefix;
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -39,14 +38,17 @@ impl SequenceStorage {
         Ok(Self { chunks })
     }
 
-    pub fn get_all_data(&self) -> Result<SequenceDataExchange> {
+    pub fn get_data_of(&self, prefix: Prefix) -> SequenceDataExchange {
         let store = &self.chunks;
-        let all_keys = store.keys();
-        let mut sequence: BTreeMap<SequenceAddress, Sequence> = BTreeMap::new();
-        for key in all_keys {
-            let _ = sequence.insert(key, store.get(&key)?);
-        }
-        Ok(SequenceDataExchange(sequence))
+        let data = self
+            .chunks
+            .keys()
+            .iter()
+            .filter(|address| prefix.matches(address.name()))
+            .filter_map(|key| store.get(&key).ok())
+            .map(|seq| (*seq.address(), seq))
+            .collect();
+        SequenceDataExchange(data)
     }
 
     pub async fn update(&mut self, seq_data: SequenceDataExchange) -> Result<()> {
