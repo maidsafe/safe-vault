@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.42.1](https://github.com/maidsafe/sn_node/compare/v0.42.0...v0.42.1) (2021-05-06)
+
+
+### Bug Fixes
+
+* **section_funds:** fix unfinished loop when dropping wallets ([bae1cc9](https://github.com/maidsafe/sn_node/commit/bae1cc9d461cd5240b0abff9d4fad0cbd0fb8954))
+
 ## [0.42.0](https://github.com/maidsafe/sn_node/compare/v0.41.2...v0.42.0) (2021-05-06)
 
 
