@@ -57,7 +57,11 @@ impl RewardWallets {
     /// part of this section, after a split.
     pub fn keep_wallets_of(&self, prefix: Prefix) {
         // Removes keys that are no longer our section responsibility.
-        let keys = self.node_rewards.iter().map(|info| *info.key());
+        let keys = self
+            .node_rewards
+            .iter()
+            .map(|info| *info.key())
+            .collect::<Vec<_>>();
 
         for key in keys {
             if !prefix.matches(&key) {
