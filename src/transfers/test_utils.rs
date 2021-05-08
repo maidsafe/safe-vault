@@ -33,8 +33,8 @@ impl TestReplicaSigning {
     pub fn new(secret_key: SecretKeyShare, key_index: usize, peer_replicas: PublicKeySet) -> Self {
         let id = secret_key.public_key_share();
         Self {
-            secret_key,
             id,
+            secret_key,
             key_index,
             peer_replicas,
         }

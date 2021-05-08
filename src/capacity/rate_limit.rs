@@ -21,7 +21,7 @@ pub struct RateLimit {
 impl RateLimit {
     /// gets a new instance of rate limit
     pub fn new(network: Network, capacity: Capacity) -> RateLimit {
-        Self { network, capacity }
+        Self { capacity, network }
     }
 
     /// Calculates the rate limit of write operations,
