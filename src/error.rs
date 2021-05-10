@@ -23,9 +23,6 @@ pub enum Error {
     /// Attempted to perform an operation meant only for Elders when we are not one.
     #[error("Attempted Elder operation when not an Elder")]
     NotAnElder,
-    /// The key balance already exists when it was expected to be empty (during section genesis)
-    #[error("Balance already exists.")]
-    BalanceExists,
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,
@@ -53,12 +50,6 @@ pub enum Error {
     /// Node not found for rewarding
     #[error("Node not found for rewards")]
     NodeNotFoundForReward,
-    /// Node not found in holders db.
-    #[error("No chunks held at node")]
-    NodeDoesNotHoldChunks,
-    /// No holders of chunk in metadata db.
-    #[error("No holders found for chunk")]
-    NoHoldersOfChunk,
     /// Key, Value pair not found in `ChunkStore`.
     #[error("No such chunk: {0:?}")]
     NoSuchChunk(DataAddress),
@@ -104,9 +95,6 @@ pub enum Error {
     /// Routing error.
     #[error("Routing error:: {0}")]
     Routing(#[from] sn_routing::Error),
-    /// Onboarding error
-    #[error("Onboarding error")]
-    Onboarding,
     /// Transfer has already been registered
     #[error("Transfer has already been registered")]
     TransferAlreadyRegistered,
@@ -144,7 +132,6 @@ pub(crate) fn convert_to_error_message(error: Error) -> Result<sn_messaging::cli
         Error::TransferAlreadyRegistered => Ok(ErrorMessage::TransactionIdExists),
         Error::NoSuchChunk(address) => Ok(ErrorMessage::DataNotFound(address)),
         Error::NotEnoughSpace => Ok(ErrorMessage::NotEnoughSpace),
-        Error::BalanceExists => Ok(ErrorMessage::BalanceExists),
         Error::TempDirCreationFailed(_) => Ok(ErrorMessage::FailedToWriteFile),
         Error::DataExists => Ok(ErrorMessage::DataExists),
         Error::NetworkData(error) => convert_dt_error_to_error_message(error),
