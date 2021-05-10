@@ -121,14 +121,6 @@ impl Node {
     /// by client sending in a `Command` to free it.
     pub async fn run(&mut self) -> Result<()> {
         while let Some(event) = self.network_events.next().await {
-            // info!(
-            //     "New RoutingEvent received. Current role: {}, section prefix: {:?}, age: {}, node name: {}",
-            //     self.role,
-            //     self.our_prefix().await,
-            //     self.network_api.age().await,
-            //     self.our_name().await
-            // );
-
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
             match map_routing_event(event, &self.network_api).await {
                 Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,

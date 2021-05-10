@@ -211,18 +211,10 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 }
 
 pub async fn log_network_stats(network_api: &Network) {
-    if network_api.is_elder().await {
-        debug!(
-            "{:?}: {:?} Elders, {:?} Adults.",
-            network_api.our_prefix().await,
-            network_api.our_elder_names().await.len(),
-            network_api.our_adults().await.len()
-        );
-    } else {
-        debug!(
-            "{:?}: {:?} Elders.",
-            network_api.our_prefix().await,
-            network_api.our_elder_names().await.len(),
-        );
-    }
+    debug!(
+        "{:?}: {:?} Elders, {:?} Adults.",
+        network_api.our_prefix().await,
+        network_api.our_elder_names().await.len(),
+        network_api.our_adults().await.len()
+    );
 }
