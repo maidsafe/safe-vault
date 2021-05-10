@@ -24,42 +24,21 @@ use std::collections::BTreeSet;
 pub(crate) struct AdultRole {
     // immutable chunks
     pub chunks: Chunks,
-    // Adult list
-    pub adult_list: BTreeSet<XorName>,
 }
 
 impl AdultRole {
-    pub async fn handle_adults_changed(
-        &mut self,
-        new_adult_list: BTreeSet<XorName>,
-        our_name: XorName,
-    ) -> NodeDuties {
-        let new_adults = new_adult_list
-            .difference(&self.adult_list)
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        let lost_adults = self
-            .adult_list
-            .difference(&new_adult_list)
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        let old_adult_list = std::mem::replace(&mut self.adult_list, new_adult_list);
-        self.reorganize_chunks(our_name, new_adults, lost_adults, old_adult_list)
-            .await
-    }
-
-    async fn reorganize_chunks(
+    pub async fn reorganize_chunks(
         &mut self,
         our_name: XorName,
         new_adults: BTreeSet<XorName>,
         lost_adults: BTreeSet<XorName>,
-        old_adult_list: BTreeSet<XorName>,
+        remaining: BTreeSet<XorName>,
     ) -> NodeDuties {
         let keys = self.chunks.keys();
         let mut ops = vec![];
         for addr in keys.iter() {
             if let Some(operation) = self
-                .republish_and_cache(addr, &our_name, &new_adults, &lost_adults, &old_adult_list)
+                .republish_and_cache(addr, &our_name, &new_adults, &lost_adults, &remaining)
                 .await
             {
                 ops.push(operation);
@@ -74,10 +53,12 @@ impl AdultRole {
         our_name: &XorName,
         new_adults: &BTreeSet<XorName>,
         lost_adults: &BTreeSet<XorName>,
-        old_adult_list: &BTreeSet<XorName>,
+        remaining: &BTreeSet<XorName>,
     ) -> Option<NodeDuty> {
-        let new_holders = self.compute_holders(addr, &self.adult_list);
-        let old_holders = self.compute_holders(addr, old_adult_list);
+        let old_adult_list = remaining.union(lost_adults).copied().collect();
+        let new_adult_list = remaining.union(new_adults).copied().collect();
+        let new_holders = self.compute_holders(addr, &new_adult_list);
+        let old_holders = self.compute_holders(addr, &old_adult_list);
 
         let we_are_not_holder_anymore = !new_holders.contains(our_name);
         let new_adult_is_holder = !new_holders.is_disjoint(new_adults);

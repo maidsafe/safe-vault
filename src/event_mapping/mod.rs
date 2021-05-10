@@ -10,7 +10,7 @@ mod map_msg;
 
 use super::node_ops::NodeDuty;
 use crate::network::Network;
-use log::{debug, info, trace};
+use log::{debug, error, info, trace};
 use map_msg::{map_node_msg, match_user_sent_msg};
 use sn_data_types::PublicKey;
 use sn_messaging::{client::Message, SrcLocation};
@@ -59,12 +59,37 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             map_node_msg(msg, src, dst)
         }
         RoutingEvent::ClientMessageReceived { msg, user } => match_user_sent_msg(*msg, user),
-        RoutingEvent::EldersChanged {
-            prefix,
-            key,
-            sibling_key,
+        RoutingEvent::SectionSplit {
+            elders,
+            sibling_elders,
             self_status_change,
-            ..
+        } => {
+            let newbie = match self_status_change {
+                NodeElderChange::None => false,
+                NodeElderChange::Promoted => true,
+                NodeElderChange::Demoted => {
+                    error!("This should be unreachable, as there would be no demotions of Elders during a split.");
+                    return Mapping::Ok {
+                        op: NodeDuty::NoOp,
+                        ctx: None,
+                    };
+                }
+            };
+            Mapping::Ok {
+                op: NodeDuty::SectionSplit {
+                    our_prefix: elders.prefix,
+                    our_key: PublicKey::from(elders.key),
+                    our_new_elders: elders.added,
+                    their_new_elders: sibling_elders.added,
+                    sibling_key: PublicKey::from(sibling_elders.key),
+                    newbie,
+                },
+                ctx: None,
+            }
+        }
+        RoutingEvent::EldersChanged {
+            elders,
+            self_status_change,
         } => {
             log_network_stats(network_api).await;
             let first_section = network_api.our_prefix().await.is_empty();
@@ -89,7 +114,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     while sanity_counter < 240 {
                         match network_api.our_public_key_set().await {
                             Ok(pk_set) => {
-                                if key == pk_set.public_key() {
+                                if elders.key == pk_set.public_key() {
                                     break;
                                 } else {
                                     trace!("******Elders changed, we are still Elder but we seem to be lagging the DKG...");
@@ -108,21 +133,15 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     // -- ugly temporary until fixed in routing --
 
                     trace!("******Elders changed, we are still Elder");
-                    let op = if let Some(sibling_key) = sibling_key {
-                        NodeDuty::SectionSplit {
-                            our_prefix: prefix,
-                            our_key: PublicKey::from(key),
-                            sibling_key: PublicKey::from(sibling_key),
+                    Mapping::Ok {
+                        op: NodeDuty::EldersChanged {
+                            our_prefix: elders.prefix,
+                            our_key: PublicKey::from(elders.key),
+                            new_elders: elders.added,
                             newbie: false,
-                        }
-                    } else {
-                        NodeDuty::EldersChanged {
-                            our_prefix: prefix,
-                            our_key: PublicKey::from(key),
-                            newbie: false,
-                        }
-                    };
-                    Mapping::Ok { op, ctx: None }
+                        },
+                        ctx: None,
+                    }
                 }
                 NodeElderChange::Promoted => {
                     // -- ugly temporary until fixed in routing --
@@ -142,21 +161,16 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     // -- ugly temporary until fixed in routing --
 
                     trace!("******Elders changed, we are promoted");
-                    let op = if let Some(sibling_key) = sibling_key {
-                        NodeDuty::SectionSplit {
-                            our_prefix: prefix,
-                            our_key: PublicKey::from(key),
-                            sibling_key: PublicKey::from(sibling_key),
+
+                    Mapping::Ok {
+                        op: NodeDuty::EldersChanged {
+                            our_prefix: elders.prefix,
+                            our_key: PublicKey::from(elders.key),
+                            new_elders: elders.added,
                             newbie: true,
-                        }
-                    } else {
-                        NodeDuty::EldersChanged {
-                            our_prefix: prefix,
-                            our_key: PublicKey::from(key),
-                            newbie: true,
-                        }
-                    };
-                    Mapping::Ok { op, ctx: None }
+                        },
+                        ctx: None,
+                    }
                 }
                 NodeElderChange::Demoted => Mapping::Ok {
                     op: NodeDuty::LevelDown,
@@ -198,10 +212,18 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                 ctx: None,
             }
         }
-        RoutingEvent::AdultsChanged(adults) => {
-            let op = NodeDuty::AdultsChanged(adults);
-            Mapping::Ok { op, ctx: None }
-        }
+        RoutingEvent::AdultsChanged {
+            remaining,
+            added,
+            removed,
+        } => Mapping::Ok {
+            op: NodeDuty::AdultsChanged {
+                remaining,
+                added,
+                removed,
+            },
+            ctx: None,
+        },
         // Ignore all other events
         _ => Mapping::Ok {
             op: NodeDuty::NoOp,

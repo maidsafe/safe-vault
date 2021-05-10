@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::collections::BTreeSet;
-
 use super::{
     interaction::push_state,
     messaging::{send, send_to_nodes},
@@ -43,6 +41,7 @@ impl Node {
             NodeDuty::EldersChanged {
                 our_key,
                 our_prefix,
+                new_elders,
                 newbie,
             } => {
                 if newbie {
@@ -61,7 +60,7 @@ impl Node {
                     let elder = self.role.as_elder_mut()?;
                     let msg_id =
                         MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-                    let ops = vec![push_state(elder, our_prefix, msg_id).await?];
+                    let ops = vec![push_state(elder, our_prefix, msg_id, new_elders).await?];
                     elder
                         .meta_data
                         .retain_members_only(self.network_api.our_adults().await)
@@ -69,17 +68,23 @@ impl Node {
                     Ok(ops)
                 }
             }
-            NodeDuty::AdultsChanged(adults) => {
+            NodeDuty::AdultsChanged {
+                added,
+                removed,
+                remaining,
+            } => {
                 let our_name = self.our_name().await;
                 Ok(self
                     .role
                     .as_adult_mut()?
-                    .handle_adults_changed(adults, our_name)
+                    .reorganize_chunks(our_name, added, removed, remaining)
                     .await)
             }
             NodeDuty::SectionSplit {
                 our_key,
                 our_prefix,
+                our_new_elders,
+                their_new_elders,
                 sibling_key,
                 newbie,
             } => {
@@ -89,8 +94,14 @@ impl Node {
                     Ok(vec![])
                 } else {
                     info!("Beginning split as Oldie");
-                    self.begin_split_as_oldie(our_prefix, our_key, sibling_key)
-                        .await
+                    self.begin_split_as_oldie(
+                        our_prefix,
+                        our_key,
+                        sibling_key,
+                        our_new_elders,
+                        their_new_elders,
+                    )
+                    .await
                 }
             }
             NodeDuty::ProposeOffline(unresponsive_adults) => {
@@ -191,7 +202,6 @@ impl Node {
                 let capacity = self.used_space.max_capacity().await;
                 self.role = Role::Adult(AdultRole {
                     chunks: Chunks::new(self.node_info.root_dir.as_path(), capacity).await?,
-                    adult_list: BTreeSet::new(),
                 });
                 Ok(vec![])
             }

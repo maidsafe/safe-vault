@@ -139,17 +139,30 @@ pub enum NodeDuty {
     EldersChanged {
         /// Our section prefix.
         our_prefix: Prefix,
-        /// our section public key
+        /// Our section public key.
         our_key: PublicKey,
-        /// oldie or newbie?
+        /// The new Elders.
+        new_elders: BTreeSet<XorName>,
+        /// Oldie or newbie?
         newbie: bool,
     },
-    AdultsChanged(BTreeSet<XorName>),
+    AdultsChanged {
+        /// Remaining Adults in our section.
+        remaining: BTreeSet<XorName>,
+        /// New Adults in our section.
+        added: BTreeSet<XorName>,
+        /// Removed Adults in our section.
+        removed: BTreeSet<XorName>,
+    },
     SectionSplit {
         /// Our section prefix.
         our_prefix: Prefix,
         /// our section public key
         our_key: PublicKey,
+        /// The new Elders of our section.
+        our_new_elders: BTreeSet<XorName>,
+        /// The new Elders of our sibling section.
+        their_new_elders: BTreeSet<XorName>,
         /// The PK of the sibling section, as this event is fired during a split.
         sibling_key: PublicKey,
         /// oldie or newbie?

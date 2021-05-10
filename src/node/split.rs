@@ -22,7 +22,7 @@ use section_funds::{
 use sn_data_types::{NodeAge, PublicKey, Token};
 use sn_messaging::MessageId;
 use sn_routing::{Prefix, XorName};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 impl Node {
     /// Called on split reported from routing layer.
@@ -64,6 +64,8 @@ impl Node {
         our_prefix: Prefix,
         our_key: PublicKey,
         sibling_key: PublicKey,
+        our_new_elders: BTreeSet<XorName>,
+        their_new_elders: BTreeSet<XorName>,
     ) -> Result<NodeDuties> {
         let elder = self.role.as_elder_mut()?;
 
@@ -125,11 +127,11 @@ impl Node {
 
         // replicate state to our new elders
         let msg_id = MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
-        ops.push(push_state(elder, our_prefix, msg_id).await?);
+        ops.push(push_state(elder, our_prefix, msg_id, our_new_elders).await?);
 
         // replicate state to our neighbour's new elders
         let msg_id = MessageId::combine(vec![sibling_prefix.name(), XorName::from(sibling_key)]);
-        ops.push(push_state(elder, sibling_prefix, msg_id).await?);
+        ops.push(push_state(elder, sibling_prefix, msg_id, their_new_elders).await?);
 
         // drop metadata state
         elder

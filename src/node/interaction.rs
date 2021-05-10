@@ -19,7 +19,7 @@ use sn_messaging::{
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
 use sn_routing::{Prefix, XorName};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::role::ElderRole;
 
@@ -110,24 +110,24 @@ pub(crate) async fn push_state(
     elder: &mut ElderRole,
     prefix: Prefix,
     msg_id: MessageId,
+    peers: BTreeSet<XorName>,
 ) -> Result<NodeDuty> {
-    let dst = DstLocation::Section(prefix.name());
     let user_wallets = elder.transfers.user_wallets();
     let node_rewards = elder.section_funds.node_wallets();
 
     // only push that what should be in dst
     let user_wallets = user_wallets
         .into_iter()
-        .filter(|(key, _)| dst.contains(&XorName::from(*key), &prefix))
+        .filter(|(key, _)| prefix.matches(&XorName::from(*key)))
         .collect();
     let node_rewards = node_rewards
         .into_iter()
-        .filter(|(name, _)| dst.contains(name, &prefix))
+        .filter(|(name, _)| prefix.matches(name))
         .collect();
     // Create an aggregated map of all the metadata of the provided prefix
     let metadata = elder.meta_data.get_data_exchange_packet(prefix).await?;
 
-    Ok(NodeDuty::Send(OutgoingMsg {
+    Ok(NodeDuty::SendToNodes {
         msg: Message::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ReceiveExistingData {
                 node_rewards,
@@ -136,8 +136,7 @@ pub(crate) async fn push_state(
             }),
             id: msg_id,
         },
-        section_source: false, // strictly this is not correct, but we don't expect responses to an event..
-        dst,
+        targets: peers,
         aggregation: Aggregation::None,
-    }))
+    })
 }
