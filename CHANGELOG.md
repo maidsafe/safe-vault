@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.42.5](https://github.com/maidsafe/sn_node/compare/v0.42.4...v0.42.5) (2021-05-11)
+
+
+### Bug Fixes
+
+* **adult-tracking:** misc. fixes for republishing data and tracking adult responsiveness ([4c931be](https://github.com/maidsafe/sn_node/commit/4c931beb6faa994a2d54f2dcc29b5818d37d1026))
+* **storage:** do storage checks on writes at adults as well ([42b9b78](https://github.com/maidsafe/sn_node/commit/42b9b78007b6c87edc64443e6a5410fd8ccacd42))
+
 ### [0.42.4](https://github.com/maidsafe/sn_node/compare/v0.42.3...v0.42.4) (2021-05-10)
 
 ### [0.42.3](https://github.com/maidsafe/sn_node/compare/v0.42.2...v0.42.3) (2021-05-10)
