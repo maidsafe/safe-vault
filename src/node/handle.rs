@@ -283,7 +283,9 @@ impl Node {
                 origin,
             } => {
                 let adult = self.role.as_adult_mut()?;
-                Ok(vec![adult.chunks.write(&write, msg_id, origin).await?])
+                let mut ops = vec![adult.chunks.write(&write, msg_id, origin).await?];
+                ops.extend(adult.chunks.check_storage().await?);
+                Ok(ops)
             }
             NodeDuty::ProcessRepublish { chunk, msg_id, .. } => {
                 info!("Processing republish with MessageId: {:?}", msg_id);
