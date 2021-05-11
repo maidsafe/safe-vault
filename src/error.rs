@@ -8,6 +8,7 @@
 
 use sn_data_types::{DataAddress, Error as DtError, PublicKey};
 use sn_messaging::{client::Error as ErrorMessage, MessageId};
+use sn_routing::Prefix;
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;
@@ -23,6 +24,9 @@ pub enum Error {
     /// Attempted to perform an operation meant only for Elders when we are not one.
     #[error("Attempted Elder operation when not an Elder")]
     NotAnElder,
+    /// No Adults in the section to perform Chunk operation
+    #[error("No Adults available in Section({0:?})")]
+    NoAdults(Prefix),
     /// Not enough space in `ChunkStore` to perform `put`.
     #[error("Not enough space")]
     NotEnoughSpace,

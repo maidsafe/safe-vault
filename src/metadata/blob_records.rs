@@ -168,6 +168,16 @@ impl BlobRecords {
 
         info!("Storing {} copies of the data", target_holders.len());
 
+        if target_holders.is_empty() {
+            return self
+                .send_error(
+                    Error::NoAdults(self.reader.our_prefix().await),
+                    msg_id,
+                    origin,
+                )
+                .await;
+        }
+
         let blob_write = BlobWrite::New(data);
 
         if self.adult_liveness.new_write(
@@ -198,7 +208,7 @@ impl BlobRecords {
 
     async fn store(&mut self, data: Blob, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
         if let Err(error) = validate_data_owner(&data, &origin) {
-            return self.send_blob_cmd_error(error, msg_id, origin).await;
+            return self.send_error(error, msg_id, origin).await;
         }
 
         self.send_chunks_to_adults(data, msg_id, origin).await
@@ -293,7 +303,7 @@ impl BlobRecords {
         Ok(duties)
     }
 
-    async fn send_blob_cmd_error(
+    async fn send_error(
         &self,
         error: Error,
         msg_id: MessageId,
@@ -319,13 +329,7 @@ impl BlobRecords {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.get_holders_for_chunk(address.name()).await;
-        let full_adults = self.adult_storage_info.full_adults.read().await;
-
-        let targets = targets
-            .iter()
-            .cloned()
-            .chain(full_adults.iter().cloned())
-            .collect::<BTreeSet<_>>();
+        let targets = targets.iter().cloned().collect::<BTreeSet<_>>();
 
         if self.adult_liveness.new_write(
             msg_id,
@@ -412,12 +416,18 @@ impl BlobRecords {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.get_holders_for_chunk(address.name()).await;
-        let full_adults = self.adult_storage_info.full_adults.read().await;
 
-        let targets = targets
-            .into_iter()
-            .chain(full_adults.iter().cloned())
-            .collect::<BTreeSet<_>>();
+        let targets = targets.into_iter().collect::<BTreeSet<_>>();
+
+        if targets.is_empty() {
+            return self
+                .send_error(
+                    Error::NoAdults(self.reader.our_prefix().await),
+                    msg_id,
+                    origin,
+                )
+                .await;
+        }
 
         if self
             .adult_liveness

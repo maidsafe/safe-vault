@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use sn_routing::XorName;
+use sn_routing::{Prefix, XorName};
 
 use crate::network::Network;
 
@@ -21,6 +21,11 @@ impl AdultReader {
     /// Access to the current state of our adult constellation
     pub fn new(network: Network) -> Self {
         Self { network }
+    }
+
+    /// Get the sections's current Prefix
+    pub async fn our_prefix(&self) -> Prefix {
+        self.network.our_prefix().await
     }
 
     /// Dynamic state
