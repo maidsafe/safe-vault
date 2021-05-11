@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.42.6](https://github.com/maidsafe/sn_node/compare/v0.42.5...v0.42.6) (2021-05-11)
+
+
+### Bug Fixes
+
+* **chunk-ops:** respond back to clients with an error when adults are ([4c10c17](https://github.com/maidsafe/sn_node/commit/4c10c17f38b0fcdd4f9751631f1c1843e939eaff))
+
 ### [0.42.5](https://github.com/maidsafe/sn_node/compare/v0.42.4...v0.42.5) (2021-05-11)
 
 
