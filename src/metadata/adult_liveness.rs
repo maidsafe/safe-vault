@@ -17,6 +17,7 @@ use std::collections::hash_map::Entry;
 
 const NEIGHBOUR_COUNT: usize = 2;
 const MIN_PENDING_OPS: usize = 10;
+const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
 
 #[derive(Clone, Debug)]
 enum Operation {
@@ -206,7 +207,8 @@ impl AdultLiveness {
             {
                 let adult_pending_ops = *self.pending_ops.get(adult).unwrap_or(&0);
                 if adult_pending_ops > MIN_PENDING_OPS
-                    && adult_pending_ops > 2 * max_pending_by_neighbours
+                    && adult_pending_ops as f64 * PENDING_OP_TOLERANCE_RATIO
+                        > max_pending_by_neighbours as f64
                 {
                     log::info!(
                         "Pending ops for {}: {} Neighbour max: {}",
