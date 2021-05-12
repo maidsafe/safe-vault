@@ -9,7 +9,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use itertools::Itertools;
-use log::debug;
 use sn_data_types::BlobAddress;
 use sn_messaging::{client::BlobWrite, EndUser, MessageId};
 use sn_routing::XorName;
@@ -139,8 +138,6 @@ impl AdultLiveness {
         if complete {
             let _ = self.ops.remove(&msg_id);
         }
-        debug!("Pending op. count: {:?}", &self.pending_ops);
-        debug!("Ongoing ops: {:?}", &self.ops);
     }
 
     pub fn record_adult_write_liveness(
@@ -207,6 +204,7 @@ impl AdultLiveness {
             {
                 let adult_pending_ops = *self.pending_ops.get(adult).unwrap_or(&0);
                 if adult_pending_ops > MIN_PENDING_OPS
+                    && max_pending_by_neighbours > MIN_PENDING_OPS
                     && adult_pending_ops as f64 * PENDING_OP_TOLERANCE_RATIO
                         > max_pending_by_neighbours as f64
                 {
