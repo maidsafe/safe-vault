@@ -178,11 +178,12 @@ impl BlobRecords {
                 .await;
         }
 
+        let blob_address = *data.address();
         let blob_write = BlobWrite::New(data);
 
         if self
             .adult_liveness
-            .new_write(msg_id, Some(origin), blob_write.clone(), &target_holders)
+            .new_write(msg_id, Some(origin), blob_address, &target_holders)
         {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
@@ -219,7 +220,7 @@ impl BlobRecords {
         src: XorName,
     ) -> NodeDuties {
         let mut duties = vec![];
-        if let Some((blob_write, origin)) = self
+        if let Some((address, origin)) = self
             .adult_liveness
             .record_adult_write_liveness(correlation_id, src)
         {
@@ -235,8 +236,8 @@ impl BlobRecords {
                 }
             } else {
                 info!(
-                    "AdultWrite operation {:?} MessageId {:?} at {:?} was successful",
-                    blob_write, correlation_id, src
+                    "AdultWrite operation at {:?} MessageId {:?} at {:?} was successful",
+                    address, correlation_id, src
                 );
             }
         }
@@ -314,12 +315,10 @@ impl BlobRecords {
         let targets = self.get_holders_for_chunk(address.name()).await;
         let targets = targets.iter().cloned().collect::<BTreeSet<_>>();
 
-        if self.adult_liveness.new_write(
-            msg_id,
-            Some(origin),
-            BlobWrite::DeletePrivate(address),
-            &targets,
-        ) {
+        if self
+            .adult_liveness
+            .new_write(msg_id, Some(origin), address, &targets)
+        {
             let msg = NodeMsg::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: BlobWrite::DeletePrivate(address),
@@ -360,12 +359,10 @@ impl BlobRecords {
             msg_id
         );
 
-        if self.adult_liveness.new_write(
-            msg_id,
-            None,
-            BlobWrite::New(data.clone()),
-            &target_holders,
-        ) {
+        if self
+            .adult_liveness
+            .new_write(msg_id, None, *data.address(), &target_holders)
+        {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
                 msg: NodeMsg::NodeCmd {
