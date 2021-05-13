@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.43.0](https://github.com/maidsafe/sn_node/compare/v0.42.7...v0.43.0) (2021-05-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* Messaging dep update.
+
+### Features
+
+* add SupportingInfo message support ([74d1c9f](https://github.com/maidsafe/sn_node/commit/74d1c9f763bbd00e92e0dd1f002b7b4f75207297))
+* handle sending + receiving updated section wallet history ([fe4327d](https://github.com/maidsafe/sn_node/commit/fe4327d0e3feb5011267e9d3eda570028ecf504f))
+* Initital set up for some lazy message sending ([a29b16c](https://github.com/maidsafe/sn_node/commit/a29b16ce13199dd05ff6e5d6f0ba490c97de5d25))
+* **adult_ops:** compute new holders for chunks and republish them on ([ce8d9e5](https://github.com/maidsafe/sn_node/commit/ce8d9e5b0e808fe8b8a1143d4674e09b8265d541))
+* **data-organisation:** republish data on AdultsChanged events ([d4289f0](https://github.com/maidsafe/sn_node/commit/d4289f05b43b5efb8d74505ba058e806625c70f3))
+
+
+### Bug Fixes
+
+* cleanup and PR comments ([125806a](https://github.com/maidsafe/sn_node/commit/125806aac6f1b275b67af76fdf631b7036d092b8))
+* multiple fixes and rebase atop T5 ([a2c56bc](https://github.com/maidsafe/sn_node/commit/a2c56bcdfc1da1c4f37edc4b4c158b2d632dce5c))
+* **AE:** rebase fixes of AE atop T4.2 ([ac8a030](https://github.com/maidsafe/sn_node/commit/ac8a0304f20567b67eca5a0b57bd73fb86961d82))
+* **blob-storage:** handle edge-cases when republishing Blob data ([e596869](https://github.com/maidsafe/sn_node/commit/e596869cf97cd44731a37d73b3e7dfd1b9de7434))
+* **error-handling:** return a message to the sender when any error was encountered ([1327cc2](https://github.com/maidsafe/sn_node/commit/1327cc264986b9ab52ea7d8f4be4d19831b6acb8))
+* post-rebase issues ([2bedd59](https://github.com/maidsafe/sn_node/commit/2bedd59cbc31932f0bed264ae35c43f891e8ba7b))
+* **messaging:** only try get section key when to aggregate ([28a5bda](https://github.com/maidsafe/sn_node/commit/28a5bda17a6125003e8624e91dde8467818293de))
+
+
+* messaging dep updates for ProcessMsg ([7935639](https://github.com/maidsafe/sn_node/commit/79356390e8640fe881fedfb56c4a5403c7cc6b8f))
+
 ### [0.42.7](https://github.com/maidsafe/sn_node/compare/v0.42.6...v0.42.7) (2021-05-12)
 
 ### [0.42.6](https://github.com/maidsafe/sn_node/compare/v0.42.5...v0.42.6) (2021-05-11)
