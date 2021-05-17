@@ -9,15 +9,15 @@
 use crate::{
     capacity::AdultsStorageInfo,
     error::convert_to_error_message,
-    node_ops::{NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuties, NodeDuty},
     Error, Result,
 };
 use log::{debug, error, info, warn};
 use sn_data_types::{Blob, BlobAddress, PublicKey};
 use sn_messaging::{
-    client::{BlobDataExchange, BlobRead, BlobWrite, CmdError, ProcessMsg, QueryResponse},
+    client::{BlobDataExchange, BlobRead, BlobWrite, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
-    Aggregation, DstLocation, EndUser, MessageId,
+    Aggregation, EndUser, MessageId,
 };
 use sn_routing::Prefix;
 
@@ -27,10 +27,10 @@ use std::{
 };
 use xor_name::XorName;
 
-use super::adult_liveness::AdultLiveness;
-use super::adult_reader::AdultReader;
-use crate::node_ops::MsgType;
-use sn_messaging::client::ClientMsg;
+use super::{
+    adult_liveness::AdultLiveness, adult_reader::AdultReader, build_client_error_response,
+    build_client_query_response,
+};
 
 // The number of separate copies of a blob chunk which should be maintained.
 pub(crate) const CHUNK_COPY_COUNT: usize = 4;
@@ -229,16 +229,11 @@ impl BlobRecords {
                 error!("Error at Adult while performing a BlobWrite: {:?}", &error);
                 // Depending on error, we might have to take action here.
                 if let Some(end_user) = origin {
-                    duties.push(NodeDuty::Send(OutgoingMsg {
-                        msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
-                            error,
-                            id: MessageId::in_response_to(&correlation_id),
-                            correlation_id,
-                        })),
-                        dst: DstLocation::EndUser(end_user),
-                        section_source: false,
-                        aggregation: Aggregation::AtDestination,
-                    }))
+                    duties.push(NodeDuty::Send(build_client_error_response(
+                        error,
+                        correlation_id,
+                        end_user,
+                    )))
                 }
             } else {
                 info!(
@@ -278,16 +273,12 @@ impl BlobRecords {
             .adult_liveness
             .record_adult_read_liveness(correlation_id, src)
         {
-            return Ok(vec![NodeDuty::Send(OutgoingMsg {
-                msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
-                    response,
-                    id: MessageId::in_response_to(&correlation_id),
-                    correlation_id,
-                })),
-                dst: DstLocation::EndUser(end_user),
-                section_source: false,
-                aggregation: Aggregation::AtDestination,
-            })]);
+            return Ok(vec![NodeDuty::Send(build_client_query_response(
+                response,
+                correlation_id,
+                end_user,
+                Aggregation::AtDestination,
+            ))]);
         }
         let mut unresponsive_adults = Vec::new();
         for (name, count) in self.adult_liveness.find_unresponsive_adults() {
@@ -309,17 +300,12 @@ impl BlobRecords {
         msg_id: MessageId,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let message_error = convert_to_error_message(error);
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
-                error: CmdError::Data(message_error),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-            })),
-            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::AtDestination,
-        }))
+        let error = convert_to_error_message(error);
+        Ok(NodeDuty::Send(build_client_error_response(
+            CmdError::Data(error),
+            msg_id,
+            origin,
+        )))
     }
 
     async fn delete(

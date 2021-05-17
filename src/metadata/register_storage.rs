@@ -6,19 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::{build_client_error_response, build_client_query_response};
 use crate::{
-    chunk_store::RegisterChunkStore,
-    error::convert_to_error_message,
-    node_ops::{MsgType, NodeDuty, OutgoingMsg},
-    Error, Result,
+    chunk_store::RegisterChunkStore, error::convert_to_error_message, node_ops::NodeDuty, Error,
+    Result,
 };
 use log::info;
 use sn_data_types::register::{Action, Address, Entry, Register, RegisterOp, User};
 use sn_messaging::{
-    client::{ClientMsg, CmdError, ProcessMsg, QueryResponse, RegisterRead, RegisterWrite},
-    Aggregation, DstLocation, EndUser, MessageId,
+    client::{CmdError, QueryResponse, RegisterRead, RegisterWrite},
+    Aggregation, EndUser, MessageId,
 };
-
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -93,16 +91,12 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
-                response: QueryResponse::GetRegister(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-            })),
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        Ok(NodeDuty::Send(build_client_query_response(
+            QueryResponse::GetRegister(result),
+            msg_id,
+            origin,
+            Aggregation::None,
+        )))
     }
 
     fn get_chunk(&self, address: Address, action: Action, origin: EndUser) -> Result<Register> {
@@ -154,16 +148,12 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
-                response: QueryResponse::ReadRegister(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-            })),
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        Ok(NodeDuty::Send(build_client_query_response(
+            QueryResponse::ReadRegister(result),
+            msg_id,
+            origin,
+            Aggregation::None,
+        )))
     }
 
     async fn get_owner(
@@ -177,16 +167,12 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
-                response: QueryResponse::GetRegisterOwner(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-            })),
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        Ok(NodeDuty::Send(build_client_query_response(
+            QueryResponse::GetRegisterOwner(result),
+            msg_id,
+            origin,
+            Aggregation::None,
+        )))
     }
 
     async fn get_user_permissions(
@@ -207,16 +193,12 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
-                response: QueryResponse::GetRegisterUserPermissions(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-            })),
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        Ok(NodeDuty::Send(build_client_query_response(
+            QueryResponse::GetRegisterUserPermissions(result),
+            msg_id,
+            origin,
+            Aggregation::None,
+        )))
     }
 
     async fn get_policy(
@@ -237,16 +219,12 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
-                response: QueryResponse::GetRegisterPolicy(result),
-                id: MessageId::in_response_to(&msg_id),
-                correlation_id: msg_id,
-            })),
-            section_source: false, // strictly this is not correct, but we don't expect responses to a response..
-            dst: DstLocation::EndUser(origin),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+        Ok(NodeDuty::Send(build_client_query_response(
+            QueryResponse::GetRegisterPolicy(result),
+            msg_id,
+            origin,
+            Aggregation::None,
+        )))
     }
 
     async fn edit(
@@ -303,16 +281,12 @@ impl RegisterStorage {
                 convert_to_error_message(error)
             }
         };
-        Ok(NodeDuty::Send(OutgoingMsg {
-            msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
-                id: MessageId::in_response_to(&msg_id),
-                error: CmdError::Data(error),
-                correlation_id: msg_id,
-            })),
-            section_source: false, // strictly this is not correct, but we don't expect responses to an error..
-            dst: DstLocation::Section(origin.name()),
-            aggregation: Aggregation::None, // TODO: to_be_aggregated: Aggregation::AtDestination,
-        }))
+
+        Ok(NodeDuty::Send(build_client_error_response(
+            CmdError::Data(error),
+            msg_id,
+            origin,
+        )))
     }
 }
 

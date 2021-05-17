@@ -16,7 +16,11 @@ mod sequence_storage;
 
 use self::adult_reader::AdultReader;
 use super::node_ops::NodeDuty;
-use crate::{capacity::AdultsStorageInfo, node_ops::NodeDuties, Result};
+use crate::{
+    capacity::AdultsStorageInfo,
+    node_ops::{MsgType, NodeDuties, OutgoingMsg},
+    Result,
+};
 use blob_records::BlobRecords;
 pub(crate) use blob_records::CHUNK_COPY_COUNT;
 use elder_stores::ElderStores;
@@ -25,8 +29,8 @@ use register_storage::RegisterStorage;
 use sequence_storage::SequenceStorage;
 use sn_data_types::{Blob, PublicKey};
 use sn_messaging::{
-    client::{CmdError, DataCmd, DataExchange, DataQuery, QueryResponse},
-    EndUser, MessageId,
+    client::{ClientMsg, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg, QueryResponse},
+    Aggregation, DstLocation, EndUser, MessageId,
 };
 use sn_routing::Prefix;
 use std::{
@@ -144,5 +148,36 @@ impl Metadata {
 impl Display for Metadata {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "Metadata")
+    }
+}
+
+fn build_client_query_response(
+    response: QueryResponse,
+    msg_id: MessageId,
+    origin: EndUser,
+    aggregation: Aggregation,
+) -> OutgoingMsg {
+    OutgoingMsg {
+        msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
+            response,
+            id: MessageId::in_response_to(&msg_id),
+            correlation_id: msg_id,
+        })),
+        section_source: false, // strictly this is not correct, but we don't expect responses to a response..
+        dst: DstLocation::EndUser(origin),
+        aggregation,
+    }
+}
+
+fn build_client_error_response(error: CmdError, msg_id: MessageId, origin: EndUser) -> OutgoingMsg {
+    OutgoingMsg {
+        msg: MsgType::Client(ClientMsg::Process(ProcessMsg::CmdError {
+            id: MessageId::in_response_to(&msg_id),
+            error,
+            correlation_id: msg_id,
+        })),
+        section_source: false, // strictly this is not correct, but we don't expect responses to an error..
+        dst: DstLocation::EndUser(origin),
+        aggregation: Aggregation::None,
     }
 }
