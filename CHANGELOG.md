@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.43.1](https://github.com/maidsafe/sn_node/compare/v0.43.0...v0.43.1) (2021-05-17)
+
+
+### Bug Fixes
+
+* **blob:** don't mark Blob responses for aggregation at destination ([a4efe5b](https://github.com/maidsafe/sn_node/commit/a4efe5b060879da7c7459d1a6fc6e417429a2cc0))
+
 ## [0.43.0](https://github.com/maidsafe/sn_node/compare/v0.42.7...v0.43.0) (2021-05-13)
 
 
