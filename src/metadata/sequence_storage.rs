@@ -18,7 +18,7 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{CmdError, QueryResponse, SequenceDataExchange, SequenceRead, SequenceWrite},
-    Aggregation, EndUser, MessageId,
+    EndUser, MessageId,
 };
 use sn_routing::Prefix;
 use std::{
@@ -128,7 +128,6 @@ impl SequenceStorage {
             QueryResponse::GetSequence(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -196,7 +195,6 @@ impl SequenceStorage {
             QueryResponse::GetSequenceRange(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -220,7 +218,6 @@ impl SequenceStorage {
             QueryResponse::GetSequenceLastEntry(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -246,7 +243,6 @@ impl SequenceStorage {
             QueryResponse::GetSequenceUserPermissions(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -275,7 +271,6 @@ impl SequenceStorage {
             QueryResponse::GetSequencePublicPolicy(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -304,7 +299,6 @@ impl SequenceStorage {
             QueryResponse::GetSequencePrivatePolicy(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 

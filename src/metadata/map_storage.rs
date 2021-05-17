@@ -17,7 +17,7 @@ use sn_data_types::{
 };
 use sn_messaging::{
     client::{CmdError, MapDataExchange, MapRead, MapWrite, QueryResponse},
-    Aggregation, EndUser, MessageId,
+    EndUser, MessageId,
 };
 use sn_routing::Prefix;
 use std::{
@@ -247,7 +247,6 @@ impl MapStorage {
             QueryResponse::GetMap(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -270,7 +269,6 @@ impl MapStorage {
             QueryResponse::GetMapShell(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -293,7 +291,6 @@ impl MapStorage {
             QueryResponse::GetMapVersion(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -326,7 +323,6 @@ impl MapStorage {
             QueryResponse::GetMapValue(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -349,7 +345,6 @@ impl MapStorage {
             QueryResponse::ListMapKeys(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -373,7 +368,6 @@ impl MapStorage {
             QueryResponse::ListMapValues(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -397,7 +391,6 @@ impl MapStorage {
             QueryResponse::ListMapEntries(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -420,7 +413,6 @@ impl MapStorage {
             QueryResponse::ListMapPermissions(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -447,7 +439,6 @@ impl MapStorage {
             QueryResponse::ListMapUserPermissions(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 

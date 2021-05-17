@@ -15,7 +15,7 @@ use log::info;
 use sn_data_types::register::{Action, Address, Entry, Register, RegisterOp, User};
 use sn_messaging::{
     client::{CmdError, QueryResponse, RegisterRead, RegisterWrite},
-    Aggregation, EndUser, MessageId,
+    EndUser, MessageId,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -95,7 +95,6 @@ impl RegisterStorage {
             QueryResponse::GetRegister(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -152,7 +151,6 @@ impl RegisterStorage {
             QueryResponse::ReadRegister(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -171,7 +169,6 @@ impl RegisterStorage {
             QueryResponse::GetRegisterOwner(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -197,7 +194,6 @@ impl RegisterStorage {
             QueryResponse::GetRegisterUserPermissions(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 
@@ -223,7 +219,6 @@ impl RegisterStorage {
             QueryResponse::GetRegisterPolicy(result),
             msg_id,
             origin,
-            Aggregation::None,
         )))
     }
 

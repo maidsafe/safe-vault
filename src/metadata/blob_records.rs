@@ -277,7 +277,6 @@ impl BlobRecords {
                 response,
                 correlation_id,
                 end_user,
-                Aggregation::AtDestination,
             ))]);
         }
         let mut unresponsive_adults = Vec::new();

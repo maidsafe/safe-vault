@@ -155,7 +155,6 @@ fn build_client_query_response(
     response: QueryResponse,
     msg_id: MessageId,
     origin: EndUser,
-    aggregation: Aggregation,
 ) -> OutgoingMsg {
     OutgoingMsg {
         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
@@ -165,7 +164,7 @@ fn build_client_query_response(
         })),
         section_source: false, // strictly this is not correct, but we don't expect responses to a response..
         dst: DstLocation::EndUser(origin),
-        aggregation,
+        aggregation: Aggregation::None,
     }
 }
 
