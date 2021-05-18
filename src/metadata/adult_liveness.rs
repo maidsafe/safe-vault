@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 // Copyright 2021 MaidSafe.net limited.
 //
@@ -55,7 +55,7 @@ impl AdultLiveness {
         msg_id: MessageId,
         origin: Option<EndUser>,
         blob_write: BlobWrite,
-        targets: BTreeSet<XorName>,
+        targets: &BTreeSet<XorName>,
     ) -> bool {
         let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
             let _ = entry.insert(Operation::Write {
@@ -181,17 +181,20 @@ impl AdultLiveness {
     }
 
     pub fn recompute_closest_adults(&mut self) {
-        let adults = self.closest_adults.keys().cloned().collect::<HashSet<_>>();
-        for adult in &adults {
-            let closest_adults = adults
-                .iter()
-                .filter(|name| name != &adult)
-                .sorted_by(|lhs, rhs| adult.cmp_distance(lhs, rhs))
-                .take(NEIGHBOUR_COUNT)
-                .cloned()
-                .collect::<Vec<_>>();
-            let _ = self.closest_adults.insert(*adult, closest_adults);
-        }
+        let closest_adults = self.closest_adults.iter().map(|(key, value)| {
+           let closest_adults = value
+                    .iter()
+                    .filter(|name| key != *name)
+                    .sorted_by(|lhs, rhs| key.cmp_distance(lhs, rhs))
+                    .take(NEIGHBOUR_COUNT)
+                    .map(|x| *x)
+                    .collect::<Vec<_>>();
+
+                (key.to_owned(), closest_adults)
+        }).collect::<Vec<(XorName, Vec<XorName>)>>();
+
+            self.closest_adults.extend(closest_adults.into_iter());
+
     }
 
     pub fn find_unresponsive_adults(&self) -> Vec<(XorName, usize)> {
@@ -199,14 +202,12 @@ impl AdultLiveness {
         for (adult, neighbours) in &self.closest_adults {
             if let Some(max_pending_by_neighbours) = neighbours
                 .iter()
-                .map(|neighbour| self.pending_ops.get(neighbour).cloned().unwrap_or(0))
+                .map(|neighbour| self.pending_ops.get(neighbour).unwrap_or(&0))
                 .max()
             {
-                let adult_pending_ops = *self.pending_ops.get(adult).unwrap_or(&0);
-                if adult_pending_ops > MIN_PENDING_OPS
-                    && max_pending_by_neighbours > MIN_PENDING_OPS
-                    && adult_pending_ops as f64 * PENDING_OP_TOLERANCE_RATIO
-                        > max_pending_by_neighbours as f64
+                let our_pending_ops = *self.pending_ops.get(adult).unwrap_or(&0);
+                if our_pending_ops.saturating_sub(*max_pending_by_neighbours)
+                    > MAX_PENDING_OP_DIFFERENCE
                 {
                     log::info!(
                         "Pending ops for {}: {} Neighbour max: {}",

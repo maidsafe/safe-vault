@@ -173,7 +173,7 @@ impl RewardProcess {
         if proposal.section_key != self.section.wallet_key() {
             return Err(Error::Transfer(sn_transfers::Error::InvalidOwner));
         }
-        match self.stage.clone() {
+        match &mut self.stage {
             RewardStage::AwaitingThreshold => {
                 debug!("@ receive_churn_proposal when RewardStage::None | RewardStage::AwaitingThreshold");
                 let rewards = proposal
@@ -200,7 +200,7 @@ impl RewardProcess {
 
                 Ok(send_prop_msg(to_send, self.section.address()))
             }
-            RewardStage::ProposingCredits(mut proposal_details) => {
+            RewardStage::ProposingCredits(ref mut proposal_details) => {
                 // Add proposals
                 for p in proposal.rewards {
                     proposal_details.add_sig(p.id(), &p.actor_signature)?
@@ -227,7 +227,7 @@ impl RewardProcess {
 
                     Ok(send_acc_msg(to_send, self.section.address()))
                 } else {
-                    self.stage = RewardStage::ProposingCredits(proposal_details);
+                    self.stage = RewardStage::ProposingCredits(proposal_details.clone());
                     Ok(NodeDuty::NoOp)
                 }
             }
@@ -244,7 +244,7 @@ impl RewardProcess {
         if new_acc.section_key != self.section.wallet_key() {
             return Err(Error::Transfer(sn_transfers::Error::InvalidOwner));
         }
-        match self.stage.clone() {
+        match &mut self.stage {
             RewardStage::AwaitingThreshold => {
                 let rewards = new_acc
                     .rewards
@@ -297,18 +297,18 @@ impl RewardProcess {
 
                 Ok(send_acc_msg(to_send, self.section.address()))
             }
-            RewardStage::AccumulatingCredits(mut our_acc) => {
+            RewardStage::AccumulatingCredits(ref mut our_acc) => {
                 // Add sigs of incoming proposal
                 for p in new_acc.rewards {
                     our_acc.add_sig(p.id(), &p.sig)?
                 }
 
-                if let Some(credit_proofs) = our_acc.pending_agreements() {
+                self.stage = if let Some(credit_proofs) = our_acc.pending_agreements() {
                     info!("******* there is an agreement for reward accumulation.");
-                    self.stage = RewardStage::Completed(credit_proofs);
+                    RewardStage::Completed(credit_proofs)
                 } else {
-                    self.stage = RewardStage::AccumulatingCredits(our_acc);
-                }
+                    RewardStage::AccumulatingCredits(our_acc.to_owned())
+                };
                 Ok(NodeDuty::NoOp)
             }
             RewardStage::Completed(_) => Ok(NodeDuty::NoOp),

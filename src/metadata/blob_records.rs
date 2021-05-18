@@ -184,7 +184,7 @@ impl BlobRecords {
             msg_id,
             Some(origin),
             blob_write.clone(),
-            target_holders.clone(),
+            &target_holders,
         ) {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
@@ -320,7 +320,7 @@ impl BlobRecords {
             msg_id,
             Some(origin),
             BlobWrite::DeletePrivate(address),
-            targets.clone(),
+            &targets,
         ) {
             let msg = NodeMsg::NodeCmd {
                 cmd: NodeCmd::Chunks {
@@ -349,12 +349,11 @@ impl BlobRecords {
         let target_holders = self
             .get_holders_for_chunk(data.name())
             .await
-            .iter()
-            .cloned()
+            .into_iter()
             .collect::<BTreeSet<_>>();
 
         // deterministic msg id for aggregation
-        let msg_id = MessageId::from_content(&(*data.name(), owner, target_holders.clone()))?;
+        let msg_id = MessageId::from_content(&(*data.name(), owner, &target_holders))?;
 
         info!(
             "Republishing chunk {:?} to holders {:?} with MessageId {:?}",
@@ -367,7 +366,7 @@ impl BlobRecords {
             msg_id,
             None,
             BlobWrite::New(data.clone()),
-            target_holders.clone(),
+            &target_holders,
         ) {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,

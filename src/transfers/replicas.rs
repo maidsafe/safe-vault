@@ -198,13 +198,13 @@ impl<T: ReplicaSigning> Replicas<T> {
     fn get_debits(&self, events: Vec<ReplicaEvent>) -> Vec<TransferAgreementProof> {
         use itertools::Itertools;
         let mut debits: Vec<_> = events
-            .iter()
+            .into_iter()
             .filter_map(|e| match e {
                 ReplicaEvent::TransferRegistered(e) => Some(e),
                 _ => None,
             })
             .unique_by(|e| e.id())
-            .map(|e| e.transfer_proof.clone())
+            .map(|e| e.transfer_proof)
             .collect();
 
         debits.sort_by_key(|t| t.id().counter);
