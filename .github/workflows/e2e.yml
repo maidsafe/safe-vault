@@ -68,8 +68,11 @@ jobs:
       - run: ./target/release/launch_network
 
       # Our basic test: create an account
-      - name: Create Account
-        run: ~/.safe/cli/safe keys create --test-coins --for-cli
+      - name: Create Account and upload
+        run: ./scripts/upload-files.sh
+
+      - name: Download files
+        run: ./scripts/read-files.sh
 
       # TODO: Add more tests/scripts to run here (or use CLI tests directly somehow...)
 
@@ -80,8 +83,8 @@ jobs:
           cat $HOME/.safe/node/local-test-network/sn-node-genesis/sn_node.log
         if: failure()
 
-      - name: Authd Logs
-        run: |
-          ls $HOME/.safe/authd/
-          cat $HOME/.safe/authd/logs/sn_authd.log
-        if: failure()
+      # - name: Authd Logs
+      #   run: |
+      #     ls $HOME/.safe/authd/
+      #     cat $HOME/.safe/authd/logs/sn_authd.log
+      #   if: failure()
