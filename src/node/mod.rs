@@ -23,6 +23,7 @@ use crate::{
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
+use crate::{event_mapping::Mapping, node_ops::NodeDuties};
 use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
@@ -36,6 +37,7 @@ use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
 };
+use tokio::task::JoinHandle;
 
 /// Static info about the node.
 #[derive(Clone)]
@@ -131,18 +133,44 @@ impl Node {
 
     // Keeps processing resulting node operations.
     async fn process_while_any(&mut self, op: NodeDuty, ctx: Option<MsgContext>) {
-        let mut next_ops = vec![op];
-
-        while !next_ops.is_empty() {
-            let mut pending_node_ops: Vec<NodeDuty> = vec![];
-            for duty in next_ops {
-                match self.handle(duty).await {
-                    Ok(new_ops) => pending_node_ops.extend(new_ops),
-                    Err(e) => pending_node_ops.push(try_handle_error(e, ctx.clone())),
-                };
+        // let mut threads = vec![tokio::spawn(self.handle(op))];
+        let ops = self.handle(op).await;
+        let mut threads = self.helper(ops, ctx.clone()).await;
+        loop {
+            let (result, _count, mut remaining_futures) =
+                futures::future::select_all(threads.into_iter()).await;
+            match result {
+                Ok(res) => {
+                    remaining_futures.extend(self.helper(res, ctx.clone()).await);
+                }
+                Err(e) => {
+                    error!("Error spawing thread for task: {}", e);
+                }
             }
-            next_ops = pending_node_ops;
+            threads = remaining_futures;
         }
+    }
+
+    async fn helper(
+        &mut self,
+        result: Result<NodeDuties>,
+        ctx: Option<MsgContext>,
+    ) -> Vec<JoinHandle<Result<NodeDuties>>> {
+        let threads = vec![];
+        match result {
+            Ok(new_ops) => {
+                for op in new_ops {
+                    threads.push(tokio::spawn(self.handle(op)));
+                }
+            }
+            Err(e) => {
+                let new_ops = try_handle_error(e, ctx.clone());
+                for op in new_ops {
+                    threads.push(tokio::spawn(self.handle(op)));
+                }
+            }
+        }
+        threads
     }
 }
 
