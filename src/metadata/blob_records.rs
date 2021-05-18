@@ -180,12 +180,10 @@ impl BlobRecords {
 
         let blob_write = BlobWrite::New(data);
 
-        if self.adult_liveness.new_write(
-            msg_id,
-            Some(origin),
-            blob_write.clone(),
-            &target_holders,
-        ) {
+        if self
+            .adult_liveness
+            .new_write(msg_id, Some(origin), blob_write.clone(), &target_holders)
+        {
             Ok(NodeDuty::SendToNodes {
                 targets: target_holders,
                 msg: NodeMsg::NodeCmd {

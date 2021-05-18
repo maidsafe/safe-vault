@@ -181,20 +181,23 @@ impl AdultLiveness {
     }
 
     pub fn recompute_closest_adults(&mut self) {
-        let closest_adults = self.closest_adults.iter().map(|(key, value)| {
-           let closest_adults = value
+        let closest_adults_collection = self
+            .closest_adults
+            .iter()
+            .map(|(key, value)| {
+                let closest_adults = value
                     .iter()
                     .filter(|name| key != *name)
                     .sorted_by(|lhs, rhs| key.cmp_distance(lhs, rhs))
                     .take(NEIGHBOUR_COUNT)
-                    .map(|x| *x)
+                    .copied()
                     .collect::<Vec<_>>();
 
                 (key.to_owned(), closest_adults)
-        }).collect::<Vec<(XorName, Vec<XorName>)>>();
+            })
+            .collect::<Vec<(XorName, Vec<XorName>)>>();
 
-            self.closest_adults.extend(closest_adults.into_iter());
-
+        self.closest_adults.extend(closest_adults_collection);
     }
 
     pub fn find_unresponsive_adults(&self) -> Vec<(XorName, usize)> {
@@ -205,9 +208,11 @@ impl AdultLiveness {
                 .map(|neighbour| self.pending_ops.get(neighbour).unwrap_or(&0))
                 .max()
             {
-                let our_pending_ops = *self.pending_ops.get(adult).unwrap_or(&0);
-                if our_pending_ops.saturating_sub(*max_pending_by_neighbours)
-                    > MAX_PENDING_OP_DIFFERENCE
+                let adult_pending_ops = *self.pending_ops.get(adult).unwrap_or(&0);
+                if adult_pending_ops > MIN_PENDING_OPS
+                    && max_pending_by_neighbours > &MIN_PENDING_OPS
+                    && adult_pending_ops as f64 * PENDING_OP_TOLERANCE_RATIO
+                        > *max_pending_by_neighbours as f64
                 {
                     log::info!(
                         "Pending ops for {}: {} Neighbour max: {}",
