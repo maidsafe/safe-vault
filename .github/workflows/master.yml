@@ -172,7 +172,7 @@ jobs:
           tag_name: v${{ steps.versioning.outputs.version }}
           release_name: sn_node v${{ steps.versioning.outputs.version }}
           draft: false
-          prerelease: false
+          prerelease: true
           body_path: RELEASE_DESCRIPTION.txt
 
       # Upload zip files
