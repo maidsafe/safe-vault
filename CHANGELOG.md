@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.43.4](https://github.com/maidsafe/sn_node/compare/v0.43.3...v0.43.4) (2021-05-20)
+
+
+### Bug Fixes
+
+* **adult-liveliness:** hold only node addresses for write liveliness ([fd019b5](https://github.com/maidsafe/sn_node/commit/fd019b5205f9af545aa16d18a338921ae10aaa08))
+
 ### [0.43.3](https://github.com/maidsafe/sn_node/compare/v0.43.2...v0.43.3) (2021-05-20)
 
 ### [0.43.2](https://github.com/maidsafe/sn_node/compare/v0.43.1...v0.43.2) (2021-05-19)
