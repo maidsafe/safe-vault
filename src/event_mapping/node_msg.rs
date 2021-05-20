@@ -30,9 +30,9 @@ pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping
     );
 
     match &dst {
-        DstLocation::Section(_) | DstLocation::Node(_) => Mapping::Ok {
+        DstLocation::Section(_) | DstLocation::Node(_) => Mapping {
             op: match_node_msg(msg.clone(), src),
-            ctx: Some(MsgContext::Msg {
+            ctx: Some(MsgContext {
                 msg: Msg::Node(msg),
                 src,
             }),
@@ -46,13 +46,13 @@ pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping
 
             if let SrcLocation::EndUser(_) = src {
                 log::error!("Logic error! EndUser cannot send NodeMsgs. ({:?})", msg);
-                return Mapping::Ok {
+                return Mapping {
                     op: NodeDuty::NoOp,
                     ctx: None,
                 };
             }
 
-            Mapping::Ok {
+            Mapping {
                 op: NodeDuty::Send(OutgoingMsg {
                     msg: MsgType::Node(NodeMsg::NodeMsgError {
                         error,
@@ -63,7 +63,7 @@ pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping
                     dst: src.to_dst(),
                     aggregation: Aggregation::AtDestination,
                 }),
-                ctx: Some(MsgContext::Msg {
+                ctx: Some(MsgContext {
                     msg: Msg::Node(msg),
                     src,
                 }),

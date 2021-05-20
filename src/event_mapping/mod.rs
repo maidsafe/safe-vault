@@ -9,35 +9,32 @@
 mod client_msg;
 mod node_msg;
 
-use crate::{network::Network, node_ops::NodeDuty};
+use crate::{
+    network::Network,
+    node_ops::{NodeDuty, OutgoingLazyError},
+};
 use client_msg::map_client_msg;
 use log::{debug, error, info, trace, warn};
 use node_msg::map_node_msg;
 use sn_data_types::PublicKey;
-use sn_messaging::{Msg, SrcLocation};
+use sn_messaging::{
+    client::{Error as ErrorMessage, ProcessingError},
+    MessageId, Msg, SrcLocation,
+};
 use sn_routing::XorName;
 use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use std::{thread::sleep, time::Duration};
 
 #[derive(Debug)]
-pub enum Mapping {
-    Ok {
-        op: NodeDuty,
-        ctx: Option<MsgContext>,
-    },
-    Error(LazyError),
+pub struct Mapping {
+    pub op: NodeDuty,
+    pub ctx: Option<MsgContext>,
 }
 
 #[derive(Debug, Clone)]
-pub enum MsgContext {
-    Msg { msg: Msg, src: SrcLocation },
-    Bytes { msg: bytes::Bytes, src: SrcLocation },
-}
-
-#[derive(Debug)]
-pub struct LazyError {
-    pub msg: MsgContext,
-    pub error: crate::Error,
+pub struct MsgContext {
+    pub msg: Msg,
+    pub src: SrcLocation,
 }
 
 // Process any routing event
@@ -54,17 +51,33 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                         "Unexpected ClientMsg at RoutingEvent::MessageReceived {:?}",
                         msg
                     );
-                    return Mapping::Ok {
+                    return Mapping {
                         op: NodeDuty::NoOp,
                         ctx: None,
                     };
                 }
             },
             Err(error) => {
-                return Mapping::Error(LazyError {
-                    msg: MsgContext::Bytes { msg: content, src },
-                    error: crate::Error::Message(error),
-                })
+                warn!("Error decoding msg bytes, sent from {:?}", src);
+
+                // We generate a message id here since we cannot
+                // retrieve the message id from the message received
+                let msg_id = MessageId::from_content(&content).unwrap_or_else(|_| MessageId::new());
+
+                Mapping {
+                    op: NodeDuty::SendError(OutgoingLazyError {
+                        msg: ProcessingError::new(
+                            Some(ErrorMessage::Serialization(format!(
+                                "Could not deserialize Message at node: {:?}",
+                                error
+                            ))),
+                            None,
+                            msg_id,
+                        ),
+                        dst: src.to_dst(),
+                    }),
+                    ctx: None,
+                }
             }
         },
         RoutingEvent::ClientMsgReceived { msg, user } => map_client_msg(&msg, user),
@@ -78,13 +91,13 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                 NodeElderChange::Promoted => true,
                 NodeElderChange::Demoted => {
                     error!("This should be unreachable, as there would be no demotions of Elders during a split.");
-                    return Mapping::Ok {
+                    return Mapping {
                         op: NodeDuty::NoOp,
                         ctx: None,
                     };
                 }
             };
-            Mapping::Ok {
+            Mapping {
                 op: NodeDuty::SectionSplit {
                     our_prefix: elders.prefix,
                     our_key: PublicKey::from(elders.key),
@@ -104,7 +117,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             let first_section = network_api.our_prefix().await.is_empty();
             let first_elder = network_api.our_elder_names().await.len() == 1;
             if first_section && first_elder {
-                return Mapping::Ok {
+                return Mapping {
                     op: NodeDuty::Genesis,
                     ctx: None,
                 };
@@ -113,7 +126,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             match self_status_change {
                 NodeElderChange::None => {
                     if !network_api.is_elder().await {
-                        return Mapping::Ok {
+                        return Mapping {
                             op: NodeDuty::NoOp,
                             ctx: None,
                         };
@@ -143,7 +156,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     // -- ugly temporary until fixed in routing --
 
                     trace!("******Elders changed, we are still Elder");
-                    Mapping::Ok {
+                    Mapping {
                         op: NodeDuty::EldersChanged {
                             our_prefix: elders.prefix,
                             our_key: PublicKey::from(elders.key),
@@ -159,7 +172,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                     while network_api.our_public_key_set().await.is_err() {
                         if sanity_counter > 240 {
                             trace!("******Elders changed, we were promoted, but no key share found, so skip this..");
-                            return Mapping::Ok {
+                            return Mapping {
                                 op: NodeDuty::NoOp,
                                 ctx: None,
                             };
@@ -172,7 +185,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
 
                     trace!("******Elders changed, we are promoted");
 
-                    Mapping::Ok {
+                    Mapping {
                         op: NodeDuty::EldersChanged {
                             our_prefix: elders.prefix,
                             our_key: PublicKey::from(elders.key),
@@ -182,7 +195,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                         ctx: None,
                     }
                 }
-                NodeElderChange::Demoted => Mapping::Ok {
+                NodeElderChange::Demoted => Mapping {
                     op: NodeDuty::LevelDown,
                     ctx: None,
                 },
@@ -190,7 +203,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
         }
         RoutingEvent::MemberLeft { name, age } => {
             log_network_stats(network_api).await;
-            Mapping::Ok {
+            Mapping {
                 op: NodeDuty::ProcessLostMember {
                     name: XorName(name.0),
                     age,
@@ -209,7 +222,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             } else {
                 NodeDuty::SetNodeJoinsAllowed(false)
             };
-            Mapping::Ok { op, ctx: None }
+            Mapping { op, ctx: None }
         }
         RoutingEvent::Relocated { .. } => {
             // Check our current status
@@ -217,7 +230,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             if age > MIN_AGE {
                 info!("Relocated, our Age: {:?}", age);
             }
-            Mapping::Ok {
+            Mapping {
                 op: NodeDuty::NoOp,
                 ctx: None,
             }
@@ -226,7 +239,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             remaining,
             added,
             removed,
-        } => Mapping::Ok {
+        } => Mapping {
             op: NodeDuty::AdultsChanged {
                 remaining,
                 added,
@@ -235,7 +248,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             ctx: None,
         },
         // Ignore all other events
-        _ => Mapping::Ok {
+        _ => Mapping {
             op: NodeDuty::NoOp,
             ctx: None,
         },

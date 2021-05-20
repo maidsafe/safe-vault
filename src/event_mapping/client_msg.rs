@@ -23,12 +23,12 @@ pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
         ClientMsg::Process(process_msg) => {
             let op = map_client_process_msg(process_msg.clone(), user);
 
-            let ctx = Some(MsgContext::Msg {
+            let ctx = Some(MsgContext {
                 msg: Msg::Client(msg.clone()),
                 src: SrcLocation::EndUser(user),
             });
 
-            Mapping::Ok { op, ctx }
+            Mapping { op, ctx }
         }
         ClientMsg::ProcessingError(error) => {
             warn!(
@@ -36,7 +36,7 @@ pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
                 error
             );
 
-            Mapping::Ok {
+            Mapping {
                 op: NodeDuty::NoOp,
                 ctx: None,
             }
@@ -47,7 +47,7 @@ pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
                 msg
             );
 
-            Mapping::Ok {
+            Mapping {
                 op: NodeDuty::NoOp,
                 ctx: None,
             }

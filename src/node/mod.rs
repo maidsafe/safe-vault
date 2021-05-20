@@ -13,7 +13,6 @@ mod messaging;
 mod role;
 mod split;
 
-use crate::event_mapping::Mapping;
 use crate::{
     chunk_store::UsedSpace,
     chunks::Chunks,
@@ -28,10 +27,7 @@ use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
-use sn_messaging::{
-    client::{ClientMsg, Error as ErrorMessage, ProcessingError},
-    MessageId, Msg,
-};
+use sn_messaging::{client::ClientMsg, Msg};
 use sn_routing::{
     EventStream, {Prefix, XorName},
 };
@@ -126,15 +122,8 @@ impl Node {
     pub async fn run(&mut self) -> Result<()> {
         while let Some(event) = self.network_events.next().await {
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
-            match map_routing_event(event, &self.network_api).await {
-                Mapping::Ok { op, ctx } => self.process_while_any(op, ctx).await,
-                Mapping::Error(error) => {
-                    let duties = try_handle_error(error.error, Some(error.msg));
-                    for duty in duties {
-                        self.process_while_any(duty, None).await;
-                    }
-                }
-            }
+            let mapping = map_routing_event(event, &self.network_api).await;
+            self.process_while_any(mapping.op, mapping.ctx).await;
         }
 
         Ok(())
@@ -150,8 +139,9 @@ impl Node {
                 match self.handle(duty).await {
                     Ok(new_ops) => pending_node_ops.extend(new_ops),
                     Err(e) => {
-                        let new_op = try_handle_error(e, ctx.clone());
-                        pending_node_ops.extend(new_op)
+                        if let Some(new_op) = try_handle_error(e, ctx.clone()) {
+                            pending_node_ops.push(new_op)
+                        }
                     }
                 };
             }
@@ -160,50 +150,33 @@ impl Node {
     }
 }
 
-fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Vec<NodeDuty> {
+fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> Option<NodeDuty> {
     use std::error::Error;
     warn!("Error being handled by node: {:?}", err);
     if let Some(source) = err.source() {
         warn!("Source: {:?}", source);
     }
-    let op = match ctx {
+
+    match ctx {
         None => {
             error!(
                     "Erroring when processing a message without a msg context, we cannot report it to the sender: {:?}", err
                 );
-            return vec![];
+            None
         }
-        Some(MsgContext::Msg { msg, src }) => {
+        Some(MsgContext { msg, src }) => {
             warn!("Sending in response to a message: {:?}", msg);
             match msg {
-                Msg::Client(ClientMsg::Process(msg)) => NodeDuty::SendError(OutgoingLazyError {
-                    msg: msg.create_processing_error(Some(convert_to_error_message(err))),
-                    dst: src.to_dst(),
-                }),
-                _ => NodeDuty::NoOp,
+                Msg::Client(ClientMsg::Process(msg)) => {
+                    Some(NodeDuty::SendError(OutgoingLazyError {
+                        msg: msg.create_processing_error(Some(convert_to_error_message(err))),
+                        dst: src.to_dst(),
+                    }))
+                }
+                _ => None,
             }
         }
-        Some(MsgContext::Bytes { msg, src }) => {
-            // We generate a message id here since we cannot
-            // retrieve the message id from the message received
-            let msg_id = MessageId::from_content(&msg).unwrap_or_else(|_| MessageId::new());
-
-            warn!("Error decoding msg bytes, sent from {:?}", src);
-
-            NodeDuty::SendError(OutgoingLazyError {
-                msg: ProcessingError::new(
-                    Some(ErrorMessage::Serialization(
-                        "Could not deserialize Message at node".to_string(),
-                    )),
-                    None,
-                    msg_id,
-                ),
-                dst: src.to_dst(),
-            })
-        }
-    };
-
-    vec![op]
+    }
 }
 
 impl Display for Node {
