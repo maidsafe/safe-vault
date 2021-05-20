@@ -216,13 +216,13 @@ pub enum NodeDuty {
     /// Process read of data
     ProcessRead {
         query: sn_messaging::client::DataQuery,
-        id: MessageId,
+        msg_id: MessageId,
         origin: EndUser,
     },
     /// Process write of data
     ProcessWrite {
         cmd: sn_messaging::client::DataCmd,
-        id: MessageId,
+        msg_id: MessageId,
         origin: EndUser,
     },
     /// Process Payment for a DataCmd
@@ -234,7 +234,7 @@ pub enum NodeDuty {
     /// This is run at an Adult (the new holder).
     ReplicateChunk {
         data: Blob,
-        id: MessageId,
+        msg_id: MessageId,
     },
     /// Create proposals to vote unresponsive nodes as offline
     ProposeOffline(Vec<XorName>),

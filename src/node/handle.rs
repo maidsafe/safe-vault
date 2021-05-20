@@ -326,7 +326,11 @@ impl Node {
             }
             //
             // ------- Data ------------
-            NodeDuty::ProcessRead { query, id, origin } => {
+            NodeDuty::ProcessRead {
+                query,
+                msg_id,
+                origin,
+            } => {
                 // TODO: remove this conditional branching
                 // routing should take care of this
                 let data_section_addr = query.dst_address();
@@ -337,12 +341,12 @@ impl Node {
                     .matches(&data_section_addr)
                 {
                     let elder = self.role.as_elder_mut()?;
-                    Ok(vec![elder.meta_data.read(query, id, origin).await?])
+                    Ok(vec![elder.meta_data.read(query, msg_id, origin).await?])
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
                         msg: MsgType::Node(NodeMsg::NodeQuery {
                             query: NodeQuery::Metadata { query, origin },
-                            id,
+                            id: msg_id,
                         }),
                         dst: DstLocation::Section(data_section_addr),
                         section_source: false,
@@ -350,9 +354,13 @@ impl Node {
                     })])
                 }
             }
-            NodeDuty::ProcessWrite { cmd, id, origin } => {
+            NodeDuty::ProcessWrite {
+                cmd,
+                msg_id,
+                origin,
+            } => {
                 let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.meta_data.write(cmd, id, origin).await?])
+                Ok(vec![elder.meta_data.write(cmd, msg_id, origin).await?])
             }
             // --- Completion of Adult operations ---
             NodeDuty::RecordAdultWriteLiveness {
@@ -381,9 +389,11 @@ impl Node {
                 let elder = self.role.as_elder_mut()?;
                 Ok(elder.transfers.process_payment(&msg, origin).await?)
             }
-            NodeDuty::ReplicateChunk { data, id } => {
+            NodeDuty::ReplicateChunk { data, msg_id } => {
                 let adult = self.role.as_adult_mut()?;
-                Ok(vec![adult.chunks.store_for_replication(data, id).await?])
+                Ok(vec![
+                    adult.chunks.store_for_replication(data, msg_id).await?,
+                ])
             }
             NodeDuty::NoOp => Ok(vec![]),
         }

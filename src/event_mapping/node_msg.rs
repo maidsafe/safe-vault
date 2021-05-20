@@ -6,12 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::Mapping;
 use crate::{
     error::convert_to_error_message,
     event_mapping::MsgContext,
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error,
 };
+use log::debug;
 use sn_messaging::{
     node::{
         NodeCmd, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery, NodeQueryResponse,
@@ -20,14 +22,18 @@ use sn_messaging::{
     Aggregation, DstLocation, MessageId, Msg, SrcLocation,
 };
 
-use super::Mapping;
+pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
+    debug!(
+        "Handling Node message received event with id {}: {:?}",
+        msg.id(),
+        msg
+    );
 
-pub fn map_node_msg(msg: &NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
     match &dst {
-        DstLocation::Section(_name) | DstLocation::Node(_name) => Mapping::Ok {
-            op: match_node_msg(msg, src),
+        DstLocation::Section(_) | DstLocation::Node(_) => Mapping::Ok {
+            op: match_node_msg(msg.clone(), src),
             ctx: Some(MsgContext::Msg {
-                msg: Msg::Node(msg.clone()),
+                msg: Msg::Node(msg),
                 src,
             }),
         },
@@ -37,6 +43,7 @@ pub fn map_node_msg(msg: &NodeMsg, src: SrcLocation, dst: DstLocation) -> Mappin
                 msg_id,
                 format!("Invalid dst: {:?}", msg),
             ));
+
             if let SrcLocation::EndUser(_) = src {
                 log::error!("Logic error! EndUser cannot send NodeMsgs. ({:?})", msg);
                 return Mapping::Ok {
@@ -44,6 +51,7 @@ pub fn map_node_msg(msg: &NodeMsg, src: SrcLocation, dst: DstLocation) -> Mappin
                     ctx: None,
                 };
             }
+
             Mapping::Ok {
                 op: NodeDuty::Send(OutgoingMsg {
                     msg: MsgType::Node(NodeMsg::NodeMsgError {
@@ -56,7 +64,7 @@ pub fn map_node_msg(msg: &NodeMsg, src: SrcLocation, dst: DstLocation) -> Mappin
                     aggregation: Aggregation::AtDestination,
                 }),
                 ctx: Some(MsgContext::Msg {
-                    msg: Msg::Node(msg.clone()),
+                    msg: Msg::Node(msg),
                     src,
                 }),
             }
@@ -64,14 +72,14 @@ pub fn map_node_msg(msg: &NodeMsg, src: SrcLocation, dst: DstLocation) -> Mappin
     }
 }
 
-fn match_node_msg(msg: &NodeMsg, origin: SrcLocation) -> NodeDuty {
+fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
     match msg {
         // ------ wallet register ------
         NodeMsg::NodeCmd {
-            cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet)),
+            cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(wallet_id)),
             ..
         } => NodeDuty::SetNodeWallet {
-            wallet_id: *wallet,
+            wallet_id,
             node_id: origin.name(),
         },
         // Churn synch
@@ -84,26 +92,26 @@ fn match_node_msg(msg: &NodeMsg, origin: SrcLocation) -> NodeDuty {
                 }),
             ..
         } => NodeDuty::SynchState {
-            node_rewards: node_rewards.to_owned(),
-            user_wallets: user_wallets.to_owned(),
-            metadata: metadata.to_owned(),
+            node_rewards,
+            user_wallets,
+            metadata,
         },
         NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ProposeRewardPayout(proposal)),
             ..
-        } => NodeDuty::ReceiveRewardProposal(proposal.clone()),
+        } => NodeDuty::ReceiveRewardProposal(proposal),
         NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::AccumulateRewardPayout(accumulation)),
             ..
-        } => NodeDuty::ReceiveRewardAccumulation(accumulation.clone()),
+        } => NodeDuty::ReceiveRewardAccumulation(accumulation),
         // ------ section funds -----
         NodeMsg::NodeQuery {
             query: NodeQuery::Rewards(NodeRewardQuery::GetNodeWalletKey(node_name)),
             id,
             ..
         } => NodeDuty::GetNodeWalletKey {
-            node_name: *node_name,
-            msg_id: *id,
+            node_name,
+            msg_id: id,
             origin,
         },
         //
@@ -113,8 +121,8 @@ fn match_node_msg(msg: &NodeMsg, origin: SrcLocation) -> NodeDuty {
             id,
             ..
         } => NodeDuty::PropagateTransfer {
-            proof: proof.to_owned(),
-            msg_id: *id,
+            proof,
+            msg_id: id,
             origin,
         },
         // ------ metadata ------
@@ -123,18 +131,18 @@ fn match_node_msg(msg: &NodeMsg, origin: SrcLocation) -> NodeDuty {
             id,
             ..
         } => NodeDuty::ProcessRead {
-            query: query.clone(),
-            id: *id,
-            origin: *origin,
+            query,
+            msg_id: id,
+            origin,
         },
         NodeMsg::NodeCmd {
             cmd: NodeCmd::Metadata { cmd, origin },
             id,
             ..
         } => NodeDuty::ProcessWrite {
-            cmd: cmd.clone(),
-            id: *id,
-            origin: *origin,
+            cmd,
+            msg_id: id,
+            origin,
         },
         //
         // ------ Adult ------
@@ -143,66 +151,57 @@ fn match_node_msg(msg: &NodeMsg, origin: SrcLocation) -> NodeDuty {
             id,
             ..
         } => NodeDuty::ReadChunk {
-            read: query.clone(),
-            msg_id: *id,
+            read: query,
+            msg_id: id,
         },
         NodeMsg::NodeCmd {
             cmd: NodeCmd::Chunks { cmd, origin },
             id,
             ..
         } => NodeDuty::WriteChunk {
-            write: cmd.clone(),
-            msg_id: *id,
-            origin: *origin,
+            write: cmd,
+            msg_id: id,
+            origin,
         },
         // this cmd is accumulated, thus has authority
         NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
             id,
-        } => NodeDuty::ReplicateChunk {
-            data: data.clone(),
-            id: *id,
-        },
+        } => NodeDuty::ReplicateChunk { data, msg_id: id },
         NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(data)),
             id,
         } => NodeDuty::ProcessRepublish {
-            chunk: data.clone(),
-            msg_id: *id,
+            chunk: data,
+            msg_id: id,
         },
         // Aggregated by us, for security
         NodeMsg::NodeQuery {
             query: NodeQuery::System(NodeSystemQuery::GetSectionElders),
             id,
             ..
-        } => NodeDuty::GetSectionElders {
-            msg_id: *id,
-            origin,
-        },
+        } => NodeDuty::GetSectionElders { msg_id: id, origin },
         //
         // ------ system cmd ------
         NodeMsg::NodeCmd {
             cmd: NodeCmd::System(NodeSystemCmd::StorageFull { node_id, .. }),
             ..
-        } => NodeDuty::IncrementFullNodeCount { node_id: *node_id },
+        } => NodeDuty::IncrementFullNodeCount { node_id },
         //
         // ------ transfers ------
         NodeMsg::NodeQuery {
             query: NodeQuery::Transfers(NodeTransferQuery::GetReplicaEvents),
             id,
             ..
-        } => NodeDuty::GetTransferReplicaEvents {
-            msg_id: *id,
-            origin,
-        },
+        } => NodeDuty::GetTransferReplicaEvents { msg_id: id, origin },
         // --- Adult Operation response ---
         NodeMsg::NodeEvent {
             event: NodeEvent::ChunkWriteHandled(result),
             correlation_id,
             ..
         } => NodeDuty::RecordAdultWriteLiveness {
-            result: result.clone(),
-            correlation_id: *correlation_id,
+            result,
+            correlation_id,
             src: origin.name(),
         },
         NodeMsg::NodeQueryResponse {
@@ -210,8 +209,8 @@ fn match_node_msg(msg: &NodeMsg, origin: SrcLocation) -> NodeDuty {
             correlation_id,
             ..
         } => NodeDuty::RecordAdultReadLiveness {
-            response: sn_messaging::client::QueryResponse::GetBlob(res.clone()),
-            correlation_id: *correlation_id,
+            response: sn_messaging::client::QueryResponse::GetBlob(res),
+            correlation_id,
             src: origin.name(),
         },
         _ => {

@@ -14,7 +14,7 @@ use client_msg::map_client_msg;
 use log::{debug, error, info, trace, warn};
 use node_msg::map_node_msg;
 use sn_data_types::PublicKey;
-use sn_messaging::{client::ClientMsg, Msg, SrcLocation};
+use sn_messaging::{Msg, SrcLocation};
 use sn_routing::XorName;
 use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
 use std::{thread::sleep, time::Duration};
@@ -48,7 +48,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
             content, src, dst, ..
         } => match Msg::from(content.clone()) {
             Ok(msg) => match msg {
-                Msg::Node(msg) => map_node_msg(&msg, src, dst),
+                Msg::Node(msg) => map_node_msg(msg, src, dst),
                 Msg::Client(msg) => {
                     warn!(
                         "Unexpected ClientMsg at RoutingEvent::MessageReceived {:?}",
@@ -67,39 +67,7 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
                 })
             }
         },
-        RoutingEvent::ClientMsgReceived { msg, user } => match *msg {
-            ClientMsg::Process(process_msg) => {
-                let op = map_client_msg(process_msg.clone(), user);
-                let ctx = Some(MsgContext::Msg {
-                    msg: Msg::Client(ClientMsg::Process(process_msg)),
-                    src: SrcLocation::EndUser(user),
-                });
-
-                Mapping::Ok { op, ctx }
-            }
-            ClientMsg::ProcessingError(error) => {
-                warn!(
-                    "A node should never receive a ClientMsg::ProcessingError {:?}",
-                    error
-                );
-
-                Mapping::Ok {
-                    op: NodeDuty::NoOp,
-                    ctx: None,
-                }
-            }
-            ClientMsg::SupportingInfo(msg) => {
-                warn!(
-                    "A node should never receive a ClientMsg::SupportingInfo {:?}",
-                    msg
-                );
-
-                Mapping::Ok {
-                    op: NodeDuty::NoOp,
-                    ctx: None,
-                }
-            }
-        },
+        RoutingEvent::ClientMsgReceived { msg, user } => map_client_msg(&msg, user),
         RoutingEvent::SectionSplit {
             elders,
             sibling_elders,
