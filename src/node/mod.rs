@@ -19,7 +19,7 @@ use crate::{
     error::convert_to_error_message,
     event_mapping::{map_routing_event, MsgContext},
     network::Network,
-    node_ops::{NodeDuty, OutgoingLazyError},
+    node_ops::{MsgType, NodeDuty, OutgoingLazyError},
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
@@ -27,7 +27,7 @@ use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
-use sn_messaging::{client::ClientMsg, Msg};
+use sn_messaging::client::ClientMsg;
 use sn_routing::{
     EventStream, {Prefix, XorName},
 };
@@ -163,10 +163,12 @@ fn try_handle_error(err: Error, ctx: Option<MsgContext>) -> NodeDuty {
         Some(MsgContext { msg, src }) => {
             warn!("Sending in response to a message: {:?}", msg);
             match msg {
-                Msg::Client(ClientMsg::Process(msg)) => NodeDuty::SendError(OutgoingLazyError {
-                    msg: msg.create_processing_error(Some(convert_to_error_message(err))),
-                    dst: src.to_dst(),
-                }),
+                MsgType::Client(ClientMsg::Process(msg)) => {
+                    NodeDuty::SendError(OutgoingLazyError {
+                        msg: msg.create_processing_error(Some(convert_to_error_message(err))),
+                        dst: src.to_dst(),
+                    })
+                }
                 _ => NodeDuty::NoOp,
             }
         }

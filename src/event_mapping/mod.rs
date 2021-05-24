@@ -11,7 +11,7 @@ mod node_msg;
 
 use crate::{
     network::Network,
-    node_ops::{NodeDuty, OutgoingLazyError},
+    node_ops::{MsgType, NodeDuty, OutgoingLazyError},
 };
 use client_msg::map_client_msg;
 use log::{debug, error, info, trace, warn};
@@ -19,7 +19,8 @@ use node_msg::map_node_msg;
 use sn_data_types::PublicKey;
 use sn_messaging::{
     client::{Error as ErrorMessage, ProcessingError},
-    MessageId, Msg, SrcLocation,
+    node::NodeMsg,
+    MessageId, SrcLocation,
 };
 use sn_routing::XorName;
 use sn_routing::{Event as RoutingEvent, NodeElderChange, MIN_AGE};
@@ -33,7 +34,7 @@ pub struct Mapping {
 
 #[derive(Debug, Clone)]
 pub struct MsgContext {
-    pub msg: Msg,
+    pub msg: MsgType,
     pub src: SrcLocation,
 }
 
@@ -43,26 +44,14 @@ pub async fn map_routing_event(event: RoutingEvent, network_api: &Network) -> Ma
     match event {
         RoutingEvent::MessageReceived {
             content, src, dst, ..
-        } => match Msg::from(content.clone()) {
-            Ok(msg) => match msg {
-                Msg::Node(msg) => map_node_msg(msg, src, dst),
-                Msg::Client(msg) => {
-                    warn!(
-                        "Unexpected ClientMsg at RoutingEvent::MessageReceived {:?}",
-                        msg
-                    );
-                    return Mapping {
-                        op: NodeDuty::NoOp,
-                        ctx: None,
-                    };
-                }
-            },
+        } => match NodeMsg::from(content) {
+            Ok(msg) => map_node_msg(msg, src, dst),
             Err(error) => {
                 warn!("Error decoding msg bytes, sent from {:?}", src);
 
-                // We generate a message id here since we cannot
+                // We generate a random message id here since we cannot
                 // retrieve the message id from the message received
-                let msg_id = MessageId::from_content(&content).unwrap_or_else(|_| MessageId::new());
+                let msg_id = MessageId::new();
 
                 Mapping {
                     op: NodeDuty::SendError(OutgoingLazyError {

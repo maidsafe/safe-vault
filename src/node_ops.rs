@@ -19,7 +19,7 @@ use sn_messaging::{
         ProcessingError, QueryResponse, SupportingInfo,
     },
     node::NodeMsg,
-    Aggregation, DstLocation, EndUser, MessageId, Msg, SrcLocation,
+    Aggregation, DstLocation, EndUser, MessageId, SrcLocation,
 };
 use sn_routing::Prefix;
 use std::{
@@ -340,22 +340,6 @@ pub struct OutgoingMsg {
 pub enum MsgType {
     Node(NodeMsg),
     Client(ClientMsg),
-}
-
-impl MsgType {
-    pub fn id(&self) -> MessageId {
-        match self {
-            Self::Node(msg) => msg.id(),
-            Self::Client(msg) => msg.id(),
-        }
-    }
-
-    pub fn convert(msg: MsgType) -> Msg {
-        match msg {
-            Self::Client(msg) => Msg::Client(msg),
-            Self::Node(msg) => Msg::Node(msg),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
