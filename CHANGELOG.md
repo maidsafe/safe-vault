@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.44.0](https://github.com/maidsafe/sn_node/compare/v0.43.6...v0.44.0) (2021-05-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **client-msgs:** using a non-backward compatible version of sn_messaging
+
+### Features
+
+* **client-msgs:** adapt to changes to client messages to receive client signature in each message ([0432987](https://github.com/maidsafe/sn_node/commit/043298714e70919fde269c462fcb009b6ef4cdd3))
+
 ### [0.43.6](https://github.com/maidsafe/sn_node/compare/v0.43.5...v0.43.6) (2021-05-22)
 
 ### [0.43.5](https://github.com/maidsafe/sn_node/compare/v0.43.4...v0.43.5) (2021-05-21)
