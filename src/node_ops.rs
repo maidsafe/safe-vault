@@ -12,7 +12,7 @@ use sn_data_types::{
     ActorHistory, Blob, CreditAgreementProof, NodeAge, PublicKey, RewardAccumulation,
     RewardProposal, SignedTransfer, TransferAgreementProof,
 };
-use sn_messaging::client::{ClientMsg, CmdError};
+use sn_messaging::client::ClientMsg;
 use sn_messaging::{
     client::{
         BlobRead, BlobWrite, ClientSigned, DataCmd, DataExchange, DataQuery, ProcessMsg,
@@ -95,13 +95,6 @@ pub enum NodeDuty {
     ProcessRepublish {
         chunk: Blob,
         msg_id: MessageId,
-    },
-    /// Run at data-section Elders on receiving the result of
-    /// write operations from Adults
-    RecordAdultWriteLiveness {
-        result: Result<(), CmdError>,
-        correlation_id: MessageId,
-        src: XorName,
     },
     /// Run at data-section Elders on receiving the result of
     /// read operations from Adults
@@ -271,15 +264,6 @@ impl Debug for NodeDuty {
             Self::ReadChunk { .. } => write!(f, "ReadChunk"),
             Self::WriteChunk { .. } => write!(f, "WriteChunk"),
             Self::ProcessRepublish { .. } => write!(f, "ProcessRepublish"),
-            Self::RecordAdultWriteLiveness {
-                correlation_id,
-                result,
-                src,
-            } => write!(
-                f,
-                "RecordAdultWriteLiveness {{ correlation_id: {}, result: {:?}, src: {} }}",
-                correlation_id, result, src
-            ),
             Self::RecordAdultReadLiveness {
                 correlation_id,
                 response,

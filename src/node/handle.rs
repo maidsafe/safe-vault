@@ -393,17 +393,6 @@ impl Node {
                 ])
             }
             // --- Completion of Adult operations ---
-            NodeDuty::RecordAdultWriteLiveness {
-                correlation_id,
-                result,
-                src,
-            } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(elder
-                    .meta_data
-                    .record_adult_write_liveness(correlation_id, result, src)
-                    .await)
-            }
             NodeDuty::RecordAdultReadLiveness {
                 response,
                 correlation_id,
@@ -432,11 +421,9 @@ impl Node {
                     .await?)
             }
             NodeDuty::ProcessDataPayment { .. } => Ok(vec![]),
-            NodeDuty::ReplicateChunk { data, msg_id } => {
+            NodeDuty::ReplicateChunk { data, .. } => {
                 let adult = self.role.as_adult_mut()?;
-                Ok(vec![
-                    adult.chunks.store_for_replication(data, msg_id).await?,
-                ])
+                Ok(vec![adult.chunks.store_for_replication(data).await?])
             }
             NodeDuty::NoOp => Ok(vec![]),
         }

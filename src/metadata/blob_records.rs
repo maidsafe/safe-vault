@@ -12,7 +12,7 @@ use crate::{
     node_ops::{NodeDuties, NodeDuty},
     Error, Result,
 };
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use sn_data_types::{Blob, BlobAddress, PublicKey};
 use sn_messaging::{
     client::{BlobDataExchange, BlobRead, BlobWrite, ClientSigned, CmdError, QueryResponse},
@@ -180,32 +180,20 @@ impl BlobRecords {
                 .await;
         }
 
-        let blob_address = *data.address();
         let blob_write = BlobWrite::New(data);
 
-        if self
-            .adult_liveness
-            .new_write(msg_id, Some(origin), blob_address, &target_holders)
-        {
-            Ok(NodeDuty::SendToNodes {
-                targets: target_holders,
-                msg: NodeMsg::NodeCmd {
-                    cmd: NodeCmd::Chunks {
-                        cmd: blob_write,
-                        client_signed,
-                        origin,
-                    },
-                    id: msg_id,
+        Ok(NodeDuty::SendToNodes {
+            targets: target_holders,
+            msg: NodeMsg::NodeCmd {
+                cmd: NodeCmd::Chunks {
+                    cmd: blob_write,
+                    client_signed,
+                    origin,
                 },
-                aggregation: Aggregation::AtDestination,
-            })
-        } else {
-            info!(
-                "Operation with MessageId {:?} is already in progress",
-                msg_id
-            );
-            Ok(NodeDuty::NoOp)
-        }
+                id: msg_id,
+            },
+            aggregation: Aggregation::AtDestination,
+        })
     }
 
     async fn store(
@@ -223,48 +211,6 @@ impl BlobRecords {
             .await
     }
 
-    pub async fn record_adult_write_liveness(
-        &mut self,
-        correlation_id: MessageId,
-        result: Result<(), CmdError>,
-        src: XorName,
-    ) -> NodeDuties {
-        let mut duties = vec![];
-        if let Some((address, origin)) = self
-            .adult_liveness
-            .record_adult_write_liveness(correlation_id, src)
-        {
-            if let Err(error) = result {
-                error!("Error at Adult while performing a BlobWrite: {:?}", &error);
-                // Depending on error, we might have to take action here.
-                if let Some(end_user) = origin {
-                    duties.push(NodeDuty::Send(build_client_error_response(
-                        error,
-                        correlation_id,
-                        end_user,
-                    )))
-                }
-            } else {
-                info!(
-                    "AdultWrite operation at {:?} MessageId {:?} at {:?} was successful",
-                    address, correlation_id, src
-                );
-            }
-        }
-        let mut unresponsive_adults = Vec::new();
-        for (name, count) in self.adult_liveness.find_unresponsive_adults() {
-            warn!(
-                "Adult {} has {} pending ops. It might be unresponsive",
-                name, count
-            );
-            unresponsive_adults.push(name);
-        }
-        if !unresponsive_adults.is_empty() {
-            duties.push(NodeDuty::ProposeOffline(unresponsive_adults))
-        }
-        duties
-    }
-
     pub async fn record_adult_read_liveness(
         &mut self,
         correlation_id: MessageId,
@@ -278,10 +224,11 @@ impl BlobRecords {
             )));
         }
         let mut duties = vec![];
-        if let Some((_address, end_user)) = self
-            .adult_liveness
-            .record_adult_read_liveness(correlation_id, src)
-        {
+        if let Some((_address, end_user)) = self.adult_liveness.record_adult_read_liveness(
+            correlation_id,
+            src,
+            response.is_success(),
+        ) {
             return Ok(vec![NodeDuty::Send(build_client_query_response(
                 response,
                 correlation_id,
@@ -326,30 +273,19 @@ impl BlobRecords {
         let targets = self.get_holders_for_chunk(address.name()).await;
         let targets = targets.iter().cloned().collect::<BTreeSet<_>>();
 
-        if self
-            .adult_liveness
-            .new_write(msg_id, Some(origin), address, &targets)
-        {
-            let msg = NodeMsg::NodeCmd {
-                cmd: NodeCmd::Chunks {
-                    cmd: BlobWrite::DeletePrivate(address),
-                    client_signed,
-                    origin,
-                },
-                id: msg_id,
-            };
-            Ok(NodeDuty::SendToNodes {
-                msg,
-                targets,
-                aggregation: Aggregation::AtDestination,
-            })
-        } else {
-            info!(
-                "Operation with MessageId {:?} is already in progress",
-                msg_id
-            );
-            Ok(NodeDuty::NoOp)
-        }
+        let msg = NodeMsg::NodeCmd {
+            cmd: NodeCmd::Chunks {
+                cmd: BlobWrite::DeletePrivate(address),
+                client_signed,
+                origin,
+            },
+            id: msg_id,
+        };
+        Ok(NodeDuty::SendToNodes {
+            msg,
+            targets,
+            aggregation: Aggregation::AtDestination,
+        })
     }
 
     pub(super) async fn republish_chunk(&mut self, data: Blob) -> Result<NodeDuty> {
@@ -371,22 +307,14 @@ impl BlobRecords {
             msg_id
         );
 
-        if self
-            .adult_liveness
-            .new_write(msg_id, None, *data.address(), &target_holders)
-        {
-            Ok(NodeDuty::SendToNodes {
-                targets: target_holders,
-                msg: NodeMsg::NodeCmd {
-                    cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
-                    id: msg_id,
-                },
-                aggregation: Aggregation::None,
-            })
-        } else {
-            info!("Skipping chunk republish since it's already in progress");
-            Ok(NodeDuty::NoOp)
-        }
+        Ok(NodeDuty::SendToNodes {
+            targets: target_holders,
+            msg: NodeMsg::NodeCmd {
+                cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
+                id: msg_id,
+            },
+            aggregation: Aggregation::None,
+        })
     }
 
     pub(super) async fn read(
