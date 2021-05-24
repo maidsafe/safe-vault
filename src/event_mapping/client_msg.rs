@@ -21,6 +21,7 @@ use sn_messaging::{
 pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
     match msg {
         ClientMsg::Process(process_msg) => {
+            // FIXME: ******** validate client signature!!!! *********
             let op = map_client_process_msg(process_msg.clone(), user);
 
             let ctx = Some(MsgContext {
@@ -61,10 +62,12 @@ fn map_client_process_msg(process_msg: ProcessMsg, origin: EndUser) -> NodeDuty 
     match process_msg {
         ProcessMsg::Query {
             query: Query::Data(query),
+            client_signed,
             ..
         } => NodeDuty::ProcessRead {
             query,
             msg_id,
+            client_signed,
             origin,
         },
         ProcessMsg::Cmd {
@@ -94,7 +97,11 @@ fn map_client_process_msg(process_msg: ProcessMsg, origin: EndUser) -> NodeDuty 
         ProcessMsg::Cmd {
             cmd: Cmd::Transfer(TransferCmd::RegisterTransfer(proof)),
             ..
-        } => NodeDuty::RegisterTransfer { proof, msg_id },
+        } => NodeDuty::RegisterTransfer {
+            proof,
+            origin: SrcLocation::EndUser(origin),
+            msg_id,
+        },
         // TODO: Map more transfer queries
         ProcessMsg::Query {
             query: Query::Transfer(TransferQuery::GetHistory { at, since_version }),

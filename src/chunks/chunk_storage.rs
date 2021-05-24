@@ -14,11 +14,11 @@ use crate::{
     Error, Result,
 };
 use log::{error, info};
-use sn_data_types::{Blob, BlobAddress, DataAddress};
+use sn_data_types::{Blob, BlobAddress, DataAddress, PublicKey};
 use sn_messaging::{
     client::{CmdError, Error as ErrorMessage},
     node::{NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQueryResponse},
-    Aggregation, DstLocation, EndUser, MessageId,
+    Aggregation, DstLocation, MessageId,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -121,7 +121,7 @@ impl ChunkStorage {
         &mut self,
         address: BlobAddress,
         msg_id: MessageId,
-        origin: EndUser,
+        requester: PublicKey,
     ) -> Result<NodeDuty> {
         if !self.chunks.has(&address) {
             info!("{}: Immutable chunk doesn't exist: {:?}", self, address);
@@ -130,12 +130,12 @@ impl ChunkStorage {
 
         let result = match self.chunks.get(&address) {
             Ok(Blob::Private(data)) => {
-                if data.owner() == origin.id() {
+                if data.owner() == &requester {
                     self.delete_chunk(&address)
                         .await
                         .map_err(|_error| ErrorMessage::FailedToDelete)
                 } else {
-                    Err(ErrorMessage::InvalidOwners(*origin.id()))
+                    Err(ErrorMessage::InvalidOwners(requester))
                 }
             }
             Ok(_) => {

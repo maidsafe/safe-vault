@@ -18,17 +18,20 @@ use crate::{
     Error, Node, Result,
 };
 use log::{debug, info};
-use sn_messaging::node::NodeMsg;
-use sn_messaging::{node::NodeQuery, Aggregation, DstLocation, MessageId};
+use sn_messaging::{
+    client::{Cmd, ProcessMsg},
+    node::{NodeMsg, NodeQuery},
+    Aggregation, DstLocation, MessageId,
+};
 use sn_routing::ELDER_SIZE;
 use xor_name::XorName;
 
 impl Node {
-    ///
-    pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
+    pub(crate) async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
         if !matches!(duty, NodeDuty::NoOp) {
             debug!("Handling NodeDuty: {:?}", duty);
         }
+
         match duty {
             NodeDuty::Genesis => {
                 self.level_up().await?;
@@ -263,9 +266,15 @@ impl Node {
                 let elder = self.role.as_elder_mut()?;
                 Ok(elder.transfers.get_store_cost(bytes, msg_id, origin).await)
             }
-            NodeDuty::RegisterTransfer { proof, msg_id } => {
+            NodeDuty::RegisterTransfer {
+                proof,
+                msg_id,
+                origin,
+            } => {
                 let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.transfers.register(&proof, msg_id).await?])
+                Ok(vec![
+                    elder.transfers.register(&proof, msg_id, origin).await?,
+                ])
             }
             //
             // -------- Immutable chunks --------
@@ -278,10 +287,15 @@ impl Node {
             NodeDuty::WriteChunk {
                 write,
                 msg_id,
-                origin,
+                client_signed,
             } => {
                 let adult = self.role.as_adult_mut()?;
-                let mut ops = vec![adult.chunks.write(&write, msg_id, origin).await?];
+                let mut ops = vec![
+                    adult
+                        .chunks
+                        .write(&write, msg_id, client_signed.public_key)
+                        .await?,
+                ];
                 ops.extend(adult.chunks.check_storage().await?);
                 Ok(ops)
             }
@@ -329,6 +343,7 @@ impl Node {
             NodeDuty::ProcessRead {
                 query,
                 msg_id,
+                client_signed,
                 origin,
             } => {
                 // TODO: remove this conditional branching
@@ -341,11 +356,20 @@ impl Node {
                     .matches(&data_section_addr)
                 {
                     let elder = self.role.as_elder_mut()?;
-                    Ok(vec![elder.meta_data.read(query, msg_id, origin).await?])
+                    Ok(vec![
+                        elder
+                            .meta_data
+                            .read(query, msg_id, client_signed.public_key, origin)
+                            .await?,
+                    ])
                 } else {
                     Ok(vec![NodeDuty::Send(OutgoingMsg {
                         msg: MsgType::Node(NodeMsg::NodeQuery {
-                            query: NodeQuery::Metadata { query, origin },
+                            query: NodeQuery::Metadata {
+                                query,
+                                client_signed,
+                                origin,
+                            },
                             id: msg_id,
                         }),
                         dst: DstLocation::Section(data_section_addr),
@@ -358,9 +382,15 @@ impl Node {
                 cmd,
                 msg_id,
                 origin,
+                client_signed,
             } => {
                 let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.meta_data.write(cmd, msg_id, origin).await?])
+                Ok(vec![
+                    elder
+                        .meta_data
+                        .write(cmd, msg_id, client_signed, origin)
+                        .await?,
+                ])
             }
             // --- Completion of Adult operations ---
             NodeDuty::RecordAdultWriteLiveness {
@@ -385,10 +415,23 @@ impl Node {
                     .record_adult_read_liveness(correlation_id, response, src)
                     .await?)
             }
-            NodeDuty::ProcessDataPayment { msg, origin } => {
+            NodeDuty::ProcessDataPayment {
+                msg:
+                    ProcessMsg::Cmd {
+                        id,
+                        cmd: Cmd::Data { payment, cmd },
+                        client_signed,
+                    },
+                origin,
+                ..
+            } => {
                 let elder = self.role.as_elder_mut()?;
-                Ok(elder.transfers.process_payment(&msg, origin).await?)
+                Ok(elder
+                    .transfers
+                    .process_payment(id, payment, cmd, client_signed, origin)
+                    .await?)
             }
+            NodeDuty::ProcessDataPayment { .. } => Ok(vec![]),
             NodeDuty::ReplicateChunk { data, msg_id } => {
                 let adult = self.role.as_adult_mut()?;
                 Ok(vec![

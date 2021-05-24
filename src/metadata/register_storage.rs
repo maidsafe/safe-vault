@@ -12,7 +12,10 @@ use crate::{
     Result,
 };
 use log::info;
-use sn_data_types::register::{Action, Address, Entry, Register, RegisterOp, User};
+use sn_data_types::{
+    register::{Action, Address, Entry, Register, RegisterOp, User},
+    PublicKey,
+};
 use sn_messaging::{
     client::{CmdError, QueryResponse, RegisterRead, RegisterWrite},
     EndUser, MessageId,
@@ -38,18 +41,22 @@ impl RegisterStorage {
         &self,
         read: &RegisterRead,
         msg_id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         use RegisterRead::*;
         match read {
-            Get(address) => self.get(*address, msg_id, origin).await,
-            Read(address) => self.read_register(*address, msg_id, origin).await,
-            GetOwner(address) => self.get_owner(*address, msg_id, origin).await,
-            GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, msg_id, origin)
+            Get(address) => self.get(*address, msg_id, requester, origin).await,
+            Read(address) => {
+                self.read_register(*address, msg_id, requester, origin)
                     .await
             }
-            GetPolicy(address) => self.get_policy(*address, msg_id, origin).await,
+            GetOwner(address) => self.get_owner(*address, msg_id, requester, origin).await,
+            GetUserPermissions { address, user } => {
+                self.get_user_permissions(*address, *user, msg_id, requester, origin)
+                    .await
+            }
+            GetPolicy(address) => self.get_policy(*address, msg_id, requester, origin).await,
         }
     }
 
@@ -57,6 +64,7 @@ impl RegisterStorage {
         &mut self,
         write: RegisterWrite,
         msg_id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         use RegisterWrite::*;
@@ -65,9 +73,9 @@ impl RegisterStorage {
             New(data) => self.store(&data, msg_id, origin).await,
             Edit(operation) => {
                 info!("Editing Register");
-                self.edit(operation, msg_id, origin).await
+                self.edit(operation, msg_id, requester, origin).await
             }
-            Delete(address) => self.delete(address, msg_id, origin).await,
+            Delete(address) => self.delete(address, msg_id, requester, origin).await,
         }
     }
 
@@ -85,8 +93,14 @@ impl RegisterStorage {
         self.ok_or_error(result, msg_id, origin).await
     }
 
-    async fn get(&self, address: Address, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
-        let result = match self.get_chunk(address, Action::Read, origin) {
+    async fn get(
+        &self,
+        address: Address,
+        msg_id: MessageId,
+        requester: PublicKey,
+        origin: EndUser,
+    ) -> Result<NodeDuty> {
+        let result = match self.get_chunk(address, Action::Read, requester) {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)),
         };
@@ -98,9 +112,14 @@ impl RegisterStorage {
         )))
     }
 
-    fn get_chunk(&self, address: Address, action: Action, origin: EndUser) -> Result<Register> {
+    fn get_chunk(
+        &self,
+        address: Address,
+        action: Action,
+        requester: PublicKey,
+    ) -> Result<Register> {
         let data = self.chunks.get(&address)?;
-        data.check_permission(action, Some(*origin.id()))?;
+        data.check_permission(action, Some(requester))?;
         Ok(data)
     }
 
@@ -108,6 +127,7 @@ impl RegisterStorage {
         &mut self,
         address: Address,
         msg_id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self.chunks.get(&address).and_then(|register| {
@@ -119,9 +139,8 @@ impl RegisterStorage {
                 ));
             }
 
-            let public_key = *origin.id();
-            if public_key != register.owner() {
-                Err(Error::InvalidOwners(public_key))
+            if requester != register.owner() {
+                Err(Error::InvalidOwners(requester))
             } else {
                 Ok(())
             }
@@ -137,11 +156,12 @@ impl RegisterStorage {
         &self,
         address: Address,
         msg_id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(address, Action::Read, origin)
-            .and_then(|register| register.read(Some(*origin.id())).map_err(Error::from))
+            .get_chunk(address, Action::Read, requester)
+            .and_then(|register| register.read(Some(requester)).map_err(Error::from))
         {
             Ok(res) => Ok(res),
             Err(error) => Err(convert_to_error_message(error)),
@@ -158,9 +178,10 @@ impl RegisterStorage {
         &self,
         address: Address,
         msg_id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        let result = match self.get_chunk(address, Action::Read, origin) {
+        let result = match self.get_chunk(address, Action::Read, requester) {
             Ok(res) => Ok(res.owner()),
             Err(error) => Err(convert_to_error_message(error)),
         };
@@ -177,13 +198,14 @@ impl RegisterStorage {
         address: Address,
         user: User,
         msg_id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(address, Action::Read, origin)
+            .get_chunk(address, Action::Read, requester)
             .and_then(|register| {
                 register
-                    .permissions(user, Some(*origin.id()))
+                    .permissions(user, Some(requester))
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
@@ -201,13 +223,14 @@ impl RegisterStorage {
         &self,
         address: Address,
         msg_id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let result = match self
-            .get_chunk(address, Action::Read, origin)
+            .get_chunk(address, Action::Read, requester)
             .and_then(|register| {
                 register
-                    .policy(Some(*origin.id()))
+                    .policy(Some(requester))
                     .map(|p| p.clone())
                     .map_err(Error::from)
             }) {
@@ -226,12 +249,13 @@ impl RegisterStorage {
         &mut self,
         write_op: RegisterOp<Entry>,
         msg_id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let address = write_op.address;
         info!("Editing Register chunk");
         let result = self
-            .edit_chunk(address, Action::Write, origin, move |mut register| {
+            .edit_chunk(address, Action::Write, requester, move |mut register| {
                 register.apply_op(write_op)?;
                 Ok(register)
             })
@@ -250,14 +274,14 @@ impl RegisterStorage {
         &mut self,
         address: Address,
         action: Action,
-        origin: EndUser,
+        requester: PublicKey,
         write_fn: F,
     ) -> Result<()>
     where
         F: FnOnce(Register) -> Result<Register>,
     {
         info!("Getting Register chunk for Edit");
-        let result = self.get_chunk(address, action, origin)?;
+        let result = self.get_chunk(address, action, requester)?;
         let sequence = write_fn(result)?;
         info!("Edited Register chunk successfully");
         self.chunks.put(&sequence).await

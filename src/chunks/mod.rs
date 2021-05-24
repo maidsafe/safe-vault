@@ -15,11 +15,11 @@ use crate::{
 };
 use chunk_storage::ChunkStorage;
 use log::info;
-use sn_data_types::{Blob, BlobAddress};
+use sn_data_types::{Blob, BlobAddress, PublicKey};
 use sn_messaging::{
     client::{BlobRead, BlobWrite, CmdError},
     node::{NodeEvent, NodeMsg},
-    Aggregation, DstLocation, EndUser, MessageId,
+    Aggregation, DstLocation, MessageId,
 };
 use std::{
     fmt::{self, Display, Formatter},
@@ -62,13 +62,12 @@ impl Chunks {
         &mut self,
         write: &BlobWrite,
         msg_id: MessageId,
-        origin: EndUser,
+        requester: PublicKey,
     ) -> Result<NodeDuty> {
         match &write {
             BlobWrite::New(data) => self.chunk_storage.store(&data, msg_id).await,
-            // really though, for a delete, what we should be looking at is the origin signature! That would be the source of truth!
             BlobWrite::DeletePrivate(address) => {
-                self.chunk_storage.delete(*address, msg_id, origin).await
+                self.chunk_storage.delete(*address, msg_id, requester).await
             }
         }
     }

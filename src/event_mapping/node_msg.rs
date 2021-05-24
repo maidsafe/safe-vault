@@ -127,23 +127,43 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
         },
         // ------ metadata ------
         NodeMsg::NodeQuery {
-            query: NodeQuery::Metadata { query, origin },
+            query:
+                NodeQuery::Metadata {
+                    query,
+                    client_signed,
+                    origin,
+                },
             id,
             ..
-        } => NodeDuty::ProcessRead {
-            query,
-            msg_id: id,
-            origin,
-        },
+        } => {
+            // FIXME: ******** validate client signature!!!! *********
+
+            NodeDuty::ProcessRead {
+                query,
+                msg_id: id,
+                client_signed,
+                origin,
+            }
+        }
         NodeMsg::NodeCmd {
-            cmd: NodeCmd::Metadata { cmd, origin },
+            cmd:
+                NodeCmd::Metadata {
+                    cmd,
+                    client_signed,
+                    origin,
+                },
             id,
             ..
-        } => NodeDuty::ProcessWrite {
-            cmd,
-            msg_id: id,
-            origin,
-        },
+        } => {
+            // FIXME: ******** validate client signature!!!! *********
+
+            NodeDuty::ProcessWrite {
+                cmd,
+                msg_id: id,
+                client_signed,
+                origin,
+            }
+        }
         //
         // ------ Adult ------
         NodeMsg::NodeQuery {
@@ -155,13 +175,15 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             msg_id: id,
         },
         NodeMsg::NodeCmd {
-            cmd: NodeCmd::Chunks { cmd, origin },
+            cmd: NodeCmd::Chunks {
+                cmd, client_signed, ..
+            },
             id,
             ..
         } => NodeDuty::WriteChunk {
             write: cmd,
             msg_id: id,
-            origin,
+            client_signed,
         },
         // this cmd is accumulated, thus has authority
         NodeMsg::NodeCmd {

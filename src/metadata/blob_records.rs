@@ -15,7 +15,7 @@ use crate::{
 use log::{debug, error, info, warn};
 use sn_data_types::{Blob, BlobAddress, PublicKey};
 use sn_messaging::{
-    client::{BlobDataExchange, BlobRead, BlobWrite, CmdError, QueryResponse},
+    client::{BlobDataExchange, BlobRead, BlobWrite, ClientSigned, CmdError, QueryResponse},
     node::{NodeCmd, NodeMsg, NodeQuery, NodeSystemCmd},
     Aggregation, EndUser, MessageId,
 };
@@ -103,12 +103,13 @@ impl BlobRecords {
         &mut self,
         write: BlobWrite,
         msg_id: MessageId,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         use BlobWrite::*;
         match write {
-            New(data) => self.store(data, msg_id, origin).await,
-            DeletePrivate(address) => self.delete(address, msg_id, origin).await,
+            New(data) => self.store(data, msg_id, client_signed, origin).await,
+            DeletePrivate(address) => self.delete(address, msg_id, client_signed, origin).await,
         }
     }
 
@@ -157,6 +158,7 @@ impl BlobRecords {
         &mut self,
         data: Blob,
         msg_id: MessageId,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let target_holders = self
@@ -190,6 +192,7 @@ impl BlobRecords {
                 msg: NodeMsg::NodeCmd {
                     cmd: NodeCmd::Chunks {
                         cmd: blob_write,
+                        client_signed,
                         origin,
                     },
                     id: msg_id,
@@ -205,12 +208,19 @@ impl BlobRecords {
         }
     }
 
-    async fn store(&mut self, data: Blob, msg_id: MessageId, origin: EndUser) -> Result<NodeDuty> {
-        if let Err(error) = validate_data_owner(&data, &origin) {
+    async fn store(
+        &mut self,
+        data: Blob,
+        msg_id: MessageId,
+        client_signed: ClientSigned,
+        origin: EndUser,
+    ) -> Result<NodeDuty> {
+        if let Err(error) = validate_data_owner(&data, &client_signed.public_key) {
             return self.send_error(error, msg_id, origin).await;
         }
 
-        self.send_chunks_to_adults(data, msg_id, origin).await
+        self.send_chunks_to_adults(data, msg_id, client_signed, origin)
+            .await
     }
 
     pub async fn record_adult_write_liveness(
@@ -310,6 +320,7 @@ impl BlobRecords {
         &mut self,
         address: BlobAddress,
         msg_id: MessageId,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.get_holders_for_chunk(address.name()).await;
@@ -322,6 +333,7 @@ impl BlobRecords {
             let msg = NodeMsg::NodeCmd {
                 cmd: NodeCmd::Chunks {
                     cmd: BlobWrite::DeletePrivate(address),
+                    client_signed,
                     origin,
                 },
                 id: msg_id,
@@ -444,13 +456,13 @@ impl BlobRecords {
     }
 }
 
-fn validate_data_owner(data: &Blob, origin: &EndUser) -> Result<()> {
+fn validate_data_owner(data: &Blob, requester: &PublicKey) -> Result<()> {
     if data.is_private() {
         data.owner()
-            .ok_or_else(|| Error::InvalidOwners(*origin.id()))
+            .ok_or_else(|| Error::InvalidOwners(*requester))
             .and_then(|data_owner| {
-                if data_owner != origin.id() {
-                    Err(Error::InvalidOwners(*origin.id()))
+                if data_owner != requester {
+                    Err(Error::InvalidOwners(*requester))
                 } else {
                     Ok(())
                 }

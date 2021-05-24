@@ -84,6 +84,7 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
     let message = ClientMsg::ProcessingError(msg.msg);
+
     let result = network
         .send_message(itinerary, message.serialize(dst_name, target_section_pk)?)
         .await;
@@ -115,6 +116,7 @@ pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network)
         .ok_or(Error::NoSectionPublicKeyKnown(dst_name))?;
 
     let message = ClientMsg::SupportingInfo(msg.msg);
+
     let result = network
         .send_message(itinerary, message.serialize(dst_name, target_section_pk)?)
         .await;

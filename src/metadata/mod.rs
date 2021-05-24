@@ -29,7 +29,10 @@ use register_storage::RegisterStorage;
 use sequence_storage::SequenceStorage;
 use sn_data_types::{Blob, PublicKey};
 use sn_messaging::{
-    client::{ClientMsg, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg, QueryResponse},
+    client::{
+        ClientMsg, ClientSigned, CmdError, DataCmd, DataExchange, DataQuery, ProcessMsg,
+        QueryResponse,
+    },
     Aggregation, DstLocation, EndUser, MessageId,
 };
 use sn_routing::Prefix;
@@ -74,9 +77,10 @@ impl Metadata {
         &mut self,
         query: DataQuery,
         id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        self.elder_stores.read(query, id, origin).await
+        self.elder_stores.read(query, id, requester, origin).await
     }
 
     pub async fn record_adult_write_liveness(
@@ -115,9 +119,12 @@ impl Metadata {
         &mut self,
         cmd: DataCmd,
         id: MessageId,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        self.elder_stores.write(cmd, id, origin).await
+        self.elder_stores
+            .write(cmd, id, client_signed, origin)
+            .await
     }
 
     /// Adds a given node to the list of full nodes.
@@ -158,8 +165,8 @@ fn build_client_query_response(
 ) -> OutgoingMsg {
     OutgoingMsg {
         msg: MsgType::Client(ClientMsg::Process(ProcessMsg::QueryResponse {
-            response,
             id: MessageId::in_response_to(&msg_id),
+            response,
             correlation_id: msg_id,
         })),
         section_source: false, // strictly this is not correct, but we don't expect responses to a response..

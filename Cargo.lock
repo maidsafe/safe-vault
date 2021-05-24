@@ -2289,9 +2289,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "22.0.1"
+version = "23.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c4e6afc749c456cf4029fe4f6588984d22d12c141fb480f65a9c00f3dae4c9b"
+checksum = "de33bddc2a26db6127554d6bfda149eee433d92fe068d5ffb93575eb57a480ac"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2315,7 +2315,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.43.5"
+version = "0.43.6"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2358,9 +2358,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.68.6"
+version = "0.69.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc6cbc9c546a691eaac978cc29c5c7dbad0e0bb090355a469a48903721832d85"
+checksum = "6c32fd36999938c4dfccaee36835d17a01c244f976926452fdd8390475dc0808"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2578,18 +2578,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.24"
+version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0f4a65597094d4483ddaed134f409b2cb7c1beccf25201a9f73c719254fa98e"
+checksum = "fa6f76457f59514c7eeb4e59d891395fab0b2fd1d40723ae737d64153392e9c6"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.24"
+version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7765189610d8241a44529806d6fd1f2e0a08734313a35d5b3a556f92b381f3c0"
+checksum = "8a36768c0fbf1bb15eca10defa29526bda730a2376c2ab4393ccfa16fb1a318d"
 dependencies = [
  "proc-macro2 1.0.27",
  "quote 1.0.9",

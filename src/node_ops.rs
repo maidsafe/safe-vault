@@ -15,8 +15,8 @@ use sn_data_types::{
 use sn_messaging::client::{ClientMsg, CmdError};
 use sn_messaging::{
     client::{
-        BlobRead, BlobWrite, DataExchange, ProcessMsg, ProcessingError, QueryResponse,
-        SupportingInfo,
+        BlobRead, BlobWrite, ClientSigned, DataCmd, DataExchange, DataQuery, ProcessMsg,
+        ProcessingError, QueryResponse, SupportingInfo,
     },
     node::NodeMsg,
     Aggregation, DstLocation, EndUser, MessageId, Msg, SrcLocation,
@@ -75,6 +75,7 @@ pub enum NodeDuty {
     RegisterTransfer {
         proof: TransferAgreementProof,
         msg_id: MessageId,
+        origin: SrcLocation,
     },
     /// TEMP: Simulate a transfer from a client
     SimulatePayout {
@@ -89,7 +90,7 @@ pub enum NodeDuty {
     WriteChunk {
         write: BlobWrite,
         msg_id: MessageId,
-        origin: EndUser,
+        client_signed: ClientSigned,
     },
     ProcessRepublish {
         chunk: Blob,
@@ -215,14 +216,16 @@ pub enum NodeDuty {
     },
     /// Process read of data
     ProcessRead {
-        query: sn_messaging::client::DataQuery,
+        query: DataQuery,
         msg_id: MessageId,
+        client_signed: ClientSigned,
         origin: EndUser,
     },
     /// Process write of data
     ProcessWrite {
-        cmd: sn_messaging::client::DataCmd,
+        cmd: DataCmd,
         msg_id: MessageId,
+        client_signed: ClientSigned,
         origin: EndUser,
     },
     /// Process Payment for a DataCmd
@@ -365,22 +368,4 @@ pub struct OutgoingLazyError {
 pub struct OutgoingSupportingInfo {
     pub msg: SupportingInfo,
     pub dst: DstLocation,
-}
-
-impl OutgoingMsg {
-    pub fn id(&self) -> MessageId {
-        self.msg.id()
-    }
-}
-
-impl OutgoingLazyError {
-    pub fn id(&self) -> MessageId {
-        self.msg.id()
-    }
-}
-
-impl OutgoingSupportingInfo {
-    pub fn id(&self) -> MessageId {
-        self.msg.id()
-    }
 }

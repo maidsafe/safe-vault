@@ -12,8 +12,9 @@ use super::{
 };
 use crate::{node_ops::NodeDuty, Error, Result};
 use log::info;
+use sn_data_types::PublicKey;
 use sn_messaging::{
-    client::{DataCmd, DataExchange, DataQuery},
+    client::{ClientSigned, DataCmd, DataExchange, DataQuery},
     EndUser, MessageId,
 };
 use sn_routing::Prefix;
@@ -46,13 +47,22 @@ impl ElderStores {
         &mut self,
         query: DataQuery,
         msg_id: MessageId,
+        requester: PublicKey,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         match &query {
             DataQuery::Blob(read) => self.blob_records.read(read, msg_id, origin).await,
-            DataQuery::Map(read) => self.map_storage.read(read, msg_id, origin).await,
-            DataQuery::Sequence(read) => self.sequence_storage.read(read, msg_id, origin).await,
-            DataQuery::Register(read) => self.register_storage.read(read, msg_id, origin).await,
+            DataQuery::Map(read) => self.map_storage.read(read, msg_id, requester, origin).await,
+            DataQuery::Sequence(read) => {
+                self.sequence_storage
+                    .read(read, msg_id, requester, origin)
+                    .await
+            }
+            DataQuery::Register(read) => {
+                self.register_storage
+                    .read(read, msg_id, requester, origin)
+                    .await
+            }
         }
     }
 
@@ -60,25 +70,34 @@ impl ElderStores {
         &mut self,
         cmd: DataCmd,
         msg_id: MessageId,
+        client_signed: ClientSigned,
         origin: EndUser,
     ) -> Result<NodeDuty> {
         info!("Writing Data");
         match cmd {
             DataCmd::Blob(write) => {
                 info!("Writing Blob");
-                self.blob_records.write(write, msg_id, origin).await
+                self.blob_records
+                    .write(write, msg_id, client_signed, origin)
+                    .await
             }
             DataCmd::Map(write) => {
                 info!("Writing Map");
-                self.map_storage.write(write, msg_id, origin).await
+                self.map_storage
+                    .write(write, msg_id, client_signed.public_key, origin)
+                    .await
             }
             DataCmd::Sequence(write) => {
                 info!("Writing Sequence");
-                self.sequence_storage.write(write, msg_id, origin).await
+                self.sequence_storage
+                    .write(write, msg_id, client_signed.public_key, origin)
+                    .await
             }
             DataCmd::Register(write) => {
                 info!("Writing Register");
-                self.register_storage.write(write, msg_id, origin).await
+                self.register_storage
+                    .write(write, msg_id, client_signed.public_key, origin)
+                    .await
             }
         }
     }
