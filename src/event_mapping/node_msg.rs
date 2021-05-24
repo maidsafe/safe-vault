@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Mapping;
+use super::{Mapping, MsgContext};
 use crate::{
     error::convert_to_error_message,
-    event_mapping::MsgContext,
     node_ops::{MsgType, NodeDuty, OutgoingMsg},
     Error,
 };
@@ -19,7 +18,7 @@ use sn_messaging::{
         NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeRewardQuery,
         NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
     },
-    Aggregation, DstLocation, MessageId, Msg, SrcLocation,
+    Aggregation, DstLocation, MessageId, SrcLocation,
 };
 
 pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping {
@@ -33,7 +32,7 @@ pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping
         DstLocation::Section(_) | DstLocation::Node(_) => Mapping {
             op: match_node_msg(msg.clone(), src),
             ctx: Some(MsgContext {
-                msg: Msg::Node(msg),
+                msg: MsgType::Node(msg),
                 src,
             }),
         },
@@ -64,7 +63,7 @@ pub fn map_node_msg(msg: NodeMsg, src: SrcLocation, dst: DstLocation) -> Mapping
                     aggregation: Aggregation::AtDestination,
                 }),
                 ctx: Some(MsgContext {
-                    msg: Msg::Node(msg),
+                    msg: MsgType::Node(msg),
                     src,
                 }),
             }

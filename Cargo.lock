@@ -324,9 +324,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.67"
+version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3c69b077ad434294d3ce9f1f6143a2a4b89a8a2d54ef813d85003a4fd1137fd"
+checksum = "4a72c244c1ff497a746a7e1fb3d14bd08420ecda70c8f25c7112f2781652d787"
 
 [[package]]
 name = "cfg-if"
@@ -1042,9 +1042,9 @@ checksum = "494b4d60369511e7dea41cf646832512a94e542f68bb9c49e54518e0f468eb47"
 
 [[package]]
 name = "httpdate"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05842d0d43232b23ccb7060ecb0f0626922c21f30012e97b767b30afd4a5d4b9"
+checksum = "6456b8a6c8f33fee7d958fcd1b60d55b11940a79e63ae87013e6d22e26034440"
 
 [[package]]
 name = "humantime"
@@ -1090,7 +1090,7 @@ dependencies = [
  "http",
  "http-body 0.4.2",
  "httparse",
- "httpdate 1.0.0",
+ "httpdate 1.0.1",
  "itoa",
  "pin-project",
  "socket2 0.4.0",
@@ -2289,9 +2289,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "23.0.0"
+version = "24.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de33bddc2a26db6127554d6bfda149eee433d92fe068d5ffb93575eb57a480ac"
+checksum = "70ded55085c4066c6bc2e4eac495c5cd28148e6518ddc3258a6ce7ac78b63f62"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2358,9 +2358,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.69.2"
+version = "0.70.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c32fd36999938c4dfccaee36835d17a01c244f976926452fdd8390475dc0808"
+checksum = "fc93f4dbe00c5d2d65fec8338127b1e284a6f424c06fd12430e56ac4a2b4ec72"
 dependencies = [
  "bincode",
  "bls_dkg",

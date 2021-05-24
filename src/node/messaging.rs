@@ -13,7 +13,7 @@ use crate::{
 };
 use log::{error, trace};
 use sn_messaging::{
-    client::ClientMsg, node::NodeMsg, Aggregation, DstLocation, Itinerary, Msg, SrcLocation,
+    client::ClientMsg, node::NodeMsg, Aggregation, DstLocation, Itinerary, SrcLocation,
 };
 use sn_routing::XorName;
 use std::collections::BTreeSet;
@@ -56,12 +56,11 @@ pub(crate) async fn send(msg: OutgoingMsg, network: &Network) -> Result<()> {
             msg.serialize(dst_name, dest_section_pk, src_section_pk)?
         }
     };
-    let result = network.send_message(itinerary, content).await;
 
-    result.map_or_else(
+    network.send_message(itinerary, content).await.map_or_else(
         |err| {
             error!("Unable to send msg: {:?}", err);
-            Err(Error::UnableToSend(MsgType::convert(msg.msg)))
+            Err(Error::UnableToSend(msg.msg))
         },
         |()| Ok(()),
     )
@@ -92,7 +91,7 @@ pub(crate) async fn send_error(msg: OutgoingLazyError, network: &Network) -> Res
     result.map_or_else(
         |err| {
             error!("Unable to send msg: {:?}", err);
-            Err(Error::UnableToSend(Msg::Client(message)))
+            Err(Error::UnableToSend(MsgType::Client(message)))
         },
         |()| Ok(()),
     )
@@ -124,7 +123,7 @@ pub(crate) async fn send_support(msg: OutgoingSupportingInfo, network: &Network)
     result.map_or_else(
         |err| {
             error!("Unable to send msg: {:?}", err);
-            Err(Error::UnableToSend(Msg::Client(message)))
+            Err(Error::UnableToSend(MsgType::Client(message)))
         },
         |()| Ok(()),
     )

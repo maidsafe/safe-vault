@@ -15,7 +15,7 @@ use crate::{
 use log::warn;
 use sn_messaging::{
     client::{ClientMsg, Cmd, ProcessMsg, ProcessingError, Query, TransferCmd, TransferQuery},
-    Aggregation, EndUser, MessageId, Msg, SrcLocation,
+    Aggregation, EndUser, MessageId, SrcLocation,
 };
 
 pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
@@ -25,7 +25,7 @@ pub fn map_client_msg(msg: &ClientMsg, user: EndUser) -> Mapping {
             let op = map_client_process_msg(process_msg.clone(), user);
 
             let ctx = Some(MsgContext {
-                msg: Msg::Client(msg.clone()),
+                msg: MsgType::Client(msg.clone()),
                 src: SrcLocation::EndUser(user),
             });
 
