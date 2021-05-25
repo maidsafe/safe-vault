@@ -1078,9 +1078,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.14.7"
+version = "0.14.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e5f105c494081baa3bf9e200b279e27ec1623895cd504c7dbef8d0b080fcf54"
+checksum = "d3f71a7eea53a3f8257a7b4795373ff886397178cd634430ea94e12d7fe4fe34"
 dependencies = [
  "bytes 1.0.1",
  "futures-channel",
@@ -1154,7 +1154,7 @@ dependencies = [
  "bytes 1.0.1",
  "futures",
  "http",
- "hyper 0.14.7",
+ "hyper 0.14.8",
  "log",
  "rand 0.8.3",
  "tokio 1.6.0",
@@ -1256,9 +1256,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.94"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18794a8ad5b29321f790b55d93dfba91e125cb1a9edbd4f8e3150acc771c1a5e"
+checksum = "789da6d93f1b866ffe175afc5322a4d76c038605a1c3319bb57b06967ca98a36"
 
 [[package]]
 name = "linked-hash-map"
@@ -1688,9 +1688,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.11.9"
+version = "0.11.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08604106daaa1a6415e401eecbf7257fed6dce7ee42746ad207866a3a0fc89a2"
+checksum = "326dc32ecbd56d60075b9962713343eb9691fca1ab5f873966ec97ca88d514ae"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2289,9 +2289,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "24.0.0"
+version = "25.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70ded55085c4066c6bc2e4eac495c5cd28148e6518ddc3258a6ce7ac78b63f62"
+checksum = "107f742cea3304e299f8a6fcc99246765105b5099bcca705adc58e3d17fb4b07"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2315,7 +2315,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.44.0"
+version = "0.44.1"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2358,9 +2358,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.70.0"
+version = "0.71.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc93f4dbe00c5d2d65fec8338127b1e284a6f424c06fd12430e56ac4a2b4ec72"
+checksum = "c331fc0617fb3e1441230bed8faa1e9a8bdc4471b33716f8bf437829e1dca6e4"
 dependencies = [
  "bincode",
  "bls_dkg",

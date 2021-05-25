@@ -60,7 +60,7 @@ impl Node {
                     self.update_replicas().await?;
                     let elder = self.role.as_elder_mut()?;
                     let msg_id =
-                        MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
+                        MessageId::combine(&[our_prefix.name().0, XorName::from(our_key).0]);
                     let ops = vec![push_state(elder, our_prefix, msg_id, new_elders).await?];
                     elder
                         .meta_data

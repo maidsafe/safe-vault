@@ -150,9 +150,7 @@ impl RewardProcess {
         distribute_rewards(rewards, nodes)
             .into_iter()
             .map(|(node, (age, wallet, amount))| {
-                let id = MessageId::combine(vec![node, XorName::from(section_key)])
-                    .0
-                     .0;
+                let id = *MessageId::combine(&[node.0, XorName::from(section_key).0]).as_ref();
 
                 CreditProposal {
                     proposal: Credit {

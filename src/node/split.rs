@@ -126,11 +126,11 @@ impl Node {
         }
 
         // replicate state to our new elders
-        let msg_id = MessageId::combine(vec![our_prefix.name(), XorName::from(our_key)]);
+        let msg_id = MessageId::combine(&[our_prefix.name().0, XorName::from(our_key).0]);
         ops.push(push_state(elder, our_prefix, msg_id, our_new_elders).await?);
 
         // replicate state to our neighbour's new elders
-        let msg_id = MessageId::combine(vec![sibling_prefix.name(), XorName::from(sibling_key)]);
+        let msg_id = MessageId::combine(&[sibling_prefix.name().0, XorName::from(sibling_key).0]);
         ops.push(push_state(elder, sibling_prefix, msg_id, their_new_elders).await?);
 
         // drop metadata state
