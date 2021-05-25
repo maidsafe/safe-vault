@@ -23,7 +23,9 @@ use crate::{
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
-use crate::{event_mapping::Mapping, node_ops::NodeDuties};
+use crate::node_ops::NodeDuties;
+use futures::{future::BoxFuture, FutureExt};
+use handle::NodeTask;
 use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
@@ -32,11 +34,13 @@ use sn_messaging::client::ClientMsg;
 use sn_routing::{
     EventStream, {Prefix, XorName},
 };
+use std::sync::Arc;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     path::{Path, PathBuf},
 };
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 /// Static info about the node.
@@ -90,15 +94,21 @@ impl Node {
 
         let node = Self {
             role: Role::Adult(AdultRole {
-                chunks: Chunks::new(node_info.root_dir.as_path(), config.max_capacity()).await?,
+                chunks: Arc::new(RwLock::new(
+                    Chunks::new(node_info.root_dir.as_path(), config.max_capacity()).await?,
+                )),
             }),
             node_info,
             used_space: UsedSpace::new(config.max_capacity()),
-            network_api,
+            network_api: network_api.clone(),
             network_events,
         };
 
-        messaging::send(node.register_wallet().await, &node.network_api).await?;
+        messaging::send(
+            Self::register_wallet(&network_api, reward_key).await,
+            &node.network_api,
+        )
+        .await?;
 
         Ok(node)
     }
@@ -131,46 +141,68 @@ impl Node {
         Ok(())
     }
 
+    fn handle_and_get_threads(
+        &mut self,
+        op: NodeDuty,
+        ctx: Option<MsgContext>,
+    ) -> BoxFuture<Vec<JoinHandle<Result<NodeDuties>>>> {
+        async move {
+            let mut threads = vec![];
+            match self.handle(op).await {
+                Ok(node_task) => match node_task {
+                    NodeTask::Result(node_duties) => {
+                        for duty in node_duties {
+                            let tasks = self.handle_and_get_threads(duty, ctx.clone()).await;
+                            threads.extend(tasks.into_iter());
+                        }
+                    }
+                    NodeTask::Thread(task_handle) => {
+                        threads.push(task_handle);
+                    }
+                    NodeTask::None => (),
+                },
+                Err(err) => {
+                    let duty = try_handle_error(err, ctx.clone());
+                    let tasks = self.handle_and_get_threads(duty, ctx.clone()).await;
+                    threads.extend(tasks.into_iter());
+                }
+            }
+            threads
+        }
+        .boxed()
+    }
+
     // Keeps processing resulting node operations.
     async fn process_while_any(&mut self, op: NodeDuty, ctx: Option<MsgContext>) {
-        // let mut threads = vec![tokio::spawn(self.handle(op))];
-        let ops = self.handle(op).await;
-        let mut threads = self.helper(ops, ctx.clone()).await;
-        loop {
+        // This processes the relevant duty for the incoming routing event
+        // and returns relevant node duties and spawned threads
+        let mut threads = self.handle_and_get_threads(op, ctx.clone()).await;
+        while !threads.is_empty() {
             let (result, _count, mut remaining_futures) =
                 futures::future::select_all(threads.into_iter()).await;
             match result {
-                Ok(res) => {
-                    remaining_futures.extend(self.helper(res, ctx.clone()).await);
-                }
+                Ok(res) => match res {
+                    Ok(node_duties) => {
+                        for duty in node_duties {
+                            remaining_futures.extend(
+                                self.handle_and_get_threads(duty, ctx.clone())
+                                    .await
+                                    .into_iter(),
+                            );
+                        }
+                    }
+                    Err(err) => {
+                        let duty = try_handle_error(err, ctx.clone());
+                        let tasks = self.handle_and_get_threads(duty, ctx.clone()).await;
+                        remaining_futures.extend(tasks.into_iter());
+                    }
+                },
                 Err(e) => {
                     error!("Error spawing thread for task: {}", e);
                 }
             }
             threads = remaining_futures;
         }
-    }
-
-    async fn helper(
-        &mut self,
-        result: Result<NodeDuties>,
-        ctx: Option<MsgContext>,
-    ) -> Vec<JoinHandle<Result<NodeDuties>>> {
-        let threads = vec![];
-        match result {
-            Ok(new_ops) => {
-                for op in new_ops {
-                    threads.push(tokio::spawn(self.handle(op)));
-                }
-            }
-            Err(e) => {
-                let new_ops = try_handle_error(e, ctx.clone());
-                for op in new_ops {
-                    threads.push(tokio::spawn(self.handle(op)));
-                }
-            }
-        }
-        threads
     }
 }
 

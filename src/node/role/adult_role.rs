@@ -20,10 +20,13 @@ use sn_messaging::{
 };
 use sn_routing::XorName;
 use std::collections::BTreeSet;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
+#[derive(Clone)]
 pub(crate) struct AdultRole {
     // immutable chunks
-    pub chunks: Chunks,
+    pub chunks: Arc<RwLock<Chunks>>,
 }
 
 impl AdultRole {
@@ -34,7 +37,7 @@ impl AdultRole {
         lost_adults: BTreeSet<XorName>,
         remaining: BTreeSet<XorName>,
     ) -> NodeDuties {
-        let keys = self.chunks.keys();
+        let keys = self.chunks.read().await.keys();
         let mut data_for_replication = BTreeSet::new();
         for addr in keys.iter() {
             if let Some(data) = self
@@ -81,9 +84,9 @@ impl AdultRole {
         if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
             info!("Republishing chunk at {:?}", addr);
             trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
-            let chunk = self.chunks.get_chunk(addr).ok()?;
+            let chunk = self.chunks.read().await.get_chunk(addr).ok()?;
             if we_are_not_holder_anymore {
-                if let Err(err) = self.chunks.remove_chunk(addr).await {
+                if let Err(err) = self.chunks.write().await.remove_chunk(addr).await {
                     warn!("Error deleting chunk during republish: {:?}", err);
                 }
             }

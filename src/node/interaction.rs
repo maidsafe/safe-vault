@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    network::Network,
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     Node, Result,
 };
@@ -50,16 +51,16 @@ impl Node {
     /// https://github.com/rust-lang/rust-clippy/issues?q=is%3Aissue+is%3Aopen+eval_order_dependence
     #[allow(clippy::eval_order_dependence)]
     pub(crate) async fn get_section_elders(
-        &self,
+        network_api: &Network,
         msg_id: MessageId,
         origin: SrcLocation,
-    ) -> Result<NodeDuty> {
+    ) -> Result<NodeDuties> {
         let elders = SectionElders {
-            prefix: self.network_api.our_prefix().await,
-            names: self.network_api.our_elder_names().await,
-            key_set: self.network_api.our_public_key_set().await?,
+            prefix: network_api.our_prefix().await,
+            names: network_api.our_elder_names().await,
+            key_set: network_api.our_public_key_set().await?,
         };
-        Ok(NodeDuty::Send(OutgoingMsg {
+        Ok(vec![NodeDuty::Send(OutgoingMsg {
             msg: MsgType::Node(NodeMsg::NodeQueryResponse {
                 response: NodeQueryResponse::System(NodeSystemQueryResponse::GetSectionElders(
                     elders,
@@ -70,12 +71,12 @@ impl Node {
             section_source: false, // strictly this is not correct, but we don't expect responses to a response..
             dst: origin.to_dst(),  // this will be a section
             aggregation: Aggregation::AtDestination, // None,
-        }))
+        })])
     }
 
     ///
-    pub(crate) async fn notify_section_of_our_storage(&mut self) -> Result<NodeDuty> {
-        let node_id = PublicKey::from(self.network_api.public_key().await);
+    pub(crate) async fn notify_section_of_our_storage(network_api: &Network) -> Result<NodeDuty> {
+        let node_id = PublicKey::from(network_api.public_key().await);
         Ok(NodeDuty::Send(OutgoingMsg {
             msg: MsgType::Node(NodeMsg::NodeCmd {
                 cmd: NodeCmd::System(NodeSystemCmd::StorageFull {
@@ -91,11 +92,14 @@ impl Node {
     }
 
     ///
-    pub(crate) async fn register_wallet(&self) -> OutgoingMsg {
-        let address = self.network_api.our_prefix().await.name();
+    pub(crate) async fn register_wallet(
+        network_api: &Network,
+        reward_key: PublicKey,
+    ) -> OutgoingMsg {
+        let address = network_api.our_prefix().await.name();
         OutgoingMsg {
             msg: MsgType::Node(NodeMsg::NodeCmd {
-                cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(self.node_info.reward_key)),
+                cmd: NodeCmd::System(NodeSystemCmd::RegisterWallet(reward_key)),
                 id: MessageId::new(),
             }),
             section_source: false, // sent as single node
@@ -107,13 +111,13 @@ impl Node {
 
 /// Push our state to the given dst
 pub(crate) async fn push_state(
-    elder: &mut ElderRole,
+    elder: &ElderRole,
     prefix: Prefix,
     msg_id: MessageId,
     peers: BTreeSet<XorName>,
 ) -> Result<NodeDuty> {
-    let user_wallets = elder.transfers.user_wallets();
-    let node_rewards = elder.section_funds.node_wallets();
+    let user_wallets = elder.transfers.read().await.user_wallets();
+    let node_rewards = elder.section_funds.read().await.node_wallets();
 
     // only push that what should be in dst
     let user_wallets = user_wallets
@@ -125,7 +129,12 @@ pub(crate) async fn push_state(
         .filter(|(name, _)| prefix.matches(name))
         .collect();
     // Create an aggregated map of all the metadata of the provided prefix
-    let metadata = elder.meta_data.get_data_exchange_packet(prefix).await?;
+    let metadata = elder
+        .meta_data
+        .read()
+        .await
+        .get_data_exchange_packet(prefix)
+        .await?;
 
     Ok(NodeDuty::SendToNodes {
         msg: NodeMsg::NodeCmd {

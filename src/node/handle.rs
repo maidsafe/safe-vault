@@ -24,10 +24,19 @@ use sn_messaging::{
     Aggregation, DstLocation, MessageId,
 };
 use sn_routing::ELDER_SIZE;
+use std::sync::Arc;
+use tokio::{sync::RwLock, task::JoinHandle};
 use xor_name::XorName;
 
+pub enum NodeTask {
+    None,
+    Result(NodeDuties),
+    Thread(JoinHandle<Result<NodeDuties>>),
+}
+
 impl Node {
-    pub(crate) async fn handle(&mut self, duty: NodeDuty) -> Result<NodeDuties> {
+    ///
+    pub async fn handle(&mut self, duty: NodeDuty) -> Result<NodeTask> {
         if !matches!(duty, NodeDuty::NoOp) {
             debug!("Handling NodeDuty: {:?}", duty);
         }
@@ -36,8 +45,8 @@ impl Node {
             NodeDuty::Genesis => {
                 self.level_up().await?;
                 let elder = self.role.as_elder_mut()?;
-                elder.received_initial_sync = true;
-                Ok(vec![])
+                *elder.received_initial_sync.write().await = true;
+                Ok(NodeTask::None)
             }
             NodeDuty::EldersChanged {
                 our_key,
@@ -52,21 +61,27 @@ impl Node {
                         && self.network_api.section_chain().await.len() <= ELDER_SIZE
                     {
                         let elder = self.role.as_elder_mut()?;
-                        elder.received_initial_sync = true;
+                        *elder.received_initial_sync.write().await = true;
                     }
-                    Ok(vec![])
+                    Ok(NodeTask::None)
                 } else {
                     info!("Updating our replicas on Churn");
-                    self.update_replicas().await?;
-                    let elder = self.role.as_elder_mut()?;
-                    let msg_id =
-                        MessageId::combine(&[our_prefix.name().0, XorName::from(our_key).0]);
-                    let ops = vec![push_state(elder, our_prefix, msg_id, new_elders).await?];
-                    elder
-                        .meta_data
-                        .retain_members_only(self.network_api.our_adults().await)
-                        .await?;
-                    Ok(ops)
+                    let elder = self.role.as_elder_mut()?.clone();
+                    let network = self.network_api.clone();
+                    let handle = tokio::spawn(async move {
+                        Self::update_replicas(&elder, &network).await?;
+                        let msg_id =
+                            MessageId::combine(&[our_prefix.name().0, XorName::from(our_key).0]);
+                        let ops = vec![push_state(&elder, our_prefix, msg_id, new_elders).await?];
+                        elder
+                            .meta_data
+                            .write()
+                            .await
+                            .retain_members_only(network.our_adults().await)
+                            .await?;
+                        Ok(ops)
+                    });
+                    Ok(NodeTask::Thread(handle))
                 }
             }
             NodeDuty::AdultsChanged {
@@ -75,11 +90,13 @@ impl Node {
                 remaining,
             } => {
                 let our_name = self.our_name().await;
-                Ok(self
-                    .role
-                    .as_adult_mut()?
-                    .reorganize_chunks(our_name, added, removed, remaining)
-                    .await)
+                let mut adult_role = self.role.as_adult()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(adult_role
+                        .reorganize_chunks(our_name, added, removed, remaining)
+                        .await)
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::SectionSplit {
                 our_key,
@@ -92,105 +109,145 @@ impl Node {
                 if newbie {
                     info!("Beginning split as Newbie");
                     self.begin_split_as_newbie(our_key, our_prefix).await?;
-                    Ok(vec![])
+                    Ok(NodeTask::None)
                 } else {
                     info!("Beginning split as Oldie");
-                    self.begin_split_as_oldie(
-                        our_prefix,
-                        our_key,
-                        sibling_key,
-                        our_new_elders,
-                        their_new_elders,
-                    )
-                    .await
+                    let elder = self.role.as_elder()?.clone();
+                    let network = self.network_api.clone();
+                    let handle = tokio::spawn(async move {
+                        Self::begin_split_as_oldie(
+                            &elder,
+                            &network,
+                            our_prefix,
+                            our_key,
+                            sibling_key,
+                            our_new_elders,
+                            their_new_elders,
+                        )
+                        .await
+                    });
+                    Ok(NodeTask::Thread(handle))
                 }
             }
             NodeDuty::ProposeOffline(unresponsive_adults) => {
                 for adult in unresponsive_adults {
                     self.network_api.propose_offline(adult).await?;
                 }
-                Ok(vec![])
+                Ok(NodeTask::None)
             }
             // a remote section asks for the replicas of their wallet
             NodeDuty::GetSectionElders { msg_id, origin } => {
-                Ok(vec![self.get_section_elders(msg_id, origin).await?])
+                let network = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    Self::get_section_elders(&network, msg_id, origin).await
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ReceiveRewardProposal(proposal) => {
                 info!("Handling Churn proposal as an Elder");
                 let elder = self.role.as_elder_mut()?;
-                let (churn_process, _) = elder.section_funds.as_churning_mut()?;
-                Ok(vec![churn_process.receive_churn_proposal(proposal).await?])
+                let mut churn_process = elder
+                    .section_funds
+                    .write()
+                    .await
+                    .as_churning_mut()?
+                    .0
+                    .clone();
+                let duties = vec![churn_process.receive_churn_proposal(proposal).await?];
+                Ok(NodeTask::Result(duties))
             }
             NodeDuty::ReceiveRewardAccumulation(accumulation) => {
-                let elder = self.role.as_elder_mut()?;
+                let elder = self.role.as_elder_mut()?.clone();
+                let network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    let mut section_funds = elder.section_funds.write().await;
+                    let (churn_process, reward_wallets) = section_funds.as_churning_mut()?;
 
-                let (churn_process, reward_wallets) = elder.section_funds.as_churning_mut()?;
+                    let mut ops = vec![
+                        churn_process
+                            .clone()
+                            .receive_wallet_accumulation(accumulation)
+                            .await?,
+                    ];
 
-                let mut ops = vec![
-                    churn_process
-                        .receive_wallet_accumulation(accumulation)
-                        .await?,
-                ];
+                    if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
+                        let reward_sum = credit_proofs.sum();
+                        ops.extend(Self::propagate_credits(credit_proofs)?);
+                        // update state
+                        *elder.section_funds.write().await =
+                            SectionFunds::KeepingNodeWallets(reward_wallets.clone());
+                        let section_key = network_api.section_public_key().await?;
+                        info!(
+                            "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
+                            section_key, reward_sum
+                        );
+                        ops.push(NodeDuty::SetNodeJoinsAllowed(true));
+                    }
 
-                if let RewardStage::Completed(credit_proofs) = churn_process.stage().clone() {
-                    let reward_sum = credit_proofs.sum();
-                    ops.extend(Self::propagate_credits(credit_proofs)?);
-                    // update state
-                    elder.section_funds = SectionFunds::KeepingNodeWallets(reward_wallets.clone());
-                    let section_key = &self.network_api.section_public_key().await?;
-                    info!(
-                        "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
-                        section_key, reward_sum
-                    );
-                    ops.push(NodeDuty::SetNodeJoinsAllowed(true));
-                }
-
-                Ok(ops)
+                    Ok(ops)
+                });
+                Ok(NodeTask::Thread(handle))
             }
             //
             // ------- reward reg -------
             NodeDuty::SetNodeWallet { wallet_id, node_id } => {
-                let elder = self.role.as_elder_mut()?;
-                let members = self.network_api.our_members().await;
-                if let Some(age) = members.get(&node_id) {
-                    elder
-                        .section_funds
-                        .set_node_wallet(node_id, wallet_id, *age);
-                    Ok(vec![])
-                } else {
-                    debug!(
-                        "{:?}: Couldn't find node id {} when adding wallet {}",
-                        self.network_api.our_prefix().await,
-                        node_id,
-                        wallet_id
-                    );
-                    Err(Error::NodeNotFoundForReward)
-                }
+                let elder = self.role.as_elder_mut()?.clone();
+                let network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    let members = network_api.our_members().await;
+                    if let Some(age) = members.get(&node_id) {
+                        elder
+                            .section_funds
+                            .write()
+                            .await
+                            .set_node_wallet(node_id, wallet_id, *age);
+                        Ok(vec![])
+                    } else {
+                        debug!(
+                            "{:?}: Couldn't find node id {} when adding wallet {}",
+                            network_api.our_prefix().await,
+                            node_id,
+                            wallet_id
+                        );
+                        Err(Error::NodeNotFoundForReward)
+                    }
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::GetNodeWalletKey { node_name, .. } => {
-                let elder = self.role.as_elder_mut()?;
-                let members = self.network_api.our_members().await;
-                if members.get(&node_name).is_some() {
-                    let _wallet = elder.section_funds.get_node_wallet(&node_name);
-                    Ok(vec![]) // not yet implemented
-                } else {
-                    debug!(
-                        "{:?}: Couldn't find node {} when getting wallet.",
-                        self.network_api.our_prefix().await,
-                        node_name,
-                    );
-                    Err(Error::NodeNotFoundForReward)
-                }
+                let elder = self.role.as_elder_mut()?.clone();
+                let network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    let members = network_api.our_members().await;
+                    if members.get(&node_name).is_some() {
+                        let _wallet = elder.section_funds.read().await.get_node_wallet(&node_name);
+                        Ok(vec![]) // not yet implemented
+                    } else {
+                        debug!(
+                            "{:?}: Couldn't find node {} when getting wallet.",
+                            network_api.our_prefix().await,
+                            node_name,
+                        );
+                        Err(Error::NodeNotFoundForReward)
+                    }
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ProcessLostMember { name, .. } => {
                 info!("Member Lost: {:?}", name);
-                let elder = self.role.as_elder_mut()?;
-                elder.section_funds.remove_node_wallet(name);
-                elder
-                    .meta_data
-                    .retain_members_only(self.network_api.our_adults().await)
-                    .await?;
-                Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
+                let elder = self.role.as_elder_mut()?.clone();
+                let network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    elder.section_funds.read().await.remove_node_wallet(name);
+                    elder
+                        .meta_data
+                        .write()
+                        .await
+                        .retain_members_only(network_api.our_adults().await)
+                        .await?;
+                    Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             //
             // ---------- Levelling --------------
@@ -198,64 +255,131 @@ impl Node {
                 node_rewards,
                 user_wallets,
                 metadata,
-            } => Ok(vec![
-                self.synch_state(node_rewards, user_wallets, metadata)
-                    .await?,
-            ]),
+            } => {
+                let elder = self.role.as_elder()?.clone();
+                let network_api = self.network_api.clone();
+                let reward_key = self.node_info.reward_key;
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        Self::synch_state(
+                            &elder,
+                            reward_key,
+                            &network_api,
+                            node_rewards,
+                            user_wallets,
+                            metadata,
+                        )
+                        .await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
+            }
             NodeDuty::LevelDown => {
                 info!("Getting Demoted");
                 let capacity = self.used_space.max_capacity().await;
                 self.role = Role::Adult(AdultRole {
-                    chunks: Chunks::new(self.node_info.root_dir.as_path(), capacity).await?,
+                    chunks: Arc::new(RwLock::new(
+                        Chunks::new(self.node_info.root_dir.as_path(), capacity).await?,
+                    )),
                 });
-                Ok(vec![])
+                Ok(NodeTask::None)
             }
             //
             // ----------- Transfers -----------
             NodeDuty::GetTransferReplicaEvents { msg_id, origin } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.transfers.all_events(msg_id, origin).await?])
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        elder
+                            .transfers
+                            .read()
+                            .await
+                            .all_events(msg_id, origin)
+                            .await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::PropagateTransfer {
                 proof,
                 msg_id,
                 origin,
             } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![
-                    elder
-                        .transfers
-                        .receive_propagated(&proof, msg_id, origin)
-                        .await?,
-                ])
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        elder
+                            .transfers
+                            .read()
+                            .await
+                            .receive_propagated(&proof, msg_id, origin)
+                            .await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ValidateClientTransfer {
                 signed_transfer,
                 msg_id,
                 origin,
             } => {
-                let elder = self.role.as_elder()?;
-                Ok(vec![
-                    elder
-                        .transfers
-                        .validate(signed_transfer, msg_id, origin)
-                        .await?,
-                ])
+                let elder = self.role.as_elder()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        elder
+                            .transfers
+                            .read()
+                            .await
+                            .validate(signed_transfer, msg_id, origin)
+                            .await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::SimulatePayout { transfer, .. } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.transfers.credit_without_proof(transfer).await?])
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        elder
+                            .transfers
+                            .write()
+                            .await
+                            .credit_without_proof(transfer)
+                            .await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::GetTransfersHistory {
                 at, msg_id, origin, ..
             } => {
                 // TODO: add limit with since_version
-                let elder = self.role.as_elder()?;
-                Ok(vec![elder.transfers.history(&at, msg_id, origin).await?])
+                let elder = self.role.as_elder()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        elder
+                            .transfers
+                            .read()
+                            .await
+                            .history(&at, msg_id, origin)
+                            .await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::GetBalance { at, msg_id, origin } => {
-                let elder = self.role.as_elder()?;
-                Ok(vec![elder.transfers.balance(at, msg_id, origin).await?])
+                let elder = self.role.as_elder()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        elder
+                            .transfers
+                            .read()
+                            .await
+                            .balance(at, msg_id, origin)
+                            .await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::GetStoreCost {
                 bytes,
@@ -263,80 +387,141 @@ impl Node {
                 origin,
                 ..
             } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(elder.transfers.get_store_cost(bytes, msg_id, origin).await)
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(elder
+                        .transfers
+                        .write()
+                        .await
+                        .get_store_cost(bytes, msg_id, origin)
+                        .await)
+                });
+                Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::RegisterTransfer {
-                proof,
-                msg_id,
-                origin,
-            } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![
-                    elder.transfers.register(&proof, msg_id, origin).await?,
-                ])
+            NodeDuty::RegisterTransfer { proof, msg_id, origin } => {
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        elder
+                            .transfers
+                            .read()
+                            .await
+                            .register(&proof, msg_id, origin)
+                            .await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             //
             // -------- Immutable chunks --------
             NodeDuty::ReadChunk { read, msg_id } => {
-                let adult = self.role.as_adult_mut()?;
-                let mut ops = vec![adult.chunks.read(&read, msg_id)];
-                ops.extend(adult.chunks.check_storage().await?);
-                Ok(ops)
+                let adult = self.role.as_adult()?.clone();
+                let handle = tokio::spawn(async move {
+                    let mut ops = vec![adult.chunks.write().await.read(&read, msg_id)];
+                    ops.extend(adult.chunks.read().await.check_storage().await?);
+                    Ok(ops)
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::WriteChunk {
                 write,
                 msg_id,
                 client_signed,
             } => {
-                let adult = self.role.as_adult_mut()?;
-                let mut ops = vec![
-                    adult
-                        .chunks
-                        .write(&write, msg_id, client_signed.public_key)
-                        .await?,
-                ];
-                ops.extend(adult.chunks.check_storage().await?);
-                Ok(ops)
+                let adult = self.role.as_adult()?.clone();
+                let handle = tokio::spawn(async move {
+                    let mut ops = vec![
+                        adult
+                            .chunks
+                            .write()
+                            .await
+                            .write(&write, msg_id, client_signed.public_key)
+                            .await?,
+                    ];
+                    ops.extend(adult.chunks.read().await.check_storage().await?);
+                    Ok(ops)
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ProcessRepublish { chunk, msg_id, .. } => {
                 info!("Processing republish with MessageId: {:?}", msg_id);
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![elder.meta_data.republish_chunk(chunk).await?])
+                let elder = self.role.as_elder()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        elder.meta_data.write().await.republish_chunk(chunk).await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::ReachingMaxCapacity => Ok(vec![self.notify_section_of_our_storage().await?]),
+            NodeDuty::ReachingMaxCapacity => {
+                let network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        Self::notify_section_of_our_storage(&network_api).await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
+            }
             //
             // ------- Misc ------------
             NodeDuty::IncrementFullNodeCount { node_id } => {
-                let elder = self.role.as_elder_mut()?;
-                let propose_offline = NodeDuty::ProposeOffline(vec![node_id.into()]);
-                elder.meta_data.increase_full_node_count(node_id).await?;
-                // Accept a new node in place for the full node.
-                Ok(vec![NodeDuty::SetNodeJoinsAllowed(true), propose_offline])
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    let propose_offline = NodeDuty::ProposeOffline(vec![node_id.into()]);
+                    elder
+                        .meta_data
+                        .write()
+                        .await
+                        .increase_full_node_count(node_id)
+                        .await?;
+                    // Accept a new node in place for the full node.
+                    Ok(vec![NodeDuty::SetNodeJoinsAllowed(true), propose_offline])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::Send(msg) => {
-                send(msg, &self.network_api).await?;
-                Ok(vec![])
+                let network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    send(msg, &network_api).await?;
+                    Ok(vec![])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::SendError(msg) => {
-                send_error(msg, &self.network_api).await?;
-                Ok(vec![])
+                let network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    send_error(msg, &network_api).await?;
+                    Ok(vec![])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::SendSupport(msg) => {
-                send_support(msg, &self.network_api).await?;
-                Ok(vec![])
+                let network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    send_support(msg, &network_api).await?;
+                    Ok(vec![])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::SendToNodes {
                 msg,
                 targets,
                 aggregation,
             } => {
-                send_to_nodes(&msg, targets, aggregation, &self.network_api).await?;
-                Ok(vec![])
+                let network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    send_to_nodes(&msg, targets, aggregation, &network_api).await?;
+                    Ok(vec![])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::SetNodeJoinsAllowed(joins_allowed) => {
-                self.network_api.set_joins_allowed(joins_allowed).await?;
-                Ok(vec![])
+                let mut network_api = self.network_api.clone();
+                let handle = tokio::spawn(async move {
+                    network_api.set_joins_allowed(joins_allowed).await?;
+                    Ok(vec![])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             //
             // ------- Data ------------
@@ -349,48 +534,40 @@ impl Node {
                 // TODO: remove this conditional branching
                 // routing should take care of this
                 let data_section_addr = query.dst_address();
-                if self
-                    .network_api
-                    .our_prefix()
-                    .await
-                    .matches(&data_section_addr)
-                {
-                    let elder = self.role.as_elder_mut()?;
-                    Ok(vec![
-                        elder
-                            .meta_data
-                            .read(query, msg_id, client_signed.public_key, origin)
-                            .await?,
-                    ])
-                } else {
-                    Ok(vec![NodeDuty::Send(OutgoingMsg {
-                        msg: MsgType::Node(NodeMsg::NodeQuery {
-                            query: NodeQuery::Metadata {
-                                query,
-                                client_signed,
-                                origin,
-                            },
-                            id: msg_id,
-                        }),
-                        dst: DstLocation::Section(data_section_addr),
-                        section_source: false,
-                        aggregation: Aggregation::None,
-                    })])
-                }
+                let network_api = self.network_api.clone();
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    if network_api.our_prefix().await.matches(&data_section_addr) {
+                        Ok(vec![
+                            elder
+                                .meta_data
+                                .write()
+                                .await
+                                .read(query, msg_id, client_signed.public_key, origin)
+                                .await?,
+                        ])
+                    } else {
+                        Ok(vec![NodeDuty::Send(OutgoingMsg {
+                            msg: MsgType::Node(NodeMsg::NodeQuery {
+                                query: NodeQuery::Metadata { query, client_signed, origin },
+                                id: msg_id,
+                            }),
+                            dst: DstLocation::Section(data_section_addr),
+                            section_source: false,
+                            aggregation: Aggregation::None,
+                        })])
+                    }
+                });
+                Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::ProcessWrite {
-                cmd,
-                msg_id,
-                origin,
-                client_signed,
-            } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(vec![
-                    elder
-                        .meta_data
-                        .write(cmd, msg_id, client_signed, origin)
-                        .await?,
-                ])
+            NodeDuty::ProcessWrite { cmd, msg_id, origin, client_signed } => {
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        elder.meta_data.write().await.write(cmd, msg_id, client_signed, origin).await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
             // --- Completion of Adult operations ---
             NodeDuty::RecordAdultReadLiveness {
@@ -398,11 +575,16 @@ impl Node {
                 correlation_id,
                 src,
             } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(elder
-                    .meta_data
-                    .record_adult_read_liveness(correlation_id, response, src)
-                    .await?)
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(elder
+                        .meta_data
+                        .write()
+                        .await
+                        .record_adult_read_liveness(correlation_id, response, src)
+                        .await?)
+                });
+                Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ProcessDataPayment {
                 msg:
@@ -414,18 +596,33 @@ impl Node {
                 origin,
                 ..
             } => {
-                let elder = self.role.as_elder_mut()?;
-                Ok(elder
-                    .transfers
-                    .process_payment(id, payment, cmd, client_signed, origin)
-                    .await?)
-            }
-            NodeDuty::ProcessDataPayment { .. } => Ok(vec![]),
+                let elder = self.role.as_elder_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(elder
+                        .transfers
+                        .read()
+                        .await
+                        .process_payment(id, payment, cmd, client_signed, origin)
+                        .await?)
+                });
+                Ok(NodeTask::Thread(handle))
+            },
+            NodeDuty::ProcessDataPayment { .. } => Ok(NodeTask::None),
             NodeDuty::ReplicateChunk { data, .. } => {
-                let adult = self.role.as_adult_mut()?;
-                Ok(vec![adult.chunks.store_for_replication(data).await?])
+                let adult = self.role.as_adult_mut()?.clone();
+                let handle = tokio::spawn(async move {
+                    Ok(vec![
+                        adult
+                            .chunks
+                            .write()
+                            .await
+                            .store_for_replication(data)
+                            .await?,
+                    ])
+                });
+                Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::NoOp => Ok(vec![]),
+            NodeDuty::NoOp => Ok(NodeTask::None),
         }
     }
 }

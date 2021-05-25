@@ -7,7 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    network::Network,
     node::interaction::push_state,
+    node::role::ElderRole,
     node_ops::NodeDuties,
     section_funds::{self, SectionFunds},
     transfers::get_replicas::replica_info,
@@ -53,29 +55,28 @@ impl Node {
 
         let wallets = RewardWallets::new(BTreeMap::<XorName, (NodeAge, PublicKey)>::new());
 
-        elder.section_funds = SectionFunds::Churning { process, wallets };
+        *elder.section_funds.write().await = SectionFunds::Churning { process, wallets };
 
         Ok(())
     }
 
     /// Called on split reported from routing layer.
     pub(crate) async fn begin_split_as_oldie(
-        &mut self,
+        elder: &ElderRole,
+        network_api: &Network,
         our_prefix: Prefix,
         our_key: PublicKey,
         sibling_key: PublicKey,
         our_new_elders: BTreeSet<XorName>,
         their_new_elders: BTreeSet<XorName>,
     ) -> Result<NodeDuties> {
-        let elder = self.role.as_elder_mut()?;
-
         // get payments before updating replica info
-        let payments = elder.transfers.payments().await?;
+        let payments = elder.transfers.read().await.payments().await?;
 
-        let info = replica_info(&self.network_api).await?;
-        elder.transfers.update_replica_info(info);
+        let info = replica_info(network_api).await?;
+        elder.transfers.write().await.update_replica_info(info);
 
-        let wallets = match &mut elder.section_funds {
+        let wallets = match &*elder.section_funds.read().await {
             SectionFunds::KeepingNodeWallets(wallets) | SectionFunds::Churning { wallets, .. } => {
                 wallets.clone()
             }
@@ -95,7 +96,7 @@ impl Node {
         let mut ops = vec![];
 
         if payments > Token::zero() {
-            let section_managed = elder.transfers.managed_amount().await?;
+            let section_managed = elder.transfers.read().await.managed_amount().await?;
 
             // payments made since last churn
             debug!("Payments: {}", payments);
@@ -108,7 +109,7 @@ impl Node {
                     our_prefix,
                     our_key,
                 },
-                ElderSigning::new(self.network_api.clone()).await?,
+                ElderSigning::new(network_api.clone()).await?,
             );
 
             ops.push(
@@ -117,7 +118,7 @@ impl Node {
                     .await?,
             );
 
-            elder.section_funds = SectionFunds::Churning {
+            *elder.section_funds.write().await = SectionFunds::Churning {
                 process,
                 wallets: wallets.clone(),
             };
@@ -136,14 +137,21 @@ impl Node {
         // drop metadata state
         elder
             .meta_data
-            .retain_members_only(self.network_api.our_adults().await)
+            .write()
+            .await
+            .retain_members_only(network_api.our_adults().await)
             .await?;
 
         // drop transfers state
-        elder.transfers.keep_keys_of(our_prefix).await?;
+        elder
+            .transfers
+            .read()
+            .await
+            .keep_keys_of(our_prefix)
+            .await?;
 
         // drop reward wallets state
-        elder.section_funds.keep_wallets_of(our_prefix);
+        elder.section_funds.read().await.keep_wallets_of(our_prefix);
 
         Ok(ops)
     }

@@ -23,6 +23,7 @@ use std::collections::BTreeMap;
 /// The management of section funds,
 /// via the usage of a distributed AT2 Actor.
 #[allow(clippy::large_enum_variant)]
+#[derive(Clone)]
 pub enum SectionFunds {
     KeepingNodeWallets(RewardWallets),
     Churning {

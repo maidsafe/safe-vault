@@ -10,6 +10,7 @@ use super::role::{ElderRole, Role};
 use crate::{
     capacity::{AdultsStorageInfo, Capacity, RateLimit},
     metadata::{adult_reader::AdultReader, Metadata},
+    network::Network,
     node_ops::NodeDuty,
     section_funds::{reward_wallets::RewardWallets, SectionFunds},
     transfers::{
@@ -27,10 +28,9 @@ use std::collections::BTreeMap;
 impl Node {
     /// If we are an oldie we'll have a transfer instance,
     /// This updates the replica info on it.
-    pub async fn update_replicas(&mut self) -> Result<()> {
-        let elder = self.role.as_elder_mut()?;
-        let info = replica_info(&self.network_api).await?;
-        elder.transfers.update_replica_info(info);
+    pub(crate) async fn update_replicas(elder: &ElderRole, network: &Network) -> Result<()> {
+        let info = replica_info(network).await?;
+        elder.transfers.write().await.update_replica_info(info);
         Ok(())
     }
 
@@ -66,42 +66,41 @@ impl Node {
             (NodeAge, PublicKey),
         >::new()));
 
-        self.role = Role::Elder(ElderRole {
-            meta_data,
-            transfers,
-            section_funds,
-            received_initial_sync: false,
-        });
+        self.role = Role::Elder(ElderRole::new(meta_data, transfers, section_funds, false));
 
         Ok(())
     }
 
     /// Continue the level up and handle more responsibilities.
-    pub async fn synch_state(
-        &mut self,
+    pub(crate) async fn synch_state(
+        elder: &ElderRole,
+        reward_key: PublicKey,
+        network_api: &Network,
         node_wallets: BTreeMap<XorName, (NodeAge, PublicKey)>,
         user_wallets: BTreeMap<PublicKey, ActorHistory>,
         metadata: DataExchange,
     ) -> Result<NodeDuty> {
-        let elder = self.role.as_elder_mut()?;
-
-        if elder.received_initial_sync {
+        if *elder.received_initial_sync.read().await {
             info!("We are already received the initial sync from our section. Ignoring update");
             return Ok(NodeDuty::NoOp);
         }
 
         // --------- merge in provided user wallets ---------
-        elder.transfers.merge(user_wallets).await?;
+        elder.transfers.write().await.merge(user_wallets).await?;
         // --------- merge in provided node reward stages ---------
         for (key, (age, wallet)) in &node_wallets {
-            elder.section_funds.set_node_wallet(*key, *wallet, *age)
+            elder
+                .section_funds
+                .read()
+                .await
+                .set_node_wallet(*key, *wallet, *age)
         }
         // --------- merge in provided metadata ---------
-        elder.meta_data.update(metadata).await?;
+        elder.meta_data.write().await.update(metadata).await?;
 
-        elder.received_initial_sync = true;
+        *elder.received_initial_sync.write().await = true;
 
-        let node_id = self.network_api.our_name().await;
+        let node_id = network_api.our_name().await;
         let no_wallet_found = node_wallets.get(&node_id).is_none();
 
         if no_wallet_found {
@@ -109,7 +108,9 @@ impl Node {
                 "Registering wallet of node: {} (since not found in received state)",
                 node_id,
             );
-            Ok(NodeDuty::Send(self.register_wallet().await))
+            Ok(NodeDuty::Send(
+                Self::register_wallet(network_api, reward_key).await,
+            ))
         } else {
             Ok(NodeDuty::NoOp)
         }
