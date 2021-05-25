@@ -15,8 +15,8 @@ use crate::{
 use log::debug;
 use sn_messaging::{
     node::{
-        NodeCmd, NodeDataQueryResponse, NodeEvent, NodeMsg, NodeQuery, NodeQueryResponse,
-        NodeRewardQuery, NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
+        NodeCmd, NodeDataQueryResponse, NodeMsg, NodeQuery, NodeQueryResponse, NodeRewardQuery,
+        NodeSystemCmd, NodeSystemQuery, NodeTransferCmd, NodeTransferQuery,
     },
     Aggregation, DstLocation, MessageId, SrcLocation,
 };
@@ -216,15 +216,6 @@ fn match_node_msg(msg: NodeMsg, origin: SrcLocation) -> NodeDuty {
             ..
         } => NodeDuty::GetTransferReplicaEvents { msg_id: id, origin },
         // --- Adult Operation response ---
-        NodeMsg::NodeEvent {
-            event: NodeEvent::ChunkWriteHandled(result),
-            correlation_id,
-            ..
-        } => NodeDuty::RecordAdultWriteLiveness {
-            result,
-            correlation_id,
-            src: origin.name(),
-        },
         NodeMsg::NodeQueryResponse {
             response: NodeQueryResponse::Data(NodeDataQueryResponse::GetChunk(res)),
             correlation_id,

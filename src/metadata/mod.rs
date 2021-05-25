@@ -83,18 +83,6 @@ impl Metadata {
         self.elder_stores.read(query, id, requester, origin).await
     }
 
-    pub async fn record_adult_write_liveness(
-        &mut self,
-        correlation_id: MessageId,
-        result: Result<(), CmdError>,
-        src: XorName,
-    ) -> NodeDuties {
-        self.elder_stores
-            .blob_records_mut()
-            .record_adult_write_liveness(correlation_id, result, src)
-            .await
-    }
-
     pub async fn record_adult_read_liveness(
         &mut self,
         correlation_id: MessageId,

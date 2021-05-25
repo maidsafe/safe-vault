@@ -19,22 +19,15 @@ const MIN_PENDING_OPS: usize = 10;
 const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
 
 #[derive(Clone, Debug)]
-enum Operation {
-    Read {
-        address: BlobAddress,
-        origin: EndUser,
-        targets: BTreeSet<XorName>,
-    },
-    Write {
-        address: BlobAddress,
-        // Set to None if write was initiated by the section
-        origin: Option<EndUser>,
-        targets: BTreeSet<XorName>,
-    },
+struct ReadOperation {
+    address: BlobAddress,
+    origin: EndUser,
+    targets: BTreeSet<XorName>,
+    responded_with_success: bool,
 }
 
 pub struct AdultLiveness {
-    ops: HashMap<MessageId, Operation>,
+    ops: HashMap<MessageId, ReadOperation>,
     pending_ops: HashMap<XorName, usize>,
     closest_adults: HashMap<XorName, Vec<XorName>>,
 }
@@ -48,31 +41,6 @@ impl AdultLiveness {
         }
     }
 
-    // Inserts a new write operation
-    // Returns false if the operation already existed.
-    pub fn new_write(
-        &mut self,
-        msg_id: MessageId,
-        origin: Option<EndUser>,
-        address: BlobAddress,
-        targets: &BTreeSet<XorName>,
-    ) -> bool {
-        let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
-            let _ = entry.insert(Operation::Write {
-                address,
-                origin,
-                targets: targets.clone(),
-            });
-            true
-        } else {
-            false
-        };
-        if new_operation {
-            self.increment_pending_op(targets);
-        }
-        new_operation
-    }
-
     // Inserts a new read operation
     // Returns false if the operation already existed.
     pub fn new_read(
@@ -83,10 +51,11 @@ impl AdultLiveness {
         targets: BTreeSet<XorName>,
     ) -> bool {
         let new_operation = if let Entry::Vacant(entry) = self.ops.entry(msg_id) {
-            let _ = entry.insert(Operation::Read {
+            let _ = entry.insert(ReadOperation {
                 address,
                 origin,
                 targets: targets.clone(),
+                responded_with_success: false,
             });
             true
         } else {
@@ -122,16 +91,9 @@ impl AdultLiveness {
             }
         }
         let complete = if let Some(operation) = self.ops.get_mut(&msg_id) {
-            match operation {
-                Operation::Read { targets, .. } => {
-                    let _ = targets.remove(name);
-                    targets.is_empty()
-                }
-                Operation::Write { targets, .. } => {
-                    let _ = targets.remove(name);
-                    targets.is_empty()
-                }
-            }
+            let ReadOperation { targets, .. } = operation;
+            let _ = targets.remove(name);
+            targets.is_empty()
         } else {
             true
         };
@@ -140,33 +102,28 @@ impl AdultLiveness {
         }
     }
 
-    pub fn record_adult_write_liveness(
-        &mut self,
-        correlation_id: MessageId,
-        src: XorName,
-    ) -> Option<(BlobAddress, Option<EndUser>)> {
-        let op = self.ops.get(&correlation_id).cloned();
-        self.remove_target(correlation_id, &src);
-        op.and_then(|op| match op {
-            Operation::Write {
-                address, origin, ..
-            } => Some((address, origin)),
-            Operation::Read { .. } => None,
-        })
-    }
-
     pub fn record_adult_read_liveness(
         &mut self,
         correlation_id: MessageId,
         src: XorName,
+        success: bool,
     ) -> Option<(BlobAddress, EndUser)> {
-        let op = self.ops.get(&correlation_id).cloned();
         self.remove_target(correlation_id, &src);
-        op.and_then(|op| match op {
-            Operation::Read {
-                address, origin, ..
-            } => Some((address, origin)),
-            Operation::Write { .. } => None,
+        let op = self.ops.get_mut(&correlation_id);
+        op.and_then(|op| {
+            let ReadOperation {
+                address,
+                origin,
+                targets,
+                responded_with_success,
+            } = op;
+
+            if targets.len() < super::CHUNK_COPY_COUNT && *responded_with_success {
+                None
+            } else {
+                *responded_with_success = success;
+                Some((*address, *origin))
+            }
         })
     }
 
