@@ -134,12 +134,13 @@ impl Node {
         let msg_id = MessageId::combine(&[sibling_prefix.name().0, XorName::from(sibling_key).0]);
         ops.push(push_state(elder, sibling_prefix, msg_id, their_new_elders).await?);
 
+        let our_adults = network_api.our_adults().await;
         // drop metadata state
         elder
             .meta_data
             .write()
             .await
-            .retain_members_only(network_api.our_adults().await)
+            .retain_members_only(our_adults)
             .await?;
 
         // drop transfers state

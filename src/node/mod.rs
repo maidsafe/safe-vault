@@ -23,7 +23,7 @@ use crate::{
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
 };
-use futures::{future::BoxFuture, lock::Mutex, FutureExt};
+use futures::{future::BoxFuture, lock::Mutex, stream::FuturesUnordered, FutureExt, StreamExt};
 use handle::NodeTask;
 use log::{error, info, warn};
 use rand::rngs::OsRng;
@@ -149,30 +149,30 @@ impl Node {
             event_lock.clone(),
             network_api.clone(),
         ));
-        let mut threads = vec![routing_task_handle];
-        while !threads.is_empty() {
+        let mut threads = FuturesUnordered::new();
+        threads.push(routing_task_handle);
+        while let Some(result) = threads.next().await {
             info!("THREAD COUNT: {}", threads.len());
-            let (result, _index, mut remaining_futures) =
-                futures::future::select_all(threads.into_iter()).await;
+            // let (result, _index, mut remaining_futures) =
+            //     futures::future::select_all(threads.into_iter()).await;
             match result {
-                Ok(Ok(NodeTask::Thread(handle))) => remaining_futures.push(handle),
+                Ok(Ok(NodeTask::Thread(handle))) => threads.push(handle),
                 Ok(Ok(NodeTask::Result((duties, ctx)))) => {
                     for duty in duties {
                         let tasks = self.handle_and_get_threads(duty, ctx.clone()).await;
-                        remaining_futures.extend(tasks.into_iter());
+                        threads.extend(tasks.into_iter());
                     }
                 }
                 Ok(Ok(NodeTask::None)) => (),
                 Ok(Err(err)) => {
                     let duty = try_handle_error(err, None);
                     let tasks = self.handle_and_get_threads(duty, None).await;
-                    remaining_futures.extend(tasks.into_iter());
+                    threads.extend(tasks.into_iter());
                 }
                 Err(err) => {
                     error!("Error spawning task for task: {}", err);
                 }
             }
-            threads = remaining_futures;
             // If we can attain the lock on the mutex it means the previous routing event
             // has already been processed. So spawn it again
             if event_lock.try_lock().is_some() {
