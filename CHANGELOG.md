@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.45.0](https://github.com/maidsafe/sn_node/compare/v0.44.1...v0.45.0) (2021-05-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* removing support for Ping message type.
+* removing the use of msg::Msg message type which breaks backward compatibility with clients.
+
+* minor refactor to adapt to new sn_messaging v24.0.0 ([fb7ae79](https://github.com/maidsafe/sn_node/commit/fb7ae79a19e6a39dddcd2767cdaef63210c5e535))
+* minor refactor to adapt to new sn_messaging v25.0.0 ([082b50e](https://github.com/maidsafe/sn_node/commit/082b50e4d493829b76e15b8ba9a5a0debdfd4569))
+
 ### [0.44.1](https://github.com/maidsafe/sn_node/compare/v0.44.0...v0.44.1) (2021-05-25)
 
 ## [0.44.0](https://github.com/maidsafe/sn_node/compare/v0.43.6...v0.44.0) (2021-05-24)
