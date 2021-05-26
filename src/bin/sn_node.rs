@@ -110,9 +110,9 @@ async fn run_node() {
         BOOTSTRAP_RETRY_TIME
     );
 
-    let mut node = loop {
+    let (mut node, event_stream) = loop {
         match Node::new(&config).await {
-            Ok(node) => break node,
+            Ok(result) => break result,
             Err(sn_node::Error::Routing(sn_routing::Error::TryJoinLater)) => {
                 println!("{}", log);
                 info!("{}", log);
@@ -154,7 +154,7 @@ async fn run_node() {
         });
     }
 
-    match node.run().await {
+    match node.run(event_stream).await {
         Ok(()) => exit(0),
         Err(e) => {
             println!("Cannot start node due to error: {:?}", e);

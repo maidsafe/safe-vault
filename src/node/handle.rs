@@ -13,6 +13,7 @@ use super::{
 };
 use crate::{
     chunks::Chunks,
+    event_mapping::MsgContext,
     node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
@@ -30,8 +31,14 @@ use xor_name::XorName;
 
 pub enum NodeTask {
     None,
-    Result(NodeDuties),
-    Thread(JoinHandle<Result<NodeDuties>>),
+    Result((NodeDuties, Option<MsgContext>)),
+    Thread(JoinHandle<Result<NodeTask>>),
+}
+
+impl From<NodeDuties> for NodeTask {
+    fn from(duties: NodeDuties) -> Self {
+        Self::Result((duties, None))
+    }
 }
 
 impl Node {
@@ -73,13 +80,14 @@ impl Node {
                         let msg_id =
                             MessageId::combine(&[our_prefix.name().0, XorName::from(our_key).0]);
                         let ops = vec![push_state(&elder, our_prefix, msg_id, new_elders).await?];
+                        let our_adults = network.our_adults().await;
                         elder
                             .meta_data
                             .write()
                             .await
-                            .retain_members_only(network.our_adults().await)
+                            .retain_members_only(our_adults)
                             .await?;
-                        Ok(ops)
+                        Ok(NodeTask::from(ops))
                     });
                     Ok(NodeTask::Thread(handle))
                 }
@@ -92,9 +100,11 @@ impl Node {
                 let our_name = self.our_name().await;
                 let mut adult_role = self.role.as_adult()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(adult_role
-                        .reorganize_chunks(our_name, added, removed, remaining)
-                        .await)
+                    Ok(NodeTask::from(
+                        adult_role
+                            .reorganize_chunks(our_name, added, removed, remaining)
+                            .await,
+                    ))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -115,16 +125,18 @@ impl Node {
                     let elder = self.role.as_elder()?.clone();
                     let network = self.network_api.clone();
                     let handle = tokio::spawn(async move {
-                        Self::begin_split_as_oldie(
-                            &elder,
-                            &network,
-                            our_prefix,
-                            our_key,
-                            sibling_key,
-                            our_new_elders,
-                            their_new_elders,
-                        )
-                        .await
+                        Ok(NodeTask::from(
+                            Self::begin_split_as_oldie(
+                                &elder,
+                                &network,
+                                our_prefix,
+                                our_key,
+                                sibling_key,
+                                our_new_elders,
+                                their_new_elders,
+                            )
+                            .await?,
+                        ))
                     });
                     Ok(NodeTask::Thread(handle))
                 }
@@ -139,7 +151,9 @@ impl Node {
             NodeDuty::GetSectionElders { msg_id, origin } => {
                 let network = self.network_api.clone();
                 let handle = tokio::spawn(async move {
-                    Self::get_section_elders(&network, msg_id, origin).await
+                    Ok(NodeTask::from(
+                        Self::get_section_elders(&network, msg_id, origin).await?,
+                    ))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -154,7 +168,7 @@ impl Node {
                     .0
                     .clone();
                 let duties = vec![churn_process.receive_churn_proposal(proposal).await?];
-                Ok(NodeTask::Result(duties))
+                Ok(NodeTask::Result((duties, None)))
             }
             NodeDuty::ReceiveRewardAccumulation(accumulation) => {
                 let elder = self.role.as_elder_mut()?.clone();
@@ -184,7 +198,7 @@ impl Node {
                         ops.push(NodeDuty::SetNodeJoinsAllowed(true));
                     }
 
-                    Ok(ops)
+                    Ok(NodeTask::from(ops))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -195,7 +209,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     let members = network_api.our_members().await;
-                    if let Some(age) = members.get(&node_id) {
+                    let result = if let Some(age) = members.get(&node_id) {
                         elder
                             .section_funds
                             .write()
@@ -210,7 +224,8 @@ impl Node {
                             wallet_id
                         );
                         Err(Error::NodeNotFoundForReward)
-                    }
+                    }?;
+                    Ok(NodeTask::from(result))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -219,7 +234,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     let members = network_api.our_members().await;
-                    if members.get(&node_name).is_some() {
+                    let result = if members.get(&node_name).is_some() {
                         let _wallet = elder.section_funds.read().await.get_node_wallet(&node_name);
                         Ok(vec![]) // not yet implemented
                     } else {
@@ -229,7 +244,8 @@ impl Node {
                             node_name,
                         );
                         Err(Error::NodeNotFoundForReward)
-                    }
+                    }?;
+                    Ok(NodeTask::from(result))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -239,13 +255,14 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     elder.section_funds.read().await.remove_node_wallet(name);
+                    let our_adults = network_api.our_adults().await;
                     elder
                         .meta_data
                         .write()
                         .await
-                        .retain_members_only(network_api.our_adults().await)
+                        .retain_members_only(our_adults)
                         .await?;
-                    Ok(vec![NodeDuty::SetNodeJoinsAllowed(true)])
+                    Ok(NodeTask::from(vec![NodeDuty::SetNodeJoinsAllowed(true)]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -260,7 +277,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let reward_key = self.node_info.reward_key;
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         Self::synch_state(
                             &elder,
                             reward_key,
@@ -270,7 +287,7 @@ impl Node {
                             metadata,
                         )
                         .await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -289,14 +306,14 @@ impl Node {
             NodeDuty::GetTransferReplicaEvents { msg_id, origin } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         elder
                             .transfers
                             .read()
                             .await
                             .all_events(msg_id, origin)
                             .await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -307,14 +324,14 @@ impl Node {
             } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         elder
                             .transfers
                             .read()
                             .await
                             .receive_propagated(&proof, msg_id, origin)
                             .await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -325,28 +342,28 @@ impl Node {
             } => {
                 let elder = self.role.as_elder()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         elder
                             .transfers
                             .read()
                             .await
                             .validate(signed_transfer, msg_id, origin)
                             .await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::SimulatePayout { transfer, .. } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         elder
                             .transfers
                             .write()
                             .await
                             .credit_without_proof(transfer)
                             .await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -356,28 +373,28 @@ impl Node {
                 // TODO: add limit with since_version
                 let elder = self.role.as_elder()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         elder
                             .transfers
                             .read()
                             .await
                             .history(&at, msg_id, origin)
                             .await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::GetBalance { at, msg_id, origin } => {
                 let elder = self.role.as_elder()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         elder
                             .transfers
                             .read()
                             .await
                             .balance(at, msg_id, origin)
                             .await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -389,26 +406,32 @@ impl Node {
             } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(elder
-                        .transfers
-                        .write()
-                        .await
-                        .get_store_cost(bytes, msg_id, origin)
-                        .await)
+                    Ok(NodeTask::from(
+                        elder
+                            .transfers
+                            .write()
+                            .await
+                            .get_store_cost(bytes, msg_id, origin)
+                            .await,
+                    ))
                 });
                 Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::RegisterTransfer { proof, msg_id, origin } => {
+            NodeDuty::RegisterTransfer {
+                proof,
+                msg_id,
+                origin,
+            } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         elder
                             .transfers
                             .read()
                             .await
                             .register(&proof, msg_id, origin)
                             .await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -419,7 +442,7 @@ impl Node {
                 let handle = tokio::spawn(async move {
                     let mut ops = vec![adult.chunks.write().await.read(&read, msg_id)];
                     ops.extend(adult.chunks.read().await.check_storage().await?);
-                    Ok(ops)
+                    Ok(NodeTask::from(ops))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -439,7 +462,7 @@ impl Node {
                             .await?,
                     ];
                     ops.extend(adult.chunks.read().await.check_storage().await?);
-                    Ok(ops)
+                    Ok(NodeTask::from(ops))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -447,18 +470,18 @@ impl Node {
                 info!("Processing republish with MessageId: {:?}", msg_id);
                 let elder = self.role.as_elder()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         elder.meta_data.write().await.republish_chunk(chunk).await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
             NodeDuty::ReachingMaxCapacity => {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         Self::notify_section_of_our_storage(&network_api).await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -475,7 +498,10 @@ impl Node {
                         .increase_full_node_count(node_id)
                         .await?;
                     // Accept a new node in place for the full node.
-                    Ok(vec![NodeDuty::SetNodeJoinsAllowed(true), propose_offline])
+                    Ok(NodeTask::from(vec![
+                        NodeDuty::SetNodeJoinsAllowed(true),
+                        propose_offline,
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -483,7 +509,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     send(msg, &network_api).await?;
-                    Ok(vec![])
+                    Ok(NodeTask::from(vec![]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -491,7 +517,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     send_error(msg, &network_api).await?;
-                    Ok(vec![])
+                    Ok(NodeTask::from(vec![]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -499,7 +525,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     send_support(msg, &network_api).await?;
-                    Ok(vec![])
+                    Ok(NodeTask::from(vec![]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -511,7 +537,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     send_to_nodes(&msg, targets, aggregation, &network_api).await?;
-                    Ok(vec![])
+                    Ok(NodeTask::from(vec![]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -519,7 +545,7 @@ impl Node {
                 let mut network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     network_api.set_joins_allowed(joins_allowed).await?;
-                    Ok(vec![])
+                    Ok(NodeTask::from(vec![]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -537,35 +563,50 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    if network_api.our_prefix().await.matches(&data_section_addr) {
-                        Ok(vec![
+                    let duties = if network_api.our_prefix().await.matches(&data_section_addr) {
+                        vec![
                             elder
                                 .meta_data
                                 .write()
                                 .await
                                 .read(query, msg_id, client_signed.public_key, origin)
                                 .await?,
-                        ])
+                        ]
                     } else {
-                        Ok(vec![NodeDuty::Send(OutgoingMsg {
+                        vec![NodeDuty::Send(OutgoingMsg {
                             msg: MsgType::Node(NodeMsg::NodeQuery {
-                                query: NodeQuery::Metadata { query, client_signed, origin },
+                                query: NodeQuery::Metadata {
+                                    query,
+                                    client_signed,
+                                    origin,
+                                },
                                 id: msg_id,
                             }),
                             dst: DstLocation::Section(data_section_addr),
                             section_source: false,
                             aggregation: Aggregation::None,
-                        })])
-                    }
+                        })]
+                    };
+                    Ok(NodeTask::from(duties))
                 });
                 Ok(NodeTask::Thread(handle))
             }
-            NodeDuty::ProcessWrite { cmd, msg_id, origin, client_signed } => {
+            NodeDuty::ProcessWrite {
+                cmd,
+                msg_id,
+                origin,
+                client_signed,
+            } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
-                        elder.meta_data.write().await.write(cmd, msg_id, client_signed, origin).await?,
-                    ])
+                    Ok(NodeTask::from(vec![
+                        elder
+                            .meta_data
+                            .write()
+                            .await
+                            .write(cmd, msg_id, client_signed, origin)
+                            .await?,
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -577,12 +618,14 @@ impl Node {
             } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(elder
-                        .meta_data
-                        .write()
-                        .await
-                        .record_adult_read_liveness(correlation_id, response, src)
-                        .await?)
+                    Ok(NodeTask::from(
+                        elder
+                            .meta_data
+                            .write()
+                            .await
+                            .record_adult_read_liveness(correlation_id, response, src)
+                            .await?,
+                    ))
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -598,27 +641,29 @@ impl Node {
             } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(elder
-                        .transfers
-                        .read()
-                        .await
-                        .process_payment(id, payment, cmd, client_signed, origin)
-                        .await?)
+                    Ok(NodeTask::from(
+                        elder
+                            .transfers
+                            .read()
+                            .await
+                            .process_payment(id, payment, cmd, client_signed, origin)
+                            .await?,
+                    ))
                 });
                 Ok(NodeTask::Thread(handle))
-            },
+            }
             NodeDuty::ProcessDataPayment { .. } => Ok(NodeTask::None),
             NodeDuty::ReplicateChunk { data, .. } => {
                 let adult = self.role.as_adult_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    Ok(vec![
+                    Ok(NodeTask::from(vec![
                         adult
                             .chunks
                             .write()
                             .await
                             .store_for_replication(data)
                             .await?,
-                    ])
+                    ]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
