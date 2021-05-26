@@ -31,13 +31,13 @@ use xor_name::XorName;
 
 pub enum NodeTask {
     None,
-    Result((NodeDuties, Option<MsgContext>)),
+    Result(Box<(NodeDuties, Option<MsgContext>)>),
     Thread(JoinHandle<Result<NodeTask>>),
 }
 
 impl From<NodeDuties> for NodeTask {
     fn from(duties: NodeDuties) -> Self {
-        Self::Result((duties, None))
+        Self::Result(Box::new((duties, None)))
     }
 }
 
@@ -168,7 +168,7 @@ impl Node {
                     .0
                     .clone();
                 let duties = vec![churn_process.receive_churn_proposal(proposal).await?];
-                Ok(NodeTask::Result((duties, None)))
+                Ok(NodeTask::Result(Box::new((duties, None))))
             }
             NodeDuty::ReceiveRewardAccumulation(accumulation) => {
                 let elder = self.role.as_elder_mut()?.clone();
@@ -509,7 +509,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     send(msg, &network_api).await?;
-                    Ok(NodeTask::from(vec![]))
+                    Ok(NodeTask::None)
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -517,7 +517,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     send_error(msg, &network_api).await?;
-                    Ok(NodeTask::from(vec![]))
+                    Ok(NodeTask::None)
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -525,7 +525,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     send_support(msg, &network_api).await?;
-                    Ok(NodeTask::from(vec![]))
+                    Ok(NodeTask::None)
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -537,7 +537,7 @@ impl Node {
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     send_to_nodes(&msg, targets, aggregation, &network_api).await?;
-                    Ok(NodeTask::from(vec![]))
+                    Ok(NodeTask::None)
                 });
                 Ok(NodeTask::Thread(handle))
             }
@@ -545,7 +545,7 @@ impl Node {
                 let mut network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
                     network_api.set_joins_allowed(joins_allowed).await?;
-                    Ok(NodeTask::from(vec![]))
+                    Ok(NodeTask::None)
                 });
                 Ok(NodeTask::Thread(handle))
             }

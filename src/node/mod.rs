@@ -25,7 +25,7 @@ use crate::{
 };
 use futures::{future::BoxFuture, lock::Mutex, stream::FuturesUnordered, FutureExt, StreamExt};
 use handle::NodeTask;
-use log::{error, info, warn};
+use log::{error, warn};
 use rand::rngs::OsRng;
 use role::{AdultRole, Role};
 use sn_data_types::PublicKey;
@@ -132,7 +132,7 @@ impl Node {
         let node_task = if let Some(event) = network_events.lock().await.next().await {
             // tokio spawn should only be needed around intensive tasks, ie sign/verify
             let Mapping { op, ctx } = map_routing_event(event, &network_api).await;
-            NodeTask::Result((vec![op], ctx))
+            NodeTask::Result(Box::new((vec![op], ctx)))
         } else {
             NodeTask::None
         };
@@ -152,12 +152,10 @@ impl Node {
         let mut threads = FuturesUnordered::new();
         threads.push(routing_task_handle);
         while let Some(result) = threads.next().await {
-            info!("THREAD COUNT: {}", threads.len());
-            // let (result, _index, mut remaining_futures) =
-            //     futures::future::select_all(threads.into_iter()).await;
             match result {
                 Ok(Ok(NodeTask::Thread(handle))) => threads.push(handle),
-                Ok(Ok(NodeTask::Result((duties, ctx)))) => {
+                Ok(Ok(NodeTask::Result(boxed))) => {
+                    let (duties, ctx) = *boxed;
                     for duty in duties {
                         let tasks = self.handle_and_get_threads(duty, ctx.clone()).await;
                         threads.extend(tasks.into_iter());
@@ -182,7 +180,6 @@ impl Node {
                 )))
             }
         }
-
         Ok(())
     }
 
@@ -195,7 +192,8 @@ impl Node {
             let mut threads = vec![];
             match self.handle(op).await {
                 Ok(node_task) => match node_task {
-                    NodeTask::Result((node_duties, ctx)) => {
+                    NodeTask::Result(boxed) => {
+                        let (node_duties, ctx) = *boxed;
                         for duty in node_duties {
                             let tasks = self.handle_and_get_threads(duty, ctx.clone()).await;
                             threads.extend(tasks.into_iter());
@@ -212,7 +210,6 @@ impl Node {
                     threads.extend(tasks.into_iter());
                 }
             }
-            log::info!("_TASK_ COUNT: {}", threads.len());
             threads
         }
         .boxed()
