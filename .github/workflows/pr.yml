@@ -16,7 +16,9 @@ env:
 
 jobs:
   clippy:
-    if: github.repository_owner == 'maidsafe'
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Rustfmt-Clippy
     runs-on: ubuntu-latest
     steps:
@@ -50,6 +52,7 @@ jobs:
         run: cargo clippy --all-targets
 
   check_pr_size:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Check PR size doesn't break set limit
     runs-on: ubuntu-latest
     steps:
@@ -61,7 +64,9 @@ jobs:
         max_lines_changed: 200
   
   coverage:
-    if: github.repository_owner == 'maidsafe'
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Code coverage check
     runs-on: ubuntu-latest
     steps:
@@ -103,7 +108,9 @@ jobs:
           parallel-finished: true
 
   test:
-    if: github.repository_owner == 'maidsafe'
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -152,7 +159,9 @@ jobs:
 
   # list any unused dependencies using cargo-udeps
   cargo-udeps:
-    if: github.repository_owner == 'maidsafe'
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Unused dependency check
     runs-on: ubuntu-latest
     steps:
@@ -172,7 +181,9 @@ jobs:
   
   # list all duplicate dependencies. Note that this does not error if duplicates found
   duplicate-dependencies:
-    if: github.repository_owner == 'maidsafe'
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: List Duplicate Dependencies
     runs-on: ubuntu-latest
     steps:
@@ -190,7 +201,9 @@ jobs:
         run: ./scripts/duplicate_dependency_check
 
   cargo-deny:
-    if: ${{ github.repository_owner == 'maidsafe' }}
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -203,7 +216,9 @@ jobs:
 
   # Test publish using --dry-run.
   test-publish:
-    if: github.repository_owner == 'maidsafe'
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      !startsWith(github.event.pull_request.title, 'Automated version bump')
     name: Test Publish
     runs-on: ubuntu-latest
     steps:
