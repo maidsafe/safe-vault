@@ -19,6 +19,7 @@ env:
 
 jobs:
   tests:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests
     runs-on: ${{ matrix.os }}
     strategy:
@@ -52,14 +53,12 @@ jobs:
         run:  curl -so- https://sn-api.s3.amazonaws.com/install.sh | bash
      
       - run: ~/.safe/cli/safe -V
-      - run: ~/.safe/cli/safe auth install
 
       - name: Check Safe Versions
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         run : |
           echo $PATH
           ~/.safe/cli/safe -V
-          ~/.safe/authd/sn_authd -V
           ~/.safe/cli/safe --version
 
       - name: Build launch local network
@@ -69,8 +68,6 @@ jobs:
           args: --release
       
       - run: ./target/release/launch_network
-
-      - run: ~/.safe/cli/safe auth restart
 
       # Our basic test: create an account
       - name: Create Account
@@ -83,10 +80,4 @@ jobs:
         run: |
           ls $HOME/.safe/node/local-test-network
           cat $HOME/.safe/node/local-test-network/sn-node-genesis/sn_node.log
-        if: failure()
-
-      - name: Authd Logs
-        run: |
-          ls $HOME/.safe/authd/
-          cat $HOME/.safe/authd/logs/sn_authd.log
         if: failure()
