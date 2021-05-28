@@ -490,9 +490,9 @@ checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
 name = "data-encoding-macro"
-version = "0.1.10"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a94feec3d2ba66c0b6621bca8bc6f68415b1e5c69af3586fdd0af9fd9f29b17"
+checksum = "86927b7cd2fe88fa698b87404b287ab98d1a0063a34071d92e575b72d3029aca"
 dependencies = [
  "data-encoding",
  "data-encoding-macro-internal",
@@ -500,9 +500,9 @@ dependencies = [
 
 [[package]]
 name = "data-encoding-macro-internal"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0f83e699727abca3c56e187945f303389590305ab2f0185ea445aa66e8d5f2a"
+checksum = "a5bbed42daaa95e780b60a50546aa345b8413a1e46f9a40a12907d3598f038db"
 dependencies = [
  "data-encoding",
  "syn 1.0.72",
@@ -2119,6 +2119,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "secured_linked_list"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "937151f7d7f72310fa54064dbd903d0335190a08e666dd7014a941d96e8bc49e"
+dependencies = [
+ "bincode",
+ "itertools 0.9.0",
+ "serde",
+ "thiserror",
+ "threshold_crypto",
+]
+
+[[package]]
 name = "self_update"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2289,9 +2302,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "25.0.0"
+version = "26.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "107f742cea3304e299f8a6fcc99246765105b5099bcca705adc58e3d17fb4b07"
+checksum = "25ec4d142a960f4ad204c3c57d2ded22e98bccde64cde3cd229f4c9b8e4b123b"
 dependencies = [
  "bincode",
  "bytes 1.0.1",
@@ -2315,7 +2328,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.44.1"
+version = "0.45.2"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2339,6 +2352,7 @@ dependencies = [
  "pickledb",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
+ "secured_linked_list",
  "self_update",
  "serde",
  "serde_json",
@@ -2358,9 +2372,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.71.0"
+version = "0.71.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c331fc0617fb3e1441230bed8faa1e9a8bdc4471b33716f8bf437829e1dca6e4"
+checksum = "47bfa0b69018a720f7468fc0409b0139a6706329559996d64770742e7620df4d"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2375,6 +2389,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_chacha 0.2.2",
  "resource_proof",
+ "secured_linked_list",
  "serde",
  "sn_data_types",
  "sn_messaging",
@@ -2503,9 +2518,9 @@ dependencies = [
 
 [[package]]
 name = "tar"
-version = "0.4.33"
+version = "0.4.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0bcfbd6a598361fda270d82469fff3d65089dc33e175c9a131f7b4cd395f228"
+checksum = "7d779dc6aeff029314570f666ec83f19df7280bb36ef338442cfa8c604021b80"
 dependencies = [
  "filetime",
  "libc",

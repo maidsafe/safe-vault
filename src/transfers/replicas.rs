@@ -39,7 +39,7 @@ where
     pub id: bls::PublicKeyShare,
     pub key_index: usize,
     pub peer_replicas: PublicKeySet,
-    pub section_chain: sn_routing::SectionChain,
+    pub section_chain: secured_linked_list::SecuredLinkedList,
     pub signing: T,
 }
 

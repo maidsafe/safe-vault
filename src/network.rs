@@ -13,12 +13,12 @@ use crate::{
 use bls::PublicKeySet;
 use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
+use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
 use sn_messaging::Itinerary;
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
-    SectionChain,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -176,7 +176,7 @@ impl Network {
         self.routing.our_prefix().await
     }
 
-    pub async fn section_chain(&self) -> SectionChain {
+    pub async fn section_chain(&self) -> SecuredLinkedList {
         self.routing.section_chain().await
     }
 
