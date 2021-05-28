@@ -130,7 +130,6 @@ impl Node {
         network_api: Network,
     ) -> Result<NodeTask> {
         let node_task = if let Some(event) = network_events.lock().await.next().await {
-            // tokio spawn should only be needed around intensive tasks, ie sign/verify
             let Mapping { op, ctx } = map_routing_event(event, &network_api).await;
             NodeTask::Result(Box::new((vec![op], ctx)))
         } else {
@@ -171,8 +170,8 @@ impl Node {
                     error!("Error spawning task for task: {}", err);
                 }
             }
-            // If we can attain the lock on the mutex it means the previous routing event
-            // has already been processed. So spawn it again
+            // If the Mutex is locked, it means there is already a task running which
+            // is listening for routing events. If not, spawn a new task to listen for further events
             if event_lock.try_lock().is_some() {
                 threads.push(tokio::spawn(Self::process_routing_event(
                     event_lock.clone(),
