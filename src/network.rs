@@ -16,10 +16,10 @@ use ed25519_dalek::PublicKey as Ed25519PublicKey;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
 use sn_messaging::Itinerary;
-use sn_routing::{
+use sn_routing::{PeerUtils,
     Config as RoutingConfig, Error as RoutingError, EventStream, Routing as RoutingNode,
-    SectionChain,
 };
+use secured_linked_list::SecuredLinkedList;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -176,7 +176,7 @@ impl Network {
         self.routing.our_prefix().await
     }
 
-    pub async fn section_chain(&self) -> SectionChain {
+    pub async fn section_chain(&self) -> SecuredLinkedList {
         self.routing.section_chain().await
     }
 

@@ -19,6 +19,7 @@ use sn_data_types::{
 use sn_transfers::WalletReplica;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use xor_name::Prefix;
+use secured_linked_list::SecuredLinkedList;
 
 #[cfg(feature = "simulated-payouts")]
 use {
@@ -39,7 +40,7 @@ where
     pub id: bls::PublicKeyShare,
     pub key_index: usize,
     pub peer_replicas: PublicKeySet,
-    pub section_chain: sn_routing::SectionChain,
+    pub section_chain: SecuredLinkedList,
     pub signing: T,
 }
 
