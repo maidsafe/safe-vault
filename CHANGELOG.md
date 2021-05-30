@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.46.0](https://github.com/maidsafe/sn_node/compare/v0.45.2...v0.46.0) (2021-05-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* sn_messaging used by this version is not backward compatible.
+
+* upgrading sn_routing to v74.0 ([c501650](https://github.com/maidsafe/sn_node/commit/c501650c4a3c730f4614aa2336694ec5026eb417))
+
 ### [0.45.2](https://github.com/maidsafe/sn_node/compare/v0.45.1...v0.45.2) (2021-05-27)
 
 ### [0.45.1](https://github.com/maidsafe/sn_node/compare/v0.45.0...v0.45.1) (2021-05-27)
