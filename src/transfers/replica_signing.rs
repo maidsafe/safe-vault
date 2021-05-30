@@ -91,7 +91,7 @@ impl ReplicaSigning for ReplicaSigningImpl {
         wallet_name: &sn_routing::XorName,
         section_key: bls::PublicKey,
     ) -> bool {
-        if let Some(key) = self.network.matching_section(wallet_name).await {
+        if let Ok(key) = self.network.matching_section(wallet_name).await {
             key == section_key
         } else {
             false

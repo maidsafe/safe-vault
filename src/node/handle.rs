@@ -14,7 +14,7 @@ use super::{
 use crate::{
     chunks::Chunks,
     event_mapping::MsgContext,
-    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuties, NodeDuty},
     section_funds::{reward_stage::RewardStage, Credits, SectionFunds},
     Error, Node, Result,
 };
@@ -22,12 +22,14 @@ use log::{debug, info};
 use sn_messaging::{
     client::{Cmd, ProcessMsg},
     node::{NodeMsg, NodeQuery},
-    Aggregation, DstLocation, MessageId,
+    Aggregation, MessageId,
 };
 use sn_routing::ELDER_SIZE;
 use std::sync::Arc;
 use tokio::{sync::RwLock, task::JoinHandle};
 use xor_name::XorName;
+
+const DATA_SECTION_TARGET_COUNT: usize = 3;
 
 pub enum NodeTask {
     None,
@@ -573,19 +575,21 @@ impl Node {
                                 .await?,
                         ]
                     } else {
-                        vec![NodeDuty::Send(OutgoingMsg {
-                            msg: MsgType::Node(NodeMsg::NodeQuery {
+                        let targets = network_api
+                            .get_closest_elders_to(&data_section_addr, DATA_SECTION_TARGET_COUNT)
+                            .await?;
+                        vec![NodeDuty::SendToNodes {
+                            msg: NodeMsg::NodeQuery {
                                 query: NodeQuery::Metadata {
                                     query,
                                     client_signed,
                                     origin,
                                 },
                                 id: msg_id,
-                            }),
-                            dst: DstLocation::Section(data_section_addr),
-                            section_source: false,
+                            },
+                            targets,
                             aggregation: Aggregation::None,
-                        })]
+                        }]
                     };
                     Ok(NodeTask::from(duties))
                 });

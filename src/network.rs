@@ -13,18 +13,21 @@ use crate::{
 use bls::PublicKeySet;
 use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
+use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
 use sn_messaging::Itinerary;
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
+    SectionAuthorityProviderUtils,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
     path::Path,
     sync::Arc,
+    usize,
 };
 use xor_name::{Prefix, XorName};
 
@@ -140,9 +143,31 @@ impl Network {
             .map(PublicKey::Bls)
     }
 
-    pub async fn matching_section(&self, name: &XorName) -> Option<bls::PublicKey> {
-        let (key, _) = self.routing.matching_section(name).await;
-        key
+    pub async fn matching_section(&self, name: &XorName) -> Result<bls::PublicKey> {
+        self.routing
+            .matching_section(name)
+            .await
+            .map(|provider| provider.section_key)
+            .map_err(From::from)
+    }
+
+    pub async fn get_closest_elders_to(
+        &self,
+        name: &XorName,
+        count: usize,
+    ) -> Result<BTreeSet<XorName>> {
+        self.routing
+            .matching_section(name)
+            .await
+            .map(|auth_provider| {
+                auth_provider
+                    .names()
+                    .into_iter()
+                    .sorted_by(|lhs, rhs| name.cmp_distance(lhs, rhs))
+                    .take(count)
+                    .collect()
+            })
+            .map_err(From::from)
     }
 
     pub async fn our_public_key_set(&self) -> Result<PublicKeySet> {
@@ -150,13 +175,11 @@ impl Network {
     }
 
     pub async fn get_section_pk_by_name(&self, name: &XorName) -> Result<PublicKey> {
-        let (pk, _elders) = self.routing.matching_section(name).await;
-        if let Some(pk) = pk {
-            let pk = PublicKey::from(pk);
-            Ok(pk)
-        } else {
-            Err(Error::NoSectionPublicKeyKnown(*name))
-        }
+        self.routing
+            .matching_section(name)
+            .await
+            .map(|provider| PublicKey::from(provider.section_key))
+            .map_err(From::from)
     }
 
     pub async fn our_name(&self) -> XorName {
