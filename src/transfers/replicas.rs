@@ -12,6 +12,7 @@ use bls::PublicKeySet;
 use dashmap::DashMap;
 use futures::lock::Mutex;
 use log::info;
+use secured_linked_list::SecuredLinkedList;
 use sn_data_types::{
     ActorHistory, CreditAgreementProof, OwnerType, PublicKey, ReplicaEvent, SignedTransfer, Token,
     TransferAgreementProof, TransferPropagated, TransferRegistered, TransferValidated,
@@ -19,7 +20,6 @@ use sn_data_types::{
 use sn_transfers::WalletReplica;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use xor_name::Prefix;
-use secured_linked_list::SecuredLinkedList;
 
 #[cfg(feature = "simulated-payouts")]
 use {

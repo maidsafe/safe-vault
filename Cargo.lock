@@ -2302,8 +2302,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "26.0.0"
-source = "git+https://github.com/bochaco/sn_messaging?branch=feat-adding-routing-msg-defs#3a065b6a0db60790003ab72d475a4db4471b28d5"
+version = "27.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0894386547b82c5f9603470e708dbe4c58d3dcd34a37261b4a9298b7322771c2"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2375,8 +2376,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.71.4"
-source = "git+https://github.com/bochaco/sn_routing?branch=refactor-strip-out-msgs-defs#3052fe6226d873369c4e8002388fd3733e41a495"
+version = "0.72.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ed27a867b9c53eb945306f8ea03ff283f8da2c398a350980312f352c7d77f8c"
 dependencies = [
  "bincode",
  "bls_dkg",
