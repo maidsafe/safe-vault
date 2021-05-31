@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.46.1](https://github.com/maidsafe/sn_node/compare/v0.46.0...v0.46.1) (2021-05-31)
+
+
+### Features
+
+* **multi-threading:** initial refactor for a multi-threaded node ([3962254](https://github.com/maidsafe/sn_node/commit/3962254bb08009c7eed1f716e41791ecbbdd567f))
+
+
+### Bug Fixes
+
+* **clippy:** box NodeTask variant to fix clippy error ([6cfd416](https://github.com/maidsafe/sn_node/commit/6cfd41609955070c27ed80025e59677c3a5cd456))
+
 ## [0.46.0](https://github.com/maidsafe/sn_node/compare/v0.45.2...v0.46.0) (2021-05-30)
 
 
