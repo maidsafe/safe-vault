@@ -546,6 +546,11 @@ impl Node {
             NodeDuty::SetNodeJoinsAllowed(joins_allowed) => {
                 let mut network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
+                    #[cfg(feature = "always-joinable")]
+                    {
+                        network_api.set_joins_allowed(true).await?;
+                        return Ok(NodeTask::None)
+                    }
                     network_api.set_joins_allowed(joins_allowed).await?;
                     Ok(NodeTask::None)
                 });
