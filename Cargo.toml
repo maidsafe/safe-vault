@@ -97,4 +97,4 @@ simulated-payouts = [
   "sn_messaging/simulated-payouts"
 ]
 chaos = [ ]
-always_joinable = [ ]
+always-joinable = [ ]
