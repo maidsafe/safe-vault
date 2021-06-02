@@ -2302,8 +2302,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "27.0.1"
-source = "git+https://github.com/yoga07/sn_messaging?branch=remove-proofchain#5b2ad2f9973de03b71b74a704c3a874ab2b836ef"
+version = "28.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b894f12405d2a535eb35f2e29ce4f51aa822b4d55a1fd4fc79c7f55d0c05b05"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2375,7 +2376,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.73.1"
+version = "0.73.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abd92c7a809ee8b4b357a640f14411a3b4d20872957023f5d7bf395cc918cc75"
 dependencies = [
  "bincode",
  "bls_dkg",
