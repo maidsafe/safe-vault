@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.46.3](https://github.com/maidsafe/sn_node/compare/v0.46.2...v0.46.3) (2021-06-02)
+
+
+### Features
+
+* deps ([5e00a26](https://github.com/maidsafe/sn_node/commit/5e00a26ce545443c61564b66fdc7724fdcdb40f3))
+* force network to be joinable feature flag ([b2fb496](https://github.com/maidsafe/sn_node/commit/b2fb496f4a164ea2e549f3b6b4675d9383e72b76))
+
 ### [0.46.2](https://github.com/maidsafe/sn_node/compare/v0.46.1...v0.46.2) (2021-05-31)
 
 ### [0.46.1](https://github.com/maidsafe/sn_node/compare/v0.46.0...v0.46.1) (2021-05-31)
