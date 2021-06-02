@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.46.4](https://github.com/maidsafe/sn_node/compare/v0.46.3...v0.46.4) (2021-06-02)
+
+
+### Bug Fixes
+
+* **always-joinable:** fix configuration check ([a08312b](https://github.com/maidsafe/sn_node/commit/a08312b6a2d2ac330cfad7ac729bacad8ebb8dea))
+
 ### [0.46.3](https://github.com/maidsafe/sn_node/compare/v0.46.2...v0.46.3) (2021-06-02)
 
 
