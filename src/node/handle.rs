@@ -549,7 +549,7 @@ impl Node {
                     #[cfg(feature = "always-joinable")]
                     {
                         network_api.set_joins_allowed(true).await?;
-                        return Ok(NodeTask::None)
+                        return Ok(NodeTask::None);
                     }
                     network_api.set_joins_allowed(joins_allowed).await?;
                     Ok(NodeTask::None)
