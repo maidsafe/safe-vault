@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.46.7](https://github.com/maidsafe/sn_node/compare/v0.46.6...v0.46.7) (2021-06-03)
+
+
+### Bug Fixes
+
+* **store_cost:** add network full error ([dbf81ed](https://github.com/maidsafe/sn_node/commit/dbf81ed764137996bbffadb51392d394196645c3))
+
 ### [0.46.6](https://github.com/maidsafe/sn_node/compare/v0.46.5...v0.46.6) (2021-06-03)
 
 
