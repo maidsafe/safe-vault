@@ -83,16 +83,6 @@ impl Node {
         };
 
         let sibling_prefix = our_prefix.sibling();
-
-        debug!(
-            "@@@@@@ SPLIT: Our prefix: {:?}, neighbour: {:?}",
-            our_prefix, sibling_prefix,
-        );
-        debug!(
-            "@@@@@@ SPLIT: Our key: {:?}, neighbour: {:?}",
-            our_key, sibling_key
-        );
-
         let mut ops = vec![];
 
         if payments > Token::zero() {

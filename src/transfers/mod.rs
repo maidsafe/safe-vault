@@ -238,7 +238,7 @@ impl Transfers {
                 info!("Payment: forwarding data..");
                 // consider having the section actor be
                 // informed of this transfer as well..
-                return Ok(vec![NodeDuty::Send(OutgoingMsg {
+                Ok(vec![NodeDuty::Send(OutgoingMsg {
                     msg: MsgType::Node(NodeMsg::NodeCmd {
                         cmd: NodeCmd::Metadata {
                             cmd: data_cmd.clone(),
@@ -250,7 +250,7 @@ impl Transfers {
                     section_source: true, // i.e. errors go to our section
                     dst: DstLocation::Section(data_cmd.dst_address()),
                     aggregation: Aggregation::AtDestination,
-                })]);
+                })])
             }
             Err(e) => {
                 warn!("Payment: registration or propagation failed: {:?}", e);
