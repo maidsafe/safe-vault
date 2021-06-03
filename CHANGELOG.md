@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.46.5](https://github.com/maidsafe/sn_node/compare/v0.46.4...v0.46.5) (2021-06-03)
+
+
+### Bug Fixes
+
+* logging properly during split ([3a5ed09](https://github.com/maidsafe/sn_node/commit/3a5ed09c7bf542930120269b5049ac97cbd13333))
+
 ### [0.46.4](https://github.com/maidsafe/sn_node/compare/v0.46.3...v0.46.4) (2021-06-02)
 
 
