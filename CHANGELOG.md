@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.46.6](https://github.com/maidsafe/sn_node/compare/v0.46.5...v0.46.6) (2021-06-03)
+
+
+### Bug Fixes
+
+* **rate_limit:** return u64 max value as store cost when no nodes ([d2b5b58](https://github.com/maidsafe/sn_node/commit/d2b5b585f6847e9516490c8d403e37e67b89cd55))
+
 ### [0.46.5](https://github.com/maidsafe/sn_node/compare/v0.46.4...v0.46.5) (2021-06-03)
 
 
