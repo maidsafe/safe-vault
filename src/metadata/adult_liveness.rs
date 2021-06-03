@@ -105,10 +105,10 @@ impl AdultLiveness {
     pub fn record_adult_read_liveness(
         &mut self,
         correlation_id: MessageId,
-        src: XorName,
+        src: &XorName,
         success: bool,
     ) -> Option<(BlobAddress, EndUser)> {
-        self.remove_target(correlation_id, &src);
+        self.remove_target(correlation_id, src);
         let op = self.ops.get_mut(&correlation_id);
         op.and_then(|op| {
             let ReadOperation {

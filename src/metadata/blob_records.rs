@@ -226,14 +226,20 @@ impl BlobRecords {
         let mut duties = vec![];
         if let Some((_address, end_user)) = self.adult_liveness.record_adult_read_liveness(
             correlation_id,
-            src,
+            &src,
             response.is_success(),
         ) {
-            return Ok(vec![NodeDuty::Send(build_client_query_response(
-                response,
-                correlation_id,
-                end_user,
-            ))]);
+            let full_adults = self.adult_storage_info.full_adults.read().await;
+            // If a full adult responds with error. Drop the response
+            if full_adults.contains(&src) && !response.is_success() {
+                return Ok(vec![]);
+            } else {
+                return Ok(vec![NodeDuty::Send(build_client_query_response(
+                    response,
+                    correlation_id,
+                    end_user,
+                ))]);
+            }
         }
         let mut unresponsive_adults = Vec::new();
         for (name, count) in self.adult_liveness.find_unresponsive_adults() {
@@ -335,8 +341,12 @@ impl BlobRecords {
         origin: EndUser,
     ) -> Result<NodeDuty> {
         let targets = self.get_holders_for_chunk(address.name()).await;
+        let full_adults = self.adult_storage_info.full_adults.read().await.clone();
 
-        let targets = targets.into_iter().collect::<BTreeSet<_>>();
+        let targets = targets
+            .into_iter()
+            .chain(full_adults.into_iter())
+            .collect::<BTreeSet<_>>();
 
         if targets.is_empty() {
             return self

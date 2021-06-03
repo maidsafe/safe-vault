@@ -501,7 +501,6 @@ impl Node {
             NodeDuty::IncrementFullNodeCount { node_id } => {
                 let elder = self.role.as_elder_mut()?.clone();
                 let handle = tokio::spawn(async move {
-                    let propose_offline = NodeDuty::ProposeOffline(vec![node_id.into()]);
                     elder
                         .meta_data
                         .write()
@@ -509,10 +508,7 @@ impl Node {
                         .increase_full_node_count(node_id)
                         .await?;
                     // Accept a new node in place for the full node.
-                    Ok(NodeTask::from(vec![
-                        NodeDuty::SetNodeJoinsAllowed(true),
-                        propose_offline,
-                    ]))
+                    Ok(NodeTask::from(vec![NodeDuty::SetNodeJoinsAllowed(true)]))
                 });
                 Ok(NodeTask::Thread(handle))
             }
