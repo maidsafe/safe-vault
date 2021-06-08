@@ -199,8 +199,7 @@ impl Node {
                         let reward_sum = credit_proofs.sum();
                         ops.extend(Self::propagate_credits(credit_proofs)?);
                         // update state
-                        *section_funds=
-                            SectionFunds::KeepingNodeWallets(reward_wallets.clone());
+                        *section_funds = SectionFunds::KeepingNodeWallets(reward_wallets.clone());
                         let section_key = network_api.section_public_key().await?;
                         info!(
                             "COMPLETED SPLIT. New section: ({}). Total rewards paid: {}.",
@@ -246,7 +245,11 @@ impl Node {
                 let handle = tokio::spawn(async move {
                     let members = network_api.our_members().await;
                     let result = if members.get(&node_name).is_some() {
-                        let _wallet = elder.section_funds.write().await.get_node_wallet(&node_name);
+                        let _wallet = elder
+                            .section_funds
+                            .write()
+                            .await
+                            .get_node_wallet(&node_name);
                         Ok(vec![]) // not yet implemented
                     } else {
                         debug!(
