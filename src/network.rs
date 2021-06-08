@@ -13,11 +13,11 @@ use crate::{
 use bls::PublicKeySet;
 use bytes::Bytes;
 use ed25519_dalek::PublicKey as Ed25519PublicKey;
-use itertools::Itertools;
+use rand::{seq::SliceRandom, SeedableRng};
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use sn_data_types::{PublicKey, Signature, SignatureShare};
-use sn_messaging::Itinerary;
+use sn_messaging::{Itinerary, MessageId};
 use sn_routing::{
     Config as RoutingConfig, Error as RoutingError, EventStream, PeerUtils, Routing as RoutingNode,
     SectionAuthorityProviderUtils,
@@ -154,18 +154,17 @@ impl Network {
     pub async fn get_closest_elders_to(
         &self,
         name: &XorName,
+        msg_id: MessageId,
         count: usize,
     ) -> Result<BTreeSet<XorName>> {
         self.routing
             .matching_section(name)
             .await
             .map(|auth_provider| {
-                auth_provider
-                    .names()
-                    .into_iter()
-                    .sorted_by(|lhs, rhs| name.cmp_distance(lhs, rhs))
-                    .take(count)
-                    .collect()
+                let mut targets: Vec<_> = auth_provider.names().iter().cloned().collect();
+                let mut rng = rand_chacha::ChaChaRng::from_seed(*msg_id.as_ref());
+                targets.shuffle(&mut rng);
+                targets.into_iter().take(count).collect()
             })
             .map_err(From::from)
     }

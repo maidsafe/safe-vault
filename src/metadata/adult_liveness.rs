@@ -141,9 +141,10 @@ impl AdultLiveness {
         let closest_adults_collection = self
             .closest_adults
             .iter()
-            .map(|(key, value)| {
-                let closest_adults = value
-                    .iter()
+            .map(|(key, _)| {
+                let closest_adults = self
+                    .closest_adults
+                    .keys()
                     .filter(|name| key != *name)
                     .sorted_by(|lhs, rhs| key.cmp_distance(lhs, rhs))
                     .take(NEIGHBOUR_COUNT)

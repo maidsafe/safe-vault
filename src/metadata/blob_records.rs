@@ -232,13 +232,14 @@ impl BlobRecords {
             let full_adults = self.adult_storage_info.full_adults.read().await;
             // If a full adult responds with error. Drop the response
             if full_adults.contains(&src) && !response.is_success() {
-                return Ok(vec![]);
+                // We've already responded already with a success
+                // so do nothing
             } else {
-                return Ok(vec![NodeDuty::Send(build_client_query_response(
+                duties.push(NodeDuty::Send(build_client_query_response(
                     response,
                     correlation_id,
                     end_user,
-                ))]);
+                )));
             }
         }
         let mut unresponsive_adults = Vec::new();

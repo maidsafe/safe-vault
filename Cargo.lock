@@ -1694,9 +1694,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.11.11"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "015346bc391951d1eca81d76c8fe553d486c2198f92e4407a67001c7a7480fc9"
+checksum = "54ff153a9c76cb982f8114f1e1e5b120f7f810c67ddc04af1b6822de209f1939"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -2308,9 +2308,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "28.0.0"
+version = "31.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b894f12405d2a535eb35f2e29ce4f51aa822b4d55a1fd4fc79c7f55d0c05b05"
+checksum = "dea248c074546e6903e653f9351dcf3b097ab9318b87abeb2c2734773ded6efd"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2338,7 +2338,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.46.7"
+version = "0.46.8"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2382,9 +2382,9 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.73.6"
+version = "0.74.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d12e3151b35d3d4517877f283409d9b7e2da6c90a986fb300f91d40399e87e26"
+checksum = "c67e5024ad5f83d8cd7c0d5e752893a16d7bb5b75332233cb89f6d5364d3cd6a"
 dependencies = [
  "bincode",
  "bls_dkg",

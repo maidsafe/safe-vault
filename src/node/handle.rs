@@ -583,7 +583,11 @@ impl Node {
                         ]
                     } else {
                         let targets = network_api
-                            .get_closest_elders_to(&data_section_addr, DATA_SECTION_TARGET_COUNT)
+                            .get_closest_elders_to(
+                                &data_section_addr,
+                                msg_id,
+                                DATA_SECTION_TARGET_COUNT,
+                            )
                             .await?;
                         vec![NodeDuty::SendToNodes {
                             msg: NodeMsg::NodeQuery {

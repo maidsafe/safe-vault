@@ -218,7 +218,7 @@ impl Transfers {
                                 payment.amount(),
                                 total_cost
                             );
-                            (total_cost, Some(ErrorMessage::InsufficientBalance))
+                            (total_cost, Some(ErrorMessage::InsufficientPayment))
                         } else {
                             (total_cost, None)
                         }

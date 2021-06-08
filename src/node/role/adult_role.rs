@@ -9,17 +9,17 @@
 use crate::{
     chunks::Chunks,
     metadata::CHUNK_COPY_COUNT,
-    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
+    node_ops::{NodeDuties, NodeDuty},
 };
 use itertools::Itertools;
 use log::{info, trace, warn};
 use sn_data_types::{Blob, BlobAddress};
 use sn_messaging::{
     node::{NodeCmd, NodeMsg, NodeSystemCmd},
-    Aggregation, DstLocation, MessageId,
+    Aggregation, MessageId,
 };
 use sn_routing::XorName;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -38,28 +38,24 @@ impl AdultRole {
         remaining: BTreeSet<XorName>,
     ) -> NodeDuties {
         let keys = self.chunks.read().await.keys();
-        let mut data_for_replication = BTreeSet::new();
+        let mut data_for_replication = BTreeMap::new();
         for addr in keys.iter() {
-            if let Some(data) = self
+            if let Some((data, holders)) = self
                 .republish_and_cache(addr, &our_name, &new_adults, &lost_adults, &remaining)
                 .await
             {
-                let _ = data_for_replication.insert(data);
+                let _ = data_for_replication.insert(data, holders);
             }
         }
         data_for_replication
             .into_iter()
-            .map(|data| {
-                let data_name = *data.name();
-                NodeDuty::Send(OutgoingMsg {
-                    msg: MsgType::Node(NodeMsg::NodeCmd {
-                        cmd: NodeCmd::System(NodeSystemCmd::RepublishChunk(data)),
-                        id: MessageId::new(),
-                    }),
-                    dst: DstLocation::Section(data_name),
-                    section_source: false,
-                    aggregation: Aggregation::None,
-                })
+            .map(|(data, targets)| NodeDuty::SendToNodes {
+                msg: NodeMsg::NodeCmd {
+                    cmd: NodeCmd::System(NodeSystemCmd::ReplicateChunk(data)),
+                    id: MessageId::new(),
+                },
+                targets,
+                aggregation: Aggregation::None,
             })
             .collect::<Vec<_>>()
     }
@@ -71,7 +67,7 @@ impl AdultRole {
         new_adults: &BTreeSet<XorName>,
         lost_adults: &BTreeSet<XorName>,
         remaining: &BTreeSet<XorName>,
-    ) -> Option<Blob> {
+    ) -> Option<(Blob, BTreeSet<XorName>)> {
         let old_adult_list = remaining.union(lost_adults).copied().collect();
         let new_adult_list = remaining.union(new_adults).copied().collect();
         let new_holders = self.compute_holders(addr, &new_adult_list);
@@ -91,7 +87,7 @@ impl AdultRole {
                 }
             }
             // TODO: Push to LRU cache
-            Some(chunk)
+            Some((chunk, new_holders))
         } else {
             None
         }
