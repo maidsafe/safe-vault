@@ -438,7 +438,7 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .transfers
-                            .read()
+                            .write()
                             .await
                             .register(&proof, msg_id, origin)
                             .await?,
