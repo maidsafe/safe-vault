@@ -51,7 +51,7 @@ impl Chunks {
         self.chunk_storage.get_chunk(address)
     }
 
-    pub fn read(&mut self, read: &BlobRead, msg_id: MessageId) -> NodeDuty {
+    pub fn read(&self, read: &BlobRead, msg_id: MessageId) -> NodeDuty {
         let BlobRead::Get(address) = read;
         self.chunk_storage.get(address, msg_id)
     }

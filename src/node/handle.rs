@@ -199,7 +199,7 @@ impl Node {
                         let reward_sum = credit_proofs.sum();
                         ops.extend(Self::propagate_credits(credit_proofs)?);
                         // update state
-                        *elder.section_funds.write().await =
+                        *section_funds=
                             SectionFunds::KeepingNodeWallets(reward_wallets.clone());
                         let section_key = network_api.section_public_key().await?;
                         info!(
@@ -246,7 +246,7 @@ impl Node {
                 let handle = tokio::spawn(async move {
                     let members = network_api.our_members().await;
                     let result = if members.get(&node_name).is_some() {
-                        let _wallet = elder.section_funds.read().await.get_node_wallet(&node_name);
+                        let _wallet = elder.section_funds.write().await.get_node_wallet(&node_name);
                         Ok(vec![]) // not yet implemented
                     } else {
                         debug!(
@@ -265,7 +265,7 @@ impl Node {
                 let elder = self.role.as_elder_mut()?.clone();
                 let network_api = self.network_api.clone();
                 let handle = tokio::spawn(async move {
-                    elder.section_funds.read().await.remove_node_wallet(name);
+                    elder.section_funds.write().await.remove_node_wallet(name);
                     let our_adults = network_api.our_adults().await;
                     elder
                         .meta_data
@@ -338,7 +338,7 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .transfers
-                            .read()
+                            .write()
                             .await
                             .receive_propagated(&proof, msg_id, origin)
                             .await?,
@@ -370,7 +370,7 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .transfers
-                            .read()
+                            .write()
                             .await
                             .credit_without_proof(transfer)
                             .await?,
@@ -438,7 +438,7 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .transfers
-                            .read()
+                            .write()
                             .await
                             .register(&proof, msg_id, origin)
                             .await?,
@@ -451,8 +451,8 @@ impl Node {
             NodeDuty::ReadChunk { read, msg_id } => {
                 let adult = self.role.as_adult()?.clone();
                 let handle = tokio::spawn(async move {
-                    let mut ops = vec![adult.chunks.write().await.read(&read, msg_id)];
-                    ops.extend(adult.chunks.read().await.check_storage().await?);
+                    let mut ops = vec![adult.chunks.read().await.read(&read, msg_id)];
+                    ops.extend(adult.chunks.write().await.check_storage().await?);
                     Ok(NodeTask::from(ops))
                 });
                 Ok(NodeTask::Thread(handle))
@@ -576,6 +576,7 @@ impl Node {
                         vec![
                             elder
                                 .meta_data
+                                // this is a write here as we write the liveness check for each adult
                                 .write()
                                 .await
                                 .read(query, msg_id, client_signed.public_key, origin)
@@ -659,7 +660,7 @@ impl Node {
                     Ok(NodeTask::from(
                         elder
                             .transfers
-                            .read()
+                            .write()
                             .await
                             .process_payment(id, payment, cmd, client_signed, origin)
                             .await?,

@@ -91,7 +91,7 @@ impl Node {
         for (key, (age, wallet)) in &node_wallets {
             elder
                 .section_funds
-                .read()
+                .write()
                 .await
                 .set_node_wallet(*key, *wallet, *age)
         }
