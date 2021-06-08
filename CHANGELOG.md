@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.47.1](https://github.com/maidsafe/sn_node/compare/v0.47.0...v0.47.1) (2021-06-08)
+
+
+### Bug Fixes
+
+* get a write lock for handling transfers ([f671b32](https://github.com/maidsafe/sn_node/commit/f671b32fe78b7f757271ff9bfd657473942b32e7))
+
 ## [0.47.0](https://github.com/maidsafe/sn_node/compare/v0.46.8...v0.47.0) (2021-06-08)
 
 
