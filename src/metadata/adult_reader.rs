@@ -34,13 +34,13 @@ impl AdultReader {
         name: &XorName,
         full_adults: &BTreeSet<XorName>,
         count: usize,
-    ) -> Vec<XorName> {
+    ) -> BTreeSet<XorName> {
         self.network
             .our_adults_sorted_by_distance_to(name)
             .await
             .into_iter()
             .filter(|name| !full_adults.contains(name))
             .take(count)
-            .collect::<Vec<_>>()
+            .collect::<BTreeSet<_>>()
     }
 }

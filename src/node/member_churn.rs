@@ -8,7 +8,7 @@
 
 use super::role::{ElderRole, Role};
 use crate::{
-    capacity::{AdultsStorageInfo, Capacity, StoreCost},
+    capacity::{AdultsStorageInfo, Capacity, CapacityReader, CapacityWriter, StoreCost},
     metadata::{adult_reader::AdultReader, Metadata},
     network::Network,
     node_ops::NodeDuty,
@@ -38,23 +38,21 @@ impl Node {
     pub async fn level_up(&mut self) -> Result<()> {
         self.used_space.reset().await?;
 
+        let adult_storage_info = AdultsStorageInfo::new();
+        let adult_reader = AdultReader::new(self.network_api.clone());
+        let capacity_reader = CapacityReader::new(adult_storage_info.clone(), adult_reader.clone());
+        let capacity_writer = CapacityWriter::new(adult_storage_info.clone(), adult_reader.clone());
+        let capacity = Capacity::new(capacity_reader.clone(), capacity_writer);
+
         //
         // start handling metadata
-        let adult_storage_info = AdultsStorageInfo::new();
-        let reader = AdultReader::new(self.network_api.clone());
-        let capacity = self.used_space.max_capacity().await;
-        let meta_data = Metadata::new(
-            &self.node_info.path(),
-            capacity,
-            adult_storage_info.clone(),
-            reader,
-        )
-        .await?;
+        let max_capacity = self.used_space.max_capacity().await;
+        let meta_data =
+            Metadata::new(&self.node_info.path(), max_capacity, capacity.clone()).await?;
 
         //
         // start handling transfers
-        let store_cost =
-            StoreCost::new(self.network_api.clone(), Capacity::new(adult_storage_info));
+        let store_cost = StoreCost::new(self.network_api.clone(), capacity_reader);
         let user_wallets = BTreeMap::<PublicKey, ActorHistory>::new();
         let replicas = transfer_replicas(&self.node_info, &self.network_api, user_wallets).await?;
         let transfers = Transfers::new(replicas, store_cost);

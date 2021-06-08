@@ -176,7 +176,7 @@ impl SequenceStorage {
 
             let policy = sequence.private_policy(Some(requester))?;
             if requester != policy.owner {
-                Err(Error::InvalidOwners(requester))
+                Err(Error::InvalidOwner(requester))
             } else {
                 Ok(())
             }

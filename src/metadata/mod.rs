@@ -14,15 +14,12 @@ mod map_storage;
 mod register_storage;
 mod sequence_storage;
 
-use self::adult_reader::AdultReader;
-use super::node_ops::NodeDuty;
 use crate::{
-    capacity::AdultsStorageInfo,
-    node_ops::{MsgType, NodeDuties, OutgoingMsg},
+    capacity::Capacity,
+    node_ops::{MsgType, NodeDuties, NodeDuty, OutgoingMsg},
     Result,
 };
 use blob_records::BlobRecords;
-pub(crate) use blob_records::CHUNK_COPY_COUNT;
 use elder_stores::ElderStores;
 use map_storage::MapStorage;
 use register_storage::RegisterStorage;
@@ -54,13 +51,8 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub async fn new(
-        path: &Path,
-        max_capacity: u64,
-        adult_storage_info: AdultsStorageInfo,
-        reader: AdultReader,
-    ) -> Result<Self> {
-        let blob_records = BlobRecords::new(adult_storage_info, reader);
+    pub async fn new(path: &Path, max_capacity: u64, capacity: Capacity) -> Result<Self> {
+        let blob_records = BlobRecords::new(capacity);
         let map_storage = MapStorage::new(path, max_capacity).await?;
         let sequence_storage = SequenceStorage::new(path, max_capacity).await?;
         let register_storage = RegisterStorage::new(path, max_capacity).await?;
@@ -116,7 +108,7 @@ impl Metadata {
     }
 
     /// Adds a given node to the list of full nodes.
-    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) -> Result<()> {
+    pub async fn increase_full_node_count(&mut self, node_id: PublicKey) {
         self.elder_stores
             .blob_records_mut()
             .increase_full_node_count(node_id)

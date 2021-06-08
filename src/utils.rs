@@ -20,6 +20,42 @@ use std::{fs, path::Path};
 
 const NODE_MODULE_NAME: &str = "sn_node";
 
+/// Easily create a `BTreeSet`.
+#[macro_export]
+macro_rules! btree_set {
+    ($($item:expr),*) => {{
+        let mut _set = ::std::collections::BTreeSet::new();
+        $(
+            let _ = _set.insert($item);
+        )*
+        _set
+    }};
+
+    ($($item:expr),*,) => {
+        btree_set![$($item),*]
+    };
+}
+
+/// Easily create a `BTreeMap` with the key => value syntax.
+#[macro_export]
+macro_rules! btree_map {
+    () => ({
+        ::std::collections::BTreeMap::new()
+    });
+
+    ($($key:expr => $value:expr),*) => {{
+        let mut _map = ::std::collections::BTreeMap::new();
+        $(
+            let _ = _map.insert($key, $value);
+        )*
+        _map
+    }};
+
+    ($($key:expr => $value:expr),*,) => {
+        btree_map![$($key => $value),*]
+    };
+}
+
 pub(crate) fn new_auto_dump_db<D: AsRef<Path>, N: AsRef<Path>>(
     db_dir: D,
     db_name: N,

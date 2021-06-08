@@ -14,6 +14,8 @@ use sn_messaging::{EndUser, MessageId};
 use sn_routing::XorName;
 use std::collections::hash_map::Entry;
 
+use crate::capacity::CHUNK_COPY_COUNT;
+
 const NEIGHBOUR_COUNT: usize = 2;
 const MIN_PENDING_OPS: usize = 10;
 const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
@@ -118,7 +120,7 @@ impl AdultLiveness {
                 responded_with_success,
             } = op;
 
-            if targets.len() < super::CHUNK_COPY_COUNT && *responded_with_success {
+            if targets.len() < CHUNK_COPY_COUNT && *responded_with_success {
                 None
             } else {
                 *responded_with_success = success;

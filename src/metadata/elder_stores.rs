@@ -123,7 +123,7 @@ impl ElderStores {
     pub async fn update(&mut self, data: DataExchange) -> Result<(), Error> {
         self.map_storage.update(data.map_data).await?;
         self.sequence_storage.update(data.seq_data).await?;
-        self.blob_records.update(data.blob_data).await?;
+        self.blob_records.update(data.blob_data).await;
 
         Ok(())
     }

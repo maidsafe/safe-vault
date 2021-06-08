@@ -140,7 +140,7 @@ impl RegisterStorage {
             }
 
             if requester != register.owner() {
-                Err(Error::InvalidOwners(requester))
+                Err(Error::InvalidOwner(requester))
             } else {
                 Ok(())
             }

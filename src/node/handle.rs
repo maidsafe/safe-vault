@@ -506,7 +506,7 @@ impl Node {
                         .write()
                         .await
                         .increase_full_node_count(node_id)
-                        .await?;
+                        .await;
                     // Accept a new node in place for the full node.
                     Ok(NodeTask::from(vec![NodeDuty::SetNodeJoinsAllowed(true)]))
                 });

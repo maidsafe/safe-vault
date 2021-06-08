@@ -159,7 +159,7 @@ pub enum Error {
     InvalidMessage(MessageId, String),
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
-    InvalidOwners(PublicKey),
+    InvalidOwner(PublicKey),
     /// Operation is invalid, eg signing validation
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
@@ -181,7 +181,7 @@ pub(crate) fn convert_to_error_message(error: Error) -> sn_messaging::client::Er
     match error {
         Error::InvalidOperation(msg) => ErrorMessage::InvalidOperation(msg),
         Error::InvalidMessage(_, msg) => ErrorMessage::InvalidOperation(msg),
-        Error::InvalidOwners(key) => ErrorMessage::InvalidOwners(key),
+        Error::InvalidOwner(key) => ErrorMessage::InvalidOwners(key),
         Error::InvalidSignedTransfer(_) => ErrorMessage::InvalidSignature,
         Error::TransferAlreadyRegistered => ErrorMessage::TransactionIdExists,
         Error::NoSuchChunk(address) => ErrorMessage::DataNotFound(address),
