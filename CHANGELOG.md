@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.47.0](https://github.com/maidsafe/sn_node/compare/v0.46.8...v0.47.0) (2021-06-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chunk-replication:** sn_messaging is updated to v31.0.0
+
+* **chunk-replication:** allow Adults to replicate chunks by ([2e7537c](https://github.com/maidsafe/sn_node/commit/2e7537c7131e1d62f1bc6f6d4f115e8d84b1855b))
+
 ### [0.46.8](https://github.com/maidsafe/sn_node/compare/v0.46.7...v0.46.8) (2021-06-03)
 
 ### [0.46.7](https://github.com/maidsafe/sn_node/compare/v0.46.6...v0.46.7) (2021-06-03)
