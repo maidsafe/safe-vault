@@ -341,7 +341,7 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .transfers
-                            .write()
+                            .read()
                             .await
                             .receive_propagated(&proof, msg_id, origin)
                             .await?,
@@ -441,7 +441,7 @@ impl Node {
                     Ok(NodeTask::from(vec![
                         elder
                             .transfers
-                            .write()
+                            .read()
                             .await
                             .register(&proof, msg_id, origin)
                             .await?,
