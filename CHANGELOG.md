@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.47.3](https://github.com/maidsafe/sn_node/compare/v0.47.2...v0.47.3) (2021-06-09)
+
+
+### Bug Fixes
+
+* RwLock changes in a couple of instances ([4c09366](https://github.com/maidsafe/sn_node/commit/4c09366b10b2364da71419b1bf8edecdb9ceea32))
+
 ### [0.47.2](https://github.com/maidsafe/sn_node/compare/v0.47.1...v0.47.2) (2021-06-08)
 
 ### [0.47.1](https://github.com/maidsafe/sn_node/compare/v0.47.0...v0.47.1) (2021-06-08)
