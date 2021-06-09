@@ -247,7 +247,7 @@ impl Node {
                     let result = if members.get(&node_name).is_some() {
                         let _wallet = elder
                             .section_funds
-                            .write()
+                            .read()
                             .await
                             .get_node_wallet(&node_name);
                         Ok(vec![]) // not yet implemented
@@ -455,7 +455,7 @@ impl Node {
                 let adult = self.role.as_adult()?.clone();
                 let handle = tokio::spawn(async move {
                     let mut ops = vec![adult.chunks.read().await.read(&read, msg_id)];
-                    ops.extend(adult.chunks.write().await.check_storage().await?);
+                    ops.extend(adult.chunks.read().await.check_storage().await?);
                     Ok(NodeTask::from(ops))
                 });
                 Ok(NodeTask::Thread(handle))
