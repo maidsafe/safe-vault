@@ -245,11 +245,7 @@ impl Node {
                 let handle = tokio::spawn(async move {
                     let members = network_api.our_members().await;
                     let result = if members.get(&node_name).is_some() {
-                        let _wallet = elder
-                            .section_funds
-                            .read()
-                            .await
-                            .get_node_wallet(&node_name);
+                        let _wallet = elder.section_funds.read().await.get_node_wallet(&node_name);
                         Ok(vec![]) // not yet implemented
                     } else {
                         debug!(
