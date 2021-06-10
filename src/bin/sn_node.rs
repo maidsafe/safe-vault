@@ -119,6 +119,19 @@ async fn run_node() {
                 tokio::time::sleep(tokio::time::Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60))
                     .await;
             }
+            Err(sn_node::Error::Routing(sn_routing::Error::NodeNotReachable(_))) => {
+                println!("Unfortunately we are unable to establish a connection to your machine either through a \
+                public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
+                if it is and you are still unable to add your node to the testnet, then skip adding a node for this \
+                testnet iteration. You can still use the testnet as a client, uploading and downloading content, etc. \
+                https://safenetforum.org/");
+                error!("Unfortunately we are unable to establish a connection to your machine either through a \
+                public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
+                if it is and you are still unable to add your node to the testnet, then skip adding a node for this \
+                testnet iteration. You can still use the testnet as a client, uploading and downloading content, etc. \
+                https://safenetforum.org/");
+                exit(1);
+            }
             Err(e) => {
                 println!("Cannot start node due to error: {:?}. If this is the first node on the network \
                  pass the local address to be used using --first. Exiting", e);
@@ -146,11 +159,11 @@ async fn run_node() {
 
     if config.is_first() {
         set_connection_info(our_conn_info).unwrap_or_else(|err| {
-            error!("Unable to write our connection info to disk: {}", err);
+            error!("Unable to write our connection info to disk: {:?}", err);
         });
     } else {
         add_connection_info(our_conn_info).unwrap_or_else(|err| {
-            error!("Unable to add our connection info to disk: {}", err);
+            error!("Unable to add our connection info to disk: {:?}", err);
         });
     }
 
