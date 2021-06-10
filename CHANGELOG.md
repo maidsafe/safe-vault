@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.48.0](https://github.com/maidsafe/sn_node/compare/v0.47.7...v0.48.0) (2021-06-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api-usage:** dependency updates
+
+* **api-usage:** use Routing::matching_section() API to get our ([c37fe53](https://github.com/maidsafe/sn_node/commit/c37fe538fb524990f05d8fa9d74dc8b9715491dd))
+
 ### [0.47.7](https://github.com/maidsafe/sn_node/compare/v0.47.6...v0.47.7) (2021-06-10)
 
 ### [0.47.6](https://github.com/maidsafe/sn_node/compare/v0.47.5...v0.47.6) (2021-06-09)
