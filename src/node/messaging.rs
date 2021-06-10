@@ -144,13 +144,7 @@ pub(crate) async fn send_to_nodes(
     );
 
     let name = network.our_name().await;
-    let src_section_pk = Some(
-        network
-            .section_public_key()
-            .await?
-            .bls()
-            .ok_or(Error::NoSectionPublicKey)?,
-    );
+    let src_section_pk = Some(network.matching_section(&name).await?);
 
     for target in targets {
         let target_section_pk = network

@@ -118,6 +118,8 @@ impl Network {
     }
 
     pub async fn propose_offline(&self, name: XorName) -> Result<()> {
+        // Notify the entire section to test connectivity to this node
+        self.routing.start_connectivity_test(name).await?;
         self.routing
             .propose_offline(name)
             .await
