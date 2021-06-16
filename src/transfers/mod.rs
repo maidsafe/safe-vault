@@ -113,6 +113,7 @@ impl Transfers {
         self.replicas.keep_keys_of(prefix).await
     }
 
+    #[allow(unused)]
     pub async fn payments(&self) -> Result<Token> {
         self.replicas.balance(self.section_wallet_id()).await
     }
