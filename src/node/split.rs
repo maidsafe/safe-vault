@@ -71,7 +71,7 @@ impl Node {
         their_new_elders: BTreeSet<XorName>,
     ) -> Result<NodeDuties> {
         // get payments before updating replica info
-        let payments = elder.transfers.read().await.payments().await?;
+        let payments = Token::zero();
 
         let info = replica_info(network_api).await?;
         elder.transfers.write().await.update_replica_info(info);
