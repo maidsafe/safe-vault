@@ -471,16 +471,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dashmap"
-version = "4.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
-dependencies = [
- "cfg-if 1.0.0",
- "num_cpus",
-]
-
-[[package]]
 name = "data-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2297,9 +2287,9 @@ dependencies = [
 
 [[package]]
 name = "sn_messaging"
-version = "36.0.0"
+version = "37.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f626a2ae43951374e417a2de9fa570c59a794fab35b16f22cc76d4f5ef89fe8"
+checksum = "38cb964f687a22879f9dbf9ce91e401f1e0363002836cecf310ddcea1ae7f11e"
 dependencies = [
  "bincode",
  "bls_dkg",
@@ -2326,7 +2316,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.48.0"
+version = "0.48.1"
 dependencies = [
  "anyhow",
  "async-log",
@@ -2335,7 +2325,7 @@ dependencies = [
  "bincode",
  "bytes 1.0.1",
  "crdts",
- "dashmap 3.11.10",
+ "dashmap",
  "dirs-next 1.0.2",
  "ed25519",
  "ed25519-dalek",
@@ -2370,14 +2360,13 @@ dependencies = [
 
 [[package]]
 name = "sn_routing"
-version = "0.77.1"
+version = "0.77.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1466a79d8b26de717844c5c8c1dec2af46bb5af438a22c0581e174b56c25fb49"
+checksum = "75f35bedfe8154a9dcf4bdbfbe5e60879872ebe1c07b94ce8298130c3665efbb"
 dependencies = [
  "bincode",
  "bls_dkg",
  "bytes 1.0.1",
- "dashmap 4.0.2",
  "ed25519-dalek",
  "futures",
  "hex_fmt",
