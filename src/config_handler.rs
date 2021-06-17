@@ -138,8 +138,9 @@ impl Config {
 
         if command_line_args.hard_coded_contacts.is_empty() {
             debug!("Using node connection config file as no hard coded contacts were passed in");
-            let contacts_config = read_conn_info_from_file()?;
-            command_line_args.hard_coded_contacts = contacts_config;
+            if let Ok(info) = read_conn_info_from_file() {
+                command_line_args.hard_coded_contacts = info;
+            }
         }
 
         config.merge(command_line_args);
