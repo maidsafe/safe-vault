@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.49.4](https://github.com/maidsafe/sn_node/compare/v0.49.3...v0.49.4) (2021-06-17)
+
+
+### Bug Fixes
+
+* **logger:** fix logger configuration ([fd74565](https://github.com/maidsafe/sn_node/commit/fd745655a96b3c22e76f92574285d8551d3fa919))
+
 ### [0.49.3](https://github.com/maidsafe/sn_node/compare/v0.49.2...v0.49.3) (2021-06-17)
 
 
