@@ -80,7 +80,13 @@ async fn run_node() {
         return;
     }
 
-    utils::init_logging(&config);
+    match utils::init_logging(&config) {
+        Ok(()) => (),
+        Err(e) => {
+            println!("Error setting up logging {:?}", e);
+            return exit(1);
+        }
+    }
 
     if config.update() || config.update_only() {
         match update() {
