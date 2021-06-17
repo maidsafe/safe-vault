@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.49.7](https://github.com/maidsafe/sn_node/compare/v0.49.6...v0.49.7) (2021-06-17)
+
+
+### Bug Fixes
+
+* **bin:** log the node's addr the network failed to connect as part of the connectivit test ([8b6a409](https://github.com/maidsafe/sn_node/commit/8b6a409d37d8a12973d6dc77650ea0e4873f2ef7))
+
 ### [0.49.6](https://github.com/maidsafe/sn_node/compare/v0.49.5...v0.49.6) (2021-06-17)
 
 ### [0.49.5](https://github.com/maidsafe/sn_node/compare/v0.49.4...v0.49.5) (2021-06-17)
