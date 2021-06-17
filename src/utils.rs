@@ -121,11 +121,7 @@ pub fn init_logging(config: &Config) -> Result<()> {
         );
 
     let logger = if let Some(log_dir) = config.log_dir() {
-        logger.log_to_file(
-            FileSpec::try_from(log_dir)
-                .map_err(|e| Error::Configuration(format!("{:?}", e)))?
-                .suppress_timestamp(),
-        )
+        logger.log_to_file(FileSpec::default().directory(log_dir).suppress_timestamp())
     } else {
         logger
     };
