@@ -125,17 +125,17 @@ async fn run_node() {
                 tokio::time::sleep(tokio::time::Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60))
                     .await;
             }
-            Err(sn_node::Error::Routing(sn_routing::Error::NodeNotReachable(_))) => {
-                println!("Unfortunately we are unable to establish a connection to your machine either through a \
-                public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
-                if it is and you are still unable to add your node to the testnet, then skip adding a node for this \
-                testnet iteration. You can still use the testnet as a client, uploading and downloading content, etc. \
-                https://safenetforum.org/");
-                error!("Unfortunately we are unable to establish a connection to your machine either through a \
-                public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
-                if it is and you are still unable to add your node to the testnet, then skip adding a node for this \
-                testnet iteration. You can still use the testnet as a client, uploading and downloading content, etc. \
-                https://safenetforum.org/");
+            Err(sn_node::Error::Routing(sn_routing::Error::NodeNotReachable(addr))) => {
+                let err_msg = format!(
+                    "Unfortunately we are unable to establish a connection to your machine ({}) either through a \
+                    public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
+                    if it is and you are still unable to add your node to the testnet, then skip adding a node for this \
+                    testnet iteration. You can still use the testnet as a client, uploading and downloading content, etc. \
+                    https://safenetforum.org/",
+                    addr
+                );
+                println!("{}", err_msg);
+                error!("{}", err_msg);
                 exit(1);
             }
             Err(e) => {
