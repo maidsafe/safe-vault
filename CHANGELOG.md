@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.49.3](https://github.com/maidsafe/sn_node/compare/v0.49.2...v0.49.3) (2021-06-17)
+
+
+### Features
+
+* **logs:** update flexi_logger and introduce log rotation ([2930da5](https://github.com/maidsafe/sn_node/commit/2930da560c261c24b28659c53ffc970a7a025487))
+
+
+### Bug Fixes
+
+* use tokio 1.6, 1.7 seems buggy ([bf4423f](https://github.com/maidsafe/sn_node/commit/bf4423f39eba2343d66cbfcec839c60cf4582744))
+
 ### [0.49.2](https://github.com/maidsafe/sn_node/compare/v0.49.1...v0.49.2) (2021-06-16)
 
 ### [0.49.1](https://github.com/maidsafe/sn_node/compare/v0.49.0...v0.49.1) (2021-06-16)
