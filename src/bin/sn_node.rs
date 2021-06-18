@@ -138,6 +138,11 @@ async fn run_node() {
                 error!("{}", err_msg);
                 exit(1);
             }
+            Err(sn_node::Error::JoinTimeout) => {
+                println!("Encountered a timeout while trying to join the network. Please try again later.");
+                error!("Encountered a timeout while trying to join the network. Please try again later.");
+                exit(1);
+            }
             Err(e) => {
                 println!("Cannot start node due to error: {:?}. If this is the first node on the network \
                  pass the local address to be used using --first. Exiting", e);

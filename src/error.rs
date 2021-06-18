@@ -169,6 +169,9 @@ pub enum Error {
     /// Logic error.
     #[error("Logic error: {0}")]
     Logic(String),
+    /// Timeout errors
+    #[error("Timeout when trying to join the network")]
+    JoinTimeout,
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
