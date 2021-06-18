@@ -34,6 +34,7 @@ use sn_routing::{
     EventStream, {Prefix, XorName},
 };
 use std::sync::Arc;
+use std::time::Duration;
 use std::{
     fmt::{self, Display, Formatter},
     net::SocketAddr,
@@ -41,6 +42,8 @@ use std::{
 };
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+
+const JOINING_TIMEOUT: u64 = 180; // 180 seconds
 
 /// Static info about the node.
 #[derive(Clone)]
@@ -83,7 +86,12 @@ impl Node {
             }
         };
 
-        let (network_api, network_events) = Network::new(root_dir, config).await?;
+        let (network_api, network_events) = tokio::time::timeout(
+            Duration::from_secs(JOINING_TIMEOUT),
+            Network::new(root_dir, config),
+        )
+        .await
+        .map_err(|_| Error::JoinTimeout)??;
 
         let node_info = NodeInfo {
             root_dir: root_dir_buf,
