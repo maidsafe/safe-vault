@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.49.8](https://github.com/maidsafe/sn_node/compare/v0.49.7...v0.49.8) (2021-06-18)
+
+
+### Features
+
+* **network:** add timeout on initializing routing ([ccc1982](https://github.com/maidsafe/sn_node/commit/ccc1982a6bd478c01bef6db9e4ed80a2ab7aab1d))
+
 ### [0.49.7](https://github.com/maidsafe/sn_node/compare/v0.49.6...v0.49.7) (2021-06-17)
 
 
