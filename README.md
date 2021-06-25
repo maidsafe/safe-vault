@@ -1,3 +1,8 @@
+## **PLEASE NOTE THAT THIS REPOSITORY HAS NOW BEEN ARCHIVED**
+### All node development is now via the [safe_network](https://github.com/maidsafe/safe_network) repository
+
+#
+
 # sn_node
 
 |Crate|Documentation|Safe Rust|
